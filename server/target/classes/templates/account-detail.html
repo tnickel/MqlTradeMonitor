@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor'">Account Detail - Trade Monitor</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        /* Filter Buttons */
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            border-color: var(--accent-primary);
+        }
+
+        .trade-comment {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Zurück zum Dashboard</a>
+            <h1>
+                <span th:text="${account.accountId}">12345</span>
+                <span th:class="${online ? 'status-badge online' : 'status-badge offline'}"
+                    th:text="${online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+            </h1>
+            <p class="subtitle" th:text="${account.broker}">Broker Name</p>
+        </header>
+
+        <div class="account-summary">
+            <div class="summary-card">
+                <span class="summary-label">Balance</span>
+                <span class="summary-value"
+                    th:text="${#numbers.formatDecimal(account.balance, 1, 2)} + ' ' + ${account.currency}">10,000.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Equity</span>
+                <span class="summary-value"
+                    th:text="${#numbers.formatDecimal(account.equity, 1, 2)} + ' ' + ${account.currency}">10,500.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Floating P/L</span>
+                <span
+                    th:class="${account.totalProfit >= 0 ? 'summary-value profit-positive' : 'summary-value profit-negative'}"
+                    th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)} + ' ' + ${account.currency}">+500.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Open Trades</span>
+                <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
+            </div>
+        </div>
+
+        <!-- ======= OPEN TRADES (paginated) ======= -->
+        <section class="trades-section">
+            <h2>📈 Offene Positionen</h2>
+
+            <div th:if="${#lists.size(account.openTrades) == 0}" class="no-trades">
+                <p>Keine offenen Positionen</p>
+            </div>
+
+            <div th:if="${#lists.size(account.openTrades) > 0}" class="paginated-table-wrapper"
+                id="open-trades-wrapper">
+                <table class="trades-table" id="open-trades-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Typ</th>
+                            <th>Volume</th>
+                            <th>Open Price</th>
+                            <th>S/L</th>
+                            <th>T/P</th>
+                            <th>Swap</th>
+                            <th>Profit</th>
+                            <th>Magic</th>
+                            <th>Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="trade : ${account.openTrades}">
+                            <td th:text="${trade.ticket}">123456789</td>
+                            <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                            <td>
+                                <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                    th:text="${trade.type}">BUY</span>
+                            </td>
+                            <td th:text="${trade.volume}">0.10</td>
+                            <td th:text="${trade.openPrice}">1.08500</td>
+                            <td th:text="${trade.stopLoss}">1.08000</td>
+                            <td th:text="${trade.takeProfit}">1.09000</td>
+                            <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                            <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                            <td th:text="${trade.magicNumber}">12345</td>
+                            <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination-bar" id="open-trades-pagination"></div>
+            </div>
+        </section>
+
+        <!-- ======= MAGIC NUMBER PROFIT BREAKDOWN ======= -->
+        <section class="trades-section magic-breakdown" th:if="${#lists.size(magicProfits) > 0}">
+            <h2>📊 Gewinn pro Magic Number</h2>
+
+            <table class="trades-table">
+                <thead>
+                    <tr>
+                        <th>Magic Number</th>
+                        <th>Offene Trades</th>
+                        <th>Float. P/L</th>
+                        <th>Geschl. Trades</th>
+                        <th>Real. P/L</th>
+                        <th>Gesamt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="mp : ${magicProfits}">
+                        <td><strong th:text="${mp.magicNumber}">12345</strong></td>
+                        <td th:text="${mp.openTradeCount}">3</td>
+                        <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                            th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
+                        <td th:text="${mp.closedTradeCount}">10</td>
+                        <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                            th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
+                        <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                            th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ======= MAGIC NUMBER PROFIT CURVES ======= -->
+        <section class="trades-section magic-charts" th:if="${magicCurveJson != '{}'}">
+            <h2>📈 Gewinnkurven pro Magic Number</h2>
+            <div id="magic-charts-container"></div>
+        </section>
+
+        <!-- Fullscreen chart modal -->
+        <div id="chart-modal" class="chart-modal">
+            <div class="chart-modal-content">
+                <button class="chart-modal-close" id="chart-modal-close">✕</button>
+                <h2 id="chart-modal-title" class="chart-modal-title"></h2>
+                <div class="chart-modal-canvas-wrap">
+                    <canvas id="chart-modal-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
+        <section class="trades-section history-section">
+            <h2>📜 Trade Historie</h2>
+
+            <div class="filter-bar" id="history-filter-bar">
+                <button class="filter-btn active" data-range="today">Heute</button>
+                <button class="filter-btn" data-range="1week">1 Woche</button>
+                <button class="filter-btn" data-range="1month">1 Monat</button>
+                <button class="filter-btn" data-range="6months">6 Monate</button>
+                <button class="filter-btn" data-range="thisyear">Dieses Jahr</button>
+                <button class="filter-btn" data-range="1year">1 Jahr</button>
+                <button class="filter-btn" data-range="all">Alles</button>
+            </div>
+
+            <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
+                <p>Keine geschlossenen Trades vorhanden</p>
+            </div>
+
+            <div class="history-summary" id="history-summary" th:if="${#lists.size(account.closedTrades) > 0}">
+                <span>Angezeigt: <strong id="visible-trades-count">0</strong> Trades</span>
+                <span id="visible-profit-label" class="profit-positive">
+                    Profit: <strong id="visible-profit-amount">0.00</strong> <span
+                        th:text="${account.currency}">EUR</span>
+                </span>
+            </div>
+
+            <div th:if="${#lists.size(account.closedTrades) > 0}" class="paginated-table-wrapper"
+                id="closed-trades-wrapper">
+                <table class="trades-table" id="closed-trades-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Typ</th>
+                            <th>Volume</th>
+                            <th>Close Time</th>
+                            <th>Close Price</th>
+                            <th>Swap</th>
+                            <th>Commission</th>
+                            <th>Profit</th>
+                            <th>Magic</th>
+                            <th>Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Loop all closed trades, rows will be filtered by JS -->
+                        <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}">
+                            <td th:text="${trade.ticket}">123456789</td>
+                            <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                            <td>
+                                <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                    th:text="${trade.type}">BUY</span>
+                            </td>
+                            <td th:text="${trade.volume}">0.10</td>
+                            <td th:text="${trade.closeTime}">2026-02-09 10:30:00</td>
+                            <td th:text="${trade.closePrice}">1.08600</td>
+                            <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                            <td th:text="${#numbers.formatDecimal(trade.commission, 1, 2)}">-0.70</td>
+                            <td class="profit-cell" th:data-profit="${trade.profit}"
+                                th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                            <td th:text="${trade.magicNumber}">12345</td>
+                            <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination-bar" id="closed-trades-pagination"></div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Letzte Aktualisierung: <span th:text="${account.lastSeen}">2026-02-09
+                    20:30:00</span></p>
+        </footer>
+    </div>
+
+    <script th:inline="javascript">
+        // ============ TABLE MANAGER: FILTERING + PAGINATION ============
+
+        function TableManager(tableId, paginationId, summaryId) {
+            this.table = document.getElementById(tableId);
+            this.paginationBar = document.getElementById(paginationId);
+            this.pageSize = 30;
+            this.currentPage = 1;
+            this.allRows = [];
+
+            if (this.table) {
+                this.allRows = Array.from(this.table.querySelectorAll('tbody tr'));
+            }
+            this.filteredRows = this.allRows; // initially all
+        }
+
+        TableManager.prototype.applyFilter = function (filterFn) {
+            if (!this.table) return;
+
+            // Filter all rows
+            this.filteredRows = [];
+            var totalProfit = 0.0;
+
+            this.allRows.forEach(row => {
+                var visible = true;
+                if (filterFn) {
+                    visible = filterFn(row);
+                }
+                if (visible) {
+                    this.filteredRows.push(row);
+                    // Sum profit if history table
+                    var profitCell = row.querySelector('.profit-cell');
+                    if (profitCell) {
+                        var val = parseFloat(profitCell.dataset.profit || 0);
+                        totalProfit += val;
+                    }
+                }
+            });
+
+            // Update summary if exists
+            var countEl = document.getElementById('visible-trades-count');
+            var profitAmtEl = document.getElementById('visible-profit-amount');
+            var profitLbl = document.getElementById('visible-profit-label');
+
+            if (countEl && profitAmtEl && profitLbl) {
+                countEl.textContent = this.filteredRows.length;
+                profitAmtEl.textContent = totalProfit.toFixed(2);
+                profitLbl.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+            }
+
+            this.showPage(1);
+        };
+
+        TableManager.prototype.showPage = function (page) {
+            if (!this.table) return;
+
+            this.currentPage = page;
+            var totalPages = Math.ceil(this.filteredRows.length / this.pageSize);
+            if (totalPages === 0) totalPages = 1;
+            if (this.currentPage > totalPages) this.currentPage = totalPages;
+
+            // Hide all first
+            this.allRows.forEach(r => r.style.display = 'none');
+
+            // Show current page of filtered rows
+            var start = (this.currentPage - 1) * this.pageSize;
+            var end = start + this.pageSize;
+
+            for (var i = start; i < end && i < this.filteredRows.length; i++) {
+                this.filteredRows[i].style.display = '';
+            }
+
+            this.renderPagination(totalPages);
+        };
+
+        TableManager.prototype.renderPagination = function (totalPages) {
+            if (!this.paginationBar) return;
+
+            // Hide pagination if no pages needed (or minimal)
+            if (this.filteredRows.length <= this.pageSize) {
+                this.paginationBar.style.display = 'none';
+                return;
+            }
+            this.paginationBar.style.display = 'flex';
+            this.paginationBar.innerHTML = '';
+
+            // Left arrow
+            var leftBtn = document.createElement('button');
+            leftBtn.className = 'page-btn' + (this.currentPage <= 1 ? ' disabled' : '');
+            leftBtn.innerHTML = '◀';
+            leftBtn.disabled = this.currentPage <= 1;
+            leftBtn.onclick = () => {
+                if (this.currentPage > 1) this.showPage(this.currentPage - 1);
+            };
+            this.paginationBar.appendChild(leftBtn);
+
+            // Page info
+            var info = document.createElement('span');
+            info.className = 'page-info';
+            info.textContent = 'Seite ' + this.currentPage + ' / ' + totalPages +
+                ' (' + this.filteredRows.length + ' Trades)';
+            this.paginationBar.appendChild(info);
+
+            // Right arrow
+            var rightBtn = document.createElement('button');
+            rightBtn.className = 'page-btn' + (this.currentPage >= totalPages ? ' disabled' : '');
+            rightBtn.innerHTML = '▶';
+            rightBtn.disabled = this.currentPage >= totalPages;
+            rightBtn.onclick = () => {
+                if (this.currentPage < totalPages) this.showPage(this.currentPage + 1);
+            };
+            this.paginationBar.appendChild(rightBtn);
+        };
+
+        // Initialize managers
+        var openTradesMgr, historyMgr;
+
+        // Storage key
+        var accountId = /*[[${account.accountId}]]*/ '0';
+        var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Open trades: simple pagination, no filtering (always show all open)
+            openTradesMgr = new TableManager('open-trades-table', 'open-trades-pagination', null);
+            openTradesMgr.applyFilter(null); // Just init
+
+            // History trades: Setup filters
+            historyMgr = new TableManager('closed-trades-table', 'closed-trades-pagination', 'history-summary');
+
+            // Restore filter
+            var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'today';
+
+            // Filter click handlers
+            var btns = document.querySelectorAll('.filter-btn');
+            btns.forEach(btn => {
+                // Set initial active state
+                var range = btn.dataset.range;
+                if (range === savedFilter) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+
+                btn.addEventListener('click', function () {
+                    // Update active class
+                    btns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    var r = this.dataset.range;
+                    localStorage.setItem(STORAGE_KEY_FILTER, r);
+                    applyHistoryFilter(r);
+                });
+            });
+
+            // Default filter: Saved or Today
+            applyHistoryFilter(savedFilter);
+        });
+
+        function applyHistoryFilter(range) {
+            if (!historyMgr) return;
+
+            var now = new Date();
+            // Reset time part for accurate day comparisons
+            var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+            historyMgr.applyFilter(function (row) {
+                var closeTimeStr = row.dataset.closeTime; // "2026-02-09 10:30:00"
+                if (!closeTimeStr) return false;
+
+                // Parse "yyyy-MM-dd HH:mm:ss" or "yyyy.MM.dd HH:mm:ss"
+                var t = closeTimeStr.split(/[- :.]/);
+
+                // DEBUG: Show first timestamp
+                if (!window.debugDateShown) {
+                    var debugMsg = "DEBUG: Raw='" + closeTimeStr + "' Split=" + JSON.stringify(t);
+                    var testDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    debugMsg += " Parsed=" + testDate;
+
+                    var dDiv = document.getElementById('debug-date-display');
+                    if (!dDiv) {
+                        dDiv = document.createElement('div');
+                        dDiv.id = 'debug-date-display';
+                        dDiv.style.background = '#333';
+                        dDiv.style.color = '#ff5555';
+                        dDiv.style.padding = '10px';
+                        dDiv.style.textAlign = 'center';
+                        dDiv.style.fontWeight = 'bold';
+                        document.body.insertBefore(dDiv, document.body.firstChild);
+                    }
+                    dDiv.textContent = debugMsg;
+                    window.debugDateShown = true;
+                }
+
+                // new Date(year, monthIndex, day, hours, minutes, seconds)
+                var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                var tradeTs = tradeDate.getTime();
+
+                switch (range) {
+                    case 'today':
+                        return tradeTs >= todayStart;
+                    case '1week':
+                        return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
+                    case '1month':
+                        var m = new Date(now);
+                        m.setMonth(now.getMonth() - 1);
+                        return tradeTs >= m.getTime();
+                    case '6months':
+                        var m6 = new Date(now);
+                        m6.setMonth(now.getMonth() - 6);
+                        return tradeTs >= m6.getTime();
+                    case 'thisyear':
+                        var y = new Date(now.getFullYear(), 0, 1);
+                        return tradeTs >= y.getTime();
+                    case '1year':
+                        var y1 = new Date(now);
+                        y1.setFullYear(now.getFullYear() - 1);
+                        return tradeTs >= y1.getTime();
+                    case 'all':
+                    default:
+                        return true;
+                }
+            });
+        }
+
+
+        // ============ CHART.JS: MAGIC PROFIT CURVES ============
+        (function () {
+            var curveData = /*[[${magicCurveJson}]]*/ '{}';
+            if (typeof curveData === 'string') {
+                curveData = JSON.parse(curveData);
+            }
+
+            var container = document.getElementById('magic-charts-container');
+            if (!container) return;
+
+            // Color palette for charts
+            var colors = [
+                { line: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
+                { line: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+                { line: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+                { line: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+                { line: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
+                { line: '#ec4899', bg: 'rgba(236,72,153,0.15)' },
+                { line: '#14b8a6', bg: 'rgba(20,184,166,0.15)' },
+                { line: '#f97316', bg: 'rgba(249,115,22,0.15)' }
+            ];
+
+            var idx = 0;
+            for (var magic in curveData) {
+                if (!curveData.hasOwnProperty(magic)) continue;
+                var d = curveData[magic];
+                if (!d.labels || d.labels.length === 0) continue;
+
+                var colorSet = colors[idx % colors.length];
+                idx++;
+
+                // Build chart label with comment
+                var commentText = d.comment || '';
+                var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
+
+                // Create chart wrapper
+                var wrapper = document.createElement('div');
+                wrapper.className = 'chart-card';
+                wrapper.style.cursor = 'pointer';
+                wrapper.dataset.magic = magic;
+                wrapper.dataset.colorLine = colorSet.line;
+                wrapper.dataset.colorBg = colorSet.bg;
+                wrapper.dataset.chartLabel = chartLabel;
+
+                var title = document.createElement('h3');
+                title.className = 'chart-title';
+                title.textContent = chartLabel;
+                wrapper.appendChild(title);
+
+                var canvasWrap = document.createElement('div');
+                canvasWrap.className = 'chart-container';
+                var canvas = document.createElement('canvas');
+                canvasWrap.appendChild(canvas);
+                wrapper.appendChild(canvasWrap);
+                container.appendChild(wrapper);
+
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: d.labels,
+                        datasets: [{
+                            label: chartLabel,
+                            data: d.data,
+                            borderColor: colorSet.line,
+                            backgroundColor: colorSet.bg,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#a0a0c0', font: { size: 11 } }
+                            },
+                            tooltip: {
+                                backgroundColor: '#252542',
+                                titleColor: '#ffffff',
+                                bodyColor: '#a0a0c0',
+                                borderColor: '#3f3f5f',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#6b6b8f', maxRotation: 45, maxTicksLimit: 10, font: { size: 9 } },
+                                grid: { color: 'rgba(63,63,95,0.3)' }
+                            },
+                            y: {
+                                ticks: { color: '#6b6b8f', font: { size: 10 } },
+                                grid: { color: 'rgba(63,63,95,0.3)' }
+                            }
+                        }
+                    }
+                });
+
+                // Click handler to open fullscreen
+                (function (m, cl, cb, lbl, lbls, dt) {
+                    wrapper.addEventListener('click', function () {
+                        openChartModal(m, cl, cb, lbl, lbls, dt);
+                    });
+                })(magic, colorSet.line, colorSet.bg, chartLabel, d.labels, d.data);
+            }
+        })();
+
+        // ============ FULLSCREEN CHART MODAL ============
+        var modalChart = null;
+        function openChartModal(magic, lineColor, bgColor, label, labels, data) {
+            var modal = document.getElementById('chart-modal');
+            var titleEl = document.getElementById('chart-modal-title');
+            var canvas = document.getElementById('chart-modal-canvas');
+
+            titleEl.textContent = label;
+            modal.classList.add('visible');
+
+            if (modalChart) { modalChart.destroy(); }
+
+            modalChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: lineColor,
+                        backgroundColor: bgColor,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        borderWidth: 2.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#a0a0c0', font: { size: 14 } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#252542',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#3f3f5f',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#6b6b8f', maxRotation: 45, maxTicksLimit: 20, font: { size: 11 } },
+                            grid: { color: 'rgba(63,63,95,0.3)' }
+                        },
+                        y: {
+                            ticks: { color: '#6b6b8f', font: { size: 12 } },
+                            grid: { color: 'rgba(63,63,95,0.3)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeChartModal() {
+            var modal = document.getElementById('chart-modal');
+            modal.classList.remove('visible');
+            if (modalChart) { modalChart.destroy(); modalChart = null; }
+        }
+
+        document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
+        document.getElementById('chart-modal').addEventListener('click', function (e) {
+            if (e.target === this) closeChartModal();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeChartModal();
+        });
+    </script>
+</body>
+
+</html>

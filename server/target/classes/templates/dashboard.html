@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Monitor - Dashboard</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Trade Monitor</h1>
+            <p class="subtitle">MetaTrader Account Übersicht</p>
+        </header>
+        
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-value" th:text="${#lists.size(accounts)}">0</span>
+                <span class="stat-label">Accounts</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="online-count">0</span>
+                <span class="stat-label">Online</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="total-trades">0</span>
+                <span class="stat-label">Open Trades</span>
+            </div>
+        </div>
+
+        <div class="account-grid" th:if="${#lists.size(accounts) > 0}">
+            <div th:each="acc : ${accounts}" 
+                 th:class="${acc.online ? 'account-card online' : 'account-card offline'}">
+                <div class="account-header">
+                    <span class="account-id" th:text="${acc.accountId}">12345</span>
+                    <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
+                          th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                </div>
+                <div class="account-broker" th:text="${acc.broker}">Broker Name</div>
+                <div class="account-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Balance</span>
+                        <span class="metric-value" th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">10,000.00 USD</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Equity</span>
+                        <span class="metric-value" th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">10,500.00 USD</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Profit</span>
+                        <span th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                              th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+500.00 USD</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Open Trades</span>
+                        <span class="metric-value" th:text="${acc.trades}">5</span>
+                    </div>
+                </div>
+                <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details anzeigen →</a>
+            </div>
+        </div>
+        
+        <div class="no-accounts" th:if="${#lists.size(accounts) == 0}">
+            <div class="no-accounts-icon">📊</div>
+            <h2>Keine Accounts verbunden</h2>
+            <p>Starten Sie den TradeMonitorClient EA auf MetaTrader um sich zu verbinden.</p>
+            <div class="setup-instructions">
+                <h3>Setup Anleitung:</h3>
+                <ol>
+                    <li>Kopieren Sie <code>TradeMonitorClient.mq5</code> in Ihren MQL5/Experts Ordner</li>
+                    <li>Kompilieren Sie den EA im MetaEditor</li>
+                    <li>Fügen Sie <code>http://localhost:8080</code> zu den erlaubten URLs hinzu<br>
+                        (Tools → Optionen → Expert Advisors → WebRequest erlauben)</li>
+                    <li>Starten Sie den EA auf einem Chart</li>
+                </ol>
+            </div>
+        </div>
+
+        <footer>
+            <p>Auto-refresh alle 5 Sekunden | Timeout: <span th:text="${timeoutSeconds}">60</span>s</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-refresh page every 5 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 5000);
+        
+        // Calculate stats
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.account-card');
+            let online = 0;
+            let trades = 0;
+            
+            cards.forEach(function(card) {
+                if (card.classList.contains('online')) online++;
+                const tradeSpan = card.querySelector('.metric:nth-child(4) .metric-value');
+                if (tradeSpan) trades += parseInt(tradeSpan.textContent) || 0;
+            });
+            
+            document.getElementById('online-count').textContent = online;
+            document.getElementById('total-trades').textContent = trades;
+        });
+    </script>
+</body>
+</html>
