@@ -34,8 +34,12 @@
             <div th:each="acc : ${accounts}" th:class="${acc.online ? 'account-card online' : 'account-card offline'}">
                 <div class="account-header">
                     <span class="account-id" th:text="${acc.accountId}">12345</span>
-                    <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
-                        th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                        <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
+                            th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                        <span th:if="${!acc.online}" style="font-size: 0.75rem; color: #6b6b8f; margin-top: 4px;"
+                            th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024 12:00</span>
+                    </div>
                 </div>
                 <div class="account-broker" th:text="${acc.broker}">Broker Name</div>
                 <div class="account-metrics">

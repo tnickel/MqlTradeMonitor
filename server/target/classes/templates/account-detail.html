@@ -154,7 +154,13 @@
                 </thead>
                 <tbody>
                     <tr th:each="mp : ${magicProfits}">
-                        <td><strong th:text="${mp.magicNumber}">12345</strong></td>
+                        <td>
+                            <strong th:text="${mp.magicNumber}">12345</strong>
+                            <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
+                                style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;" th:text="${mp.magicName}">
+                                Strategy Name
+                            </div>
+                        </td>
                         <td th:text="${mp.openTradeCount}">3</td>
                         <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
                             th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
@@ -574,13 +580,96 @@
         })();
 
         // ============ FULLSCREEN CHART MODAL ============
+        // ============ FULLSCREEN CHART MODAL ============
         var modalChart = null;
+        var currentMagic = null;
+
         function openChartModal(magic, lineColor, bgColor, label, labels, data) {
+            currentMagic = magic;
             var modal = document.getElementById('chart-modal');
             var titleEl = document.getElementById('chart-modal-title');
             var canvas = document.getElementById('chart-modal-canvas');
 
-            titleEl.textContent = label;
+            // Setup Title Editing
+            // 1. Parse current comment from label "Magic 12345 — [Comment]"
+            var magicPrefix = 'Magic ' + magic;
+            var commentText = '';
+            if (label.indexOf('—') > 0) {
+                commentText = label.split('—')[1].trim();
+            }
+
+            titleEl.innerHTML = `
+                <span>${magicPrefix}</span>
+                <span id="modal-comment-display" style="margin-left: 10px; color: #a0a0c0; font-weight: normal;">${commentText ? '— ' + commentText : ''}</span>
+                <button id="modal-edit-btn" style="background: none; border: none; cursor: pointer; color: #6366f1; margin-left: 10px; font-size: 1.2rem;">✎</button>
+                <div id="modal-edit-form" style="display: none; margin-left: 10px;">
+                    <input type="text" id="modal-comment-input" value="${commentText}" placeholder="Kommentar..." 
+                           style="background: #1e1e38; border: 1px solid #3f3f5f; color: #ffffff; padding: 4px 8px; border-radius: 4px;">
+                    <button id="modal-save-btn" style="background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px;">💾</button>
+                    <button id="modal-cancel-btn" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px;">✕</button>
+                </div>
+            `;
+
+            // Elements
+            var editBtn = document.getElementById('modal-edit-btn');
+            var editForm = document.getElementById('modal-edit-form');
+            var commentDisplay = document.getElementById('modal-comment-display');
+            var input = document.getElementById('modal-comment-input');
+            var saveBtn = document.getElementById('modal-save-btn');
+            var cancelBtn = document.getElementById('modal-cancel-btn');
+
+            // Event Handlers
+            editBtn.onclick = function () {
+                editBtn.style.display = 'none';
+                commentDisplay.style.display = 'none';
+                editForm.style.display = 'inline-flex';
+                input.focus();
+            };
+
+            cancelBtn.onclick = function () {
+                editForm.style.display = 'none';
+                editBtn.style.display = 'inline';
+                commentDisplay.style.display = 'inline';
+                input.value = commentText; // reset
+            };
+
+            saveBtn.onclick = function () {
+                var newComment = input.value.trim();
+
+                // AJAX Save
+                var formData = new FormData();
+                formData.append('magicNumber', currentMagic);
+                formData.append('customComment', newComment);
+
+                fetch('/api/mapping', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            // Update UI locally
+                            commentText = newComment;
+                            commentDisplay.textContent = newComment ? '— ' + newComment : '';
+
+                            // Close edit mode
+                            editForm.style.display = 'none';
+                            editBtn.style.display = 'inline';
+                            commentDisplay.style.display = 'inline';
+
+                            // Update Chart Title/Lable in dataset if we want (optional, requires chart update)
+                            // Ideally we would reload the page or update the main list entry too. 
+                            // For now, modal update is enough feedback.
+                        } else {
+                            alert('Fehler beim Speichern');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Netzwerkfehler');
+                    });
+            };
+
+
             modal.classList.add('visible');
 
             if (modalChart) { modalChart.destroy(); }

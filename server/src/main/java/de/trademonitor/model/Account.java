@@ -125,14 +125,44 @@ public class Account {
      * Build a sorted list of per-magic-number profit entries,
      * combining open and closed trades.
      */
-    public List<MagicProfitEntry> getMagicProfitEntries() {
+    public List<MagicProfitEntry> getMagicProfitEntries(int maxAgeDays,
+            java.util.function.Function<Long, String> nameResolver) {
         // Collect all magic numbers from both open and closed trades
         Set<Long> allMagics = new TreeSet<>();
         openTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
         closedTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
 
         List<MagicProfitEntry> entries = new ArrayList<>();
+        LocalDateTime cutoffDate = maxAgeDays > 0 ? LocalDateTime.now().minusDays(maxAgeDays) : null;
+
         for (Long magic : allMagics) {
+            // Check if magic should be visible
+            boolean hasOpenTrades = openTrades.stream().anyMatch(t -> t.getMagicNumber() == magic);
+
+            if (!hasOpenTrades && cutoffDate != null) {
+                // Check age of most recent closed trade
+                Optional<String> maxCloseTime = closedTrades.stream()
+                        .filter(t -> t.getMagicNumber() == magic)
+                        .map(ClosedTrade::getCloseTime)
+                        .filter(Objects::nonNull)
+                        .max(String::compareTo);
+
+                if (maxCloseTime.isPresent()) {
+                    try {
+                        // The date format is likely "yyyy.MM.dd HH:mm:ss" or similar from MT5
+                        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter
+                                .ofPattern("yyyy.MM.dd HH:mm:ss");
+                        LocalDateTime closeTime = LocalDateTime.parse(maxCloseTime.get(), formatter);
+                        if (closeTime.isBefore(cutoffDate)) {
+                            continue; // Skip this magic number (too old)
+                        }
+                    } catch (java.time.format.DateTimeParseException e) {
+                        // If parsing fails, don't filter it out (safe fallback)
+                        System.err.println("Failed to parse date: " + maxCloseTime.get() + " - " + e.getMessage());
+                    }
+                }
+            }
+
             double openProfit = openTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(Trade::getProfit)
@@ -147,7 +177,30 @@ public class Account {
             int closedCount = (int) closedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
-            entries.add(new MagicProfitEntry(magic, openProfit, closedProfit, openCount, closedCount));
+
+            // Resolve name
+            String magicName = nameResolver != null ? nameResolver.apply(magic) : "";
+            if (magicName == null || magicName.isEmpty()) {
+                // Fallback: Try to find a comment from open trades
+                magicName = openTrades.stream()
+                        .filter(t -> t.getMagicNumber() == magic && t.getComment() != null
+                                && !t.getComment().isEmpty())
+                        .map(Trade::getComment)
+                        .findFirst()
+                        .orElse("");
+                // Fallback: Try closed trades
+                if (magicName.isEmpty()) {
+                    magicName = closedTrades.stream()
+                            .filter(t -> t.getMagicNumber() == magic && t.getComment() != null
+                                    && !t.getComment().isEmpty())
+                            .map(ClosedTrade::getComment)
+                            .findFirst()
+                            .orElse("");
+                }
+            }
+
+            entries.add(
+                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, openCount, closedCount));
         }
         return entries;
     }

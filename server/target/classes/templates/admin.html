@@ -30,6 +30,60 @@
             </div>
         </div>
 
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🔧 Globale Konfiguration</h2>
+            <form action="/admin/config" method="post"
+                style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
+                <div class="form-group">
+                    <label for="magicNumberMaxAge" style="color: #8b949e; margin-right: 10px;">Magic Numbers max. Alter
+                        (Tage):</label>
+                    <input type="number" id="magicNumberMaxAge" name="magicNumberMaxAge"
+                        th:value="${magicMaxAgeByConfig}" min="0"
+                        style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 5px 10px; border-radius: 4px;">
+                </div>
+                <button type="submit"
+                    style="background-color: #238636; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                <div style="color: #8b949e; font-size: 0.9rem; margin-left: auto;">
+                    (0 = keine Filterung)
+                </div>
+            </form>
+        </div>
+
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">📝 Magic Number Mappings</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">Hier können benutzerdefinierte Namen für Magic Numbers
+                hinterlegt werden.</p>
+
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="text-align: left; background-color: #0d1117; color: #8b949e;">
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Magic Number</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Kommentar (Custom)</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="mapping : ${magicMappings}" style="border-bottom: 1px solid #2a2e39;">
+                        <td th:text="${mapping.key}" style="padding: 10px; color: #c9d1d9;">12345</td>
+                        <td style="padding: 10px;">
+                            <form th:action="@{/admin/mapping}" method="post"
+                                style="display: flex; gap: 10px; width: 100%;">
+                                <input type="hidden" name="magicNumber" th:value="${mapping.key}">
+                                <input type="text" name="customComment" th:value="${mapping.value}"
+                                    style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; width: 100%;">
+                                <button type="submit"
+                                    style="background-color: #1f6feb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">💾</button>
+                            </form>
+                        </td>
+                        <td style="padding: 10px; color: #8b949e; font-size: 0.9rem;">
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <div class="admin-table-container" th:if="${#lists.size(statsList) > 0}">
             <table class="admin-table">
                 <thead>

@@ -14,4 +14,6 @@ public interface OpenTradeRepository extends JpaRepository<OpenTradeEntity, Long
     void deleteByAccountId(long accountId);
 
     long countByAccountId(long accountId);
+
+    java.util.Optional<OpenTradeEntity> findFirstByMagicNumber(Long magicNumber);
 }

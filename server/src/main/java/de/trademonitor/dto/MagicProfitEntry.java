@@ -8,12 +8,14 @@ public class MagicProfitEntry {
     private double openProfit;
     private double closedProfit;
     private double totalProfit;
+    private String magicName;
     private int openTradeCount;
     private int closedTradeCount;
 
-    public MagicProfitEntry(long magicNumber, double openProfit, double closedProfit,
+    public MagicProfitEntry(long magicNumber, String magicName, double openProfit, double closedProfit,
             int openTradeCount, int closedTradeCount) {
         this.magicNumber = magicNumber;
+        this.magicName = magicName;
         this.openProfit = openProfit;
         this.closedProfit = closedProfit;
         this.totalProfit = openProfit + closedProfit;
@@ -23,6 +25,10 @@ public class MagicProfitEntry {
 
     public long getMagicNumber() {
         return magicNumber;
+    }
+
+    public String getMagicName() {
+        return magicName;
     }
 
     public double getOpenProfit() {

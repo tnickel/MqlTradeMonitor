@@ -36,6 +36,12 @@ public class DashboardController {
     @Autowired
     private OpenTradeRepository openTradeRepository;
 
+    @Autowired
+    private de.trademonitor.service.GlobalConfigService globalConfigService;
+
+    @Autowired
+    private de.trademonitor.service.MagicMappingService magicMappingService;
+
     /**
      * Main dashboard showing all accounts.
      */
@@ -89,7 +95,65 @@ public class DashboardController {
         model.addAttribute("totalAccounts", accounts.size());
         model.addAttribute("totalOpenTrades", totalOpen);
         model.addAttribute("totalClosedTrades", totalClosed);
+
+        // Add global config
+        model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
+
+        // Magic Mappings
+        // 1. Collect all magic numbers from DB (Closed + Open) to ensure we have
+        // mappings for all
+        Set<Long> allMagics = new HashSet<>();
+        closedTradeRepository.findAll().forEach(t -> allMagics.add(t.getMagicNumber()));
+        openTradeRepository.findAll().forEach(t -> allMagics.add(t.getMagicNumber()));
+
+        // 2. Ensure mappings exist (auto-create with default comment from trades)
+        magicMappingService.ensureMappingsExist(new ArrayList<>(allMagics), magic -> {
+            // Try to find a name from existing trades
+            String name = openTradeRepository.findFirstByMagicNumber(magic)
+                    .map(de.trademonitor.entity.OpenTradeEntity::getComment).orElse(null);
+            if (name == null) {
+                name = closedTradeRepository.findFirstByMagicNumber(magic)
+                        .map(de.trademonitor.entity.ClosedTradeEntity::getComment).orElse(null);
+            }
+            return name;
+        });
+
+        // 3. Load all mappings for UI
+        model.addAttribute("magicMappings", magicMappingService.getAllMappings());
+
         return "admin";
+    }
+
+    /**
+     * Update magic mapping.
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/admin/mapping")
+    public String updateMapping(@org.springframework.web.bind.annotation.RequestParam("magicNumber") Long magicNumber,
+            @org.springframework.web.bind.annotation.RequestParam("customComment") String customComment) {
+        magicMappingService.saveMapping(magicNumber, customComment);
+        return "redirect:/admin";
+    }
+
+    /**
+     * AJAX Endpoint to update magic mapping.
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/api/mapping")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<String> updateMappingAjax(
+            @org.springframework.web.bind.annotation.RequestParam("magicNumber") Long magicNumber,
+            @org.springframework.web.bind.annotation.RequestParam("customComment") String customComment) {
+        magicMappingService.saveMapping(magicNumber, customComment);
+        return org.springframework.http.ResponseEntity.ok("Saved");
+    }
+
+    /**
+     * Update global configuration.
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/admin/config")
+    public String updateConfig(
+            @org.springframework.web.bind.annotation.RequestParam("magicNumberMaxAge") int magicNumberMaxAge) {
+        globalConfigService.setMagicNumberMaxAge(magicNumberMaxAge);
+        return "redirect:/admin";
     }
 
     /**
@@ -103,10 +167,16 @@ public class DashboardController {
         }
         model.addAttribute("account", account);
         model.addAttribute("online", account.isOnline(accountManager.getTimeoutSeconds()));
-        model.addAttribute("magicProfits", account.getMagicProfitEntries());
+
+        int maxAge = globalConfigService.getMagicNumberMaxAge();
+        Map<Long, String> mappings = magicMappingService.getAllMappings();
+
+        // Pass resolver to getMagicProfitEntries
+        model.addAttribute("magicProfits", account.getMagicProfitEntries(maxAge, mappings::get));
+        model.addAttribute("magicMaxAge", maxAge);
 
         // Build magic curve data as JSON for Chart.js
-        model.addAttribute("magicCurveJson", buildMagicCurveJson(account));
+        model.addAttribute("magicCurveJson", buildMagicCurveJson(account, maxAge, mappings));
 
         return "account-detail";
     }
@@ -116,14 +186,44 @@ public class DashboardController {
      * Format: { "12345": { "labels": ["2026-01-01 10:00", ...], "data": [10.5,
      * 25.3, ...] }, ... }
      */
-    private String buildMagicCurveJson(Account account) {
+    private String buildMagicCurveJson(Account account, int maxAgeDays, Map<Long, String> mappings) {
         try {
             // Group closed trades by magic number
             Map<Long, List<ClosedTrade>> byMagic = account.getClosedTrades().stream()
                     .collect(Collectors.groupingBy(ClosedTrade::getMagicNumber));
 
+            java.time.LocalDateTime cutoffDate = maxAgeDays > 0 ? java.time.LocalDateTime.now().minusDays(maxAgeDays)
+                    : null;
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter
+                    .ofPattern("yyyy.MM.dd HH:mm:ss");
+
             Map<String, Object> result = new LinkedHashMap<>();
             for (Map.Entry<Long, List<ClosedTrade>> entry : new TreeMap<>(byMagic).entrySet()) {
+                Long magic = entry.getKey();
+
+                // Filtering Logic (same as in Account.getMagicProfitEntries)
+                boolean hasOpenTrades = account.getOpenTrades().stream().anyMatch(t -> t.getMagicNumber() == magic);
+
+                if (!hasOpenTrades && cutoffDate != null) {
+                    List<ClosedTrade> trades = entry.getValue();
+                    Optional<String> maxCloseTime = trades.stream()
+                            .map(ClosedTrade::getCloseTime)
+                            .filter(Objects::nonNull)
+                            .max(String::compareTo);
+
+                    if (maxCloseTime.isPresent()) {
+                        try {
+                            java.time.LocalDateTime closeTime = java.time.LocalDateTime.parse(maxCloseTime.get(),
+                                    formatter);
+                            if (closeTime.isBefore(cutoffDate)) {
+                                continue; // Skip this magic number
+                            }
+                        } catch (java.time.format.DateTimeParseException e) {
+                            // Ignore parse errors
+                        }
+                    }
+                }
+
                 List<ClosedTrade> trades = entry.getValue();
                 // Sort by close time
                 trades.sort(Comparator.comparing(ClosedTrade::getCloseTime, Comparator.nullsLast(String::compareTo)));
@@ -132,12 +232,15 @@ public class DashboardController {
                 List<Double> data = new ArrayList<>();
                 double cumulative = 0;
 
-                // Find first non-empty comment for this magic
-                String comment = trades.stream()
-                        .map(ClosedTrade::getComment)
-                        .filter(c -> c != null && !c.isEmpty())
-                        .findFirst()
-                        .orElse("");
+                // Find first non-empty comment for this magic: CUSTOM MAPPING FIRST
+                String comment = mappings.getOrDefault(entry.getKey(), "");
+                if (comment == null || comment.isEmpty()) {
+                    comment = trades.stream()
+                            .map(ClosedTrade::getComment)
+                            .filter(c -> c != null && !c.isEmpty())
+                            .findFirst()
+                            .orElse("");
+                }
 
                 for (ClosedTrade t : trades) {
                     cumulative += t.getProfit();
