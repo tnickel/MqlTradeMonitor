@@ -9,7 +9,7 @@
     "openTime" : "2026.02.03 16:00:00",
     "stopLoss" : 1.33857,
     "takeProfit" : 0.0,
-    "profit" : -2.09,
+    "profit" : -2.13,
     "swap" : -0.1,
     "magicNumber" : 8025,
     "comment" : "StochGridKi"
@@ -22,7 +22,7 @@
     "openTime" : "2026.02.05 00:01:30",
     "stopLoss" : 1.33736,
     "takeProfit" : 0.0,
-    "profit" : -1.47,
+    "profit" : -1.51,
     "swap" : -0.03,
     "magicNumber" : 8025,
     "comment" : "StochGridKi"
@@ -35,7 +35,7 @@
     "openTime" : "2026.02.05 00:01:30",
     "stopLoss" : 1.33736,
     "takeProfit" : 0.0,
-    "profit" : -1.47,
+    "profit" : -1.51,
     "swap" : -0.03,
     "magicNumber" : 8025,
     "comment" : "StochGridKi"
@@ -48,7 +48,7 @@
     "openTime" : "2026.02.05 00:01:30",
     "stopLoss" : 0.87617,
     "takeProfit" : 0.0,
-    "profit" : -9.25,
+    "profit" : -9.15,
     "swap" : 0.09,
     "magicNumber" : 8025,
     "comment" : "StochGridKi"
@@ -61,7 +61,7 @@
     "openTime" : "2026.02.05 01:00:01",
     "stopLoss" : 0.87643,
     "takeProfit" : 0.0,
-    "profit" : -7.88,
+    "profit" : -7.78,
     "swap" : 0.09,
     "magicNumber" : 8025,
     "comment" : "StochGridKi"
@@ -74,7 +74,7 @@
     "openTime" : "2026.02.06 18:43:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -13.1,
+    "profit" : -13.72,
     "swap" : 0.23,
     "magicNumber" : 2005,
     "comment" : "DerviUs500"
@@ -87,7 +87,7 @@
     "openTime" : "2026.02.06 18:53:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -0.5,
+    "profit" : -0.52,
     "swap" : 0.01,
     "magicNumber" : 2005,
     "comment" : "DerviUs500"
@@ -100,7 +100,7 @@
     "openTime" : "2026.02.09 18:31:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : 12.5,
+    "profit" : 9.79,
     "swap" : 0.25,
     "magicNumber" : 2005,
     "comment" : "DerviUs500"
@@ -113,7 +113,7 @@
     "openTime" : "2026.02.09 18:31:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : 0.1,
+    "profit" : 0.08,
     "swap" : 0.0,
     "magicNumber" : 2005,
     "comment" : "DerviUs500"
@@ -126,7 +126,7 @@
     "openTime" : "2026.02.10 02:21:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -50.82,
+    "profit" : -48.85,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -139,7 +139,7 @@
     "openTime" : "2026.02.10 02:21:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -1.59,
+    "profit" : -1.53,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -152,7 +152,7 @@
     "openTime" : "2026.02.10 05:50:01",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -9.12,
+    "profit" : -8.19,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -165,7 +165,7 @@
     "openTime" : "2026.02.10 10:37:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -0.4,
+    "profit" : -0.34,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -178,7 +178,7 @@
     "openTime" : "2026.02.10 11:52:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -11.81,
+    "profit" : -10.95,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -191,7 +191,7 @@
     "openTime" : "2026.02.10 13:01:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -11.95,
+    "profit" : -10.84,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -204,7 +204,7 @@
     "openTime" : "2026.02.10 14:30:00",
     "stopLoss" : 0.0,
     "takeProfit" : 154.907,
-    "profit" : -18.59,
+    "profit" : -17.33,
     "swap" : 0.0,
     "magicNumber" : 2013,
     "comment" : "JapanStrike"
@@ -217,7 +217,7 @@
     "openTime" : "2026.02.10 15:45:01",
     "stopLoss" : 0.0,
     "takeProfit" : 154.907,
-    "profit" : -10.99,
+    "profit" : -9.74,
     "swap" : 0.0,
     "magicNumber" : 2013,
     "comment" : "JapanStrike"
@@ -230,7 +230,7 @@
     "openTime" : "2026.02.10 16:01:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -0.27,
+    "profit" : -0.2,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -243,7 +243,7 @@
     "openTime" : "2026.02.10 16:01:00",
     "stopLoss" : 0.0,
     "takeProfit" : 0.0,
-    "profit" : -0.27,
+    "profit" : -0.2,
     "swap" : 0.0,
     "magicNumber" : 1096800361,
     "comment" : "Scalper Deriv V3.14"
@@ -256,7 +256,7 @@
     "openTime" : "2026.02.10 16:15:00",
     "stopLoss" : 0.0,
     "takeProfit" : 154.907,
-    "profit" : -4.3,
+    "profit" : -3.05,
     "swap" : 0.0,
     "magicNumber" : 2013,
     "comment" : "JapanStrike"
@@ -269,7 +269,7 @@
     "openTime" : "2026.02.10 16:30:00",
     "stopLoss" : 0.0,
     "takeProfit" : 154.907,
-    "profit" : 1.85,
+    "profit" : 3.1,
     "swap" : 0.0,
     "magicNumber" : 2013,
     "comment" : "JapanStrike"
@@ -282,12 +282,12 @@
     "openTime" : "2026.02.10 17:45:00",
     "stopLoss" : 0.0,
     "takeProfit" : 154.907,
-    "profit" : 7.65,
+    "profit" : 8.9,
     "swap" : 0.0,
     "magicNumber" : 2013,
     "comment" : "JapanStrike"
   } ],
-  "equity" : 35705.97,
+  "equity" : 35714.07,
   "balance" : 35839.23,
-  "timestamp" : "2026.02.10 20:57:12"
+  "timestamp" : "2026.02.10 21:09:15"
 }

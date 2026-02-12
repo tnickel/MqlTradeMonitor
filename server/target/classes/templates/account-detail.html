@@ -432,28 +432,6 @@
 
                 // Parse "yyyy-MM-dd HH:mm:ss" or "yyyy.MM.dd HH:mm:ss"
                 var t = closeTimeStr.split(/[- :.]/);
-
-                // DEBUG: Show first timestamp
-                if (!window.debugDateShown) {
-                    var debugMsg = "DEBUG: Raw='" + closeTimeStr + "' Split=" + JSON.stringify(t);
-                    var testDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
-                    debugMsg += " Parsed=" + testDate;
-
-                    var dDiv = document.getElementById('debug-date-display');
-                    if (!dDiv) {
-                        dDiv = document.createElement('div');
-                        dDiv.id = 'debug-date-display';
-                        dDiv.style.background = '#333';
-                        dDiv.style.color = '#ff5555';
-                        dDiv.style.padding = '10px';
-                        dDiv.style.textAlign = 'center';
-                        dDiv.style.fontWeight = 'bold';
-                        document.body.insertBefore(dDiv, document.body.firstChild);
-                    }
-                    dDiv.textContent = debugMsg;
-                    window.debugDateShown = true;
-                }
-
                 // new Date(year, monthIndex, day, hours, minutes, seconds)
                 var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
                 var tradeTs = tradeDate.getTime();

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Monitor - Admin</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Admin - Datenbank Übersicht</h1>
+            <p class="subtitle">Gespeicherte Trades pro Account</p>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-value" th:text="${totalAccounts}">0</span>
+                <span class="stat-label">Accounts</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" th:text="${totalOpenTrades}">0</span>
+                <span class="stat-label">Open Trades (DB)</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" th:text="${totalClosedTrades}">0</span>
+                <span class="stat-label">Closed Trades (DB)</span>
+            </div>
+        </div>
+
+        <div class="admin-table-container" th:if="${#lists.size(statsList) > 0}">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Account ID</th>
+                        <th>Broker</th>
+                        <th>Währung</th>
+                        <th>Open Trades</th>
+                        <th>Closed Trades</th>
+                        <th>Erster Trade</th>
+                        <th>Letzter Trade</th>
+                        <th>Gesamt Profit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="stats : ${statsList}">
+                        <td>
+                            <a th:href="@{/account/{id}(id=${stats.accountId})}" th:text="${stats.accountId}"
+                                class="account-link">12345</a>
+                        </td>
+                        <td th:text="${stats.broker}">Broker</td>
+                        <td th:text="${stats.currency}">USD</td>
+                        <td th:text="${stats.openTradeCount}">0</td>
+                        <td th:text="${stats.closedTradeCount}">0</td>
+                        <td th:text="${stats.earliestTradeDate}">-</td>
+                        <td th:text="${stats.latestTradeDate}">-</td>
+                        <td th:class="${stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                            th:text="${#numbers.formatDecimal(stats.totalProfit, 1, 2)} + ' ' + ${stats.currency}">0.00
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="no-accounts" th:if="${#lists.size(statsList) == 0}">
+            <div class="no-accounts-icon">📊</div>
+            <h2>Keine Daten in der Datenbank</h2>
+            <p>Es wurden noch keine Trades gespeichert.</p>
+        </div>
+
+        <div class="admin-nav">
+            <a href="/" class="view-details-btn">← Zurück zum Dashboard</a>
+        </div>
+
+        <footer>
+            <p>H2 Console: <a href="/h2-console" target="_blank">/h2-console</a></p>
+        </footer>
+    </div>
+</body>
+
+</html>

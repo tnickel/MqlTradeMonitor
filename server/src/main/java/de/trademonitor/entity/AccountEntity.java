@@ -1,0 +1,88 @@
+package de.trademonitor.entity;
+
+import jakarta.persistence.*;
+
+/**
+ * JPA entity for persisted account data.
+ */
+@Entity
+@Table(name = "accounts")
+public class AccountEntity {
+
+    @Id
+    private long accountId;
+
+    private String broker;
+    private String currency;
+    private double balance;
+    private double equity;
+    private String registeredAt;
+    private String lastSeen;
+
+    public AccountEntity() {
+    }
+
+    public AccountEntity(long accountId, String broker, String currency, double balance) {
+        this.accountId = accountId;
+        this.broker = broker;
+        this.currency = currency;
+        this.balance = balance;
+    }
+
+    // Getters and Setters
+    public long getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(long accountId) {
+        this.accountId = accountId;
+    }
+
+    public String getBroker() {
+        return broker;
+    }
+
+    public void setBroker(String broker) {
+        this.broker = broker;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void setBalance(double balance) {
+        this.balance = balance;
+    }
+
+    public double getEquity() {
+        return equity;
+    }
+
+    public void setEquity(double equity) {
+        this.equity = equity;
+    }
+
+    public String getRegisteredAt() {
+        return registeredAt;
+    }
+
+    public void setRegisteredAt(String registeredAt) {
+        this.registeredAt = registeredAt;
+    }
+
+    public String getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(String lastSeen) {
+        this.lastSeen = lastSeen;
+    }
+}

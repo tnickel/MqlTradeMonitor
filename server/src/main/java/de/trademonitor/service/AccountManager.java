@@ -1,17 +1,21 @@
 package de.trademonitor.service;
 
+import de.trademonitor.entity.AccountEntity;
 import de.trademonitor.model.Account;
 import de.trademonitor.model.ClosedTrade;
 import de.trademonitor.model.Trade;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages registered MetaTrader accounts and their status.
+ * In-memory cache for fast dashboard access, backed by H2 database.
  */
 @Service
 public class AccountManager {
@@ -20,6 +24,32 @@ public class AccountManager {
 
     @Value("${account.timeout.seconds:60}")
     private int timeoutSeconds;
+
+    @Autowired
+    private TradeStorage tradeStorage;
+
+    /**
+     * Load persisted accounts from H2 on startup.
+     */
+    @PostConstruct
+    public void init() {
+        List<AccountEntity> persisted = tradeStorage.loadAllAccounts();
+        for (AccountEntity ae : persisted) {
+            Account account = new Account(ae.getAccountId(), ae.getBroker(), ae.getCurrency(), ae.getBalance());
+            account.setEquity(ae.getEquity());
+
+            // Load trades from DB
+            List<ClosedTrade> closedTrades = tradeStorage.loadClosedTrades(ae.getAccountId());
+            account.setClosedTrades(closedTrades);
+
+            List<Trade> openTrades = tradeStorage.loadOpenTrades(ae.getAccountId());
+            account.setOpenTrades(openTrades);
+
+            accounts.put(ae.getAccountId(), account);
+            System.out.println("Loaded account " + ae.getAccountId() + " from DB with "
+                    + closedTrades.size() + " closed trades and " + openTrades.size() + " open trades");
+        }
+    }
 
     /**
      * Register or update an account.
@@ -36,6 +66,8 @@ public class AccountManager {
             account.setBalance(balance);
             account.setLastSeen(LocalDateTime.now());
         }
+        // Persist to DB
+        tradeStorage.saveAccount(accountId, broker, currency, balance);
     }
 
     /**
@@ -48,6 +80,10 @@ public class AccountManager {
             account.setEquity(equity);
             account.setBalance(balance);
             account.setLastSeen(LocalDateTime.now());
+
+            // Persist to DB
+            tradeStorage.replaceOpenTrades(accountId, trades);
+            tradeStorage.updateAccountMetrics(accountId, equity, balance);
         }
     }
 
@@ -112,13 +148,20 @@ public class AccountManager {
     }
 
     /**
-     * Update closed trades history for an account.
+     * Update closed trades history for an account with duplicate checking.
+     * Returns the number of newly inserted trades.
      */
-    public void updateHistory(long accountId, List<ClosedTrade> closedTrades) {
+    public int updateHistory(long accountId, List<ClosedTrade> closedTrades) {
         Account account = accounts.get(accountId);
         if (account != null && closedTrades != null) {
-            account.setClosedTrades(closedTrades);
+            // Save to DB with duplicate check
+            int inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
+
+            // Reload from DB to keep in-memory cache consistent
+            account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
             account.setLastSeen(LocalDateTime.now());
+            return inserted;
         }
+        return 0;
     }
 }

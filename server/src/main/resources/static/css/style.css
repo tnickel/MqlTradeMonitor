@@ -552,12 +552,71 @@ header h1 {
     text-align: center;
 }
 
+/* Admin Table */
+.admin-table-container {
+    background: var(--bg-secondary);
+    padding: 2rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+.admin-table tbody tr:hover {
+    background: var(--bg-card);
+}
+
+.account-link {
+    color: var(--accent-secondary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.account-link:hover {
+    color: var(--accent-primary);
+    text-decoration: underline;
+}
+
+.admin-nav {
+    text-align: center;
+    margin: 2rem 0;
+}
+
 /* Footer */
 footer {
     text-align: center;
     padding: 1.5rem;
     color: var(--text-muted);
     font-size: 0.9rem;
+}
+
+footer a {
+    color: var(--accent-secondary);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
 }
 
 /* Responsive */

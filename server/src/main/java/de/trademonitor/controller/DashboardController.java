@@ -1,8 +1,13 @@
 package de.trademonitor.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.trademonitor.dto.AccountDbStats;
+import de.trademonitor.entity.AccountEntity;
 import de.trademonitor.model.Account;
 import de.trademonitor.model.ClosedTrade;
+import de.trademonitor.repository.AccountRepository;
+import de.trademonitor.repository.ClosedTradeRepository;
+import de.trademonitor.repository.OpenTradeRepository;
 import de.trademonitor.service.AccountManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -22,6 +27,15 @@ public class DashboardController {
     @Autowired
     private AccountManager accountManager;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private ClosedTradeRepository closedTradeRepository;
+
+    @Autowired
+    private OpenTradeRepository openTradeRepository;
+
     /**
      * Main dashboard showing all accounts.
      */
@@ -30,6 +44,52 @@ public class DashboardController {
         model.addAttribute("accounts", accountManager.getAccountsWithStatus());
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
         return "dashboard";
+    }
+
+    /**
+     * Admin overview showing database statistics per account.
+     */
+    @GetMapping("/admin")
+    public String admin(Model model) {
+        List<AccountEntity> accounts = accountRepository.findAll();
+        List<AccountDbStats> statsList = new ArrayList<>();
+
+        long totalOpen = 0;
+        long totalClosed = 0;
+
+        for (AccountEntity acc : accounts) {
+            AccountDbStats stats = new AccountDbStats();
+            stats.setAccountId(acc.getAccountId());
+            stats.setBroker(acc.getBroker());
+            stats.setCurrency(acc.getCurrency());
+
+            long openCount = openTradeRepository.countByAccountId(acc.getAccountId());
+            long closedCount = closedTradeRepository.countByAccountId(acc.getAccountId());
+            stats.setOpenTradeCount(openCount);
+            stats.setClosedTradeCount(closedCount);
+
+            String minDate = closedTradeRepository.findMinCloseTimeByAccountId(acc.getAccountId());
+            String maxDate = closedTradeRepository.findMaxCloseTimeByAccountId(acc.getAccountId());
+            stats.setEarliestTradeDate(minDate != null ? minDate : "-");
+            stats.setLatestTradeDate(maxDate != null ? maxDate : "-");
+
+            // Sum up total profit from closed trades
+            List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
+                    .findByAccountId(acc.getAccountId());
+            double totalProfit = closedTrades.stream().mapToDouble(t -> t.getProfit()).sum();
+            stats.setTotalProfit(totalProfit);
+
+            totalOpen += openCount;
+            totalClosed += closedCount;
+
+            statsList.add(stats);
+        }
+
+        model.addAttribute("statsList", statsList);
+        model.addAttribute("totalAccounts", accounts.size());
+        model.addAttribute("totalOpenTrades", totalOpen);
+        model.addAttribute("totalClosedTrades", totalClosed);
+        return "admin";
     }
 
     /**
