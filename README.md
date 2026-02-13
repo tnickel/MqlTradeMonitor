@@ -2,6 +2,9 @@
 
 ## 1. Übersicht
 Das Projekt **MQL Trade Monitor** ist eine umfassende Lösung zur Überwachung und Analyse von Trading-Konten (MetaTrader 5). Es bietet ein modernes Web-Dashboard zur zentralen Anzeige von Account-Metriken, offenen Positionen und historischen Daten.
+<img width="1191" height="1438" alt="image" src="https://github.com/user-attachments/assets/270f3066-1006-40bf-a0a4-d766803ff5c9" />
+
+
 
 Das System besteht aus zwei Hauptkomponenten:
 1.  **MQL5 Expert Advisor (Client)**: Läuft im MetaTrader Terminal, exportiert Account-Daten und Trades in Echtzeit an den Server.
@@ -20,7 +23,6 @@ Das System besteht aus zwei Hauptkomponenten:
     *   **Historien-Export**: Überträgt geschlossene Trades zur Analyse.
 *   **Konfiguration**:
     *   Server-URL, Update-Intervalle, Magic Number Filter (Whitelist/Blacklist).
-
 ### 2.2 Java Spring Boot Server
 *   **Technologie**: Java 21, Spring Boot 3, Spring Data JPA, H2 Database, Thymeleaf.
 *   **Datenbank**:
@@ -82,6 +84,7 @@ Die Daten werden lokal im Ordner `./data` gespeichert:
 *   **Styling**: Modernes CSS mit CSS Variables für einfaches Theming (`src/main/resources/static/css/style.css`).
 
 
+<img width="1218" height="1106" alt="image" src="https://github.com/user-attachments/assets/19aa27b7-ca1d-4957-af88-73ac2dd847bb" />
 
 
 
