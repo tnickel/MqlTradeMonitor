@@ -16,6 +16,8 @@ public class AccountEntity {
     private String currency;
     private double balance;
     private double equity;
+    private String name;
+    private String type; // "DEMO" or "REAL"
     private String registeredAt;
     private String lastSeen;
 
@@ -84,5 +86,21 @@ public class AccountEntity {
 
     public void setLastSeen(String lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

@@ -52,6 +52,36 @@ public class DashboardController {
         return "dashboard";
     }
 
+    @GetMapping("/open-trades")
+    public String openTradesPage(Model model) {
+        List<de.trademonitor.model.Account> sortedAccounts = accountManager.getAccountsSortedByPrivilege();
+        model.addAttribute("accounts", sortedAccounts);
+
+        // Calculate Totals
+        int totalTrades = 0;
+        double totalEquity = 0;
+        double totalProfit = 0;
+        String currency = "EUR"; // Default fallback
+
+        for (de.trademonitor.model.Account acc : sortedAccounts) {
+            totalTrades += acc.getOpenTrades().size();
+            // Only sum online accounts or all? Usually all is safer for "current state"
+            // But if account is offline, equity might be stale. Decision: Show all.
+            totalEquity += acc.getEquity();
+            totalProfit += acc.getTotalProfit();
+            if (acc.getCurrency() != null && !acc.getCurrency().isEmpty()) {
+                currency = acc.getCurrency();
+            }
+        }
+
+        model.addAttribute("totalTrades", totalTrades);
+        model.addAttribute("totalEquity", totalEquity);
+        model.addAttribute("totalProfit", totalProfit);
+        model.addAttribute("currency", currency);
+
+        return "open-trades";
+    }
+
     /**
      * Admin overview showing database statistics per account.
      */
@@ -144,6 +174,28 @@ public class DashboardController {
             @org.springframework.web.bind.annotation.RequestParam("customComment") String customComment) {
         magicMappingService.saveMapping(magicNumber, customComment);
         return org.springframework.http.ResponseEntity.ok("Saved");
+    }
+
+    /**
+     * AJAX Endpoint to update account details (name, type).
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/api/account/update")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<String> updateAccountDetails(
+            @org.springframework.web.bind.annotation.RequestParam("accountId") Long accountId,
+            @org.springframework.web.bind.annotation.RequestParam("name") String name,
+            @org.springframework.web.bind.annotation.RequestParam("type") String type) {
+        accountManager.updateAccountDetails(accountId, name, type);
+        return org.springframework.http.ResponseEntity.ok("Saved");
+    }
+
+    /**
+     * AJAX Endpoint to get all open trades.
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/api/trades/open")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.List<java.util.Map<String, Object>> getOpenTrades() {
+        return accountManager.getAllOpenTradesSorted();
     }
 
     /**

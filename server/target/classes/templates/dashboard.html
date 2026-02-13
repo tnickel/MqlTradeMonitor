@@ -11,7 +11,9 @@
 <body>
     <div class="container">
         <header>
-            <h1>🔄 Trade Monitor</h1>
+            <h1>🔄 Trade Monitor <span
+                    style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.10.01</span>
+            </h1>
             <p class="subtitle">MetaTrader Account Übersicht</p>
         </header>
 
@@ -24,17 +26,51 @@
                 <span class="stat-value" id="online-count">0</span>
                 <span class="stat-label">Online</span>
             </div>
-            <div class="stat">
+            <div class="stat interactive" onclick="location.href='/open-trades'">
                 <span class="stat-value" id="total-trades">0</span>
                 <span class="stat-label">Open Trades</span>
             </div>
         </div>
 
         <div class="account-grid" th:if="${#lists.size(accounts) > 0}">
+
+            <!-- NEW: Global Summary Card -->
+            <div class="account-card" onclick="location.href='/open-trades'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1));">
+                <div class="account-header">
+                    <span class="account-id">Global</span>
+                    <span class="status-badge online">SUMME</span>
+                </div>
+                <div class="account-broker">Alle Accounts</div>
+                <div class="account-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Total Trades</span>
+                        <span class="metric-value" id="global-trades-count">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Equity</span>
+                        <span class="metric-value" id="global-equity-sum">Calculating...</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Open Profit</span>
+                        <span class="metric-value" id="global-profit-sum">0.00</span>
+                    </div>
+                </div>
+                <div class="view-details-btn">Alle Trades anzeigen →</div>
+            </div>
+
             <div th:each="acc : ${accounts}" th:class="${acc.online ? 'account-card online' : 'account-card offline'}">
                 <div class="account-header">
                     <span class="account-id" th:text="${acc.accountId}">12345</span>
-                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
+                        th:text="${acc.name}">(Name)</span>
+                    <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                    <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                        th:data-type="${acc.type}"
+                        onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                        title="Account bearbeiten">✏️</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; margin-left: auto;">
                         <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
                             th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
                         <span th:if="${!acc.online}" style="font-size: 0.75rem; color: #6b6b8f; margin-top: 4px;"
@@ -93,27 +129,149 @@
         </footer>
     </div>
 
+    <!-- Edit Account Modal -->
+    <div id="editAccountModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditModal()">&times;</span>
+            <h2>Account bearbeiten</h2>
+            <input type="hidden" id="editAccountId">
+
+            <div class="form-group">
+                <label for="editAccountName">Name:</label>
+                <input type="text" id="editAccountName" placeholder="z.B. My Scalper Bot">
+            </div>
+
+            <div class="form-group">
+                <label for="editAccountType">Account Typ:</label>
+                <select id="editAccountType">
+                    <option value="">-- Bitte wählen --</option>
+                    <option value="DEMO">Demo Account</option>
+                    <option value="REAL">Real Account</option>
+                </select>
+            </div>
+
+            <button class="save-btn" onclick="saveAccountDetails()">Speichern</button>
+        </div>
+    </div>
+
     <script>
         // Auto-refresh page every 5 seconds
-        setTimeout(function () {
-            location.reload();
-        }, 5000);
+        let reloadTimer = setTimeout(reloadPage, 5000);
+
+        function reloadPage() {
+            if (document.getElementById('editAccountModal').style.display !== 'block') {
+                location.reload();
+            } else {
+                // Try again in 1 second if modal is open
+                reloadTimer = setTimeout(reloadPage, 1000);
+            }
+        }
 
         // Calculate stats
         document.addEventListener('DOMContentLoaded', function () {
-            const cards = document.querySelectorAll('.account-card');
+            const clientCards = document.querySelectorAll('.account-card:not([onclick*="open-trades"])'); // Select only client cards
+
             let online = 0;
             let trades = 0;
+            let totalEquity = 0.0;
+            let totalProfit = 0.0;
+            let currency = "";
 
-            cards.forEach(function (card) {
+            clientCards.forEach(function (card) {
                 if (card.classList.contains('online')) online++;
+
+                // Trades (4th metric)
                 const tradeSpan = card.querySelector('.metric:nth-child(4) .metric-value');
                 if (tradeSpan) trades += parseInt(tradeSpan.textContent) || 0;
+
+                // Equity (2nd metric)
+                const equitySpan = card.querySelector('.metric:nth-child(2) .metric-value');
+                if (equitySpan) {
+                    const text = equitySpan.textContent.trim();
+                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(val)) totalEquity += val;
+                    // Try to grab currency from first card
+                    if (currency === "" && text.includes(" ")) currency = text.split(" ")[1];
+                }
+
+                // Profit (3rd metric)
+                const profitSpan = card.querySelector('.metric:nth-child(3) .metric-value');
+                if (profitSpan) {
+                    const text = profitSpan.textContent.trim();
+                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(val)) totalProfit += val;
+                }
             });
 
-            document.getElementById('online-count').textContent = online;
-            document.getElementById('total-trades').textContent = trades;
+            if (currency === "") currency = "EUR"; // Default fallback
+
+            const onlineCountEl = document.getElementById('online-count');
+            if (onlineCountEl) onlineCountEl.textContent = online;
+
+            const totalTradesEl = document.getElementById('total-trades');
+            if (totalTradesEl) totalTradesEl.textContent = trades;
+
+            // Update Global Card
+            const globalTrades = document.getElementById('global-trades-count');
+            const globalEquity = document.getElementById('global-equity-sum');
+            const globalProfit = document.getElementById('global-profit-sum');
+
+            if (globalTrades) globalTrades.textContent = trades;
+            if (globalEquity) globalEquity.textContent = totalEquity.toFixed(2) + " " + currency;
+            if (globalProfit) {
+                globalProfit.textContent = (totalProfit > 0 ? "+" : "") + totalProfit.toFixed(2) + " " + currency;
+                globalProfit.className = "metric-value " + (totalProfit >= 0 ? "profit-positive" : "profit-negative");
+            }
         });
+
+        // Modal functions
+        function openEditModal(accountId, currentName, currentType) {
+            document.getElementById('editAccountId').value = accountId;
+            document.getElementById('editAccountName').value = currentName === 'null' ? '' : currentName;
+            document.getElementById('editAccountType').value = currentType === 'null' ? '' : currentType;
+
+            document.getElementById('editAccountModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editAccountModal').style.display = 'none';
+        }
+
+        function saveAccountDetails() {
+            const accountId = document.getElementById('editAccountId').value;
+            const name = document.getElementById('editAccountName').value;
+            const type = document.getElementById('editAccountType').value;
+
+            const formData = new FormData();
+            formData.append('accountId', accountId);
+            formData.append('name', name);
+            formData.append('type', type);
+
+            fetch('/api/account/update', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    if (response.ok) {
+                        closeEditModal();
+                        location.reload();
+                    } else {
+                        alert('Fehler beim Speichern');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Fehler beim Speichern');
+                });
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('editAccountModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
     </script>
 </body>
 

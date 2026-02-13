@@ -49,6 +49,18 @@ public class TradeStorage {
     }
 
     /**
+     * Update account name and type.
+     */
+    public void updateAccountDetails(long accountId, String name, String type) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setName(name);
+            entity.setType(type);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Save closed trades with duplicate check.
      * Only trades that don't already exist (by accountId + ticket) are inserted.
      * Returns the number of newly inserted trades.

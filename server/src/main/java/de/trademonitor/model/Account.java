@@ -14,6 +14,8 @@ public class Account {
     private String currency;
     private double balance;
     private double equity;
+    private String name;
+    private String type; // "DEMO" or "REAL"
     private LocalDateTime lastSeen;
     private LocalDateTime registeredAt;
     private List<Trade> openTrades = new ArrayList<>();
@@ -104,6 +106,22 @@ public class Account {
 
     public double getTotalProfit() {
         return openTrades.stream().mapToDouble(Trade::getProfit).sum();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     // Closed trades history
