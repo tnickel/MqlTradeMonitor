@@ -12,7 +12,7 @@
     <div class="container">
         <header>
             <h1>🔄 Trade Monitor <span
-                    style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.10.01</span>
+                    style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.12.0</span>
             </h1>
             <p class="subtitle">MetaTrader Account Übersicht</p>
         </header>
@@ -33,6 +33,46 @@
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
             <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
                 style="display:none;">Speichern</button>
+        </div>
+
+        <!-- Global Warning Banner -->
+        <div id="sync-warning-banner" class="global-warning-banner" style="display: none;">
+            <div class="global-warning-icon">⚠️</div>
+            <div>
+                <h3 style="margin:0; color: #ff6b6b; font-size:1.2rem;">WARNUNG: Trade Sync Fehler</h3>
+                <p style="margin:0;">Ein oder mehrere REAL Accounts haben Trades ohne Matching Demo Trade!</p>
+            </div>
+        </div>
+
+        <!-- Sync Status Card -->
+        <div class="account-card"
+            style="cursor: default; margin-bottom: 1rem; border: 1px solid #4a4e69; background: linear-gradient(to bottom right, #2a2e39, #1e222d);"
+            th:if="${syncMetrics != null}">
+            <div class="account-header">
+                <span class="account-id">🛡️ Sync Monitor</span>
+                <span th:class="'status-badge ' + (${syncMetrics.status == 'OK'} ? 'online' : 'offline')"
+                    th:text="${syncMetrics.status}">OK</span>
+            </div>
+            <div class="account-metrics">
+                <div class="metric">
+                    <span class="metric-label">Last Check</span>
+                    <span class="metric-value"
+                        th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.lastCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Next Check</span>
+                    <span class="metric-value"
+                        th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.nextCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Checked Trades</span>
+                    <span class="metric-value" th:text="${syncMetrics.checkedCount}">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Interval</span>
+                    <span class="metric-value" th:text="${syncMetrics.interval + 's'}">60s</span>
+                </div>
+            </div>
         </div>
 
         <!-- NEW: Global Summary Card (Always on top or in top grid?) -->
@@ -74,7 +114,7 @@
                 <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
                     <div th:each="acc : ${accountsBySection.get(section.id)}"
                         th:class="${acc.online ? 'account-card online' : 'account-card offline'}"
-                        th:data-id="${acc.accountId}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''}" th:data-id="${acc.accountId}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
                         <!-- Account Card Content -->
@@ -249,6 +289,17 @@
             if (globalProfit) {
                 globalProfit.textContent = (totalProfit > 0 ? "+" : "") + totalProfit.toFixed(2) + " " + currency;
                 globalProfit.className = "metric-value " + (totalProfit >= 0 ? "profit-positive" : "profit-negative");
+            }
+
+            // Global Warning Banner Logic
+            const warningCards = document.querySelectorAll('.account-card.warning-pulse');
+            const banner = document.getElementById('sync-warning-banner');
+            if (banner) {
+                if (warningCards.length > 0) {
+                    banner.style.display = 'flex';
+                } else {
+                    banner.style.display = 'none';
+                }
             }
         });
 

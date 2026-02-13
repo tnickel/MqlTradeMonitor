@@ -40,6 +40,9 @@ public class DashboardController {
     private de.trademonitor.service.GlobalConfigService globalConfigService;
 
     @Autowired
+    private de.trademonitor.service.TradeSyncService tradeSyncService;
+
+    @Autowired
     private de.trademonitor.service.MagicMappingService magicMappingService;
 
     /**
@@ -88,7 +91,10 @@ public class DashboardController {
         model.addAttribute("accountsBySection", accountsBySection);
 
         // Keep "accounts" for backward compatibility if needed for totals
+        // Keep "accounts" for backward compatibility if needed for totals
         model.addAttribute("accounts", allAccounts);
+
+        model.addAttribute("syncMetrics", tradeSyncService.getMetrics());
 
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
         return "dashboard";
@@ -170,6 +176,17 @@ public class DashboardController {
 
         // Add global config
         model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
+        model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
+        model.addAttribute("tradeSyncInterval", globalConfigService.getTradeSyncIntervalSeconds());
+
+        // Mail Config
+        model.addAttribute("mailHost", globalConfigService.getMailHost());
+        model.addAttribute("mailPort", globalConfigService.getMailPort());
+        model.addAttribute("mailUser", globalConfigService.getMailUser());
+        model.addAttribute("mailPassword", globalConfigService.getMailPassword());
+        model.addAttribute("mailFrom", globalConfigService.getMailFrom());
+        model.addAttribute("mailTo", globalConfigService.getMailTo());
+        model.addAttribute("mailMaxPerDay", globalConfigService.getMailMaxPerDay());
 
         // Magic Mappings
         // 1. Collect all magic numbers from DB (Closed + Open) to ensure we have
@@ -296,10 +313,6 @@ public class DashboardController {
     /**
      * AJAX Endpoint to get all open trades.
      */
-
-    /**
-     * AJAX Endpoint to get all open trades.
-     */
     @org.springframework.web.bind.annotation.GetMapping("/api/trades/open")
     @org.springframework.web.bind.annotation.ResponseBody
     public java.util.List<java.util.Map<String, Object>> getOpenTrades() {
@@ -311,8 +324,10 @@ public class DashboardController {
      */
     @org.springframework.web.bind.annotation.PostMapping("/admin/config")
     public String updateConfig(
-            @org.springframework.web.bind.annotation.RequestParam("magicNumberMaxAge") int magicNumberMaxAge) {
+            @org.springframework.web.bind.annotation.RequestParam("magicNumberMaxAge") int magicNumberMaxAge,
+            @org.springframework.web.bind.annotation.RequestParam("tradeSyncInterval") int tradeSyncInterval) {
         globalConfigService.setMagicNumberMaxAge(magicNumberMaxAge);
+        globalConfigService.setTradeSyncIntervalSeconds(tradeSyncInterval);
         return "redirect:/admin";
     }
 
@@ -418,6 +433,20 @@ public class DashboardController {
         } catch (Exception e) {
             return "{}";
         }
+    }
+
+    @PostMapping("/admin/mail-config")
+    public String updateMailConfig(
+            @RequestParam String host,
+            @RequestParam int port,
+            @RequestParam(required = false) String user,
+            @RequestParam(required = false) String password,
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam int maxPerDay) {
+
+        globalConfigService.saveMailConfig(host, port, user, password, from, to, maxPerDay);
+        return "redirect:/admin";
     }
 
 }

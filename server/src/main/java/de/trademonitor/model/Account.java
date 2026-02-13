@@ -1,5 +1,7 @@
 package de.trademonitor.model;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import de.trademonitor.dto.MagicProfitEntry;
 
 import java.time.LocalDateTime;
@@ -22,7 +24,20 @@ public class Account {
     private String section = "TOP"; // Default to TOP (Deprecated)
     private Long sectionId;
     private int displayOrder = 0;
+
+    // Transient field for sync warning
+    private boolean syncWarning;
+
+    public boolean isSyncWarning() {
+        return syncWarning;
+    }
+
+    public void setSyncWarning(boolean syncWarning) {
+        this.syncWarning = syncWarning;
+    }
+
     private List<Trade> openTrades = new ArrayList<>();
+    private final Map<Long, String> syncStatusMap = new ConcurrentHashMap<>();
 
     public Account() {
     }
@@ -106,6 +121,29 @@ public class Account {
 
     public void setOpenTrades(List<Trade> openTrades) {
         this.openTrades = openTrades;
+        if (this.openTrades != null) {
+            // Apply known statuses
+            Set<Long> activeTickets = new HashSet<>();
+            for (Trade t : this.openTrades) {
+                activeTickets.add(t.getTicket());
+                if (syncStatusMap.containsKey(t.getTicket())) {
+                    t.setSyncStatus(syncStatusMap.get(t.getTicket()));
+                }
+            }
+            // Prune map to avoid memory leaks
+            syncStatusMap.keySet().retainAll(activeTickets);
+        }
+    }
+
+    public void updateSyncStatuses(Map<Long, String> newStatuses) {
+        this.syncStatusMap.putAll(newStatuses);
+        if (this.openTrades != null) {
+            for (Trade t : this.openTrades) {
+                if (newStatuses.containsKey(t.getTicket())) {
+                    t.setSyncStatus(newStatuses.get(t.getTicket()));
+                }
+            }
+        }
     }
 
     public double getTotalProfit() {

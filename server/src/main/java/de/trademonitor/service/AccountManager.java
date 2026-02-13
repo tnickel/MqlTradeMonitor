@@ -261,6 +261,7 @@ public class AccountManager {
             info.put("section", account.getSection());
             info.put("sectionId", account.getSectionId());
             info.put("displayOrder", account.getDisplayOrder());
+            info.put("syncWarning", account.isSyncWarning());
             result.add(info);
         }
         // Sort by online status then by account ID
@@ -303,6 +304,7 @@ public class AccountManager {
                 info.put("profit", trade.getProfit());
                 info.put("magicNumber", trade.getMagicNumber());
                 info.put("comment", trade.getComment());
+                info.put("syncStatus", trade.getSyncStatus());
 
                 result.add(info);
             }

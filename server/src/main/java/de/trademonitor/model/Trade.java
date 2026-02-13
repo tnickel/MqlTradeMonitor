@@ -118,4 +118,15 @@ public class Trade {
     public void setComment(String comment) {
         this.comment = comment;
     }
+
+    // Transient field for sync status (MATCHED, WARNING, etc.)
+    private String syncStatus;
+
+    public String getSyncStatus() {
+        return syncStatus;
+    }
+
+    public void setSyncStatus(String syncStatus) {
+        this.syncStatus = syncStatus;
+    }
 }

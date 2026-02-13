@@ -993,3 +993,76 @@ body.edit-mode-active .account-grid {
         opacity: 1;
     }
 }
+
+/* Warning Pulse Animation for Unsynced Real Accounts */
+@keyframes pulse-red {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        border-color: rgba(239, 68, 68, 1);
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+
+    70% {
+        box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+        border-color: rgba(239, 68, 68, 0.5);
+        background-color: rgba(239, 68, 68, 0.05);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        border-color: rgba(239, 68, 68, 1);
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+}
+
+.warning-pulse {
+    animation: pulse-red 1.5s infinite;
+    border: 2px solid var(--danger) !important;
+}
+
+.warning-icon {
+    color: var(--danger);
+    font-size: 1.2rem;
+    vertical-align: middle;
+    margin-left: 5px;
+}
+
+.check-icon {
+    color: var(--success);
+    font-size: 1.2rem;
+    vertical-align: middle;
+    margin-left: 5px;
+}
+
+/* Global Warning Banner */
+.global-warning-banner {
+    background-color: rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--danger);
+    color: #ffcccc;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    animation: pulse-border 2s infinite;
+}
+
+.global-warning-icon {
+    font-size: 2rem;
+}
+
+@keyframes pulse-border {
+    0% {
+        border-color: rgba(239, 68, 68, 0.5);
+    }
+
+    50% {
+        border-color: rgba(239, 68, 68, 1);
+    }
+
+    100% {
+        border-color: rgba(239, 68, 68, 0.5);
+    }
+}

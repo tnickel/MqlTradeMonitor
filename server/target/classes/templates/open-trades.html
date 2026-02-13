@@ -202,6 +202,7 @@
                                 <th>Open Price</th>
                                 <th>Time</th>
                                 <th>Profit</th>
+                                <th>Status</th>
                                 <th>Comment</th>
                             </tr>
                         </thead>
@@ -219,6 +220,14 @@
                                 <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}" style="font-weight: bold;">
                                     +50.00</td>
+                                <td>
+                                    <span th:if="${acc.type == 'REAL'}">
+                                        <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
+                                            title="Matched with Demo">✅</span>
+                                        <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
+                                            title="No matching Demo trade!">⚠️</span>
+                                    </span>
+                                </td>
                                 <td th:text="${trade.comment}" style="color: var(--text-secondary); font-size: 0.9rem;">
                                     -</td>
                             </tr>
