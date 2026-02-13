@@ -21,6 +21,13 @@ public class AccountEntity {
     private String registeredAt;
     private String lastSeen;
 
+    private String section; // "TOP" or "BOTTOM" (Deprecated, use sectionId)
+
+    @Column(name = "section_id")
+    private Long sectionId;
+
+    private Integer displayOrder = 0; // Ascending order
+
     public AccountEntity() {
     }
 
@@ -102,5 +109,29 @@ public class AccountEntity {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getSection() {
+        return section;
+    }
+
+    public void setSection(String section) {
+        this.section = section;
+    }
+
+    public Long getSectionId() {
+        return sectionId;
+    }
+
+    public void setSectionId(Long sectionId) {
+        this.sectionId = sectionId;
+    }
+
+    public Integer getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public void setDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
     }
 }

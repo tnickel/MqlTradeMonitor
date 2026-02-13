@@ -18,6 +18,10 @@ public class Account {
     private String type; // "DEMO" or "REAL"
     private LocalDateTime lastSeen;
     private LocalDateTime registeredAt;
+
+    private String section = "TOP"; // Default to TOP (Deprecated)
+    private Long sectionId;
+    private int displayOrder = 0;
     private List<Trade> openTrades = new ArrayList<>();
 
     public Account() {
@@ -122,6 +126,30 @@ public class Account {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getSection() {
+        return section;
+    }
+
+    public void setSection(String section) {
+        this.section = section;
+    }
+
+    public Long getSectionId() {
+        return sectionId;
+    }
+
+    public void setSectionId(Long sectionId) {
+        this.sectionId = sectionId;
+    }
+
+    public int getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public void setDisplayOrder(int displayOrder) {
+        this.displayOrder = displayOrder;
     }
 
     // Closed trades history

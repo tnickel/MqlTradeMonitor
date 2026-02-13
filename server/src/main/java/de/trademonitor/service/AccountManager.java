@@ -28,11 +28,32 @@ public class AccountManager {
     @Autowired
     private TradeStorage tradeStorage;
 
+    @Autowired
+    private de.trademonitor.repository.DashboardSectionRepository sectionRepository;
+
+    private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
+
     /**
      * Load persisted accounts from H2 on startup.
      */
     @PostConstruct
     public void init() {
+        // Load sections
+        List<de.trademonitor.entity.DashboardSectionEntity> sections = sectionRepository
+                .findAllByOrderByDisplayOrderAsc();
+        if (sections.isEmpty()) {
+            // Migration: Create default sections if none exist
+            de.trademonitor.entity.DashboardSectionEntity top = new de.trademonitor.entity.DashboardSectionEntity(
+                    "Hauptbereich", 0);
+            de.trademonitor.entity.DashboardSectionEntity bottom = new de.trademonitor.entity.DashboardSectionEntity(
+                    "Secondary Section", 1);
+            top = sectionRepository.save(top);
+            bottom = sectionRepository.save(bottom);
+            sections.add(top);
+            sections.add(bottom);
+        }
+        sections.forEach(s -> sectionsCache.put(s.getId(), s));
+
         List<AccountEntity> persisted = tradeStorage.loadAllAccounts();
         for (AccountEntity ae : persisted) {
             Account account = new Account(ae.getAccountId(), ae.getBroker(), ae.getCurrency(), ae.getBalance());
@@ -48,10 +69,67 @@ public class AccountManager {
             // Load name and type
             account.setName(ae.getName());
             account.setType(ae.getType());
+            account.setSection(ae.getSection()); // Legacy loading
+            account.setSectionId(ae.getSectionId()); // New loading
+            account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
+
+            // MIGRATION CHECK: If sectionID is null but we have legacy string
+            if (account.getSectionId() == null) {
+                Long targetSectionId = sections.get(0).getId(); // Default to top
+                if ("BOTTOM".equalsIgnoreCase(account.getSection())) {
+                    if (sections.size() > 1)
+                        targetSectionId = sections.get(1).getId();
+                }
+                account.setSectionId(targetSectionId);
+                // We should persist this migration eventually, but lazy update on saveLayout is
+                // also ok.
+                // Better to save now to be clean
+                saveAccountSection(account.getAccountId(), targetSectionId, account.getDisplayOrder());
+            }
 
             accounts.put(ae.getAccountId(), account);
-            System.out.println("Loaded account " + ae.getAccountId() + " from DB with "
-                    + closedTrades.size() + " closed trades and " + openTrades.size() + " open trades");
+            System.out.println("Loaded account " + ae.getAccountId() + " from DB");
+        }
+    }
+
+    public List<de.trademonitor.entity.DashboardSectionEntity> getAllSections() {
+        return sectionRepository.findAllByOrderByDisplayOrderAsc();
+    }
+
+    public de.trademonitor.entity.DashboardSectionEntity createSection(String name) {
+        int maxOrder = sectionsCache.values().stream()
+                .mapToInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder).max().orElse(0);
+        de.trademonitor.entity.DashboardSectionEntity newSection = new de.trademonitor.entity.DashboardSectionEntity(
+                name, maxOrder + 1);
+        newSection = sectionRepository.save(newSection);
+        sectionsCache.put(newSection.getId(), newSection);
+        return newSection;
+    }
+
+    public void deleteSection(Long sectionId) {
+        if (!sectionsCache.containsKey(sectionId))
+            return;
+
+        // Move accounts in this section to the first available section
+        Long fallbackId = sectionsCache.keySet().stream().filter(id -> !id.equals(sectionId)).findFirst().orElse(null);
+
+        if (fallbackId != null) {
+            for (Account acc : accounts.values()) {
+                if (sectionId.equals(acc.getSectionId())) {
+                    saveAccountSection(acc.getAccountId(), fallbackId, acc.getDisplayOrder()); // section update
+                }
+            }
+        }
+
+        sectionRepository.deleteById(sectionId);
+        sectionsCache.remove(sectionId);
+    }
+
+    public void renameSection(Long sectionId, String newName) {
+        de.trademonitor.entity.DashboardSectionEntity s = sectionsCache.get(sectionId);
+        if (s != null) {
+            s.setName(newName);
+            sectionRepository.save(s);
         }
     }
 
@@ -62,6 +140,18 @@ public class AccountManager {
         Account account = accounts.get(accountId);
         if (account == null) {
             account = new Account(accountId, broker, currency, balance);
+            // Assign to first section by default
+            if (!sectionsCache.isEmpty()) {
+                Long defaultSecId = sectionsCache.keySet().iterator().next();
+                // Try to find the one with order 0
+                Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                        .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+                if (first.isPresent())
+                    defaultSecId = first.get().getId();
+
+                account.setSectionId(defaultSecId);
+            }
+
             accounts.put(accountId, account);
             System.out.println("New account registered: " + accountId + " (" + broker + ")");
         } else {
@@ -72,6 +162,11 @@ public class AccountManager {
         }
         // Persist to DB
         tradeStorage.saveAccount(accountId, broker, currency, balance);
+        // Also persist section if it was new? saveAccount doesn't do sectionId yet...
+        // We need to update TradeStorage to save sectionID too.
+        if (account.getSectionId() != null) {
+            tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+        }
     }
 
     /**
@@ -84,6 +179,23 @@ public class AccountManager {
             account.setType(type);
             // Persist
             tradeStorage.updateAccountDetails(accountId, name, type);
+        }
+    }
+
+    /**
+     * Save layout preference for an account.
+     */
+    // Deprecated signature
+    public void saveLayout(long accountId, String section, int displayOrder) {
+        // no-op or forward?
+    }
+
+    public void saveAccountSection(long accountId, Long sectionId, int displayOrder) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setSectionId(sectionId);
+            account.setDisplayOrder(displayOrder);
+            tradeStorage.updateAccountLayout(accountId, null, displayOrder, sectionId);
         }
     }
 
@@ -146,6 +258,9 @@ public class AccountManager {
             info.put("lastSeen", account.getLastSeen());
             info.put("name", account.getName());
             info.put("type", account.getType());
+            info.put("section", account.getSection());
+            info.put("sectionId", account.getSectionId());
+            info.put("displayOrder", account.getDisplayOrder());
             result.add(info);
         }
         // Sort by online status then by account ID

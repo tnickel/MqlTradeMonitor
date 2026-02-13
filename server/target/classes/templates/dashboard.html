@@ -30,81 +30,108 @@
                 <span class="stat-value" id="total-trades">0</span>
                 <span class="stat-label">Open Trades</span>
             </div>
+            <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
+            <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
+                style="display:none;">Speichern</button>
         </div>
 
-        <div class="account-grid" th:if="${#lists.size(accounts) > 0}">
-
-            <!-- NEW: Global Summary Card -->
-            <div class="account-card" onclick="location.href='/open-trades'"
-                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1));">
-                <div class="account-header">
-                    <span class="account-id">Global</span>
-                    <span class="status-badge online">SUMME</span>
-                </div>
-                <div class="account-broker">Alle Accounts</div>
-                <div class="account-metrics">
-                    <div class="metric">
-                        <span class="metric-label">Total Trades</span>
-                        <span class="metric-value" id="global-trades-count">0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Total Equity</span>
-                        <span class="metric-value" id="global-equity-sum">Calculating...</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Open Profit</span>
-                        <span class="metric-value" id="global-profit-sum">0.00</span>
-                    </div>
-                </div>
-                <div class="view-details-btn">Alle Trades anzeigen →</div>
+        <!-- NEW: Global Summary Card (Always on top or in top grid?) -->
+        <!-- Placing it explicitly above grids as a header card -->
+        <div class="account-card" onclick="location.href='/open-trades'"
+            style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1)); margin-bottom: 2rem;">
+            <div class="account-header">
+                <span class="account-id">Global</span>
+                <span class="status-badge online">SUMME</span>
             </div>
-
-            <div th:each="acc : ${accounts}" th:class="${acc.online ? 'account-card online' : 'account-card offline'}">
-                <div class="account-header">
-                    <span class="account-id" th:text="${acc.accountId}">12345</span>
-                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
-                        th:text="${acc.name}">(Name)</span>
-                    <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
-                    <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
-                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
-                        th:data-type="${acc.type}"
-                        onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
-                        title="Account bearbeiten">✏️</span>
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; margin-left: auto;">
-                        <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
-                            th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
-                        <span th:if="${!acc.online}" style="font-size: 0.75rem; color: #6b6b8f; margin-top: 4px;"
-                            th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024 12:00</span>
-                    </div>
+            <div class="account-broker">Alle Accounts</div>
+            <div class="account-metrics">
+                <div class="metric">
+                    <span class="metric-label">Total Trades</span>
+                    <span class="metric-value" id="global-trades-count">0</span>
                 </div>
-                <div class="account-broker" th:text="${acc.broker}">Broker Name</div>
-                <div class="account-metrics">
-                    <div class="metric">
-                        <span class="metric-label">Balance</span>
-                        <span class="metric-value"
-                            th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">10,000.00
-                            USD</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Equity</span>
-                        <span class="metric-value"
-                            th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">10,500.00
-                            USD</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Profit</span>
-                        <span
-                            th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
-                            th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+500.00
-                            USD</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Open Trades</span>
-                        <span class="metric-value" th:text="${acc.trades}">5</span>
-                    </div>
+                <div class="metric">
+                    <span class="metric-label">Total Equity</span>
+                    <span class="metric-value" id="global-equity-sum">Calculating...</span>
                 </div>
-                <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details anzeigen →</a>
+                <div class="metric">
+                    <span class="metric-label">Open Profit</span>
+                    <span class="metric-value" id="global-profit-sum">0.00</span>
+                </div>
             </div>
+            <div class="view-details-btn">Alle Trades anzeigen →</div>
+        </div>
+
+        <div id="layout-container">
+            <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
+                <div class="section-header">
+                    <span class="section-title" th:text="${section.name}" onclick="renameSection(this)">Section
+                        Name</span>
+                    <div class="section-controls" style="display:none;">
+                        <button class="icon-btn delete-section-btn" onclick="deleteSection(this)">🗑️</button>
+                    </div>
+                </div>
+
+                <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
+                    <div th:each="acc : ${accountsBySection.get(section.id)}"
+                        th:class="${acc.online ? 'account-card online' : 'account-card offline'}"
+                        th:data-id="${acc.accountId}"
+                        th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
+
+                        <!-- Account Card Content -->
+                        <div class="account-header">
+                            <span class="account-id" th:text="${acc.accountId}">12345</span>
+                            <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
+                                th:text="${acc.name}">(Name)</span>
+                            <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                            <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                            <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                th:data-type="${acc.type}"
+                                onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                                title="Account bearbeiten">✏️</span>
+                            <div
+                                style="display: flex; flex-direction: column; align-items: flex-end; margin-left: auto;">
+                                <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
+                                    th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                                <span th:if="${!acc.online}"
+                                    style="font-size: 0.75rem; color: #6b6b8f; margin-top: 4px;"
+                                    th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024</span>
+                            </div>
+                        </div>
+                        <div class="account-broker" th:text="${acc.broker}">Broker</div>
+                        <div class="account-metrics">
+                            <div class="metric">
+                                <span class="metric-label">Balance</span>
+                                <span class="metric-value"
+                                    th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">1000
+                                    USD</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Equity</span>
+                                <span class="metric-value"
+                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">1000
+                                    USD</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Profit</span>
+                                <span
+                                    th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
+                                    USD</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Open Trades</span>
+                                <span class="metric-value" th:text="${acc.trades}">5</span>
+                            </div>
+                        </div>
+                        <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details anzeigen
+                            →</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="add-section-container" style="display:none; text-align: center; margin-top: 20px;">
+            <button class="add-section-btn" onclick="addNewSection()">+ Neue Sektion</button>
         </div>
 
         <div class="no-accounts" th:if="${#lists.size(accounts) == 0}">
@@ -159,10 +186,11 @@
         let reloadTimer = setTimeout(reloadPage, 5000);
 
         function reloadPage() {
-            if (document.getElementById('editAccountModal').style.display !== 'block') {
+            // Don't reload if modal is open OR if we are in Edit Mode
+            if (document.getElementById('editAccountModal').style.display !== 'block' && !isEditMode) {
                 location.reload();
             } else {
-                // Try again in 1 second if modal is open
+                // Try again in 1 second
                 reloadTimer = setTimeout(reloadPage, 1000);
             }
         }
@@ -272,7 +300,197 @@
                 modal.style.display = "none";
             }
         }
+
+        // --- Drag and Drop Logic ---
+        let isEditMode = false;
+
+        function navigateToAccount(url) {
+            if (!isEditMode) {
+                location.href = url;
+            }
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const btn = document.getElementById('edit-layout-btn');
+            const saveBtn = document.getElementById('save-layout-btn');
+            const cards = document.querySelectorAll('.account-grid .account-card');
+
+            // Section controls
+            const sectionControls = document.querySelectorAll('.section-controls');
+            const addSectionContainer = document.getElementById('add-section-container');
+            const sectionTitles = document.querySelectorAll('.section-title');
+
+            if (isEditMode) {
+                document.body.classList.add('edit-mode-active');
+                btn.textContent = "Abbrechen";
+                saveBtn.style.display = "inline-block";
+
+                // Show section controls
+                sectionControls.forEach(el => el.style.display = 'inline-block');
+                addSectionContainer.style.display = 'block';
+                sectionTitles.forEach(el => el.classList.add('editable'));
+
+                cards.forEach(card => {
+                    card.setAttribute('draggable', 'true');
+                    card.classList.add('draggable');
+
+                    card.addEventListener('dragstart', handleDragStart);
+                    card.addEventListener('dragend', handleDragEnd);
+                });
+
+                // Add Drop Zone listeners
+                document.querySelectorAll('.drop-zone').forEach(zone => {
+                    zone.addEventListener('dragover', handleDragOver);
+                    zone.addEventListener('dragleave', handleDragLeave);
+                    zone.addEventListener('drop', handleDrop);
+                });
+
+            } else {
+                // Cancel/Reset
+                location.reload();
+            }
+        }
+
+        // --- Section Management ---
+        function addNewSection() {
+            const name = prompt("Name der neuen Sektion:");
+            if (name) {
+                fetch('/api/section/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'name=' + encodeURIComponent(name)
+                }).then(resp => {
+                    if (resp.ok) {
+                        // For simplicity, reload to show new section. 
+                        // ideally we would append DOM here but reload ensures ID is correct etc.
+                        // But wait, if we reload we lose unsaved drag changes?
+                        // Yes. User should probably save layout first? 
+                        // Let's reload for now as "Add Section" is a structural change.
+                        location.reload();
+                    }
+                });
+            }
+        }
+
+        function renameSection(element) {
+            if (!isEditMode) return;
+            const sectionDiv = element.closest('.dashboard-section');
+            const id = sectionDiv.getAttribute('data-section-id');
+            const oldName = element.textContent;
+            const newName = prompt("Neuer Name:", oldName);
+
+            if (newName && newName !== oldName) {
+                fetch('/api/section/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + id + '&name=' + encodeURIComponent(newName)
+                }).then(resp => {
+                    if (resp.ok) element.textContent = newName;
+                });
+            }
+        }
+
+        function deleteSection(btn) {
+            if (!isEditMode) return;
+            const sectionDiv = btn.closest('.dashboard-section');
+            const id = sectionDiv.getAttribute('data-section-id');
+            // check if empty? or allowed to delete non-empty (accounts move to other section)
+
+            if (confirm("Sektion löschen? Enthaltene Accounts werden verschoben.")) {
+                fetch('/api/section/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + id
+                }).then(resp => {
+                    if (resp.ok) location.reload();
+                });
+            }
+        }
+
+        function handleDragStart(e) {
+            if (!isEditMode) return;
+            this.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.drop-zone').forEach(zone => zone.classList.remove('drag-over'));
+        }
+
+        function handleDragOver(e) {
+            if (!isEditMode) return;
+            e.preventDefault();
+            this.classList.add('drag-over');
+            return false;
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (!isEditMode) return;
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            const id = e.dataTransfer.getData('text/plain');
+            const draggable = document.querySelector(`.account-card[data-id="${id}"]`);
+
+            if (draggable) {
+                const afterElement = getDragAfterElement(this, e.clientY);
+                if (afterElement == null) {
+                    this.appendChild(draggable);
+                } else {
+                    this.insertBefore(draggable, afterElement);
+                }
+            }
+            return false;
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                }
+                return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function saveLayout() {
+            const sections = document.querySelectorAll('.account-grid');
+            const layoutData = {};
+
+            sections.forEach(sec => {
+                const sectionId = sec.getAttribute('data-section-id');
+                const cardIds = [...sec.querySelectorAll('.account-card')].map(c => parseInt(c.getAttribute('data-id')));
+                layoutData[sectionId] = cardIds;
+            });
+
+            fetch('/api/account/layout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(layoutData)
+            })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Fehler beim Speichern des Layouts');
+                    }
+                })
+                .catch(err => console.error(err));
+        }
     </script>
 </body>
 
 </html>
+```

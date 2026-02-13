@@ -12,8 +12,8 @@ import de.trademonitor.service.AccountManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -47,7 +47,49 @@ public class DashboardController {
      */
     @GetMapping("/")
     public String dashboard(Model model) {
-        model.addAttribute("accounts", accountManager.getAccountsWithStatus());
+        List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
+        List<de.trademonitor.entity.DashboardSectionEntity> sections = accountManager.getAllSections();
+
+        // Organize accounts by sectionId
+        Map<Long, List<java.util.Map<String, Object>>> accountsBySection = new LinkedHashMap<>();
+
+        // Initialize map with empty lists for all sections to ensure they exist
+        for (de.trademonitor.entity.DashboardSectionEntity sec : sections) {
+            accountsBySection.put(sec.getId(), new ArrayList<>());
+        }
+
+        for (java.util.Map<String, Object> acc : allAccounts) {
+            Long sectionId = (Long) acc.get("sectionId");
+            // Fallback if null (should handled by migration, but safety check)
+            if (sectionId == null && !sections.isEmpty()) {
+                sectionId = sections.get(0).getId();
+            }
+
+            if (sectionId != null && accountsBySection.containsKey(sectionId)) {
+                accountsBySection.get(sectionId).add(acc);
+            } else if (!sections.isEmpty()) {
+                // Fallback to first section
+                accountsBySection.get(sections.get(0).getId()).add(acc);
+            }
+        }
+
+        // Sort by displayOrder within each section
+        Comparator<java.util.Map<String, Object>> orderComparator = (a, b) -> {
+            Integer orderA = (Integer) a.get("displayOrder");
+            Integer orderB = (Integer) b.get("displayOrder");
+            return Integer.compare(orderA != null ? orderA : 0, orderB != null ? orderB : 0);
+        };
+
+        for (List<java.util.Map<String, Object>> list : accountsBySection.values()) {
+            list.sort(orderComparator);
+        }
+
+        model.addAttribute("sections", sections);
+        model.addAttribute("accountsBySection", accountsBySection);
+
+        // Keep "accounts" for backward compatibility if needed for totals
+        model.addAttribute("accounts", allAccounts);
+
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
         return "dashboard";
     }
@@ -157,9 +199,10 @@ public class DashboardController {
     /**
      * Update magic mapping.
      */
-    @org.springframework.web.bind.annotation.PostMapping("/admin/mapping")
-    public String updateMapping(@org.springframework.web.bind.annotation.RequestParam("magicNumber") Long magicNumber,
-            @org.springframework.web.bind.annotation.RequestParam("customComment") String customComment) {
+    @PostMapping("/admin/mapping")
+    public String updateMapping(
+            @RequestParam("magicNumber") Long magicNumber,
+            @RequestParam("customComment") String customComment) {
         magicMappingService.saveMapping(magicNumber, customComment);
         return "redirect:/admin";
     }
@@ -167,27 +210,92 @@ public class DashboardController {
     /**
      * AJAX Endpoint to update magic mapping.
      */
-    @org.springframework.web.bind.annotation.PostMapping("/api/mapping")
-    @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<String> updateMappingAjax(
-            @org.springframework.web.bind.annotation.RequestParam("magicNumber") Long magicNumber,
-            @org.springframework.web.bind.annotation.RequestParam("customComment") String customComment) {
+    @PostMapping("/api/mapping")
+    @ResponseBody
+    public ResponseEntity<String> updateMappingAjax(
+            @RequestParam("magicNumber") Long magicNumber,
+            @RequestParam("customComment") String customComment) {
         magicMappingService.saveMapping(magicNumber, customComment);
-        return org.springframework.http.ResponseEntity.ok("Saved");
+        return ResponseEntity.ok("Saved");
     }
 
     /**
      * AJAX Endpoint to update account details (name, type).
      */
-    @org.springframework.web.bind.annotation.PostMapping("/api/account/update")
-    @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<String> updateAccountDetails(
-            @org.springframework.web.bind.annotation.RequestParam("accountId") Long accountId,
-            @org.springframework.web.bind.annotation.RequestParam("name") String name,
-            @org.springframework.web.bind.annotation.RequestParam("type") String type) {
+    @PostMapping("/api/account/update")
+    @ResponseBody
+    public ResponseEntity<String> updateAccountDetails(
+            @RequestParam("accountId") Long accountId,
+            @RequestParam("name") String name,
+            @RequestParam("type") String type) {
         accountManager.updateAccountDetails(accountId, name, type);
-        return org.springframework.http.ResponseEntity.ok("Saved");
+        return ResponseEntity.ok("Saved");
     }
+
+    // --- Section Management API ---
+
+    @PostMapping("/api/section/create")
+    @ResponseBody
+    public de.trademonitor.entity.DashboardSectionEntity createSection(@RequestParam("name") String name) {
+        return accountManager.createSection(name);
+    }
+
+    @PostMapping("/api/section/rename")
+    @ResponseBody
+    public ResponseEntity<String> renameSection(
+            @RequestParam("id") Long id,
+            @RequestParam("name") String name) {
+        accountManager.renameSection(id, name);
+        return ResponseEntity.ok("Renamed");
+    }
+
+    @PostMapping("/api/section/delete")
+    @ResponseBody
+    public ResponseEntity<String> deleteSection(@RequestParam("id") Long id) {
+        accountManager.deleteSection(id);
+        return ResponseEntity.ok("Deleted");
+    }
+
+    /**
+     * AJAX Endpoint to save dashboard layout.
+     * Expects JSON: { "sectionId1": [accId1, accId2], "sectionId2": [accId3] }
+     */
+    @PostMapping("/api/account/layout")
+    @ResponseBody
+    public ResponseEntity<String> saveLayout(@RequestBody Map<String, List<Object>> layoutData) {
+        for (Map.Entry<String, List<Object>> entry : layoutData.entrySet()) {
+            try {
+                Long sectionId = Long.parseLong(entry.getKey());
+                List<Object> rawIds = entry.getValue();
+
+                if (rawIds != null) {
+                    for (int i = 0; i < rawIds.size(); i++) {
+                        Object idObj = rawIds.get(i);
+                        Long accountId = null;
+                        if (idObj instanceof Number) {
+                            accountId = ((Number) idObj).longValue();
+                        } else if (idObj instanceof String) {
+                            try {
+                                accountId = Long.parseLong((String) idObj);
+                            } catch (NumberFormatException nfe) {
+                                /* ignore */ }
+                        }
+
+                        if (accountId != null) {
+                            accountManager.saveAccountSection(accountId, sectionId, i);
+                        }
+                    }
+                }
+            } catch (NumberFormatException e) {
+                // ignore invalid keys
+            }
+        }
+        return ResponseEntity.ok("Layout saved");
+    }
+
+    /**
+     * AJAX Endpoint to get all open trades.
+     */
 
     /**
      * AJAX Endpoint to get all open trades.

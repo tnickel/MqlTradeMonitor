@@ -61,6 +61,25 @@ public class TradeStorage {
     }
 
     /**
+     * Update account layout preferences.
+     */
+    public void updateAccountLayout(long accountId, String section, int displayOrder) {
+        updateAccountLayout(accountId, section, displayOrder, null);
+    }
+
+    public void updateAccountLayout(long accountId, String section, int displayOrder, Long sectionId) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            if (section != null)
+                entity.setSection(section);
+            if (sectionId != null)
+                entity.setSectionId(sectionId);
+            entity.setDisplayOrder(displayOrder);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Save closed trades with duplicate check.
      * Only trades that don't already exist (by accountId + ticket) are inserted.
      * Returns the number of newly inserted trades.
