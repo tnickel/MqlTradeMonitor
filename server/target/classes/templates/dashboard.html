@@ -30,6 +30,17 @@
                 <span class="stat-value" id="total-trades">0</span>
                 <span class="stat-label">Open Trades</span>
             </div>
+            <div class="view-controls" style="display:flex; gap:10px; align-items:center;">
+                <button id="view-btn-grid" class="view-toggle-btn active" onclick="setViewMode('grid')">
+                    <span>▦</span> Kacheln
+                </button>
+                <button id="view-btn-compact" class="view-toggle-btn" onclick="setViewMode('compact')">
+                    <span>📄</span> Kompakt
+                </button>
+                <button id="view-btn-real" class="view-toggle-btn" onclick="setViewMode('real')">
+                    <span>🛡️</span> Real Focus
+                </button>
+            </div>
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
             <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
                 style="display:none;">Speichern</button>
@@ -115,6 +126,7 @@
                     <div th:each="acc : ${accountsBySection.get(section.id)}"
                         th:class="${acc.online ? 'account-card online' : 'account-card offline'}"
                         th:classappend="${acc.syncWarning ? ' warning-pulse' : ''}" th:data-id="${acc.accountId}"
+                        th:data-type="${acc.type}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
                         <!-- Account Card Content -->
@@ -167,6 +179,49 @@
                             →</a>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Compact View Container -->
+        <div id="compact-view-container" style="display:none;">
+            <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
+                <h3 th:text="${section.name}" class="section-title"
+                    style="margin-bottom:10px; border-bottom:1px solid #3f3f5f; padding-bottom:5px;">Section</h3>
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">Stat</th>
+                            <th>Account</th>
+                            <th>Name</th>
+                            <th>Balance</th>
+                            <th>Equity</th>
+                            <th>Profit</th>
+                            <th>Trades</th>
+                            <th style="text-align:center;">Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="acc : ${accountsBySection.get(section.id)}"
+                            th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
+                            <td style="text-align:center;">
+                                <span th:class="${acc.online ? 'status-dot online' : 'status-dot offline'}"
+                                    th:title="${acc.online ? 'Online' : 'Offline'}"></span>
+                            </td>
+                            <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
+                            <td th:text="${acc.name}">Name</td>
+                            <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
+                            <td th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</td>
+                            <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
+                            <td th:text="${acc.trades}">5</td>
+                            <td style="text-align:center;">
+                                <span th:if="${acc.syncWarning}" title="Sync Error!"
+                                    style="color: #ef4444; font-size:1.2em;">⚠️</span>
+                                <span th:unless="${acc.syncWarning}" style="color: #10b981;">●</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -234,6 +289,106 @@
                 reloadTimer = setTimeout(reloadPage, 1000);
             }
         }
+
+        // --- View Mode Logic ---
+        function setViewMode(mode) {
+            const grid = document.getElementById('layout-container');
+            const compact = document.getElementById('compact-view-container');
+            const btns = document.querySelectorAll('.view-toggle-btn');
+
+            // Stats Bar filtering for Real Focus
+            const statsBar = document.querySelector('.stats-bar');
+
+            // Reset active buttons
+            btns.forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--bg-card)';
+                b.style.color = 'var(--text-secondary)';
+                b.style.borderColor = 'var(--border-color)';
+            });
+
+            // Set Active Button Style
+            const activeBtn = document.getElementById('view-btn-' + mode);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.background = 'var(--accent-primary)';
+                activeBtn.style.color = 'white';
+                activeBtn.style.borderColor = 'var(--accent-primary)';
+            }
+
+            localStorage.setItem('tradeMonitorView', mode);
+
+            // Hide/Show Logic
+            const allCards = document.querySelectorAll('.account-card');
+            const sections = document.querySelectorAll('.dashboard-section');
+
+            if (mode === 'compact') {
+                grid.style.display = 'none';
+                compact.style.display = 'block';
+                // Show stat bar
+                if (statsBar) statsBar.style.display = 'flex';
+
+            } else if (mode === 'real') {
+                grid.style.display = 'block';
+                compact.style.display = 'none';
+
+                // Filter Grid: Show ONLY REAL accounts
+                // Also hide Global Card and Sync Monitor (as user requested "only the two tiles")
+
+                allCards.forEach(card => {
+                    const type = card.getAttribute('data-type');
+                    // Check if it's a client card (has data-id)
+                    if (card.hasAttribute('data-id')) {
+                        if (type === 'REAL') {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    } else {
+                        // It's a system card (Global, Sync, etc.)
+                        // User said "nur die beiden kacheln". So hide system cards too?
+                        // "da werden dann nur die beiden kacheln für realaccounts angezeigt und natürlich auch die 3 buttons... mehr nicht."
+                        // So hide Global and Sync cards.
+                        card.style.display = 'none';
+                    }
+                });
+
+                // Hide empty sections title?
+                sections.forEach(sec => {
+                    const realCards = sec.querySelectorAll('.account-card[data-type="REAL"]');
+                    if (realCards.length > 0) {
+                        sec.style.display = 'block';
+                    } else {
+                        sec.style.display = 'none';
+                    }
+                });
+
+                // Hide Global Warning Banner?
+                const banner = document.getElementById('sync-warning-banner');
+                if (banner) banner.style.display = 'none';
+
+
+            } else {
+                // GRID (Standard)
+                grid.style.display = 'block';
+                compact.style.display = 'none';
+
+                // Show all cards
+                allCards.forEach(c => c.style.display = '');
+                sections.forEach(s => s.style.display = '');
+
+                if (statsBar) statsBar.style.display = 'flex';
+                const banner = document.getElementById('sync-warning-banner');
+                // Only show if warning present?
+                // The banner logic runs every 5s anyway.
+            }
+        }
+
+        // Restore View Preference
+        document.addEventListener('DOMContentLoaded', () => {
+            const pref = localStorage.getItem('tradeMonitorView') || 'grid';
+            setViewMode(pref);
+        });
 
         // Calculate stats
         document.addEventListener('DOMContentLoaded', function () {
@@ -544,4 +699,3 @@
 </body>
 
 </html>
-```

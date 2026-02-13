@@ -105,6 +105,7 @@
                             <th>Typ</th>
                             <th>Volume</th>
                             <th>Open Price</th>
+                            <th>Time</th>
                             <th>S/L</th>
                             <th>T/P</th>
                             <th>Swap</th>
@@ -124,6 +125,7 @@
                             </td>
                             <td th:text="${trade.volume}">0.10</td>
                             <td th:text="${trade.openPrice}">1.08500</td>
+                            <td th:text="${trade.openTime}">2026-02-13 12:00</td>
                             <td th:text="${trade.stopLoss}">1.08000</td>
                             <td th:text="${trade.takeProfit}">1.09000</td>
                             <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>

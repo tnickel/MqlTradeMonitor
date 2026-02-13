@@ -8,9 +8,9 @@
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
         .container-fluid {
-            width: 95%;
+            width: 98%;
             margin: 0 auto;
-            max-width: 1400px;
+            /* Removed max-width */
         }
 
         .header-summary {
@@ -202,6 +202,7 @@
                                 <th>Open Price</th>
                                 <th>Time</th>
                                 <th>Profit</th>
+                                <th>Magic</th>
                                 <th>Status</th>
                                 <th>Comment</th>
                             </tr>
@@ -220,6 +221,7 @@
                                 <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}" style="font-weight: bold;">
                                     +50.00</td>
+                                <td th:text="${trade.magicNumber}">12345</td>
                                 <td>
                                     <span th:if="${acc.type == 'REAL'}">
                                         <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"

@@ -35,9 +35,9 @@ body {
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 98%;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem;
 }
 
 /* Header */
@@ -136,8 +136,8 @@ header h1 {
 /* Account Grid */
 .account-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
     margin-bottom: 2rem;
 }
 
@@ -1065,4 +1065,76 @@ body.edit-mode-active .account-grid {
     100% {
         border-color: rgba(239, 68, 68, 0.5);
     }
+}
+
+/* Compact View Styles */
+.compact-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.compact-table th,
+.compact-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.compact-table th {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.compact-table tr:last-child td {
+    border-bottom: none;
+}
+
+.compact-table tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.compact-table tbody tr:hover {
+    background: var(--bg-card-hover);
+}
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-dot.online {
+    background-color: var(--success);
+    box-shadow: 0 0 5px var(--success);
+}
+
+.status-dot.offline {
+    background-color: var(--danger);
+}
+
+.view-toggle-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.view-toggle-btn:hover {
+    border-color: var(--accent-secondary);
+    color: var(--text-primary);
 }
