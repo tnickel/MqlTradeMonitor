@@ -40,13 +40,28 @@
             color: var(--text-primary);
         }
 
+        #accounts-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            /* Max 2 columns as requested */
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1400px) {
+            #accounts-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .account-section {
             background: var(--bg-card);
             border-radius: 10px;
-            margin-bottom: 2rem;
+            /* margin-bottom removed as gap handles spacing */
             border: 1px solid var(--border-color);
             overflow: hidden;
             transition: transform 0.2s;
+            height: fit-content;
+            /* Ensure they don't stretch weirdly */
         }
 
         /* Real Account Highlighting */
@@ -93,20 +108,20 @@
         }
 
         .trades-table {
-            width: 100%;
+            width: auto;
             border-collapse: collapse;
         }
 
         .trades-table th,
         .trades-table td {
-            padding: 1rem 1.5rem;
+            padding: 0.5rem 0.5rem;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
 
         .trades-table th {
             background: rgba(0, 0, 0, 0.2);
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-secondary);

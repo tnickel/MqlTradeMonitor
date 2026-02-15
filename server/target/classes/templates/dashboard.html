@@ -55,61 +55,62 @@
             </div>
         </div>
 
-        <!-- Sync Status Card -->
-        <div class="account-card"
-            style="cursor: default; margin-bottom: 1rem; border: 1px solid #4a4e69; background: linear-gradient(to bottom right, #2a2e39, #1e222d);"
-            th:if="${syncMetrics != null}">
-            <div class="account-header">
-                <span class="account-id">🛡️ Sync Monitor</span>
-                <span th:class="'status-badge ' + (${syncMetrics.status == 'OK'} ? 'online' : 'offline')"
-                    th:text="${syncMetrics.status}">OK</span>
+        <!-- Header Cards Container (Sync & Global) -->
+        <div class="header-cards-container" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+            <!-- Sync Status Card -->
+            <div class="account-card"
+                style="cursor: default; border: 1px solid #4a4e69; background: linear-gradient(to bottom right, #2a2e39, #1e222d); flex: 0 1 auto; min-width: 300px;"
+                th:if="${syncMetrics != null}">
+                <div class="account-header">
+                    <span class="account-id" style="font-size: 1.2rem;">🛡️ Sync Monitor</span>
+                    <span th:class="'status-badge ' + (${syncMetrics.status == 'OK'} ? 'online' : 'offline')"
+                        th:text="${syncMetrics.status}">OK</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Last Check</span>
+                        <span class="metric-value"
+                            th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.lastCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Next Check</span>
+                        <span class="metric-value"
+                            th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.nextCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Checked Trades</span>
+                        <span class="metric-value" th:text="${syncMetrics.checkedCount}">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Interval</span>
+                        <span class="metric-value" th:text="${syncMetrics.interval + 's'}">60s</span>
+                    </div>
+                </div>
             </div>
-            <div class="account-metrics">
-                <div class="metric">
-                    <span class="metric-label">Last Check</span>
-                    <span class="metric-value"
-                        th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.lastCheckTime), 'HH:mm:ss') : '-'}">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Next Check</span>
-                    <span class="metric-value"
-                        th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.nextCheckTime), 'HH:mm:ss') : '-'}">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Checked Trades</span>
-                    <span class="metric-value" th:text="${syncMetrics.checkedCount}">0</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Interval</span>
-                    <span class="metric-value" th:text="${syncMetrics.interval + 's'}">60s</span>
-                </div>
-            </div>
-        </div>
 
-        <!-- NEW: Global Summary Card (Always on top or in top grid?) -->
-        <!-- Placing it explicitly above grids as a header card -->
-        <div class="account-card" onclick="location.href='/open-trades'"
-            style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1)); margin-bottom: 2rem;">
-            <div class="account-header">
-                <span class="account-id">Global</span>
-                <span class="status-badge online">SUMME</span>
+            <!-- Global Summary Card -->
+            <div class="account-card" onclick="location.href='/open-trades'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1)); flex: 0 1 auto; min-width: 300px;">
+                <div class="account-header">
+                    <span class="account-id" style="font-size: 1.2rem;">Global</span>
+                    <span class="status-badge online">SUMME</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Trades</span>
+                        <span class="metric-value" id="global-trades-count">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Equity</span>
+                        <span class="metric-value" id="global-equity-sum">...</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Open Profit</span>
+                        <span class="metric-value" id="global-profit-sum">0.00</span>
+                    </div>
+                </div>
+                <div class="view-details-btn" style="padding: 0.5rem; font-size: 0.9rem;">Alle Trades →</div>
             </div>
-            <div class="account-broker">Alle Accounts</div>
-            <div class="account-metrics">
-                <div class="metric">
-                    <span class="metric-label">Total Trades</span>
-                    <span class="metric-value" id="global-trades-count">0</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Total Equity</span>
-                    <span class="metric-value" id="global-equity-sum">Calculating...</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Open Profit</span>
-                    <span class="metric-value" id="global-profit-sum">0.00</span>
-                </div>
-            </div>
-            <div class="view-details-btn">Alle Trades anzeigen →</div>
         </div>
 
         <div id="layout-container">
@@ -130,22 +131,30 @@
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
                         <!-- Account Card Content -->
-                        <div class="account-header">
-                            <span class="account-id" th:text="${acc.accountId}">12345</span>
-                            <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
-                                th:text="${acc.name}">(Name)</span>
-                            <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
-                            <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
-                            <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
-                                th:data-type="${acc.type}"
-                                onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
-                                title="Account bearbeiten">✏️</span>
-                            <div
-                                style="display: flex; flex-direction: column; align-items: flex-end; margin-left: auto;">
-                                <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
-                                    th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                        <div class="account-header"
+                            style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="display: flex; flex-direction: column;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="account-id" th:text="${acc.accountId}">12345</span>
+                                    <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                                    <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                                </div>
+                                <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
+                                    th:text="${acc.name}"
+                                    style="font-size: 0.9em; color: #a0a0c0; margin-top: 4px;">(Name)</span>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                        th:data-type="${acc.type}"
+                                        onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                                        title="Account bearbeiten">✏️</span>
+                                    <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
+                                        th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                                </div>
                                 <span th:if="${!acc.online}"
-                                    style="font-size: 0.75rem; color: #6b6b8f; margin-top: 4px;"
+                                    style="font-size: 0.75rem; color: #6b6b8f; white-space: nowrap;"
                                     th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024</span>
                             </div>
                         </div>

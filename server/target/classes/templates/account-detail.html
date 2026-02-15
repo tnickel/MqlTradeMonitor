@@ -62,6 +62,16 @@
         </header>
 
         <div class="account-summary">
+            <div class="filter-bar" id="history-filter-bar" style="flex-basis: 100%; margin-bottom: 1rem;">
+                <button class="filter-btn" data-range="today">Heute</button>
+                <button class="filter-btn" data-range="1week">1 Woche</button>
+                <button class="filter-btn" data-range="1month">1 Monat</button>
+                <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
+                <button class="filter-btn" data-range="6months">6 Monate</button>
+                <button class="filter-btn" data-range="thisyear">Dieses Jahr</button>
+                <button class="filter-btn" data-range="1year">1 Jahr</button>
+                <button class="filter-btn" data-range="all">Alles</button>
+            </div>
             <div class="summary-card">
                 <span class="summary-label">Balance</span>
                 <span class="summary-value"
@@ -86,6 +96,72 @@
                 <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
             </div>
         </div>
+
+        <!-- ======= DASHBOARD (Chart + Stats) ======= -->
+        <section class="trades-section dashboard-section">
+            <h2>📜 Trade Historie / Dashboard</h2>
+
+            <div class="chart-container"
+                style="position: relative; height: 300px; margin-bottom: 2rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                <canvas id="balance-history-chart"></canvas>
+            </div>
+
+            <!-- Statistics Grid -->
+            <div class="stats-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Gesamtgewinn</span>
+                    <span id="stat-total-profit" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Profit
+                        Faktor</span>
+                    <span id="stat-profit-factor" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trefferquote</span>
+                    <span id="stat-win-rate" style="font-size: 1.25rem; font-weight: bold;">0%</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trades
+                        (Zeitraum)</span>
+                    <span id="stat-total-trades" style="font-size: 1.25rem; font-weight: bold;">0</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Ø
+                        Win / Ø Loss</span>
+                    <span id="stat-avg-win-loss" style="font-size: 1rem; font-weight: bold;">0 / 0</span>
+                </div>
+                <!-- Static / Current Stats -->
+                <div class="stat-card"
+                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
+                        Equity (Aktuell)</span>
+                    <span th:class="${account.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                        th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)}"
+                        style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
+                        Trades (Aktuell)</span>
+                    <span th:text="${#lists.size(account.openTrades)}"
+                        style="font-size: 1.25rem; font-weight: bold;">0</span>
+                </div>
+            </div>
+        </section>
 
         <!-- ======= OPEN TRADES (paginated) ======= -->
         <section class="trades-section">
@@ -150,7 +226,8 @@
 
         <!-- ======= MAGIC NUMBER PROFIT BREAKDOWN ======= -->
         <section class="trades-section magic-breakdown" th:if="${#lists.size(magicProfits) > 0}">
-            <h2>📊 Gewinn pro Magic Number</h2>
+            <h2>📊 Gewinn pro Magic Number <span id="magic-breakdown-period"
+                    style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
 
             <table class="trades-table">
                 <thead>
@@ -187,7 +264,8 @@
 
         <!-- ======= MAGIC NUMBER PROFIT CURVES ======= -->
         <section class="trades-section magic-charts" th:if="${magicCurveJson != '{}'}">
-            <h2>📈 Gewinnkurven pro Magic Number</h2>
+            <h2>📈 Gewinnkurven pro Magic Number <span id="magic-curves-period"
+                    style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
             <div id="magic-charts-container"></div>
         </section>
 
@@ -204,17 +282,9 @@
 
         <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
         <section class="trades-section history-section">
-            <h2>📜 Trade Historie</h2>
+            <h2>📜 Geschlossene Trades Liste</h2>
 
-            <div class="filter-bar" id="history-filter-bar">
-                <button class="filter-btn active" data-range="today">Heute</button>
-                <button class="filter-btn" data-range="1week">1 Woche</button>
-                <button class="filter-btn" data-range="1month">1 Monat</button>
-                <button class="filter-btn" data-range="6months">6 Monate</button>
-                <button class="filter-btn" data-range="thisyear">Dieses Jahr</button>
-                <button class="filter-btn" data-range="1year">1 Jahr</button>
-                <button class="filter-btn" data-range="all">Alles</button>
-            </div>
+
 
             <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
                 <p>Keine geschlossenen Trades vorhanden</p>
@@ -279,6 +349,233 @@
     </div>
 
     <script th:inline="javascript">
+
+        // ============ HISTORY CHART MANAGER ============
+        function HistoryChartManager(canvasId, currentBalance, allRows) {
+            this.canvas = document.getElementById(canvasId);
+            this.currentBalance = currentBalance;
+            this.allTrades = []; // { time: timestamp, profit: float }
+            this.chart = null;
+
+            // Parse all trades once
+            // Rows are typically sorted by Close Time Descending in the HTML (backend sort)
+            // But we need to verify/sort to be sure.
+            this.parseData(allRows);
+        }
+
+        HistoryChartManager.prototype.parseData = function (rows) {
+            var data = [];
+            rows.forEach(row => {
+                var timeStr = row.dataset.closeTime;
+                var profitCell = row.querySelector('.profit-cell');
+                var profit = parseFloat(profitCell ? profitCell.dataset.profit : 0);
+
+                if (timeStr) {
+                    var t = timeStr.split(/[- :.]/);
+                    var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    data.push({
+                        time: date.getTime(),
+                        profit: profit,
+                        dateObj: date,
+                        dateStr: timeStr
+                    });
+                }
+            });
+
+            // Sort by Time Ascending for calculation
+            data.sort((a, b) => a.time - b.time);
+            this.allTrades = data;
+        };
+
+        HistoryChartManager.prototype.updateChart = function (range) {
+            if (!this.canvas) return;
+
+            // 1. Determine Start Time based on Range
+            var now = new Date();
+            var minTime = 0;
+            switch (range) {
+                case 'today':
+                    minTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    break;
+                case '1week':
+                    minTime = now.getTime() - 7 * 24 * 3600 * 1000;
+                    break;
+                case '1month':
+                    var m = new Date(now);
+                    m.setMonth(now.getMonth() - 1);
+                    minTime = m.getTime();
+                    break;
+                case 'thismonth':
+                    minTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                    break;
+                case '6months':
+                    var m6 = new Date(now);
+                    m6.setMonth(now.getMonth() - 6);
+                    minTime = m6.getTime();
+                    break;
+                case 'thisyear':
+                    minTime = new Date(now.getFullYear(), 0, 1).getTime();
+                    break;
+                case '1year':
+                    var y1 = new Date(now);
+                    y1.setFullYear(now.getFullYear() - 1);
+                    minTime = y1.getTime();
+                    break;
+                default:
+                    minTime = 0;
+            }
+
+            // 2. Calculate Balance History
+            // We know the FINAL balance (currentBalance).
+            // We work BACKWARDS from the end to find the balance at each point?
+            // OR: We calculate total profit of ALL trades, subtract from Current Balance to find Initial Balance?
+            // NOTE: Current Balance includes deposits/withdrawals that might NOT be in the trade list if they are filtered out or different type.
+            // Assumption: The trade list contains all relevant P/L operations or we only show "Cumulative P/L" curve?
+            // User requested "EquityCurve", but usually Balance Curve is what is shown for history.
+            // Let's try to reconstruct Balance relative to NOW.
+
+            // Reconstruct:
+            // Balance[Now] = CurrentBalance
+            // Balance[LastTrade] = CurrentBalance
+            // Balance[BeforeLastTrade] = Balance[LastTrade] - LastTradeProfit
+
+            // We iterate backwards through ALL trades (even those older than filter) to find the balance state.
+
+            var fullBalanceHistory = [];
+            var runningBalance = this.currentBalance;
+
+            // Add "Now" point
+            fullBalanceHistory.push({ x: now.getTime(), y: runningBalance });
+
+            // Iterate BACKWARDS through sorted trades (newest to oldest)
+            for (var i = this.allTrades.length - 1; i >= 0; i--) {
+                var trade = this.allTrades[i];
+                // Record state AFTER trade (which is runningBalance)
+                // Actually, the trade closed at trade.time. The balance became runningBalance AT trade.time.
+                // So (trade.time, runningBalance) is a point.
+                fullBalanceHistory.push({ x: trade.time, y: runningBalance });
+
+                // Revert balance for previous state
+                runningBalance -= trade.profit;
+            }
+            // Add initial state (start of time)
+            if (this.allTrades.length > 0) {
+                fullBalanceHistory.push({ x: this.allTrades[0].time - 60000, y: runningBalance }); // 1 min before first trade
+            }
+
+            // Now we have history from Now -> Past. Reverse it to be Past -> Now.
+            fullBalanceHistory.reverse();
+
+            // 3. Filter points for display
+            var displayData = fullBalanceHistory.filter(p => p.x >= minTime);
+
+            // Ensure we have at least a starting point if we cut off history
+            // Find the last point BEFORE minTime to use as "Open" value
+            if (displayData.length === 0 || displayData[0].x > minTime) {
+                // Find latest point <= minTime
+                var startPoint = { x: minTime, y: this.currentBalance }; // Default fallback
+                for (var i = 0; i < fullBalanceHistory.length; i++) {
+                    if (fullBalanceHistory[i].x <= minTime) {
+                        startPoint = { x: minTime, y: fullBalanceHistory[i].y }; // Balance at start of period
+                    } else {
+                        break; // optimization: fullBalanceHistory is sorted time asc
+                    }
+                }
+                // Prepend this start point if list is empty or first point is after minTime
+                if (displayData.length === 0 || displayData[0].x > minTime) {
+                    displayData.unshift(startPoint);
+                }
+            }
+
+            // 4. Render Chart
+            this.render(displayData);
+        };
+
+        HistoryChartManager.prototype.render = function (data) {
+            var ctx = this.canvas.getContext('2d');
+            var labels = data.map(d => new Date(d.x).toLocaleString());
+            var values = data.map(d => d.y);
+
+            // Create gradient
+            var gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // primary
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+            if (this.chart) {
+                this.chart.destroy();
+            }
+
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels, // ChartJS can handle timestamps if using time adapter, but loose labels work too
+                    datasets: [{
+                        label: 'Balance',
+                        data: values, // ChartJS 3+ can take {x,y} objects if parsing is set, but simple array is safer without moment adapter
+                        borderColor: '#6366f1',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointRadius: data.length > 100 ? 0 : 3, // Hide points if too many
+                        pointHoverRadius: 5,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return 'Balance: ' + context.parsed.y.toFixed(2);
+                                }
+                            },
+                            backgroundColor: '#252542',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#3f3f5f',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                display: true,
+                                color: '#a0a0c0',
+                                maxTicksLimit: 8,
+                                maxRotation: 0
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#e0e0e0', // Brighter text
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                callback: function (value) { return value.toFixed(2); }
+                            },
+                            grid: {
+                                color: 'rgba(63,63,95,0.3)'
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+
         // ============ TABLE MANAGER: FILTERING + PAGINATION ============
 
         function TableManager(tableId, paginationId, summaryId) {
@@ -393,10 +690,12 @@
         };
 
         // Initialize managers
-        var openTradesMgr, historyMgr;
+        var openTradesMgr, historyMgr, historyChartMgr, magicChartMgr;
 
         // Storage key
         var accountId = /*[[${account.accountId}]]*/ '0';
+        var currentBalance = /*[[${account.balance}]]*/ 0.0;
+
         var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -407,8 +706,16 @@
             // History trades: Setup filters
             historyMgr = new TableManager('closed-trades-table', 'closed-trades-pagination', 'history-summary');
 
+            // History Chart
+            // Need all rows from history table
+            var allHistoryRows = Array.from(document.querySelectorAll('#closed-trades-table tbody tr'));
+            historyChartMgr = new HistoryChartManager('balance-history-chart', currentBalance, allHistoryRows);
+
+            // Magic Chart Manager
+            magicChartMgr = new MagicChartManager('magic-charts-container');
+
             // Restore filter
-            var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'today';
+            var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
 
             // Filter click handlers
             var btns = document.querySelectorAll('.filter-btn');
@@ -437,62 +744,183 @@
         });
 
         function applyHistoryFilter(range) {
+            // Update Table
+            if (historyMgr) {
+                var now = new Date();
+                var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+                historyMgr.applyFilter(function (row) {
+                    var closeTimeStr = row.dataset.closeTime;
+                    if (!closeTimeStr) return false;
+
+                    var t = closeTimeStr.split(/[- :.]/);
+                    var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    var tradeTs = tradeDate.getTime();
+
+                    switch (range) {
+                        case 'today': return tradeTs >= todayStart;
+                        case '1week': return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
+                        case '1month':
+                            var m = new Date(now); m.setMonth(now.getMonth() - 1); return tradeTs >= m.getTime();
+                        case 'thismonth':
+                            var tm = new Date(now.getFullYear(), now.getMonth(), 1); return tradeTs >= tm.getTime();
+                        case '6months':
+                            var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); return tradeTs >= m6.getTime();
+                        case 'thisyear':
+                            var y = new Date(now.getFullYear(), 0, 1); return tradeTs >= y.getTime();
+                        case '1year':
+                            var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); return tradeTs >= y1.getTime();
+                        case 'all': default: return true;
+                    }
+                });
+            }
+
+            // Update Chart
+            if (historyChartMgr) {
+                historyChartMgr.updateChart(range);
+            }
+
+            // Update Stats
+            updateStats(range);
+
+            // Update Magic Table
+            updateMagicStats(range);
+
+            // Update Magic Charts
+            if (magicChartMgr && historyMgr) {
+                magicChartMgr.update(historyMgr.filteredRows);
+            }
+
+            // Update Period Label in Header (Charts)
+            var periodLabelCharts = document.getElementById('magic-curves-period');
+            // Update Period Label in Header (Table)
+            var periodLabelTable = document.getElementById('magic-breakdown-period');
+
+            var rangeName = '';
+            var btn = document.querySelector('.filter-btn[data-range="' + range + '"]');
+            if (btn) rangeName = btn.textContent;
+            var labelText = rangeName ? '(' + rangeName + ')' : '';
+
+            if (periodLabelCharts) periodLabelCharts.textContent = labelText;
+            if (periodLabelTable) periodLabelTable.textContent = labelText;
+        }
+
+        function updateStats(range) {
             if (!historyMgr) return;
 
-            var now = new Date();
-            // Reset time part for accurate day comparisons
-            var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            var trades = historyMgr.filteredRows.map(row => {
+                var profitCell = row.querySelector('.profit-cell');
+                return parseFloat(profitCell ? profitCell.dataset.profit : 0);
+            });
 
-            historyMgr.applyFilter(function (row) {
-                var closeTimeStr = row.dataset.closeTime; // "2026-02-09 10:30:00"
-                if (!closeTimeStr) return false;
+            var totalProfit = 0;
+            var grossProfit = 0;
+            var grossLoss = 0;
+            var wins = 0;
+            var losses = 0;
+            var totalTrades = trades.length;
 
-                // Parse "yyyy-MM-dd HH:mm:ss" or "yyyy.MM.dd HH:mm:ss"
-                var t = closeTimeStr.split(/[- :.]/);
-                // new Date(year, monthIndex, day, hours, minutes, seconds)
-                var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
-                var tradeTs = tradeDate.getTime();
+            trades.forEach(p => {
+                totalProfit += p;
+                if (p > 0) {
+                    grossProfit += p;
+                    wins++;
+                } else {
+                    grossLoss += Math.abs(p);
+                    if (p < 0) losses++;
+                }
+            });
 
-                switch (range) {
-                    case 'today':
-                        return tradeTs >= todayStart;
-                    case '1week':
-                        return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
-                    case '1month':
-                        var m = new Date(now);
-                        m.setMonth(now.getMonth() - 1);
-                        return tradeTs >= m.getTime();
-                    case '6months':
-                        var m6 = new Date(now);
-                        m6.setMonth(now.getMonth() - 6);
-                        return tradeTs >= m6.getTime();
-                    case 'thisyear':
-                        var y = new Date(now.getFullYear(), 0, 1);
-                        return tradeTs >= y.getTime();
-                    case '1year':
-                        var y1 = new Date(now);
-                        y1.setFullYear(now.getFullYear() - 1);
-                        return tradeTs >= y1.getTime();
-                    case 'all':
-                    default:
-                        return true;
+            var profitFactor = grossLoss === 0 ? (grossProfit > 0 ? 999.99 : 0) : (grossProfit / grossLoss);
+            var winRate = totalTrades === 0 ? 0 : (wins / totalTrades) * 100;
+            var avgWin = wins === 0 ? 0 : grossProfit / wins;
+            var avgLoss = losses === 0 ? 0 : grossLoss / losses; // as positive number
+
+            // Update Stats Grid
+            var elProfit = document.getElementById('stat-total-profit');
+            if (elProfit) {
+                elProfit.textContent = totalProfit.toFixed(2);
+                elProfit.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                elProfit.style.fontSize = "1.25rem";
+                elProfit.style.fontWeight = "bold";
+            }
+
+            var elPF = document.getElementById('stat-profit-factor');
+            if (elPF) elPF.textContent = profitFactor.toFixed(2);
+
+            var elWR = document.getElementById('stat-win-rate');
+            if (elWR) elWR.textContent = winRate.toFixed(1) + '%';
+
+            var elTrades = document.getElementById('stat-total-trades');
+            if (elTrades) elTrades.textContent = totalTrades;
+
+            var elAvg = document.getElementById('stat-avg-win-loss');
+            if (elAvg) elAvg.textContent = avgWin.toFixed(2) + ' / -' + avgLoss.toFixed(2);
+        }
+
+        function updateMagicStats(range) {
+            // Re-calculate statistics for the Magic Table based on historyMgr.filteredRows
+            // 1. Reset counters map
+            var magicStats = {}; // { magic: { closedCount: 0, closedProfit: 0.0 } }
+
+            // 2. Aggregate from filtered history
+            if (historyMgr && historyMgr.filteredRows) {
+                historyMgr.filteredRows.forEach(row => {
+                    // find magic cell - it's the 10th column (index 9)
+                    var cells = row.querySelectorAll('td');
+                    if (cells.length > 9) {
+                        var magic = cells[9].textContent.trim();
+                        var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
+
+                        if (!magicStats[magic]) {
+                            magicStats[magic] = { closedCount: 0, closedProfit: 0.0 };
+                        }
+                        magicStats[magic].closedCount++;
+                        magicStats[magic].closedProfit += profit;
+                    }
+                });
+            }
+
+            // 3. Update the Magic Table DOM
+            var magicRows = document.querySelectorAll('.magic-breakdown tbody tr');
+            magicRows.forEach(row => {
+                var magicCell = row.querySelector('td:nth-child(1) strong');
+                if (!magicCell) return;
+                var magic = magicCell.textContent.trim();
+
+                var stats = magicStats[magic] || { closedCount: 0, closedProfit: 0.0 };
+
+                // Open Profit (Static, from DOM as it was originally rendered)
+                var openProfitCell = row.querySelector('td:nth-child(3)');
+                var openProfit = parseFloat(openProfitCell ? openProfitCell.textContent : 0);
+
+                // Update Closed Count
+                var closedCountCell = row.querySelector('td:nth-child(4)');
+                if (closedCountCell) closedCountCell.textContent = stats.closedCount;
+
+                // Update Closed Profit
+                var closedProfitCell = row.querySelector('td:nth-child(5)');
+                if (closedProfitCell) {
+                    closedProfitCell.textContent = stats.closedProfit.toFixed(2);
+                    closedProfitCell.className = stats.closedProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                }
+
+                // Update Total Profit (Closed + Open)
+                var totalProfit = openProfit + stats.closedProfit;
+                var totalProfitCell = row.querySelector('td:nth-child(6)');
+                if (totalProfitCell) {
+                    totalProfitCell.textContent = totalProfit.toFixed(2);
+                    totalProfitCell.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
                 }
             });
         }
 
 
-        // ============ CHART.JS: MAGIC PROFIT CURVES ============
-        (function () {
-            var curveData = /*[[${magicCurveJson}]]*/ '{}';
-            if (typeof curveData === 'string') {
-                curveData = JSON.parse(curveData);
-            }
-
-            var container = document.getElementById('magic-charts-container');
-            if (!container) return;
-
-            // Color palette for charts
-            var colors = [
+        // ============ MAGIC CHART MANAGER ============
+        function MagicChartManager(containerId) {
+            this.container = document.getElementById(containerId);
+            this.charts = {}; // { magic: ChartInstance }
+            this.colors = [
                 { line: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
                 { line: '#10b981', bg: 'rgba(16,185,129,0.15)' },
                 { line: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
@@ -502,28 +930,97 @@
                 { line: '#14b8a6', bg: 'rgba(20,184,166,0.15)' },
                 { line: '#f97316', bg: 'rgba(249,115,22,0.15)' }
             ];
+        }
 
+        MagicChartManager.prototype.update = function (rows) {
+            if (!this.container) return;
+
+            // 1. Group trades by Magic
+            var magicData = {}; // { magic: [ { time, profit } ] }
+
+            rows.forEach(row => {
+                var cells = row.querySelectorAll('td');
+                if (cells.length > 9) {
+                    var magic = cells[9].textContent.trim();
+                    var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
+                    var timeStr = row.dataset.closeTime;
+
+                    if (timeStr) {
+                        var t = timeStr.split(/[- :.]/);
+                        var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+
+                        if (!magicData[magic]) magicData[magic] = [];
+                        magicData[magic].push({ time: date.getTime(), profit: profit, dateObj: date });
+                    }
+                }
+            });
+
+            // 2. Identify active magics and existing charts
+            var activeMagics = Object.keys(magicData);
+
+            // Remove charts for magics that are no longer present in filtered data
+            // Actually, maybe we just hide them? Or destroy them.
+            // Let's destroy to keep it clean, or keep them if we want to preserve state?
+            // Re-rendering is safer for now.
+
+            this.container.innerHTML = ''; // Clear container
+            this.charts = {}; // Reset charts
+
+            if (activeMagics.length === 0) {
+                this.container.innerHTML = '<p style="text-align:center; color: var(--text-secondary); padding: 1rem;">Keine Daten für diesen Zeitraum</p>';
+                return;
+            }
+
+            // 3. Render Charts
             var idx = 0;
-            for (var magic in curveData) {
-                if (!curveData.hasOwnProperty(magic)) continue;
-                var d = curveData[magic];
-                if (!d.labels || d.labels.length === 0) continue;
+            activeMagics.sort(); // Sort by magic number
 
-                var colorSet = colors[idx % colors.length];
+            activeMagics.forEach(magic => {
+                var trades = magicData[magic];
+                trades.sort((a, b) => a.time - b.time); // Sort by time asc
+
+                // Calculate Cumulative Profit for this period
+                // Note: This starts at 0 for the beginning of the selected period.
+                // It does NOT show total lifetime profit if filtered. This is standard behavior for "Profit in Period".
+                var dataPoints = [];
+                var runProfit = 0;
+
+                // Add start point
+                if (trades.length > 0) {
+                    dataPoints.push({ x: trades[0].time - 60000, y: 0 });
+                }
+
+                trades.forEach(t => {
+                    runProfit += t.profit;
+                    dataPoints.push({ x: t.time, y: runProfit });
+                });
+
+                // Get Color
+                var colorSet = this.colors[idx % this.colors.length];
                 idx++;
 
-                // Build chart label with comment
-                var commentText = d.comment || '';
-                var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
+                // Create Chart Elements
+                // Build chart label - Try to find a comment from the latest trade
+                var commentText = '';
+                // Or try to find it in the Magic Breakdown table?
+                // Let's look up the Magic Table for a name
+                var magicRow = Array.from(document.querySelectorAll('.magic-breakdown tbody tr')).find(r => {
+                    var c = r.querySelector('td:nth-child(1) strong');
+                    return c && c.textContent.trim() === magic;
+                });
+                if (magicRow) {
+                    var nameDiv = magicRow.querySelector('div');
+                    if (nameDiv) commentText = nameDiv.textContent.trim();
+                }
 
-                // Create chart wrapper
+                var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
+                var labels = dataPoints.map(d => new Date(d.x).toLocaleString());
+                var values = dataPoints.map(d => d.y);
+
                 var wrapper = document.createElement('div');
                 wrapper.className = 'chart-card';
                 wrapper.style.cursor = 'pointer';
                 wrapper.dataset.magic = magic;
-                wrapper.dataset.colorLine = colorSet.line;
-                wrapper.dataset.colorBg = colorSet.bg;
-                wrapper.dataset.chartLabel = chartLabel;
 
                 var title = document.createElement('h3');
                 title.className = 'chart-title';
@@ -535,15 +1032,15 @@
                 var canvas = document.createElement('canvas');
                 canvasWrap.appendChild(canvas);
                 wrapper.appendChild(canvasWrap);
-                container.appendChild(wrapper);
+                this.container.appendChild(wrapper);
 
                 new Chart(canvas, {
                     type: 'line',
                     data: {
-                        labels: d.labels,
+                        labels: labels,
                         datasets: [{
                             label: chartLabel,
-                            data: d.data,
+                            data: values,
                             borderColor: colorSet.line,
                             backgroundColor: colorSet.bg,
                             fill: true,
@@ -557,10 +1054,13 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: {
-                                labels: { color: '#a0a0c0', font: { size: 11 } }
-                            },
+                            legend: { display: false },
                             tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return 'Profit: ' + context.parsed.y.toFixed(2);
+                                    }
+                                },
                                 backgroundColor: '#252542',
                                 titleColor: '#ffffff',
                                 bodyColor: '#a0a0c0',
@@ -570,8 +1070,15 @@
                         },
                         scales: {
                             x: {
-                                ticks: { color: '#6b6b8f', maxRotation: 45, maxTicksLimit: 10, font: { size: 9 } },
-                                grid: { color: 'rgba(63,63,95,0.3)' }
+                                display: true, // Show X axis labels
+                                ticks: {
+                                    color: '#6b6b8f',
+                                    maxRotation: 0,
+                                    maxTicksLimit: 6, // Limit ticks to avoid clutter
+                                    font: { size: 9 },
+                                    autoSkip: true
+                                },
+                                grid: { display: false } // Keep grid hidden for cleanliness
                             },
                             y: {
                                 ticks: { color: '#6b6b8f', font: { size: 10 } },
@@ -581,14 +1088,12 @@
                     }
                 });
 
-                // Click handler to open fullscreen
-                (function (m, cl, cb, lbl, lbls, dt) {
-                    wrapper.addEventListener('click', function () {
-                        openChartModal(m, cl, cb, lbl, lbls, dt);
-                    });
-                })(magic, colorSet.line, colorSet.bg, chartLabel, d.labels, d.data);
-            }
-        })();
+                // Click handler
+                wrapper.onclick = function () {
+                    openChartModal(magic, colorSet.line, colorSet.bg, chartLabel, labels, values);
+                };
+            });
+        };
 
         // ============ FULLSCREEN CHART MODAL ============
         // ============ FULLSCREEN CHART MODAL ============

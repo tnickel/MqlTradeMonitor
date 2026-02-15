@@ -349,13 +349,14 @@ header h1 {
 }
 
 .trades-table {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
 }
 
 .trades-table th,
 .trades-table td {
-    padding: 1rem;
+    padding: 0.5rem 0.5rem;
+    /* Reduced from 1rem */
     text-align: left;
     border-bottom: 1px solid var(--border-color);
 }
@@ -364,8 +365,9 @@ header h1 {
     color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 1px;
+    font-size: 0.7rem;
+    /* Slightly smaller */
+    letter-spacing: 0.5px;
 }
 
 .trades-table tbody tr:hover {
@@ -563,13 +565,14 @@ header h1 {
 }
 
 .admin-table {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
 }
 
 .admin-table th,
 .admin-table td {
-    padding: 1rem;
+    padding: 0.5rem 0.5rem;
+    /* Reduced from 1rem */
     text-align: left;
     border-bottom: 1px solid var(--border-color);
 }
@@ -578,8 +581,8 @@ header h1 {
     color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 1px;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
 }
 
 .admin-table tbody tr:hover {
