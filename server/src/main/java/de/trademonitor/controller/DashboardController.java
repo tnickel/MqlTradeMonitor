@@ -45,6 +45,16 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.MagicMappingService magicMappingService;
 
+    @Autowired
+    private de.trademonitor.service.HomeyService homeyService;
+
+    @PostMapping("/api/test-siren")
+    @ResponseBody
+    public String testSiren() {
+        homeyService.triggerSiren();
+        return "Siren trigger sent";
+    }
+
     /**
      * Main dashboard showing all accounts.
      */
@@ -127,6 +137,9 @@ public class DashboardController {
         model.addAttribute("totalProfit", totalProfit);
         model.addAttribute("currency", currency);
 
+        model.addAttribute("magicMappings", magicMappingService.getAllMappings());
+        model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
+
         return "open-trades";
     }
 
@@ -187,6 +200,13 @@ public class DashboardController {
         model.addAttribute("mailFrom", globalConfigService.getMailFrom());
         model.addAttribute("mailTo", globalConfigService.getMailTo());
         model.addAttribute("mailMaxPerDay", globalConfigService.getMailMaxPerDay());
+
+        // Homey Config
+        model.addAttribute("homeyId", globalConfigService.getHomeyId());
+        model.addAttribute("homeyEvent", globalConfigService.getHomeyEvent());
+        model.addAttribute("homeyTriggerSync", globalConfigService.isHomeyTriggerSync());
+        model.addAttribute("homeyTriggerApi", globalConfigService.isHomeyTriggerApi());
+        model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
 
         // Magic Mappings
         // 1. Collect all magic numbers from DB (Closed + Open) to ensure we have
@@ -446,6 +466,18 @@ public class DashboardController {
             @RequestParam int maxPerDay) {
 
         globalConfigService.saveMailConfig(host, port, user, password, from, to, maxPerDay);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/admin/homey-config")
+    public String updateHomeyConfig(
+            @RequestParam String homeyId,
+            @RequestParam String homeyEvent,
+            @RequestParam(required = false) boolean triggerSync,
+            @RequestParam(required = false) boolean triggerApi,
+            @RequestParam int repeatCount) {
+
+        globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi, repeatCount);
         return "redirect:/admin";
     }
 

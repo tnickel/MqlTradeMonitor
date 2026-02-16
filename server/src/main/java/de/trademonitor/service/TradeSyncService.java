@@ -23,6 +23,9 @@ public class TradeSyncService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private HomeyService homeyService;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
 
     private long lastCheckTime = 0;
@@ -115,6 +118,12 @@ public class TradeSyncService {
             if (!warningEmailSent) {
                 emailService.sendSyncWarningEmail("Trade Monitor Warnung",
                         "Achtung: Es wurden nicht-synchronisierte Trades auf Real-Konten gefunden! Bitte Dashboard prüfen.");
+
+                // Trigger Homey Siren if enabled
+                if (globalConfigService.isHomeyTriggerSync()) {
+                    homeyService.triggerSiren();
+                }
+
                 warningEmailSent = true;
             }
         } else {

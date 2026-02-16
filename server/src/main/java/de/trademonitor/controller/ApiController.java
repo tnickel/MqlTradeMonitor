@@ -22,6 +22,24 @@ public class ApiController {
     @Autowired
     private AccountManager accountManager;
 
+    @Autowired
+    private de.trademonitor.service.EmailService emailService;
+
+    /**
+     * Test email configuration.
+     */
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmail() {
+        try {
+            emailService.sendTestEmail();
+            return ResponseEntity.ok(Map.of("status", "ok", "message", "Test email sent successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()));
+        }
+    }
+
     /**
      * Register a new MetaTrader account.
      */
@@ -37,6 +55,8 @@ public class ApiController {
                     "status", "ok",
                     "message", "Account registered successfully"));
         } catch (Exception e) {
+            // Cannot report error to account if registration fails (account might not
+            // exist)
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));
@@ -69,11 +89,13 @@ public class ApiController {
                     "closedTradesReceived", request.getClosedTrades() != null ? request.getClosedTrades().size() : 0,
                     "newTradesInserted", newTradesInserted));
         } catch (Exception e) {
-            System.err.println("ERROR in /api/trades-init: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            System.err.println("ERROR in /api/trades-init: " + msg);
             e.printStackTrace();
+            accountManager.reportError(request.getAccountId(), "Init Error: " + msg);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+                    "message", msg));
         }
     }
 
@@ -93,6 +115,7 @@ public class ApiController {
                     "status", "ok",
                     "tradesReceived", request.getTrades() != null ? request.getTrades().size() : 0));
         } catch (Exception e) {
+            accountManager.reportError(request.getAccountId(), "Update Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));
@@ -108,6 +131,7 @@ public class ApiController {
             accountManager.updateHeartbeat(request.getAccountId());
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (Exception e) {
+            accountManager.reportError(request.getAccountId(), "Heartbeat Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));
@@ -138,6 +162,7 @@ public class ApiController {
                     "historyReceived", request.getClosedTrades() != null ? request.getClosedTrades().size() : 0,
                     "newTradesInserted", newInserted));
         } catch (Exception e) {
+            accountManager.reportError(request.getAccountId(), "History Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));

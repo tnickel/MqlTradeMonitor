@@ -31,6 +31,12 @@ public class AccountManager {
     @Autowired
     private de.trademonitor.repository.DashboardSectionRepository sectionRepository;
 
+    @Autowired
+    private GlobalConfigService globalConfigService;
+
+    @Autowired
+    private HomeyService homeyService;
+
     private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
 
     /**
@@ -169,6 +175,19 @@ public class AccountManager {
         }
     }
 
+    public void reportError(long accountId, String errorMessage) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setLastErrorMsg(errorMessage);
+            account.setLastErrorTime(LocalDateTime.now());
+
+            // Trigger Homey Siren if enabled for API errors
+            if (globalConfigService.isHomeyTriggerApi()) {
+                homeyService.triggerSiren();
+            }
+        }
+    }
+
     /**
      * Update account details (Method for Dashboard).
      */
@@ -261,7 +280,10 @@ public class AccountManager {
             info.put("section", account.getSection());
             info.put("sectionId", account.getSectionId());
             info.put("displayOrder", account.getDisplayOrder());
+            info.put("displayOrder", account.getDisplayOrder());
             info.put("syncWarning", account.isSyncWarning());
+            info.put("errorState", account.isErrorState());
+            info.put("lastErrorMsg", account.getLastErrorMsg());
             result.add(info);
         }
         // Sort by online status then by account ID

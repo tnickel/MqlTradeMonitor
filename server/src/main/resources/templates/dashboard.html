@@ -150,6 +150,11 @@
                                         th:data-type="${acc.type}"
                                         onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
                                         title="Account bearbeiten">✏️</span>
+                                    <!-- Error Badge -->
+                                    <span th:if="${acc.errorState}" class="status-badge offline"
+                                        th:title="${acc.lastErrorMsg}"
+                                        style="background-color: #ef4444; color: white; cursor: help;">ERROR</span>
+
                                     <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
                                         th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
                                 </div>
@@ -184,6 +189,12 @@
                                 <span class="metric-value" th:text="${acc.trades}">5</span>
                             </div>
                         </div>
+                        <!-- Error Message Footer -->
+                        <div th:if="${acc.errorState}"
+                            style="color: #ef4444; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 5px;">
+                            <span>⚠️ <span th:text="${acc.lastErrorMsg}">Error Message</span></span>
+                        </div>
+
                         <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details anzeigen
                             →</a>
                     </div>
@@ -213,7 +224,10 @@
                         <tr th:each="acc : ${accountsBySection.get(section.id)}"
                             th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
                             <td style="text-align:center;">
-                                <span th:class="${acc.online ? 'status-dot online' : 'status-dot offline'}"
+                                <span th:if="${acc.errorState}" class="status-dot offline"
+                                    style="background-color: #ef4444;" th:title="${acc.lastErrorMsg}"></span>
+                                <span th:unless="${acc.errorState}"
+                                    th:class="${acc.online ? 'status-dot online' : 'status-dot offline'}"
                                     th:title="${acc.online ? 'Online' : 'Offline'}"></span>
                             </td>
                             <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
@@ -226,7 +240,9 @@
                             <td style="text-align:center;">
                                 <span th:if="${acc.syncWarning}" title="Sync Error!"
                                     style="color: #ef4444; font-size:1.2em;">⚠️</span>
-                                <span th:unless="${acc.syncWarning}" style="color: #10b981;">●</span>
+                                <span th:if="${!acc.syncWarning && acc.errorState}" title="API Error"
+                                    style="color: #ef4444; font-size:1.2em;">⛔</span>
+                                <span th:if="${!acc.syncWarning && !acc.errorState}" style="color: #10b981;">●</span>
                             </td>
                         </tr>
                     </tbody>
@@ -256,9 +272,36 @@
 
         <footer>
             <p>Auto-refresh alle 5 Sekunden | Timeout: <span th:text="${timeoutSeconds}">60</span>s | <a
-                    href="/admin">⚙️ Admin</a></p>
+                    href="/admin">⚙️ Admin</a> | <a href="#" onclick="sendTestEmail()" style="color: #6366f1;">📧 Test
+                    Email</a> | <a href="#" onclick="testSiren()" style="color: #ef4444;">🚨 Test Sirene</a></p>
         </footer>
     </div>
+
+    <script>
+        function sendTestEmail() {
+            if (!confirm("Test Email jetzt senden?")) return;
+
+            fetch('/api/test-email', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        alert('Erfolg: ' + data.message);
+                    } else {
+                        alert('Fehler: ' + data.message);
+                    }
+                })
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+
+        function testSiren() {
+            if (!confirm("Sirene jetzt testen?")) return;
+
+            fetch('/api/test-siren', { method: 'POST' })
+                .then(response => response.text())
+                .then(data => alert(data))
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+    </script>
 
     <!-- Edit Account Modal -->
     <div id="editAccountModal" class="modal">

@@ -165,7 +165,7 @@ public class TradeStorage {
      * Load all closed trades for an account from DB.
      */
     public List<ClosedTrade> loadClosedTrades(long accountId) {
-        List<ClosedTradeEntity> entities = closedTradeRepository.findByAccountId(accountId);
+        List<ClosedTradeEntity> entities = closedTradeRepository.findByAccountIdOrderByCloseTimeDesc(accountId);
         List<ClosedTrade> result = new ArrayList<>();
         for (ClosedTradeEntity entity : entities) {
             ClosedTrade trade = new ClosedTrade();

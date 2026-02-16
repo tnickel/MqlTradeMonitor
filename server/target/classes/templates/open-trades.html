@@ -8,123 +8,245 @@
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
         .container-fluid {
-            width: 98%;
+            width: 95%;
             margin: 0 auto;
-            /* Removed max-width */
+            max-width: 1800px;
         }
 
         .header-summary {
             background: var(--bg-card);
-            border-radius: 12px;
-            padding: 1.5rem;
+            border-radius: 16px;
+            padding: 2rem;
             margin-bottom: 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .summary-item {
             text-align: center;
+            padding: 0 1rem;
         }
 
         .summary-label {
             font-size: 0.9rem;
             color: var(--text-secondary);
             display: block;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .summary-value {
-            font-size: 1.5rem;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        /* Tile Grid */
+        #accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .account-tile {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow: hidden;
+        }
+
+        .account-tile:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+            border-color: var(--accent-primary);
+        }
+
+        .tile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+
+        .tile-account-info h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+
+        .tile-account-info .acc-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.online {
+            background-color: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .status-dot.offline {
+            background-color: var(--danger);
+        }
+
+        .tile-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .metric-box {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.4rem;
             font-weight: 700;
             color: var(--text-primary);
         }
 
-        #accounts-list {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            /* Max 2 columns as requested */
-            gap: 1.5rem;
+        .tile-details {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        @media (max-width: 1400px) {
-            #accounts-list {
-                grid-template-columns: 1fr;
-            }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
         }
 
-        .account-section {
-            background: var(--bg-card);
-            border-radius: 10px;
-            /* margin-bottom removed as gap handles spacing */
+        .detail-label {
+            font-weight: 600;
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+
+        .detail-content {
+            text-align: right;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: var(--bg-page);
+            width: 90%;
+            max-width: 1400px;
+            max-height: 90vh;
+            border-radius: 16px;
             border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            transition: transform 0.2s;
-            height: fit-content;
-            /* Ensure they don't stretch weirdly */
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         }
 
-        /* Real Account Highlighting */
-        .account-section.real {
-            border: 2px solid var(--accent-primary);
-            background: linear-gradient(to right, rgba(99, 102, 241, 0.05), transparent);
-            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.1), 0 2px 4px -1px rgba(99, 102, 241, 0.06);
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
         }
 
-        .account-section.real .account-header-bar {
-            background: rgba(99, 102, 241, 0.1);
-            border-bottom: 1px solid var(--accent-primary);
-        }
-
-        .account-header-bar {
-            padding: 1rem 1.5rem;
+        .modal-header {
+            padding: 1.5rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 255, 255, 0.02);
-            border-bottom: 1px solid var(--border-color);
         }
 
-        .account-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        .modal-title h2 {
+            margin: 0;
+            font-size: 1.5rem;
         }
 
-        .acc-name {
-            font-size: 1.2rem;
-            font-weight: 700;
-        }
-
-        .acc-id {
-            font-family: 'JetBrains Mono', monospace;
+        .modal-close {
+            background: none;
+            border: none;
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: color 0.2s;
+            line-height: 1;
         }
 
-        .trades-table-container {
-            padding: 0;
-            overflow-x: auto;
+        .modal-close:hover {
+            color: var(--text-primary);
         }
 
+        .modal-body {
+            padding: 2rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Reuse existing table styles but scoped slightly if needed */
         .trades-table {
-            width: auto;
+            width: 100%;
             border-collapse: collapse;
         }
 
-        .trades-table th,
-        .trades-table td {
-            padding: 0.5rem 0.5rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
         .trades-table th {
-            background: rgba(0, 0, 0, 0.2);
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
+            position: sticky;
+            top: 0;
+            background: var(--bg-page);
+            z-index: 10;
         }
 
         .profit-positive {
@@ -152,6 +274,10 @@
             color: var(--text-primary);
             border-color: var(--accent-primary);
         }
+
+        .hidden-data {
+            display: none;
+        }
     </style>
 </head>
 
@@ -163,9 +289,9 @@
         <header class="header-summary">
             <div>
                 <h1>Alle Offenen Trades</h1>
-                <p class="subtitle" style="margin:0;">Übersicht aller Positionen</p>
+                <p class="subtitle" style="margin:0;">Aktive Positionen & Portfolio Status</p>
             </div>
-            <div style="display: flex; gap: 3rem;">
+            <div style="display: flex; gap: 4rem;">
                 <div class="summary-item">
                     <span class="summary-label">Total Trades</span>
                     <span class="summary-value" th:text="${totalTrades}">0</span>
@@ -184,29 +310,80 @@
             </div>
         </header>
 
-        <div id="accounts-list">
-            <div th:each="acc : ${accounts}" th:if="${acc.openTrades.size() > 0}"
-                th:class="${acc.type == 'REAL' ? 'account-section real' : 'account-section'}">
+        <div id="accounts-grid">
+            <div th:each="acc : ${accounts}" th:if="${acc.openTrades.size() > 0}" class="account-tile"
+                th:onclick="'openDetailModal(' + ${acc.accountId} + ')'">
 
-                <div class="account-header-bar">
-                    <div class="account-info">
-                        <span class="acc-name"
-                            th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : 'Account ' + acc.accountId}">Acc
-                            Name</span>
+                <!-- Header: Name + Status -->
+                <div class="tile-header">
+                    <div class="tile-account-info">
+                        <h3
+                            th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : 'Account ' + acc.accountId}">
+                            Acc Name</h3>
                         <span class="acc-id" th:text="'#' + ${acc.accountId}">#123456</span>
-                        <span class="badge-mini real" th:if="${acc.type == 'REAL'}"
-                            style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">REAL</span>
-                        <span class="badge-mini demo" th:if="${acc.type == 'DEMO'}"
-                            style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">DEMO</span>
+                        <span th:if="${acc.type == 'REAL'}" class="badge-mini real"
+                            style="margin-left: 5px; font-size: 0.7rem; padding: 2px 5px;">REAL</span>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Equity: </span>
-                        <span style="font-weight: bold;"
-                            th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</span>
+                    <!-- Status Dot -->
+                    <div th:class="${acc.isOnline(timeoutSeconds) ? 'status-dot online' : 'status-dot offline'}"
+                        th:title="${acc.isOnline(timeoutSeconds) ? 'Online' : 'Offline'}"></div>
+                </div>
+
+                <!-- Main Metrics -->
+                <div class="tile-metrics">
+                    <div class="metric-box">
+                        <span class="metric-label">Balance</span>
+                        <span class="metric-value" th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">Floating Profit</span>
+                        <span class="metric-value"
+                            th:classappend="${acc.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                            th:text="${#numbers.formatDecimal(acc.totalProfit, 1, 2)}">50.00</span>
                     </div>
                 </div>
 
-                <div class="trades-table-container">
+                <!-- Secondary Info: Symbols & Algos -->
+                <div class="tile-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Symbole:</span>
+                        <span class="detail-content">
+                            <!-- Helper to extract unique symbols -->
+                            <th:block th:with="symbols=${acc.getUniqueSymbols()}">
+                                <span
+                                    th:text="${symbols.length() > 30 ? symbols.substring(0, 27) + '...' : symbols}">EURUSD,
+                                    GBPUSD</span>
+                            </th:block>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Algos:</span>
+                        <span class="detail-content">
+                            <!-- Helper to extract unique magic names via mappings -->
+                            <th:block th:with="distinctMagicNames=${acc.getUniqueAlgoNames(magicMappings)}">
+                                <span
+                                    th:text="${distinctMagicNames.length() > 30 ? distinctMagicNames.substring(0, 27) + '...' : distinctMagicNames}">Scalper,
+                                    Grid</span>
+                            </th:block>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Hidden Table Data for Modal -->
+                <div th:id="'trades-data-' + ${acc.accountId}" class="hidden-data">
+                    <div class="account-header-bar" style="margin-bottom: 1rem; border-radius: 8px;">
+                        <span class="acc-name" th:text="${acc.name != null ? acc.name : acc.accountId}">Acc Name</span>
+                        <span class="acc-id" th:text="'#' + ${acc.accountId}">#123456</span>
+
+                        <!-- Balance & Profit -->
+                        <div style="margin-left: auto; display: flex; gap: 2rem;">
+                            <span>Balance: <span style="font-weight: bold;"
+                                    th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}"></span></span>
+                            <span>Open Profit: <span style="font-weight: bold;"
+                                    th:class="${acc.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(acc.totalProfit, 1, 2)}"></span></span>
+                        </div>
+                    </div>
                     <table class="trades-table">
                         <thead>
                             <tr>
@@ -218,6 +395,7 @@
                                 <th>Time</th>
                                 <th>Profit</th>
                                 <th>Magic</th>
+                                <th>Algo Name</th>
                                 <th>Status</th>
                                 <th>Comment</th>
                             </tr>
@@ -237,6 +415,7 @@
                                     th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}" style="font-weight: bold;">
                                     +50.00</td>
                                 <td th:text="${trade.magicNumber}">12345</td>
+                                <td th:text="${magicMappings.getOrDefault(trade.magicNumber, '-')}">-</td>
                                 <td>
                                     <span th:if="${acc.type == 'REAL'}">
                                         <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
@@ -251,20 +430,74 @@
                         </tbody>
                     </table>
                 </div>
+
             </div>
 
-            <div th:if="${totalTrades == 0}" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <div th:if="${totalTrades == 0}"
+                style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
                 <h2>Keine offenen Trades</h2>
                 <p>Aktuell sind keine Positionen in den verbundenen Accounts geöffnet.</p>
             </div>
         </div>
     </div>
 
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal-overlay" onclick="closeDetailModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <h2 id="modal-account-title">Account Details</h2>
+                </div>
+                <button class="modal-close" onclick="closeDetailModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Content injected via JS -->
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Auto-refresh every 10 seconds to keep data fresh, but less aggressive than dashboard
+        // Auto-refresh every 10 seconds
         setTimeout(function () {
-            location.reload();
+            // Only reload if modal is NOT open to avoid UX interruption
+            if (!document.getElementById('detail-modal').classList.contains('active')) {
+                location.reload();
+            }
         }, 10000);
+
+        function openDetailModal(accountId) {
+            const dataDiv = document.getElementById('trades-data-' + accountId);
+            if (!dataDiv) return;
+
+            const modalBody = document.getElementById('modal-body-content');
+            modalBody.innerHTML = dataDiv.innerHTML;
+
+            const modal = document.getElementById('detail-modal');
+            modal.style.display = 'flex'; // Ensure display flex before opacity transition
+            // Small delay to allow display change to render before adding active class for transition
+            requestAnimationFrame(() => {
+                modal.classList.add('active');
+            });
+
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closeDetailModal(event) {
+            if (event && event.target !== event.currentTarget && event.target.className !== 'modal-close') {
+                return; // Clicked inside modal content (if called via overlay click, this check is redundant due to stopPropagation, but safe)
+            }
+
+            const modal = document.getElementById('detail-modal');
+            modal.classList.remove('active');
+
+            document.body.style.overflow = ''; // Restore scrolling
+
+            // Wait for transition to finish before hiding
+            setTimeout(() => {
+                modal.style.display = 'none';
+                document.getElementById('modal-body-content').innerHTML = '';
+            }, 300);
+        }
     </script>
 </body>
 

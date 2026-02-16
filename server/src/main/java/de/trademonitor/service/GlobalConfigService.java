@@ -114,4 +114,43 @@ public class GlobalConfigService {
         repository.save(new GlobalConfigEntity(KEY_MAIL_TO, to));
         repository.save(new GlobalConfigEntity(KEY_MAIL_MAX_PER_DAY, String.valueOf(maxPerDay)));
     }
+    // --- Homey Configuration Methods ---
+
+    public static final String KEY_HOMEY_ID = "HOMEY_ID";
+    public static final String KEY_HOMEY_EVENT = "HOMEY_EVENT";
+    public static final String KEY_HOMEY_TRIGGER_SYNC = "HOMEY_TRIGGER_SYNC";
+    public static final String KEY_HOMEY_TRIGGER_API = "HOMEY_TRIGGER_API";
+    public static final String KEY_HOMEY_REPEAT_COUNT = "HOMEY_REPEAT_COUNT";
+
+    public String getHomeyId() {
+        return repository.findById(KEY_HOMEY_ID).map(GlobalConfigEntity::getConfValue)
+                .orElse("64a951ea4ce9759d39b1abd3");
+    }
+
+    public String getHomeyEvent() {
+        return repository.findById(KEY_HOMEY_EVENT).map(GlobalConfigEntity::getConfValue).orElse("sirene_an");
+    }
+
+    public int getHomeyRepeatCount() {
+        return repository.findById(KEY_HOMEY_REPEAT_COUNT).map(e -> Integer.parseInt(e.getConfValue())).orElse(1);
+    }
+
+    public boolean isHomeyTriggerSync() {
+        return repository.findById(KEY_HOMEY_TRIGGER_SYNC).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(false);
+    }
+
+    public boolean isHomeyTriggerApi() {
+        return repository.findById(KEY_HOMEY_TRIGGER_API).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(false);
+    }
+
+    public void saveHomeyConfig(String homeyId, String eventName, boolean triggerSync, boolean triggerApi,
+            int repeatCount) {
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_ID, homeyId));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_EVENT, eventName));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_API, String.valueOf(triggerApi)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
+    }
 }

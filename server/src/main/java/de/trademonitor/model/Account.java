@@ -28,12 +28,39 @@ public class Account {
     // Transient field for sync warning
     private boolean syncWarning;
 
+    // Transient fields for API error warning
+    private String lastErrorMsg;
+    private LocalDateTime lastErrorTime;
+
     public boolean isSyncWarning() {
         return syncWarning;
     }
 
     public void setSyncWarning(boolean syncWarning) {
         this.syncWarning = syncWarning;
+    }
+
+    public String getLastErrorMsg() {
+        return lastErrorMsg;
+    }
+
+    public void setLastErrorMsg(String lastErrorMsg) {
+        this.lastErrorMsg = lastErrorMsg;
+    }
+
+    public LocalDateTime getLastErrorTime() {
+        return lastErrorTime;
+    }
+
+    public void setLastErrorTime(LocalDateTime lastErrorTime) {
+        this.lastErrorTime = lastErrorTime;
+    }
+
+    // Check if account is in error state (error within last 5 minutes)
+    public boolean isErrorState() {
+        if (lastErrorTime == null)
+            return false;
+        return LocalDateTime.now().minusMinutes(5).isBefore(lastErrorTime);
     }
 
     private List<Trade> openTrades = new ArrayList<>();
@@ -287,5 +314,25 @@ public class Account {
                     new MagicProfitEntry(magic, magicName, openProfit, closedProfit, openCount, closedCount));
         }
         return entries;
+    }
+
+    // Helper method for Thymeleaf
+    public String getUniqueSymbols() {
+        if (openTrades == null)
+            return "";
+        return openTrades.stream()
+                .map(Trade::getSymbol)
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    // Helper method for Thymeleaf: unique algo names via magic number mapping
+    public String getUniqueAlgoNames(Map<Long, String> mappings) {
+        if (openTrades == null)
+            return "";
+        return openTrades.stream()
+                .map(t -> mappings.getOrDefault(t.getMagicNumber(), "Magic " + t.getMagicNumber()))
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 }

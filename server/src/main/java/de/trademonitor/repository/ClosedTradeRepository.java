@@ -12,6 +12,8 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
 
     List<ClosedTradeEntity> findByAccountId(long accountId);
 
+    List<ClosedTradeEntity> findByAccountIdOrderByCloseTimeDesc(long accountId);
+
     boolean existsByAccountIdAndTicket(long accountId, long ticket);
 
     long countByAccountId(long accountId);

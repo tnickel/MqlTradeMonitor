@@ -84,4 +84,48 @@ public class EmailService {
             e.printStackTrace();
         }
     }
+
+    /**
+     * Sends a test email immediately, bypassing daily rate limits.
+     * Throws exception if sending fails, so the caller can report it.
+     */
+    public void sendTestEmail() throws Exception {
+        // 1. Validate Config
+        String to = configService.getMailTo();
+        if (to == null || to.isEmpty()) {
+            throw new Exception("Email 'To' address not configured.");
+        }
+
+        String host = configService.getMailHost();
+        if (host == null || host.isEmpty()) {
+            throw new Exception("Email 'Host' not configured.");
+        }
+
+        // 2. Configure Sender
+        JavaMailSenderImpl sender = new JavaMailSenderImpl();
+        sender.setHost(host);
+        sender.setPort(configService.getMailPort());
+        sender.setUsername(configService.getMailUser());
+        sender.setPassword(configService.getMailPassword());
+
+        Properties props = sender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
+
+        // 3. Create and Send Message
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(configService.getMailFrom());
+        message.setTo(to);
+        message.setSubject("Trade Monitor Test Email");
+        message.setText(
+                "This is a test email from your Trade Monitor Server.\n\nTime: " + java.time.LocalDateTime.now());
+
+        sender.send(message);
+
+        System.out.println("Test email sent to " + to);
+    }
 }

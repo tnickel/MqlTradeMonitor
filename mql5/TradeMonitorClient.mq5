@@ -4,11 +4,11 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "2.10"
+#property version   "1.00"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
-input string   ServerURL = "http://127.0.0.1:8080";   // Server URL (use IP, not localhost!)
+input string   ServerURL = "http://192.168.178.143:8080";   // Server URL (use IP, not localhost!)
 input int      UpdateIntervalSeconds = 5;              // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
@@ -16,6 +16,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
+#define EA_VERSION "1.00"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -44,9 +45,12 @@ string g_lastSyncedCloseTime = "";       // Last close time successfully synced 
 
 //--- Reconnect tracking
 int g_reconnectAttempts = 0;             // Number of reconnect attempts
-bool g_maxAttemptsReached = false;       // Whether max attempts reached (stop trying)
 bool g_extendedRetryMode = false;        // Whether we are in the 15-minute extended retry phase
-datetime g_extendedRetryStartTime = 0;   // When the extended retry phase started
+datetime g_nextRetryTime = 0;            // Timestamp for next retry attempt
+int g_lastError = 0;                     // Last web request error
+
+//--- Constants
+#define LONG_RETRY_INTERVAL 900          // 15 minutes (900 seconds) for long retry mode
 
 //--- Button and Label constants
 #define BTN_RECONNECT "btnReconnectServer"
@@ -168,7 +172,7 @@ void InitConfig()
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   Print("TradeMonitorClient EA v2.10 initialized");
+   Print("TradeMonitorClient EA v" + EA_VERSION + " initialized");
    
    // Load or initialize configuration
    InitConfig();
@@ -204,6 +208,7 @@ int OnInit()
    if(RegisterWithServer())
    {
       isRegistered = true;
+      g_lastError = 0;
       Print("Successfully registered with server");
       
       // Send full trade list on first connect (only if not already sent)
@@ -219,12 +224,15 @@ int OnInit()
          else
          {
             Print("Failed to send initial trade list - will be retried");
+            g_lastError = GetLastError();
          }
       }
    }
    else
    {
+      g_lastError = GetLastError();
       Print("Failed to register with server - will retry every ", cfg_ReconnectIntervalSeconds, " seconds");
+      g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
    }
    
    // Set timer for periodic updates
@@ -250,55 +258,61 @@ void OnDeinit(const int reason)
 void OnTimer()
 {
    uint currentTick = GetTickCount();
+   datetime now = TimeCurrent();
    
    // Check if we need to register / reconnect
    if(!isRegistered)
    {
-      // Stop trying if max attempts reached
-      if(g_maxAttemptsReached)
-      {
-         UpdateStatusLabel("MQL5 Client: Connection Failed", clrRed);
-         return;
-      }
+      int secondsRemaining = (int)(g_nextRetryTime - now);
+      if(secondsRemaining < 0) secondsRemaining = 0;
       
-      // Check for extended retry mode expiration
+      string statusText = "";
+      color statusColor = clrRed;
+      
       if(g_extendedRetryMode)
       {
-         UpdateStatusLabel("MQL5 Client: 15 minute check", clrRed);
-         if(TimeCurrent() - g_extendedRetryStartTime > 15 * 60) // 15 minutes
-         {
-            g_maxAttemptsReached = true;
-            g_extendedRetryMode = false;
-            Print("Extended retry period (15 min) expired. No more automatic retries.");
-            Print("Press 'Reconnect Server' button to try again.");
-            return;
-         }
+         statusText = "Offline (Long Retry Mode)";
+         statusText += "\nNext attempt in: " + IntegerToString(secondsRemaining) + "s";
       }
       else
       {
-         UpdateStatusLabel("MQL5 Client: Connection setup", clrOrange);
+         statusText = "Offline (Retrying...)";
+         statusText += "\nNext attempt in: " + IntegerToString(secondsRemaining) + "s";
+         statusText += "\nAttempt " + IntegerToString(g_reconnectAttempts + 1) + "/" + IntegerToString(cfg_MaxReconnectAttempts);
+         statusColor = clrOrange;
       }
       
-      // Only try every cfg_ReconnectIntervalSeconds
-      if(currentTick - lastReconnectAttemptTick < (uint)cfg_ReconnectIntervalSeconds * 1000)
+      if(g_lastError > 0)
+      {
+         statusText += "\nLast Error: " + IntegerToString(g_lastError);
+      }
+      
+      UpdateStatusLabel(statusText, statusColor);
+      
+      // Wait for next retry time
+      if(now < g_nextRetryTime)
          return;
       
-      lastReconnectAttemptTick = currentTick;
+      // Perform Retry
       g_reconnectAttempts++;
       
       if(g_extendedRetryMode)
-         Print("Extended Retry attempt ", g_reconnectAttempts, " (started ", TimeToString(g_extendedRetryStartTime, TIME_MINUTES), ")");
+         Print("Extended Retry attempt ", g_reconnectAttempts, " (Interval: 15 min)");
       else
          Print("Reconnect attempt ", g_reconnectAttempts, "/", cfg_MaxReconnectAttempts);
       
       if(RegisterWithServer())
       {
+         // SUCCESS
          isRegistered = true;
          g_extendedRetryMode = false; // Exit extended mode
-         UpdateStatusLabel("MQL5 Client: Connected", clrGreen);
+         g_reconnectAttempts = 0;
+         g_lastError = 0;
+         
+         statusText = "Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+         UpdateStatusLabel(statusText, clrGreen);
          
          Print("Successfully registered with server");
-         g_reconnectAttempts = 0;
          
          // Send full trade list on reconnect (if not already sent)
          if(!g_tradeListSent)
@@ -314,19 +328,40 @@ void OnTimer()
       }
       else
       {
-         // Check if max attempts reached (only if NOT already in extended mode)
+         // FAILURE
+         g_lastError = GetLastError();
+         
+         // Check if we should switch to extended retry mode
          if(!g_extendedRetryMode && cfg_MaxReconnectAttempts > 0 && g_reconnectAttempts >= cfg_MaxReconnectAttempts)
          {
             g_extendedRetryMode = true;
-            g_extendedRetryStartTime = TimeCurrent();
-            g_reconnectAttempts = 0; // Reset counter for extended phase
+            g_reconnectAttempts = 0; // Reset counter for extended phase logic if needed
             Print("Max normal reconnect attempts reached. Switching to 15-minute extended retry mode.");
+            
+            // Set next retry time to LONG interval
+            g_nextRetryTime = now + LONG_RETRY_INTERVAL;
+         }
+         else
+         {
+            // Determine next retry interval based on mode
+            int interval = g_extendedRetryMode ? LONG_RETRY_INTERVAL : cfg_ReconnectIntervalSeconds;
+            g_nextRetryTime = now + interval;
+            
+            Print("Reconnect failed. Next attempt in ", interval, " seconds.");
          }
       }
       return;
    }
    
-   UpdateStatusLabel("MQL5 Client: Connected", clrGreen);
+   // --- CONNECTED STATE ---
+   
+   string statusText = "Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   if(g_tradeListSent)
+      statusText += "\nSync: OK";
+   else
+      statusText += "\nSync: Pending";
+      
+   UpdateStatusLabel(statusText, clrGreen);
    
    // Normal update cycle (only if registered and trade list was sent)
    if(g_tradeListSent)
@@ -352,7 +387,7 @@ void OnTimer()
       // Give up after MAX_INIT_RETRIES to avoid infinite loop
       if(g_initRetryCount >= MAX_INIT_RETRIES)
       {
-         // Already logged the max-retries message, just wait for manual reconnect
+         UpdateStatusLabel("Connected\nSync Failed (Max Retries)", clrRed);
          return;
       }
       
@@ -372,14 +407,15 @@ void OnTimer()
          }
          else
          {
-            if(g_initRetryCount >= MAX_INIT_RETRIES)
-            {
-               Print("=== Max init retries (", MAX_INIT_RETRIES, ") reached. Press 'Reconnect Server' to try again. ===");
-            }
-            else
-            {
-               Print("Init trade list send failed, will retry in ", cfg_ReconnectIntervalSeconds, " seconds");
-            }
+             g_lastError = GetLastError();
+             if(g_initRetryCount >= MAX_INIT_RETRIES)
+             {
+                Print("=== Max init retries (", MAX_INIT_RETRIES, ") reached. Press 'Reconnect Server' to try again. ===");
+             }
+             else
+             {
+                Print("Init trade list send failed, will retry in ", cfg_ReconnectIntervalSeconds, " seconds");
+             }
          }
       }
    }
@@ -396,7 +432,7 @@ void CreateStatusLabel()
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_XDISTANCE, 170); // Right of the button (10 + 150 + 10)
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_YDISTANCE, 35);  // Align with button text
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "MQL5 Client: Initializing...");
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "MQL5 Client v" + EA_VERSION + ": Initializing...");
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, clrWhite);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_FONTSIZE, 10);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_SELECTABLE, false);
@@ -409,7 +445,7 @@ void CreateStatusLabel()
 //+------------------------------------------------------------------+
 void UpdateStatusLabel(string text, color col)
 {
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, text);
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, col);
    ChartRedraw(0);
 }
@@ -433,9 +469,8 @@ void OnChartEvent(const int id,
          
          // Reset all reconnect state
          g_reconnectAttempts = 0;
-         g_maxAttemptsReached = false;
          g_extendedRetryMode = false;
-         g_extendedRetryStartTime = 0;
+         g_nextRetryTime = 0;
          UpdateStatusLabel("MQL5 Client: Connection setup", clrOrange);
          g_tradeListSent = false;
          g_tradeListSentTime = 0;

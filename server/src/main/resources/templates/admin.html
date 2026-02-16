@@ -85,9 +85,15 @@
 
                 <div class="form-group">
                     <label for="password" style="color: #8b949e; display: block; margin-bottom: 5px;">Passwort</label>
-                    <input type="password" id="password" name="password" th:value="${mailPassword}"
-                        placeholder="********"
-                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <div style="display: flex; gap: 5px;">
+                        <input type="password" id="password" name="password" th:value="${mailPassword}"
+                            placeholder="********"
+                            style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                        <button type="button" onclick="togglePasswordVisibility()" title="Passwort anzeigen"
+                            style="background-color: #30363d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; border-radius: 4px; cursor: pointer;">
+                            👁️
+                        </button>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -116,6 +122,57 @@
                     <div style="margin-top: 10px; font-size: 0.85em; color: #8b949e;">
                         * Änderungen werden sofort aktiv. Standard: mail.gmx.net (587).
                     </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🏠 Homey Integration</h2>
+            <form action="/admin/homey-config" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+
+                <div class="form-group">
+                    <label for="homeyId" style="color: #8b949e; display: block; margin-bottom: 5px;">Homey ID</label>
+                    <input type="text" id="homeyId" name="homeyId" th:value="${homeyId}" placeholder="Deine Homey ID"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+
+                <div class="form-group">
+                    <label for="homeyEvent" style="color: #8b949e; display: block; margin-bottom: 5px;">Event
+                        Name</label>
+                    <input type="text" id="homeyEvent" name="homeyEvent" th:value="${homeyEvent}"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <label for="repeatCount" style="color: #8b949e; display: block; margin-bottom: 5px;">Wiederholungen
+                        (n-mal hupen)</label>
+                    <input type="number" id="repeatCount" name="repeatCount" th:value="${homeyRepeatCount}" min="1"
+                        max="100"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+
+                <div class="form-group"
+                    style="grid-column: span 2; display: flex; gap: 20px; padding: 10px; background-color: #0d1117; border-radius: 4px; border: 1px solid #30363d;">
+                    <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" name="triggerSync" th:checked="${homeyTriggerSync}"
+                            style="margin-right: 8px;">
+                        Bei Sync-Fehler (Real vs Demo)
+                    </label>
+                    <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" name="triggerApi" th:checked="${homeyTriggerApi}"
+                            style="margin-right: 8px;">
+                        Bei API-Fehler
+                    </label>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2; display: flex; gap: 10px;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1;">Speichern</button>
+                    <button type="button" onclick="testSiren()"
+                        style="background-color: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🚨
+                        Test Sirene</button>
                 </div>
             </form>
         </div>
@@ -202,6 +259,26 @@
             <p>H2 Console: <a href="/h2-console" target="_blank">/h2-console</a></p>
         </footer>
     </div>
+
+    <script>
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+            } else {
+                passwordInput.type = 'password';
+            }
+        }
+
+        function testSiren() {
+            if (!confirm("Sirene jetzt testen?")) return;
+
+            fetch('/api/test-siren', { method: 'POST' })
+                .then(response => response.text())
+                .then(data => alert(data))
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+    </script>
 </body>
 
 </html>
