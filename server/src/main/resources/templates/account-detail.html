@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor'">Account Detail - Trade Monitor</title>
+    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.1'">Account Detail - Trade Monitor</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
@@ -46,6 +46,11 @@
             color: var(--text-muted);
             font-size: 0.85rem;
         }
+
+        .trade-today {
+            background-color: rgba(99, 102, 241, 0.12) !important;
+            /* Subtle primary tint */
+        }
     </style>
 </head>
 
@@ -53,12 +58,23 @@
     <div class="container">
         <header>
             <a href="/" class="back-link">← Zurück zum Dashboard</a>
-            <h1>
-                <span th:text="${account.accountId}">12345</span>
-                <span th:class="${online ? 'status-badge online' : 'status-badge offline'}"
-                    th:text="${online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
-            </h1>
-            <p class="subtitle" th:text="${account.broker}">Broker Name</p>
+
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="badg-mini" style="font-family: 'JetBrains Mono'; font-size: 1.35rem; color: #a0a0c0;"
+                        th:text="'#' + ${account.accountId}">#12345</span>
+                    <span th:class="${online ? 'status-badge online' : 'status-badge offline'}"
+                        th:text="${online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                    <span th:if="${account.type == 'REAL'}" class="badge-mini real"
+                        style="font-size: 0.8rem; padding: 2px 6px;">REAL</span>
+                </div>
+
+                <h1 th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}"
+                    th:style="${account.name == 'FXSSI10_KI'} ? 'margin: 5px 0 0 0; font-size: 2.5rem; color: #ffd700;' : 'margin: 5px 0 0 0; font-size: 2.5rem;'">
+                    Currency Pair / Strategy Name</h1>
+
+                <p class="subtitle" th:text="${account.broker}" style="margin-top: 5px;">Broker Name</p>
+            </div>
         </header>
 
         <div class="account-summary">
@@ -318,7 +334,8 @@
                     </thead>
                     <tbody>
                         <!-- Loop all closed trades, rows will be filtered by JS -->
-                        <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}">
+                        <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}"
+                            th:classappend="${trade.closeTime != null && trade.closeTime.startsWith(todayDate)} ? 'trade-today'">
                             <td th:text="${trade.ticket}">123456789</td>
                             <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
                             <td>
@@ -344,7 +361,7 @@
 
         <footer>
             <p>Letzte Aktualisierung: <span th:text="${account.lastSeen}">2026-02-09
-                    20:30:00</span></p>
+                    20:30:00</span> <span style="margin-left: 10px; opacity: 0.5;">v1.1</span></p>
         </footer>
     </div>
 

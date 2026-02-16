@@ -72,6 +72,22 @@
             border-color: var(--accent-primary);
         }
 
+        /* Special Account Styling (e.g. FXSSI10_KI) */
+        .account-tile.account-special {
+            border: 1px solid #ffd700;
+            /* Gold */
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+        }
+
+        .account-tile.account-special:hover {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            border-color: #ffd700;
+        }
+
+        .account-tile.account-special h3 {
+            color: #ffd700;
+        }
+
         .tile-header {
             display: flex;
             justify-content: space-between;
@@ -82,14 +98,21 @@
 
         .tile-account-info h3 {
             margin: 0;
-            font-size: 1.1rem;
+            font-size: 1.5rem;
+            /* Standardized to 1.5rem */
+            font-weight: 700;
             color: var(--text-primary);
+            line-height: 1.2;
         }
 
         .tile-account-info .acc-id {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
+            font-size: 0.9rem;
+            /* Standardized to 0.9rem */
+            color: var(--text-muted);
+            display: block;
+            /* Force new line if needed */
+            margin-top: 0.25rem;
         }
 
         .status-dot {
@@ -312,17 +335,22 @@
 
         <div id="accounts-grid">
             <div th:each="acc : ${accounts}" th:if="${acc.openTrades.size() > 0}" class="account-tile"
+                th:classappend="${acc.name == 'FXSSI10_KI'} ? 'account-special'"
                 th:onclick="'openDetailModal(' + ${acc.accountId} + ')'">
 
                 <!-- Header: Name + Status -->
                 <div class="tile-header">
                     <div class="tile-account-info">
+                        <!-- ID is now small and above/secondary -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                            <span class="acc-id" th:text="'#' + ${acc.accountId}">#123456</span>
+                            <span th:if="${acc.type == 'REAL'}" class="badge-mini real"
+                                style="font-size: 0.7rem; padding: 2px 5px;">REAL</span>
+                        </div>
+                        <!-- Name is huge -->
                         <h3
                             th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : 'Account ' + acc.accountId}">
                             Acc Name</h3>
-                        <span class="acc-id" th:text="'#' + ${acc.accountId}">#123456</span>
-                        <span th:if="${acc.type == 'REAL'}" class="badge-mini real"
-                            style="margin-left: 5px; font-size: 0.7rem; padding: 2px 5px;">REAL</span>
                     </div>
                     <!-- Status Dot -->
                     <div th:class="${acc.isOnline(timeoutSeconds) ? 'status-dot online' : 'status-dot offline'}"

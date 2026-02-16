@@ -373,6 +373,10 @@ public class DashboardController {
         // Build magic curve data as JSON for Chart.js
         model.addAttribute("magicCurveJson", buildMagicCurveJson(account, maxAge, mappings));
 
+        // Add today's date for highlighting (format matches UI: yyyy.MM.dd)
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        model.addAttribute("todayDate", java.time.LocalDate.now().format(formatter));
+
         return "account-detail";
     }
 
@@ -481,4 +485,224 @@ public class DashboardController {
         return "redirect:/admin";
     }
 
+    @GetMapping("/api/report-details/{period}/{accountId}")
+    @ResponseBody
+    public List<de.trademonitor.entity.ClosedTradeEntity> getReportDetails(@PathVariable String period,
+            @PathVariable Long accountId) {
+        List<de.trademonitor.entity.ClosedTradeEntity> allTrades = closedTradeRepository.findByAccountId(accountId);
+        java.util.function.Predicate<String> dateFilter = getDateFilter(period);
+
+        return allTrades.stream()
+                .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
+                .sorted((a, b) -> b.getCloseTime().compareTo(a.getCloseTime())) // Newest first
+                .collect(Collectors.toList());
+    }
+
+    @GetMapping("/api/report-chart/{period}")
+    @ResponseBody
+    public Map<String, Object> getReportChartData(@PathVariable String period) {
+        List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        List<Double> data;
+        List<String> labels;
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter fullFormatter = java.time.format.DateTimeFormatter
+                .ofPattern("yyyy.MM.dd HH:mm:ss");
+
+        // Filter valid trades first (Real accounts preferred? No, specific requirement
+        // was closed trades)
+        // User said: "nur die gewinn die geschlossen wurden" -> Aggregated for ALL
+        // accounts?
+        // Based on the tiles, it seems to show global performance for that period.
+
+        // 1. Collect all relevant trades
+        java.util.function.Predicate<String> dateFilter = getDateFilter(period);
+        List<de.trademonitor.entity.ClosedTradeEntity> allRelevantTrades = new ArrayList<>();
+
+        for (Map<String, Object> acc : accounts) {
+            Long accountId = (Long) acc.get("accountId");
+            List<de.trademonitor.entity.ClosedTradeEntity> accountTrades = closedTradeRepository
+                    .findByAccountId(accountId);
+            allRelevantTrades.addAll(accountTrades.stream()
+                    .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
+                    .collect(Collectors.toList()));
+        }
+
+        // 2. Aggregate based on period
+        if ("daily".equalsIgnoreCase(period)) {
+            // Hourly aggregation (00-23)
+            labels = new ArrayList<>();
+            Double[] hourlyProfit = new Double[24];
+            Arrays.fill(hourlyProfit, 0.0);
+
+            for (int i = 0; i < 24; i++)
+                labels.add(String.format("%02d", i));
+
+            for (de.trademonitor.entity.ClosedTradeEntity trade : allRelevantTrades) {
+                try {
+                    java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
+                    int hour = dt.getHour();
+                    hourlyProfit[hour] += trade.getProfit();
+                } catch (Exception e) {
+                }
+            }
+            data = Arrays.asList(hourlyProfit);
+
+        } else if ("weekly".equalsIgnoreCase(period)) {
+            // Day of week aggregation (Mon-Sun)
+            labels = Arrays.asList("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So");
+            Double[] dailyProfit = new Double[7];
+            Arrays.fill(dailyProfit, 0.0);
+
+            for (de.trademonitor.entity.ClosedTradeEntity trade : allRelevantTrades) {
+                try {
+                    java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
+                    int dayIndex = dt.getDayOfWeek().getValue() - 1; // 1 (Mon) -> 0
+                    dailyProfit[dayIndex] += trade.getProfit();
+                } catch (Exception e) {
+                }
+            }
+            data = Arrays.asList(dailyProfit);
+
+        } else if ("monthly".equalsIgnoreCase(period)) {
+            // Day of month aggregation
+            int daysInMonth = today.lengthOfMonth();
+            labels = new ArrayList<>();
+            Double[] dailyProfit = new Double[daysInMonth];
+            Arrays.fill(dailyProfit, 0.0);
+
+            for (int i = 1; i <= daysInMonth; i++)
+                labels.add(String.valueOf(i));
+
+            for (de.trademonitor.entity.ClosedTradeEntity trade : allRelevantTrades) {
+                try {
+                    java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
+                    int day = dt.getDayOfMonth();
+                    if (day >= 1 && day <= daysInMonth) {
+                        dailyProfit[day - 1] += trade.getProfit();
+                    }
+                } catch (Exception e) {
+                }
+            }
+            data = Arrays.asList(dailyProfit);
+        } else {
+            return new HashMap<>();
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("labels", labels);
+        response.put("data", data);
+        return response;
+    }
+
+    private java.util.function.Predicate<String> getDateFilter(String period) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        java.time.format.DateTimeFormatter monthFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM");
+        java.time.format.DateTimeFormatter fullFormatter = java.time.format.DateTimeFormatter
+                .ofPattern("yyyy.MM.dd HH:mm:ss");
+
+        switch (period.toLowerCase()) {
+            case "daily":
+                String todayStr = today.format(dateFormatter);
+                return date -> date.startsWith(todayStr);
+            case "monthly":
+                String monthStr = today.format(monthFormatter);
+                return date -> date.startsWith(monthStr);
+            case "weekly":
+                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
+                int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
+                int currentYear = today.getYear();
+                return date -> {
+                    try {
+                        java.time.LocalDateTime tradeDate = java.time.LocalDateTime.parse(date, fullFormatter);
+                        return tradeDate.get(weekFields.weekOfWeekBasedYear()) == currentWeek
+                                && tradeDate.getYear() == currentYear;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                };
+            default:
+                return date -> true;
+        }
+    }
+
+    @GetMapping("/report/{period}")
+    public String getReport(@PathVariable String period, Model model) {
+        List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        List<Map<String, Object>> reportData = new ArrayList<>();
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+        // Determine period title (filter logic moved to helper)
+        String periodTitle = "";
+        switch (period.toLowerCase()) {
+            case "daily":
+                periodTitle = "Tagesreport (" + today.format(dateFormatter) + ")";
+                break;
+            case "monthly":
+                periodTitle = "Monatsreport (" + today.getMonth() + " " + today.getYear() + ")";
+                break;
+            case "weekly":
+                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
+                int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
+                periodTitle = "Wochenreport (KW " + currentWeek + ")";
+                break;
+            default:
+                periodTitle = "Report (" + period + ")";
+        }
+
+        java.util.function.Predicate<String> dateFilter = getDateFilter(period);
+
+        for (Map<String, Object> acc : accounts) {
+            Long accountId = (Long) acc.get("accountId");
+
+            // Get closed trades
+            List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
+                    .findByAccountId(accountId);
+
+            // Filter and sum
+            java.util.DoubleSummaryStatistics closedStats = closedTrades.stream()
+                    .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
+                    .collect(java.util.DoubleSummaryStatistics::new,
+                            (stats, t) -> stats.accept(t.getProfit()),
+                            java.util.DoubleSummaryStatistics::combine);
+
+            Map<String, Object> row = new HashMap<>(acc);
+            row.put("closedCount", closedStats.getCount());
+            row.put("closedProfit", closedStats.getSum());
+            reportData.add(row);
+        }
+
+        // Sort: Real first, then Name
+        reportData.sort((a, b) -> {
+            String typeA = (String) a.get("type");
+            String typeB = (String) b.get("type");
+            if (!Objects.equals(typeA, typeB)) {
+                return "REAL".equals(typeA) ? -1 : 1;
+            }
+            String nameA = (String) a.get("name");
+            String nameB = (String) b.get("name");
+            return ResultComparator.compare(nameA, nameB);
+        });
+
+        model.addAttribute("reportData", reportData);
+        model.addAttribute("periodTitle", periodTitle);
+        model.addAttribute("period", period); // daily, weekly, monthly
+
+        return "report";
+    }
+
+    private static class ResultComparator {
+        static int compare(String s1, String s2) {
+            if (s1 == null && s2 == null)
+                return 0;
+            if (s1 == null)
+                return 1;
+            if (s2 == null)
+                return -1;
+            return s1.compareToIgnoreCase(s2);
+        }
+    }
 }

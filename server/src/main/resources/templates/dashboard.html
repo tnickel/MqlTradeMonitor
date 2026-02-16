@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -111,7 +112,100 @@
                 </div>
                 <div class="view-details-btn" style="padding: 0.5rem; font-size: 0.9rem;">Alle Trades →</div>
             </div>
+
+            <!-- Daily Report -->
+            <div class="account-card" onclick="location.href='/report/daily'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(158, 206, 106, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Daily</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Tagesreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-daily"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
+
+            <!-- Weekly Report -->
+            <div class="account-card" onclick="location.href='/report/weekly'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(224, 175, 104, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Weekly</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Wochenreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-weekly"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
+
+            <!-- Monthly Report -->
+            <div class="account-card" onclick="location.href='/report/monthly'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(122, 162, 247, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Monthly</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Monatsreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-monthly"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
         </div>
+
+        <script>
+            function initMiniChart(canvasId, period, color) {
+                fetch('/api/report-chart/' + period)
+                    .then(response => response.json())
+                    .then(data => {
+                        const ctx = document.getElementById(canvasId).getContext('2d');
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 60);
+                        gradient.addColorStop(0, color.replace('1)', '0.5)'));
+                        gradient.addColorStop(1, color.replace('1)', '0.0)'));
+
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: data.labels,
+                                datasets: [{
+                                    data: data.data,
+                                    borderColor: color,
+                                    backgroundColor: gradient,
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    fill: true,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                                scales: {
+                                    x: { display: false },
+                                    y: { display: false, beginAtZero: true }
+                                },
+                                layout: { padding: 0 }
+                            }
+                        });
+                    })
+                    .catch(err => console.error('Error loading chart ' + period, err));
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                initMiniChart('chart-daily', 'daily', 'rgba(158, 206, 106, 1)');   // Green
+                initMiniChart('chart-weekly', 'weekly', 'rgba(224, 175, 104, 1)'); // Yellow/Orange
+                initMiniChart('chart-monthly', 'monthly', 'rgba(122, 162, 247, 1)'); // Blue
+            });
+        </script>
 
         <div id="layout-container">
             <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
@@ -134,620 +228,630 @@
                         <div class="account-header"
                             style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="display: flex; flex-direction: column;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="account-id" th:text="${acc.accountId}">12345</span>
-                                    <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
-                                    <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                                <div style="display: flex; flex-direction: column;">
+                                    <!-- Name First (Larger) -->
+                                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
+                                        th:text="${acc.name}"
+                                        style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: block; margin-bottom: 5px; line-height: 1.2;">(Name)</span>
+
+                                    <!-- ID Below (Smaller) -->
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="account-id" th:text="${acc.accountId}"
+                                            style="font-size: 0.9rem; color: #a0a0c0; font-family: 'JetBrains Mono';">12345</span>
+                                        <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                                        <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                                    </div>
                                 </div>
-                                <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
-                                    th:text="${acc.name}"
-                                    style="font-size: 0.9em; color: #a0a0c0; margin-top: 4px;">(Name)</span>
-                            </div>
 
-                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
-                                        th:data-type="${acc.type}"
-                                        onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
-                                        title="Account bearbeiten">✏️</span>
-                                    <!-- Error Badge -->
-                                    <span th:if="${acc.errorState}" class="status-badge offline"
-                                        th:title="${acc.lastErrorMsg}"
-                                        style="background-color: #ef4444; color: white; cursor: help;">ERROR</span>
+                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                            th:data-type="${acc.type}"
+                                            onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                                            title="Account bearbeiten">✏️</span>
+                                        <!-- Error Badge -->
+                                        <span th:if="${acc.errorState}" class="status-badge offline"
+                                            th:title="${acc.lastErrorMsg}"
+                                            style="background-color: #ef4444; color: white; cursor: help;">ERROR</span>
 
-                                    <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
-                                        th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                                        <span th:class="${acc.online ? 'status-badge online' : 'status-badge offline'}"
+                                            th:text="${acc.online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+                                    </div>
+                                    <span th:if="${!acc.online}"
+                                        style="font-size: 0.75rem; color: #6b6b8f; white-space: nowrap;"
+                                        th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024</span>
                                 </div>
-                                <span th:if="${!acc.online}"
-                                    style="font-size: 0.75rem; color: #6b6b8f; white-space: nowrap;"
-                                    th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024</span>
-                            </div>
-                        </div>
-                        <div class="account-broker" th:text="${acc.broker}">Broker</div>
-                        <div class="account-metrics">
-                            <div class="metric">
-                                <span class="metric-label">Balance</span>
-                                <span class="metric-value"
-                                    th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">1000
-                                    USD</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Equity</span>
-                                <span class="metric-value"
-                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">1000
-                                    USD</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Profit</span>
-                                <span
-                                    th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
-                                    th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
-                                    USD</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Open Trades</span>
-                                <span class="metric-value" th:text="${acc.trades}">5</span>
-                            </div>
-                        </div>
-                        <!-- Error Message Footer -->
-                        <div th:if="${acc.errorState}"
-                            style="color: #ef4444; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 5px;">
-                            <span>⚠️ <span th:text="${acc.lastErrorMsg}">Error Message</span></span>
-                        </div>
+                                <div class="account-broker" th:text="${acc.broker}">Broker</div>
+                                <div class="account-metrics">
+                                    <div class="metric">
+                                        <span class="metric-label">Balance</span>
+                                        <span class="metric-value"
+                                            th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">1000
+                                            USD</span>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="metric-label">Equity</span>
+                                        <span class="metric-value"
+                                            th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">1000
+                                            USD</span>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="metric-label">Profit</span>
+                                        <span
+                                            th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                                            th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
+                                            USD</span>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="metric-label">Open Trades</span>
+                                        <span class="metric-value" th:text="${acc.trades}">5</span>
+                                    </div>
+                                </div>
+                                <!-- Error Message Footer -->
+                                <div th:if="${acc.errorState}"
+                                    style="color: #ef4444; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 5px;">
+                                    <span>⚠️ <span th:text="${acc.lastErrorMsg}">Error Message</span></span>
+                                </div>
 
-                        <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details anzeigen
-                            →</a>
+                                <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details
+                                    anzeigen
+                                    →</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Compact View Container -->
+                <div id="compact-view-container" style="display:none;">
+                    <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
+                        <h3 th:text="${section.name}" class="section-title"
+                            style="margin-bottom:10px; border-bottom:1px solid #3f3f5f; padding-bottom:5px;">Section
+                        </h3>
+                        <table class="compact-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">Stat</th>
+                                    <th>Account</th>
+                                    <th>Name</th>
+                                    <th>Balance</th>
+                                    <th>Equity</th>
+                                    <th>Profit</th>
+                                    <th>Trades</th>
+                                    <th style="text-align:center;">Sync</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="acc : ${accountsBySection.get(section.id)}"
+                                    th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
+                                    <td style="text-align:center;">
+                                        <span th:if="${acc.errorState}" class="status-dot offline"
+                                            style="background-color: #ef4444;" th:title="${acc.lastErrorMsg}"></span>
+                                        <span th:unless="${acc.errorState}"
+                                            th:class="${acc.online ? 'status-dot online' : 'status-dot offline'}"
+                                            th:title="${acc.online ? 'Online' : 'Offline'}"></span>
+                                    </td>
+                                    <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
+                                    <td th:text="${acc.name}">Name</td>
+                                    <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
+                                    <td th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</td>
+                                    <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                        th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
+                                    <td th:text="${acc.trades}">5</td>
+                                    <td style="text-align:center;">
+                                        <span th:if="${acc.syncWarning}" title="Sync Error!"
+                                            style="color: #ef4444; font-size:1.2em;">⚠️</span>
+                                        <span th:if="${!acc.syncWarning && acc.errorState}" title="API Error"
+                                            style="color: #ef4444; font-size:1.2em;">⛔</span>
+                                        <span th:if="${!acc.syncWarning && !acc.errorState}"
+                                            style="color: #10b981;">●</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="add-section-container" style="display:none; text-align: center; margin-top: 20px;">
+                    <button class="add-section-btn" onclick="addNewSection()">+ Neue Sektion</button>
+                </div>
+
+                <div class="no-accounts" th:if="${#lists.size(accounts) == 0}">
+                    <div class="no-accounts-icon">📊</div>
+                    <h2>Keine Accounts verbunden</h2>
+                    <p>Starten Sie den TradeMonitorClient EA auf MetaTrader um sich zu verbinden.</p>
+                    <div class="setup-instructions">
+                        <h3>Setup Anleitung:</h3>
+                        <ol>
+                            <li>Kopieren Sie <code>TradeMonitorClient.mq5</code> in Ihren MQL5/Experts Ordner</li>
+                            <li>Kompilieren Sie den EA im MetaEditor</li>
+                            <li>Fügen Sie <code>http://localhost:8080</code> zu den erlaubten URLs hinzu<br>
+                                (Tools → Optionen → Expert Advisors → WebRequest erlauben)</li>
+                            <li>Starten Sie den EA auf einem Chart</li>
+                        </ol>
+                    </div>
+                </div>
+
+
             </div>
-        </div>
 
-        <!-- Compact View Container -->
-        <div id="compact-view-container" style="display:none;">
-            <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
-                <h3 th:text="${section.name}" class="section-title"
-                    style="margin-bottom:10px; border-bottom:1px solid #3f3f5f; padding-bottom:5px;">Section</h3>
-                <table class="compact-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">Stat</th>
-                            <th>Account</th>
-                            <th>Name</th>
-                            <th>Balance</th>
-                            <th>Equity</th>
-                            <th>Profit</th>
-                            <th>Trades</th>
-                            <th style="text-align:center;">Sync</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="acc : ${accountsBySection.get(section.id)}"
-                            th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
-                            <td style="text-align:center;">
-                                <span th:if="${acc.errorState}" class="status-dot offline"
-                                    style="background-color: #ef4444;" th:title="${acc.lastErrorMsg}"></span>
-                                <span th:unless="${acc.errorState}"
-                                    th:class="${acc.online ? 'status-dot online' : 'status-dot offline'}"
-                                    th:title="${acc.online ? 'Online' : 'Offline'}"></span>
-                            </td>
-                            <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
-                            <td th:text="${acc.name}">Name</td>
-                            <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
-                            <td th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</td>
-                            <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
-                            <td th:text="${acc.trades}">5</td>
-                            <td style="text-align:center;">
-                                <span th:if="${acc.syncWarning}" title="Sync Error!"
-                                    style="color: #ef4444; font-size:1.2em;">⚠️</span>
-                                <span th:if="${!acc.syncWarning && acc.errorState}" title="API Error"
-                                    style="color: #ef4444; font-size:1.2em;">⛔</span>
-                                <span th:if="${!acc.syncWarning && !acc.errorState}" style="color: #10b981;">●</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <script>
+                function sendTestEmail() {
+                    if (!confirm("Test Email jetzt senden?")) return;
+
+                    fetch('/api/test-email', { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'ok') {
+                                alert('Erfolg: ' + data.message);
+                            } else {
+                                alert('Fehler: ' + data.message);
+                            }
+                        })
+                        .catch(error => alert('Netzwerkfehler: ' + error));
+                }
+
+                function testSiren() {
+                    if (!confirm("Sirene jetzt testen?")) return;
+
+                    fetch('/api/test-siren', { method: 'POST' })
+                        .then(response => response.text())
+                        .then(data => alert(data))
+                        .catch(error => alert('Netzwerkfehler: ' + error));
+                }
+            </script>
+
+            <!-- Edit Account Modal -->
+            <div id="editAccountModal" class="modal">
+                <div class="modal-content">
+                    <span class="close-modal" onclick="closeEditModal()">&times;</span>
+                    <h2>Account bearbeiten</h2>
+                    <input type="hidden" id="editAccountId">
+
+                    <div class="form-group">
+                        <label for="editAccountName">Name:</label>
+                        <input type="text" id="editAccountName" placeholder="z.B. My Scalper Bot">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editAccountType">Account Typ:</label>
+                        <select id="editAccountType">
+                            <option value="">-- Bitte wählen --</option>
+                            <option value="DEMO">Demo Account</option>
+                            <option value="REAL">Real Account</option>
+                        </select>
+                    </div>
+
+                    <button class="save-btn" onclick="saveAccountDetails()">Speichern</button>
+                </div>
             </div>
-        </div>
 
-        <div id="add-section-container" style="display:none; text-align: center; margin-top: 20px;">
-            <button class="add-section-btn" onclick="addNewSection()">+ Neue Sektion</button>
-        </div>
+            <script>
+                // Auto-refresh page every 5 seconds
+                let reloadTimer = setTimeout(reloadPage, 5000);
 
-        <div class="no-accounts" th:if="${#lists.size(accounts) == 0}">
-            <div class="no-accounts-icon">📊</div>
-            <h2>Keine Accounts verbunden</h2>
-            <p>Starten Sie den TradeMonitorClient EA auf MetaTrader um sich zu verbinden.</p>
-            <div class="setup-instructions">
-                <h3>Setup Anleitung:</h3>
-                <ol>
-                    <li>Kopieren Sie <code>TradeMonitorClient.mq5</code> in Ihren MQL5/Experts Ordner</li>
-                    <li>Kompilieren Sie den EA im MetaEditor</li>
-                    <li>Fügen Sie <code>http://localhost:8080</code> zu den erlaubten URLs hinzu<br>
-                        (Tools → Optionen → Expert Advisors → WebRequest erlauben)</li>
-                    <li>Starten Sie den EA auf einem Chart</li>
-                </ol>
-            </div>
-        </div>
-
-        <footer>
-            <p>Auto-refresh alle 5 Sekunden | Timeout: <span th:text="${timeoutSeconds}">60</span>s | <a
-                    href="/admin">⚙️ Admin</a> | <a href="#" onclick="sendTestEmail()" style="color: #6366f1;">📧 Test
-                    Email</a> | <a href="#" onclick="testSiren()" style="color: #ef4444;">🚨 Test Sirene</a></p>
-        </footer>
-    </div>
-
-    <script>
-        function sendTestEmail() {
-            if (!confirm("Test Email jetzt senden?")) return;
-
-            fetch('/api/test-email', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'ok') {
-                        alert('Erfolg: ' + data.message);
+                function reloadPage() {
+                    // Don't reload if modal is open OR if we are in Edit Mode
+                    if (document.getElementById('editAccountModal').style.display !== 'block' && !isEditMode) {
+                        location.reload();
                     } else {
-                        alert('Fehler: ' + data.message);
+                        // Try again in 1 second
+                        reloadTimer = setTimeout(reloadPage, 1000);
                     }
-                })
-                .catch(error => alert('Netzwerkfehler: ' + error));
-        }
+                }
 
-        function testSiren() {
-            if (!confirm("Sirene jetzt testen?")) return;
+                // --- View Mode Logic ---
+                function setViewMode(mode) {
+                    const grid = document.getElementById('layout-container');
+                    const compact = document.getElementById('compact-view-container');
+                    const btns = document.querySelectorAll('.view-toggle-btn');
 
-            fetch('/api/test-siren', { method: 'POST' })
-                .then(response => response.text())
-                .then(data => alert(data))
-                .catch(error => alert('Netzwerkfehler: ' + error));
-        }
-    </script>
+                    // Stats Bar filtering for Real Focus
+                    const statsBar = document.querySelector('.stats-bar');
 
-    <!-- Edit Account Modal -->
-    <div id="editAccountModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeEditModal()">&times;</span>
-            <h2>Account bearbeiten</h2>
-            <input type="hidden" id="editAccountId">
+                    // Reset active buttons
+                    btns.forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'var(--bg-card)';
+                        b.style.color = 'var(--text-secondary)';
+                        b.style.borderColor = 'var(--border-color)';
+                    });
 
-            <div class="form-group">
-                <label for="editAccountName">Name:</label>
-                <input type="text" id="editAccountName" placeholder="z.B. My Scalper Bot">
-            </div>
+                    // Set Active Button Style
+                    const activeBtn = document.getElementById('view-btn-' + mode);
+                    if (activeBtn) {
+                        activeBtn.classList.add('active');
+                        activeBtn.style.background = 'var(--accent-primary)';
+                        activeBtn.style.color = 'white';
+                        activeBtn.style.borderColor = 'var(--accent-primary)';
+                    }
 
-            <div class="form-group">
-                <label for="editAccountType">Account Typ:</label>
-                <select id="editAccountType">
-                    <option value="">-- Bitte wählen --</option>
-                    <option value="DEMO">Demo Account</option>
-                    <option value="REAL">Real Account</option>
-                </select>
-            </div>
+                    localStorage.setItem('tradeMonitorView', mode);
 
-            <button class="save-btn" onclick="saveAccountDetails()">Speichern</button>
-        </div>
-    </div>
+                    // Hide/Show Logic
+                    const allCards = document.querySelectorAll('.account-card');
+                    const sections = document.querySelectorAll('.dashboard-section');
 
-    <script>
-        // Auto-refresh page every 5 seconds
-        let reloadTimer = setTimeout(reloadPage, 5000);
+                    if (mode === 'compact') {
+                        grid.style.display = 'none';
+                        compact.style.display = 'block';
+                        // Show stat bar
+                        if (statsBar) statsBar.style.display = 'flex';
 
-        function reloadPage() {
-            // Don't reload if modal is open OR if we are in Edit Mode
-            if (document.getElementById('editAccountModal').style.display !== 'block' && !isEditMode) {
-                location.reload();
-            } else {
-                // Try again in 1 second
-                reloadTimer = setTimeout(reloadPage, 1000);
-            }
-        }
+                    } else if (mode === 'real') {
+                        grid.style.display = 'block';
+                        compact.style.display = 'none';
 
-        // --- View Mode Logic ---
-        function setViewMode(mode) {
-            const grid = document.getElementById('layout-container');
-            const compact = document.getElementById('compact-view-container');
-            const btns = document.querySelectorAll('.view-toggle-btn');
+                        // Filter Grid: Show ONLY REAL accounts
+                        // Also hide Global Card and Sync Monitor (as user requested "only the two tiles")
 
-            // Stats Bar filtering for Real Focus
-            const statsBar = document.querySelector('.stats-bar');
+                        allCards.forEach(card => {
+                            const type = card.getAttribute('data-type');
+                            // Check if it's a client card (has data-id)
+                            if (card.hasAttribute('data-id')) {
+                                if (type === 'REAL') {
+                                    card.style.display = 'block';
+                                } else {
+                                    card.style.display = 'none';
+                                }
+                            } else {
+                                // It's a system card (Global, Sync, etc.)
+                                // User said "nur die beiden kacheln". So hide system cards too?
+                                // "da werden dann nur die beiden kacheln für realaccounts angezeigt und natürlich auch die 3 buttons... mehr nicht."
+                                // So hide Global and Sync cards.
+                                card.style.display = 'none';
+                            }
+                        });
 
-            // Reset active buttons
-            btns.forEach(b => {
-                b.classList.remove('active');
-                b.style.background = 'var(--bg-card)';
-                b.style.color = 'var(--text-secondary)';
-                b.style.borderColor = 'var(--border-color)';
-            });
+                        // Hide empty sections title?
+                        sections.forEach(sec => {
+                            const realCards = sec.querySelectorAll('.account-card[data-type="REAL"]');
+                            if (realCards.length > 0) {
+                                sec.style.display = 'block';
+                            } else {
+                                sec.style.display = 'none';
+                            }
+                        });
 
-            // Set Active Button Style
-            const activeBtn = document.getElementById('view-btn-' + mode);
-            if (activeBtn) {
-                activeBtn.classList.add('active');
-                activeBtn.style.background = 'var(--accent-primary)';
-                activeBtn.style.color = 'white';
-                activeBtn.style.borderColor = 'var(--accent-primary)';
-            }
+                        // Hide Global Warning Banner?
+                        const banner = document.getElementById('sync-warning-banner');
+                        if (banner) banner.style.display = 'none';
 
-            localStorage.setItem('tradeMonitorView', mode);
 
-            // Hide/Show Logic
-            const allCards = document.querySelectorAll('.account-card');
-            const sections = document.querySelectorAll('.dashboard-section');
+                    } else {
+                        // GRID (Standard)
+                        grid.style.display = 'block';
+                        compact.style.display = 'none';
 
-            if (mode === 'compact') {
-                grid.style.display = 'none';
-                compact.style.display = 'block';
-                // Show stat bar
-                if (statsBar) statsBar.style.display = 'flex';
+                        // Show all cards
+                        allCards.forEach(c => c.style.display = '');
+                        sections.forEach(s => s.style.display = '');
 
-            } else if (mode === 'real') {
-                grid.style.display = 'block';
-                compact.style.display = 'none';
+                        if (statsBar) statsBar.style.display = 'flex';
+                        const banner = document.getElementById('sync-warning-banner');
+                        // Only show if warning present?
+                        // The banner logic runs every 5s anyway.
+                    }
+                }
 
-                // Filter Grid: Show ONLY REAL accounts
-                // Also hide Global Card and Sync Monitor (as user requested "only the two tiles")
+                // Restore View Preference
+                document.addEventListener('DOMContentLoaded', () => {
+                    const pref = localStorage.getItem('tradeMonitorView') || 'grid';
+                    setViewMode(pref);
+                });
 
-                allCards.forEach(card => {
-                    const type = card.getAttribute('data-type');
-                    // Check if it's a client card (has data-id)
-                    if (card.hasAttribute('data-id')) {
-                        if (type === 'REAL') {
-                            card.style.display = 'block';
-                        } else {
-                            card.style.display = 'none';
+                // Calculate stats
+                document.addEventListener('DOMContentLoaded', function () {
+                    const clientCards = document.querySelectorAll('.account-card:not([onclick*="open-trades"])'); // Select only client cards
+
+                    let online = 0;
+                    let trades = 0;
+                    let totalEquity = 0.0;
+                    let totalProfit = 0.0;
+                    let currency = "";
+
+                    clientCards.forEach(function (card) {
+                        if (card.classList.contains('online')) online++;
+
+                        // Trades (4th metric)
+                        const tradeSpan = card.querySelector('.metric:nth-child(4) .metric-value');
+                        if (tradeSpan) trades += parseInt(tradeSpan.textContent) || 0;
+
+                        // Equity (2nd metric)
+                        const equitySpan = card.querySelector('.metric:nth-child(2) .metric-value');
+                        if (equitySpan) {
+                            const text = equitySpan.textContent.trim();
+                            const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                            if (!isNaN(val)) totalEquity += val;
+                            // Try to grab currency from first card
+                            if (currency === "" && text.includes(" ")) currency = text.split(" ")[1];
                         }
-                    } else {
-                        // It's a system card (Global, Sync, etc.)
-                        // User said "nur die beiden kacheln". So hide system cards too?
-                        // "da werden dann nur die beiden kacheln für realaccounts angezeigt und natürlich auch die 3 buttons... mehr nicht."
-                        // So hide Global and Sync cards.
-                        card.style.display = 'none';
+
+                        // Profit (3rd metric)
+                        const profitSpan = card.querySelector('.metric:nth-child(3) .metric-value');
+                        if (profitSpan) {
+                            const text = profitSpan.textContent.trim();
+                            const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                            if (!isNaN(val)) totalProfit += val;
+                        }
+                    });
+
+                    if (currency === "") currency = "EUR"; // Default fallback
+
+                    const onlineCountEl = document.getElementById('online-count');
+                    if (onlineCountEl) onlineCountEl.textContent = online;
+
+                    const totalTradesEl = document.getElementById('total-trades');
+                    if (totalTradesEl) totalTradesEl.textContent = trades;
+
+                    // Update Global Card
+                    const globalTrades = document.getElementById('global-trades-count');
+                    const globalEquity = document.getElementById('global-equity-sum');
+                    const globalProfit = document.getElementById('global-profit-sum');
+
+                    if (globalTrades) globalTrades.textContent = trades;
+                    if (globalEquity) globalEquity.textContent = totalEquity.toFixed(2) + " " + currency;
+                    if (globalProfit) {
+                        globalProfit.textContent = (totalProfit > 0 ? "+" : "") + totalProfit.toFixed(2) + " " + currency;
+                        globalProfit.className = "metric-value " + (totalProfit >= 0 ? "profit-positive" : "profit-negative");
+                    }
+
+                    // Global Warning Banner Logic
+                    const warningCards = document.querySelectorAll('.account-card.warning-pulse');
+                    const banner = document.getElementById('sync-warning-banner');
+                    if (banner) {
+                        if (warningCards.length > 0) {
+                            banner.style.display = 'flex';
+                        } else {
+                            banner.style.display = 'none';
+                        }
                     }
                 });
 
-                // Hide empty sections title?
-                sections.forEach(sec => {
-                    const realCards = sec.querySelectorAll('.account-card[data-type="REAL"]');
-                    if (realCards.length > 0) {
-                        sec.style.display = 'block';
-                    } else {
-                        sec.style.display = 'none';
+                // Modal functions
+                function openEditModal(accountId, currentName, currentType) {
+                    document.getElementById('editAccountId').value = accountId;
+                    document.getElementById('editAccountName').value = currentName === 'null' ? '' : currentName;
+                    document.getElementById('editAccountType').value = currentType === 'null' ? '' : currentType;
+
+                    document.getElementById('editAccountModal').style.display = 'block';
+                }
+
+                function closeEditModal() {
+                    document.getElementById('editAccountModal').style.display = 'none';
+                }
+
+                function saveAccountDetails() {
+                    const accountId = document.getElementById('editAccountId').value;
+                    const name = document.getElementById('editAccountName').value;
+                    const type = document.getElementById('editAccountType').value;
+
+                    const formData = new FormData();
+                    formData.append('accountId', accountId);
+                    formData.append('name', name);
+                    formData.append('type', type);
+
+                    fetch('/api/account/update', {
+                        method: 'POST',
+                        body: formData
+                    })
+                        .then(response => {
+                            if (response.ok) {
+                                closeEditModal();
+                                location.reload();
+                            } else {
+                                alert('Fehler beim Speichern');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Fehler beim Speichern');
+                        });
+                }
+
+                // Close modal when clicking outside
+                window.onclick = function (event) {
+                    const modal = document.getElementById('editAccountModal');
+                    if (event.target == modal) {
+                        modal.style.display = "none";
                     }
-                });
-
-                // Hide Global Warning Banner?
-                const banner = document.getElementById('sync-warning-banner');
-                if (banner) banner.style.display = 'none';
-
-
-            } else {
-                // GRID (Standard)
-                grid.style.display = 'block';
-                compact.style.display = 'none';
-
-                // Show all cards
-                allCards.forEach(c => c.style.display = '');
-                sections.forEach(s => s.style.display = '');
-
-                if (statsBar) statsBar.style.display = 'flex';
-                const banner = document.getElementById('sync-warning-banner');
-                // Only show if warning present?
-                // The banner logic runs every 5s anyway.
-            }
-        }
-
-        // Restore View Preference
-        document.addEventListener('DOMContentLoaded', () => {
-            const pref = localStorage.getItem('tradeMonitorView') || 'grid';
-            setViewMode(pref);
-        });
-
-        // Calculate stats
-        document.addEventListener('DOMContentLoaded', function () {
-            const clientCards = document.querySelectorAll('.account-card:not([onclick*="open-trades"])'); // Select only client cards
-
-            let online = 0;
-            let trades = 0;
-            let totalEquity = 0.0;
-            let totalProfit = 0.0;
-            let currency = "";
-
-            clientCards.forEach(function (card) {
-                if (card.classList.contains('online')) online++;
-
-                // Trades (4th metric)
-                const tradeSpan = card.querySelector('.metric:nth-child(4) .metric-value');
-                if (tradeSpan) trades += parseInt(tradeSpan.textContent) || 0;
-
-                // Equity (2nd metric)
-                const equitySpan = card.querySelector('.metric:nth-child(2) .metric-value');
-                if (equitySpan) {
-                    const text = equitySpan.textContent.trim();
-                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
-                    if (!isNaN(val)) totalEquity += val;
-                    // Try to grab currency from first card
-                    if (currency === "" && text.includes(" ")) currency = text.split(" ")[1];
                 }
 
-                // Profit (3rd metric)
-                const profitSpan = card.querySelector('.metric:nth-child(3) .metric-value');
-                if (profitSpan) {
-                    const text = profitSpan.textContent.trim();
-                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
-                    if (!isNaN(val)) totalProfit += val;
-                }
-            });
+                // --- Drag and Drop Logic ---
+                let isEditMode = false;
 
-            if (currency === "") currency = "EUR"; // Default fallback
-
-            const onlineCountEl = document.getElementById('online-count');
-            if (onlineCountEl) onlineCountEl.textContent = online;
-
-            const totalTradesEl = document.getElementById('total-trades');
-            if (totalTradesEl) totalTradesEl.textContent = trades;
-
-            // Update Global Card
-            const globalTrades = document.getElementById('global-trades-count');
-            const globalEquity = document.getElementById('global-equity-sum');
-            const globalProfit = document.getElementById('global-profit-sum');
-
-            if (globalTrades) globalTrades.textContent = trades;
-            if (globalEquity) globalEquity.textContent = totalEquity.toFixed(2) + " " + currency;
-            if (globalProfit) {
-                globalProfit.textContent = (totalProfit > 0 ? "+" : "") + totalProfit.toFixed(2) + " " + currency;
-                globalProfit.className = "metric-value " + (totalProfit >= 0 ? "profit-positive" : "profit-negative");
-            }
-
-            // Global Warning Banner Logic
-            const warningCards = document.querySelectorAll('.account-card.warning-pulse');
-            const banner = document.getElementById('sync-warning-banner');
-            if (banner) {
-                if (warningCards.length > 0) {
-                    banner.style.display = 'flex';
-                } else {
-                    banner.style.display = 'none';
-                }
-            }
-        });
-
-        // Modal functions
-        function openEditModal(accountId, currentName, currentType) {
-            document.getElementById('editAccountId').value = accountId;
-            document.getElementById('editAccountName').value = currentName === 'null' ? '' : currentName;
-            document.getElementById('editAccountType').value = currentType === 'null' ? '' : currentType;
-
-            document.getElementById('editAccountModal').style.display = 'block';
-        }
-
-        function closeEditModal() {
-            document.getElementById('editAccountModal').style.display = 'none';
-        }
-
-        function saveAccountDetails() {
-            const accountId = document.getElementById('editAccountId').value;
-            const name = document.getElementById('editAccountName').value;
-            const type = document.getElementById('editAccountType').value;
-
-            const formData = new FormData();
-            formData.append('accountId', accountId);
-            formData.append('name', name);
-            formData.append('type', type);
-
-            fetch('/api/account/update', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => {
-                    if (response.ok) {
-                        closeEditModal();
-                        location.reload();
-                    } else {
-                        alert('Fehler beim Speichern');
+                function navigateToAccount(url) {
+                    if (!isEditMode) {
+                        location.href = url;
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Fehler beim Speichern');
-                });
-        }
+                }
 
-        // Close modal when clicking outside
-        window.onclick = function (event) {
-            const modal = document.getElementById('editAccountModal');
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
+                function toggleEditMode() {
+                    isEditMode = !isEditMode;
+                    const btn = document.getElementById('edit-layout-btn');
+                    const saveBtn = document.getElementById('save-layout-btn');
+                    const cards = document.querySelectorAll('.account-grid .account-card');
 
-        // --- Drag and Drop Logic ---
-        let isEditMode = false;
+                    // Section controls
+                    const sectionControls = document.querySelectorAll('.section-controls');
+                    const addSectionContainer = document.getElementById('add-section-container');
+                    const sectionTitles = document.querySelectorAll('.section-title');
 
-        function navigateToAccount(url) {
-            if (!isEditMode) {
-                location.href = url;
-            }
-        }
+                    if (isEditMode) {
+                        document.body.classList.add('edit-mode-active');
+                        btn.textContent = "Abbrechen";
+                        saveBtn.style.display = "inline-block";
 
-        function toggleEditMode() {
-            isEditMode = !isEditMode;
-            const btn = document.getElementById('edit-layout-btn');
-            const saveBtn = document.getElementById('save-layout-btn');
-            const cards = document.querySelectorAll('.account-grid .account-card');
+                        // Show section controls
+                        sectionControls.forEach(el => el.style.display = 'inline-block');
+                        addSectionContainer.style.display = 'block';
+                        sectionTitles.forEach(el => el.classList.add('editable'));
 
-            // Section controls
-            const sectionControls = document.querySelectorAll('.section-controls');
-            const addSectionContainer = document.getElementById('add-section-container');
-            const sectionTitles = document.querySelectorAll('.section-title');
+                        cards.forEach(card => {
+                            card.setAttribute('draggable', 'true');
+                            card.classList.add('draggable');
 
-            if (isEditMode) {
-                document.body.classList.add('edit-mode-active');
-                btn.textContent = "Abbrechen";
-                saveBtn.style.display = "inline-block";
+                            card.addEventListener('dragstart', handleDragStart);
+                            card.addEventListener('dragend', handleDragEnd);
+                        });
 
-                // Show section controls
-                sectionControls.forEach(el => el.style.display = 'inline-block');
-                addSectionContainer.style.display = 'block';
-                sectionTitles.forEach(el => el.classList.add('editable'));
+                        // Add Drop Zone listeners
+                        document.querySelectorAll('.drop-zone').forEach(zone => {
+                            zone.addEventListener('dragover', handleDragOver);
+                            zone.addEventListener('dragleave', handleDragLeave);
+                            zone.addEventListener('drop', handleDrop);
+                        });
 
-                cards.forEach(card => {
-                    card.setAttribute('draggable', 'true');
-                    card.classList.add('draggable');
-
-                    card.addEventListener('dragstart', handleDragStart);
-                    card.addEventListener('dragend', handleDragEnd);
-                });
-
-                // Add Drop Zone listeners
-                document.querySelectorAll('.drop-zone').forEach(zone => {
-                    zone.addEventListener('dragover', handleDragOver);
-                    zone.addEventListener('dragleave', handleDragLeave);
-                    zone.addEventListener('drop', handleDrop);
-                });
-
-            } else {
-                // Cancel/Reset
-                location.reload();
-            }
-        }
-
-        // --- Section Management ---
-        function addNewSection() {
-            const name = prompt("Name der neuen Sektion:");
-            if (name) {
-                fetch('/api/section/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'name=' + encodeURIComponent(name)
-                }).then(resp => {
-                    if (resp.ok) {
-                        // For simplicity, reload to show new section. 
-                        // ideally we would append DOM here but reload ensures ID is correct etc.
-                        // But wait, if we reload we lose unsaved drag changes?
-                        // Yes. User should probably save layout first? 
-                        // Let's reload for now as "Add Section" is a structural change.
+                    } else {
+                        // Cancel/Reset
                         location.reload();
                     }
-                });
-            }
-        }
-
-        function renameSection(element) {
-            if (!isEditMode) return;
-            const sectionDiv = element.closest('.dashboard-section');
-            const id = sectionDiv.getAttribute('data-section-id');
-            const oldName = element.textContent;
-            const newName = prompt("Neuer Name:", oldName);
-
-            if (newName && newName !== oldName) {
-                fetch('/api/section/rename', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'id=' + id + '&name=' + encodeURIComponent(newName)
-                }).then(resp => {
-                    if (resp.ok) element.textContent = newName;
-                });
-            }
-        }
-
-        function deleteSection(btn) {
-            if (!isEditMode) return;
-            const sectionDiv = btn.closest('.dashboard-section');
-            const id = sectionDiv.getAttribute('data-section-id');
-            // check if empty? or allowed to delete non-empty (accounts move to other section)
-
-            if (confirm("Sektion löschen? Enthaltene Accounts werden verschoben.")) {
-                fetch('/api/section/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'id=' + id
-                }).then(resp => {
-                    if (resp.ok) location.reload();
-                });
-            }
-        }
-
-        function handleDragStart(e) {
-            if (!isEditMode) return;
-            this.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
-            e.dataTransfer.effectAllowed = 'move';
-        }
-
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            document.querySelectorAll('.drop-zone').forEach(zone => zone.classList.remove('drag-over'));
-        }
-
-        function handleDragOver(e) {
-            if (!isEditMode) return;
-            e.preventDefault();
-            this.classList.add('drag-over');
-            return false;
-        }
-
-        function handleDragLeave(e) {
-            this.classList.remove('drag-over');
-        }
-
-        function handleDrop(e) {
-            if (!isEditMode) return;
-            e.preventDefault();
-            this.classList.remove('drag-over');
-
-            const id = e.dataTransfer.getData('text/plain');
-            const draggable = document.querySelector(`.account-card[data-id="${id}"]`);
-
-            if (draggable) {
-                const afterElement = getDragAfterElement(this, e.clientY);
-                if (afterElement == null) {
-                    this.appendChild(draggable);
-                } else {
-                    this.insertBefore(draggable, afterElement);
                 }
-            }
-            return false;
-        }
 
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                }
-                return closest;
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-
-        function saveLayout() {
-            const sections = document.querySelectorAll('.account-grid');
-            const layoutData = {};
-
-            sections.forEach(sec => {
-                const sectionId = sec.getAttribute('data-section-id');
-                const cardIds = [...sec.querySelectorAll('.account-card')].map(c => parseInt(c.getAttribute('data-id')));
-                layoutData[sectionId] = cardIds;
-            });
-
-            fetch('/api/account/layout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(layoutData)
-            })
-                .then(response => {
-                    if (response.ok) {
-                        location.reload();
-                    } else {
-                        alert('Fehler beim Speichern des Layouts');
+                // --- Section Management ---
+                function addNewSection() {
+                    const name = prompt("Name der neuen Sektion:");
+                    if (name) {
+                        fetch('/api/section/create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'name=' + encodeURIComponent(name)
+                        }).then(resp => {
+                            if (resp.ok) {
+                                // For simplicity, reload to show new section. 
+                                // ideally we would append DOM here but reload ensures ID is correct etc.
+                                // But wait, if we reload we lose unsaved drag changes?
+                                // Yes. User should probably save layout first? 
+                                // Let's reload for now as "Add Section" is a structural change.
+                                location.reload();
+                            }
+                        });
                     }
-                })
-                .catch(err => console.error(err));
-        }
-    </script>
+                }
+
+                function renameSection(element) {
+                    if (!isEditMode) return;
+                    const sectionDiv = element.closest('.dashboard-section');
+                    const id = sectionDiv.getAttribute('data-section-id');
+                    const oldName = element.textContent;
+                    const newName = prompt("Neuer Name:", oldName);
+
+                    if (newName && newName !== oldName) {
+                        fetch('/api/section/rename', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'id=' + id + '&name=' + encodeURIComponent(newName)
+                        }).then(resp => {
+                            if (resp.ok) element.textContent = newName;
+                        });
+                    }
+                }
+
+                function deleteSection(btn) {
+                    if (!isEditMode) return;
+                    const sectionDiv = btn.closest('.dashboard-section');
+                    const id = sectionDiv.getAttribute('data-section-id');
+                    // check if empty? or allowed to delete non-empty (accounts move to other section)
+
+                    if (confirm("Sektion löschen? Enthaltene Accounts werden verschoben.")) {
+                        fetch('/api/section/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'id=' + id
+                        }).then(resp => {
+                            if (resp.ok) location.reload();
+                        });
+                    }
+                }
+
+                function handleDragStart(e) {
+                    if (!isEditMode) return;
+                    this.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+
+                function handleDragEnd(e) {
+                    this.classList.remove('dragging');
+                    document.querySelectorAll('.drop-zone').forEach(zone => zone.classList.remove('drag-over'));
+                }
+
+                function handleDragOver(e) {
+                    if (!isEditMode) return;
+                    e.preventDefault();
+                    this.classList.add('drag-over');
+                    return false;
+                }
+
+                function handleDragLeave(e) {
+                    this.classList.remove('drag-over');
+                }
+
+                function handleDrop(e) {
+                    if (!isEditMode) return;
+                    e.preventDefault();
+                    this.classList.remove('drag-over');
+
+                    const id = e.dataTransfer.getData('text/plain');
+                    const draggable = document.querySelector(`.account-card[data-id="${id}"]`);
+
+                    if (draggable) {
+                        const afterElement = getDragAfterElement(this, e.clientY);
+                        if (afterElement == null) {
+                            this.appendChild(draggable);
+                        } else {
+                            this.insertBefore(draggable, afterElement);
+                        }
+                    }
+                    return false;
+                }
+
+                function getDragAfterElement(container, y) {
+                    const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+
+                    return draggableElements.reduce((closest, child) => {
+                        const box = child.getBoundingClientRect();
+                        const offset = y - box.top - box.height / 2;
+                        if (offset < 0 && offset > closest.offset) {
+                            return { offset: offset, element: child };
+                        }
+                        return closest;
+                    }, { offset: Number.NEGATIVE_INFINITY }).element;
+                }
+
+                function saveLayout() {
+                    const sections = document.querySelectorAll('.account-grid');
+                    const layoutData = {};
+
+                    sections.forEach(sec => {
+                        const sectionId = sec.getAttribute('data-section-id');
+                        const cardIds = [...sec.querySelectorAll('.account-card')].map(c => parseInt(c.getAttribute('data-id')));
+                        layoutData[sectionId] = cardIds;
+                    });
+
+                    fetch('/api/account/layout', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(layoutData)
+                    })
+                        .then(response => {
+                            if (response.ok) {
+                                location.reload();
+                            } else {
+                                alert('Fehler beim Speichern des Layouts');
+                            }
+                        })
+                        .catch(err => console.error(err));
+                }
+            </script>
+            <footer>
+                <p>Auto-refresh alle 5 Sekunden | Timeout: <span th:text="${timeoutSeconds}">60</span>s | <a
+                        href="/admin">⚙️
+                        Admin</a> | <a href="#" onclick="sendTestEmail()" style="color: #6366f1;">📧
+                        Test
+                        Email</a> | <a href="#" onclick="testSiren()" style="color: #ef4444;">🚨 Test Sirene</a></p>
+            </footer>
 </body>
 
 </html>
