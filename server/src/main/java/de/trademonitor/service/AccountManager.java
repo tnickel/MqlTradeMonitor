@@ -410,4 +410,190 @@ public class AccountManager {
 
         return sortedList;
     }
+
+    /**
+     * Calculate and return drawdown statistics per magic number for all accounts.
+     * Logic:
+     * 1. Reconstruct "Artificial Balance" history from Current Balance - Closed
+     * Trades.
+     * 2. Track "High Water Mark" for the Account Balance.
+     * Wait, "Balance High" usually refers to the highest closed balance.
+     * But checking drawdown "from balance high" for specific magic number...
+     * Actually, usually Drawdown is Equity vs High Water Mark.
+     * The user said: "drawdown vom balance high anzeigen".
+     * If I have a Magic Number with Open Trades, its "current value" is (Realized
+     * Profit + Open Profit).
+     * Its "High Water Mark" is the max value of (Realized Profit) historically.
+     * So Magic Drawdown = (Max Realized Profit of Magic) - (Current Realized + Open
+     * Profit of Magic).
+     * 
+     * Wait, user said "drawdown vom balance high".
+     * If they mean Account Balance High, then it's global.
+     * "alle opentrades incl. den aktuellen drawdown vom balance high ... Die magic
+     * numbers müssen immer zusammengefasst werden."
+     * This implies: Show me Magic X. How much is it currently down from the
+     * Account's Balance High?
+     * OR: How much is Magic X responsible for the drawdown?
+     * 
+     * Interpretation:
+     * 1. Calculate Account Balance High (ABH).
+     * 2. Calculate Account Current Equity (ACE) = Balance + OpenPL.
+     * BUT broken down by Magic?
+     * 
+     * If I have 2 Magics open.
+     * Magic A: Open PL -50.
+     * Magic B: Open PL +10.
+     * Balance: 1000. ABH: 1000.
+     * Equity: 960.
+     * Drawdown is 40 (4%).
+     * 
+     * If we break it down:
+     * Magic A is contributing -50 to the equity.
+     * Magic B is contributing +10.
+     * 
+     * Maybe the user means: "Current Drawdown of THIS Magic Number".
+     * Magic High Water Mark (HWM) = Max Cumulative Profit of this Magic.
+     * Current Magic Equity = Cumulative Profit + Open PL.
+     * Drawdown = HWM - Current.
+     * 
+     * Let's stick to the Plan:
+     * "drawdown vom balance high" might be a slight misnomer by the user or they
+     * mean "Impact on Balance High"?
+     * Actually, "Open Drawdown" is usually specific to the strategy.
+     * If I have a strategy that made 1000 profit, and is now open -100. It is in
+     * -10% drawdown from its peak?
+     * 
+     * Let's implement:
+     * Magic Drawdown = (Max Historical Cumulative Profit for Magic) - (Current
+     * Cumulative Profit + Open PL).
+     * AND we also reference the Account Balance High to show % of Account?
+     * "drawdown in % und Euro vom balance high"
+     * 
+     * If Account Balance High is 10,000.
+     * Magic A is down 100 EUR.
+     * That is 1% of Balance High.
+     * 
+     * Okay, so:
+     * 1. Calculate Account Balance High (ABH).
+     * - Current Balance is known.
+     * - History is known.
+     * - Reconstruct history to find Max Balance.
+     * 2. For each Magic Number with Open Trades:
+     * - Calculate Open PL for this Magic.
+     * - (Optional) Calculate "Net Profit" contribution to see if it's "winning" or
+     * "losing" overall?
+     * - No, usually Drawdown is just "How much is it down from the peak".
+     * - BUT, "drawdown vom balance high" strongly suggests:
+     * DD_EUR = Open PL (if negative).
+     * DD_Percent = (Open PL / ABH) * 100.
+     * 
+     * Wait, if I have open profit +50, there is no drawdown.
+     * If I have open profit -50. Drawdown is 50.
+     * 
+     * User Ref: "alle opentrades incl. den aktuellen drawdown vom balance high
+     * anzeigen für alle offenen trades"
+     * "mir sollen nicht die trades angezeigt werden sonderen die magic numbers und
+     * der akuelle offene drawdown in % und Euro vom balance high."
+     * 
+     * So:
+     * Group Open Trades by Magic.
+     * Sum Open PL.
+     * If Sum Open PL < 0:
+     * Drawdown EUR = Abs(Sum Open PL).
+     * Drawdown % = (Drawdown EUR / Account Balance High) * 100.
+     * If Sum Open PL >= 0:
+     * Drawdown is 0. (Or explicitly show +Profit?)
+     * User asked for "drawdown", so maybe only show if negative? Or show all "Open
+     * Trades" summary.
+     * "alle opentrades ... anzeigen" -> suggest showing all active magics, even if
+     * positive.
+     * If positive, "Drawdown" is 0.
+     * 
+     * Calculation of Account Balance High:
+     * Current Balance is X.
+     * We have list of Closed Trades (p, t).
+     * Sort by time descending.
+     * Balance[t] = Balance[t+1] - Profit[t+1].
+     * Max(Balance[t]) is HWM.
+     */
+    public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns() {
+        List<de.trademonitor.dto.MagicDrawdownItem> result = new ArrayList<>();
+
+        for (Account account : accounts.values()) {
+            // Use Current Balance as the reference for "Current Drawdown"
+            // Calculating "Balance High" from history is unreliable without full
+            // deposit/withdrawal logs
+            // and often misleading if withdrawals occurred. The standard industry metric
+            // for
+            // "Current Drawdown" is Current Open PL / Current Balance.
+            double currentBalance = account.getBalance();
+            double referenceBalance = currentBalance;
+
+            // 2. Group Open Trades by Magic
+            Map<Long, Double> magicOpenPL = new HashMap<>();
+            Map<Long, String> magicLastComment = new HashMap<>();
+
+            for (Trade t : account.getOpenTrades()) {
+                magicOpenPL.merge(t.getMagicNumber(), t.getProfit(), (a, b) -> a + b);
+                if (t.getComment() != null && !t.getComment().isEmpty()) {
+                    magicLastComment.putIfAbsent(t.getMagicNumber(), t.getComment());
+                }
+            }
+
+            // 3. Create Items
+            for (Map.Entry<Long, Double> entry : magicOpenPL.entrySet()) {
+                Long magic = entry.getKey();
+                Double openPL = entry.getValue();
+
+                double ddEur = 0;
+                double ddPct = 0;
+
+                // Drawdown is positive number representing loss
+                if (openPL < 0) {
+                    ddEur = Math.abs(openPL);
+                    if (referenceBalance > 0) {
+                        ddPct = (ddEur / referenceBalance) * 100.0;
+                    }
+                }
+
+                String magicName = magicLastComment.getOrDefault(magic, String.valueOf(magic));
+
+                de.trademonitor.dto.MagicDrawdownItem item = new de.trademonitor.dto.MagicDrawdownItem(
+                        account.getAccountId(),
+                        account.getName() != null ? account.getName() : String.valueOf(account.getAccountId()),
+                        account.getType(),
+                        magic,
+                        magicName,
+                        ddEur,
+                        ddPct,
+                        referenceBalance,
+                        openPL);
+                item.setCurrentMagicEquity(openPL);
+
+                result.add(item);
+            }
+        }
+
+        // Sort: Real First, then Drawdown % Descending, then Account Name
+        result.sort((a, b) -> {
+            boolean realA = a.isReal();
+            boolean realB = b.isReal();
+            if (realA != realB)
+                return realA ? -1 : 1;
+
+            // Drawdown % Descending (Higher is worse/first)
+            // Use Double.compare for safety
+            int ddComp = Double.compare(b.getCurrentDrawdownPercent(), a.getCurrentDrawdownPercent());
+            if (ddComp != 0)
+                return ddComp;
+
+            int nameComp = a.getAccountName().compareToIgnoreCase(b.getAccountName());
+            if (nameComp != 0)
+                return nameComp;
+
+            return Long.compare(a.getMagicNumber(), b.getMagicNumber());
+        });
+
+        return result;
+    }
 }

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Connection Logs - Trade Monitor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #161b22;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-size: 0.9rem;
+        }
+
+        .log-table th,
+        .log-table td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .log-table th {
+            background-color: #21262d;
+            color: #8b949e;
+            font-weight: 600;
+        }
+
+        .log-table tr:hover {
+            background-color: #1c2128;
+        }
+
+        .status- success {
+            color: #3fb950;
+        }
+
+        .status-error {
+            color: #f85149;
+        }
+
+        .status-client-error {
+            color: #d29922;
+        }
+
+        .method-get {
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        .method-post {
+            color: #3fb950;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            background-color: #1f6feb;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .back-btn:hover {
+            background-color: #388bfd;
+        }
+
+        .user-agent {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #8b949e;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/admin" class="back-btn">← Back to Admin</a>
+        <h1>Connection Logs</h1>
+
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>IP Address</th>
+                    <th>Method</th>
+                    <th>URI</th>
+                    <th>Query</th>
+                    <th>Status</th>
+                    <th>User Agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="log : ${requests}">
+                    <td th:text="${#temporals.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2023-01-01 12:00:00</td>
+                    <td th:text="${log.ipAddress}">127.0.0.1</td>
+                    <td th:text="${log.method}"
+                        th:classappend="${log.method == 'GET' ? 'method-get' : (log.method == 'POST' ? 'method-post' : '')}">
+                        GET</td>
+                    <td th:text="${log.uri}">/api/trades</td>
+                    <td th:text="${log.queryString}" style="color: #8b949e; font-size: 0.85rem;">?foo=bar</td>
+                    <td th:text="${log.statusCode}"
+                        th:classappend="${log.statusCode >= 200 && log.statusCode < 300 ? 'status-success' : (log.statusCode >= 400 && log.statusCode < 500 ? 'status-client-error' : 'status-error')}">
+                        200</td>
+                    <td class="user-agent" th:text="${log.userAgent}" th:title="${log.userAgent}">Mozilla...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>

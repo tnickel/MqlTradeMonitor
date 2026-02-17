@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Client Activity Logs - Trade Monitor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-bar {
+            background-color: #161b22;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #161b22;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-size: 0.9rem;
+        }
+
+        .log-table th,
+        .log-table td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .log-table th {
+            background-color: #21262d;
+            color: #8b949e;
+            font-weight: 600;
+        }
+
+        .log-table tr:hover {
+            background-color: #1c2128;
+        }
+
+        .action-register {
+            color: #3fb950;
+            font-weight: bold;
+        }
+
+        .action-heartbeat {
+            color: #8b949e;
+        }
+
+        .action-update {
+            color: #58a6ff;
+        }
+
+        .action-error {
+            color: #f85149;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            background-color: #1f6feb;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .back-btn:hover {
+            background-color: #388bfd;
+        }
+
+        input[type="number"] {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/admin" class="back-btn">← Back to Admin</a>
+        <h1>Client Activity Logs</h1>
+
+        <div class="filter-bar">
+            <form action="/admin/client-logs" method="get"
+                style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                <label for="accountId">Filter by Account ID:</label>
+                <input type="number" id="accountId" name="accountId" th:value="${filterAccountId}"
+                    placeholder="e.g. 6199827">
+                <button type="submit">Filter</button>
+                <a href="/admin/client-logs" style="color: #8b949e; text-decoration: none; margin-left: 10px;"
+                    th:if="${filterAccountId != null}">Clear Filter</a>
+            </form>
+        </div>
+
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Account ID</th>
+                    <th>Action</th>
+                    <th>IP Address</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="log : ${logs}">
+                    <td th:text="${#temporals.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2023-01-01 12:00:00</td>
+                    <td>
+                        <a th:href="@{/admin/client-logs(accountId=${log.accountId})}" th:text="${log.accountId}"
+                            style="color: #58a6ff; text-decoration: none;">12345</a>
+                    </td>
+                    <td th:text="${log.action}" th:classappend="${log.action == 'REGISTER' ? 'action-register' : 
+                                         (log.action.contains('ERROR') ? 'action-error' : 
+                                         (log.action == 'HEARTBEAT' ? 'action-heartbeat' : 'action-update'))}">UPDATE
+                    </td>
+                    <td th:text="${log.ipAddress}">127.0.0.1</td>
+                    <td th:text="${log.message}">Details...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>

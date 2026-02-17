@@ -133,6 +133,8 @@ public class TradeSyncService {
     }
 
     private boolean findMatchingTrade(Trade realTrade, List<Trade> demoTrades) {
+        // Step 1: Strict Match (Symbol + Type + Time)
+        // Try strict match first to prioritize exact time matches
         for (Trade demoTrade : demoTrades) {
             // Criteria 1: Symbol must match
             if (!realTrade.getSymbol().equals(demoTrade.getSymbol()))
@@ -147,6 +149,25 @@ public class TradeSyncService {
                 return true;
             }
         }
+
+        // Step 2: Fallback Match (Symbol + Type + StopLoss)
+        // If strict match fails, try fallback using Stop Loss which must range EXACTLY
+        for (Trade demoTrade : demoTrades) {
+            // Criteria 1: Symbol must match
+            if (!realTrade.getSymbol().equals(demoTrade.getSymbol()))
+                continue;
+
+            // Criteria 2: Type must match
+            if (!realTrade.getType().equals(demoTrade.getType()))
+                continue;
+
+            // Criteria 3: StopLoss must match exactly (using epsilon for double safety)
+            // User requirement: "der SL der muss exakt sein"
+            if (Math.abs(realTrade.getStopLoss() - demoTrade.getStopLoss()) < 0.00001) {
+                return true;
+            }
+        }
+
         return false;
     }
 

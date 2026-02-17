@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Admin Logs - Trade Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-dark: #1a1b26;
+            --bg-card: #24283b;
+            --text-primary: #c0caf5;
+            --text-secondary: #a9b1d6;
+            --accent-primary: #7aa2f7;
+            --border-color: #414868;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--accent-primary);
+        }
+
+        .back-btn {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: #1f2335;
+            color: var(--accent-primary);
+        }
+
+        .success {
+            color: #9ece6a;
+        }
+
+        .failure {
+            color: #f7768e;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Login Logs</h1>
+            <a href="/" class="back-btn">← Back to Dashboard</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="log : ${logs}">
+                    <td th:text="${#temporals.format(log.timestamp, 'dd.MM.yyyy HH:mm:ss')}"></td>
+                    <td th:text="${log.username}"></td>
+                    <td th:text="${log.ipAddress}"></td>
+                    <td>
+                        <span th:if="${log.success}" class="success">SUCCESS</span>
+                        <span th:unless="${log.success}" class="failure">FAILED</span>
+                    </td>
+                    <td th:text="${log.details}"></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(logs)}">
+                    <td colspan="5" style="text-align:center; padding: 20px;">No logs found.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>

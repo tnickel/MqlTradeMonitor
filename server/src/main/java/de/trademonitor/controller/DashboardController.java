@@ -1,13 +1,9 @@
 package de.trademonitor.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.trademonitor.dto.AccountDbStats;
-import de.trademonitor.entity.AccountEntity;
 import de.trademonitor.model.Account;
 import de.trademonitor.model.ClosedTrade;
-import de.trademonitor.repository.AccountRepository;
 import de.trademonitor.repository.ClosedTradeRepository;
-import de.trademonitor.repository.OpenTradeRepository;
 import de.trademonitor.service.AccountManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -28,13 +24,7 @@ public class DashboardController {
     private AccountManager accountManager;
 
     @Autowired
-    private AccountRepository accountRepository;
-
-    @Autowired
     private ClosedTradeRepository closedTradeRepository;
-
-    @Autowired
-    private OpenTradeRepository openTradeRepository;
 
     @Autowired
     private de.trademonitor.service.GlobalConfigService globalConfigService;
@@ -144,96 +134,6 @@ public class DashboardController {
     }
 
     /**
-     * Admin overview showing database statistics per account.
-     */
-    @GetMapping("/admin")
-    public String admin(Model model) {
-        List<AccountEntity> accounts = accountRepository.findAll();
-        List<AccountDbStats> statsList = new ArrayList<>();
-
-        long totalOpen = 0;
-        long totalClosed = 0;
-
-        for (AccountEntity acc : accounts) {
-            AccountDbStats stats = new AccountDbStats();
-            stats.setAccountId(acc.getAccountId());
-            stats.setBroker(acc.getBroker());
-            stats.setCurrency(acc.getCurrency());
-
-            long openCount = openTradeRepository.countByAccountId(acc.getAccountId());
-            long closedCount = closedTradeRepository.countByAccountId(acc.getAccountId());
-            stats.setOpenTradeCount(openCount);
-            stats.setClosedTradeCount(closedCount);
-
-            String minDate = closedTradeRepository.findMinCloseTimeByAccountId(acc.getAccountId());
-            String maxDate = closedTradeRepository.findMaxCloseTimeByAccountId(acc.getAccountId());
-            stats.setEarliestTradeDate(minDate != null ? minDate : "-");
-            stats.setLatestTradeDate(maxDate != null ? maxDate : "-");
-
-            // Sum up total profit from closed trades
-            List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
-                    .findByAccountId(acc.getAccountId());
-            double totalProfit = closedTrades.stream().mapToDouble(t -> t.getProfit()).sum();
-            stats.setTotalProfit(totalProfit);
-
-            totalOpen += openCount;
-            totalClosed += closedCount;
-
-            statsList.add(stats);
-        }
-
-        model.addAttribute("statsList", statsList);
-        model.addAttribute("totalAccounts", accounts.size());
-        model.addAttribute("totalOpenTrades", totalOpen);
-        model.addAttribute("totalClosedTrades", totalClosed);
-
-        // Add global config
-        model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
-        model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
-        model.addAttribute("tradeSyncInterval", globalConfigService.getTradeSyncIntervalSeconds());
-
-        // Mail Config
-        model.addAttribute("mailHost", globalConfigService.getMailHost());
-        model.addAttribute("mailPort", globalConfigService.getMailPort());
-        model.addAttribute("mailUser", globalConfigService.getMailUser());
-        model.addAttribute("mailPassword", globalConfigService.getMailPassword());
-        model.addAttribute("mailFrom", globalConfigService.getMailFrom());
-        model.addAttribute("mailTo", globalConfigService.getMailTo());
-        model.addAttribute("mailMaxPerDay", globalConfigService.getMailMaxPerDay());
-
-        // Homey Config
-        model.addAttribute("homeyId", globalConfigService.getHomeyId());
-        model.addAttribute("homeyEvent", globalConfigService.getHomeyEvent());
-        model.addAttribute("homeyTriggerSync", globalConfigService.isHomeyTriggerSync());
-        model.addAttribute("homeyTriggerApi", globalConfigService.isHomeyTriggerApi());
-        model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
-
-        // Magic Mappings
-        // 1. Collect all magic numbers from DB (Closed + Open) to ensure we have
-        // mappings for all
-        Set<Long> allMagics = new HashSet<>();
-        closedTradeRepository.findAll().forEach(t -> allMagics.add(t.getMagicNumber()));
-        openTradeRepository.findAll().forEach(t -> allMagics.add(t.getMagicNumber()));
-
-        // 2. Ensure mappings exist (auto-create with default comment from trades)
-        magicMappingService.ensureMappingsExist(new ArrayList<>(allMagics), magic -> {
-            // Try to find a name from existing trades
-            String name = openTradeRepository.findFirstByMagicNumber(magic)
-                    .map(de.trademonitor.entity.OpenTradeEntity::getComment).orElse(null);
-            if (name == null) {
-                name = closedTradeRepository.findFirstByMagicNumber(magic)
-                        .map(de.trademonitor.entity.ClosedTradeEntity::getComment).orElse(null);
-            }
-            return name;
-        });
-
-        // 3. Load all mappings for UI
-        model.addAttribute("magicMappings", magicMappingService.getAllMappings());
-
-        return "admin";
-    }
-
-    /**
      * Update magic mapping.
      */
     @PostMapping("/admin/mapping")
@@ -337,6 +237,15 @@ public class DashboardController {
     @org.springframework.web.bind.annotation.ResponseBody
     public java.util.List<java.util.Map<String, Object>> getOpenTrades() {
         return accountManager.getAllOpenTradesSorted();
+    }
+
+    /**
+     * AJAX Endpoint to get magic number drawdowns.
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/api/stats/magic-drawdowns")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns() {
+        return accountManager.getMagicDrawdowns();
     }
 
     /**

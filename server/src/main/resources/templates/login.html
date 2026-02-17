@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Login - Trade Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: #1a1b26;
+            color: #c0caf5;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .login-container {
+            background: #24283b;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #7aa2f7;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #414868;
+            background: #1a1b26;
+            color: #fff;
+            box-sizing: border-box;
+            /* Fixes padding issue */
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #7aa2f7;
+            color: #1a1b26;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #bb9af7;
+        }
+
+        .error {
+            color: #f7768e;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <h2>Trade Monitor Login</h2>
+        <div th:if="${param.error}" class="error">
+            Invalid username or password.
+        </div>
+        <div th:if="${param.logout}" class="error" style="color: #9ece6a;">
+            You have been logged out.
+        </div>
+        <form th:action="@{/login}" method="post">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" required autofocus />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" required />
+            </div>
+            <button type="submit">Sign In</button>
+        </form>
+    </div>
+</body>
+
+</html>

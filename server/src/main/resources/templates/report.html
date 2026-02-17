@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-dark: #1a1b26;
+            --bg-card: #24283b;
+            --text-primary: #c0caf5;
+            --text-muted: #565f89;
+            --accent: #7aa2f7;
+            --success: #9ece6a;
+            --danger: #f7768e;
+            --border: #414868;
+            --hover: #2f344f;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent);
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+        }
+
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 12px 10px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--hover);
+        }
+
+        .account-name {
+            font-weight: 700;
+            color: var(--text-primary);
+            display: block;
+        }
+
+        .account-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.real {
+            background-color: rgba(158, 206, 106, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(158, 206, 106, 0.3);
+        }
+
+        .badge.demo {
+            background-color: rgba(224, 175, 104, 0.15);
+            color: #e0af68;
+            border: 1px solid rgba(224, 175, 104, 0.3);
+        }
+
+        .num-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        .neutral {
+            color: var(--text-muted);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .back-btn {
+            display: block;
+            width: fit-content;
+            margin: 20px auto 0;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1 th:text="${periodTitle}">Report</h1>
+
+    <div class="report-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th class="text-center">Type</th>
+                    <th class="text-right">Open Trades</th>
+                    <th class="text-right">Open Equity</th>
+                    <th class="text-right">Closed Trades</th>
+                    <th class="text-right">Closed Profit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="acc : ${reportData}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
+                    th:data-account-name="${acc.name}"
+                    ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
+                    <td>
+                        <span class="account-name" th:text="${acc.name}">(Name)</span>
+                        <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                        <span class="badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                    </td>
+                    <td class="text-right">
+                        <span class="num-val" th:text="${acc.trades}">0</span>
+                    </td>
+                    <td class="text-right">
+                        <span class="num-val"
+                            th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
+                            th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                            USD</span>
+                    </td>
+                    <td class="text-right">
+                        <span class="num-val" th:text="${acc.closedCount}">0</span>
+                    </td>
+                    <td class="text-right">
+                        <span class="num-val"
+                            th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
+                            th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                            USD</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <a href="/" class="back-btn">← Zurück zum Dashboard</a>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Details</h2>
+            <div class="table-wrapper">
+                <table class="details-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th class="text-right">Vol</th>
+                            <th>Open Time</th>
+                            <th>Close Time</th>
+                            <th class="text-right">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsBody">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const currentPeriod = /*[[${period}]]*/ 'daily';
+        /*]]>*/
+
+        function showDetails(accountId, accountName) {
+            document.getElementById('modalTitle').innerText = accountName + ' - ' + currentPeriod.toUpperCase() + ' Details';
+            const tbody = document.getElementById('detailsBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">Lade Daten...</td></tr>';
+
+            document.getElementById('detailsModal').style.display = 'block';
+
+            fetch('/api/report-details/' + currentPeriod + '/' + accountId)
+                .then(response => response.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Keine Trades in diesem Zeitraum.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(trade => {
+                        const tr = document.createElement('tr');
+                        const profitClass = trade.profit >= 0 ? 'positive' : 'negative';
+                        const profitStr = trade.profit.toFixed(2);
+
+                        tr.innerHTML = `
+                            <td class="mono">${trade.ticket}</td>
+                            <td class="mono">${trade.symbol}</td>
+                            <td><span class="badge ${trade.type === 'BUY' ? 'real' : 'demo'}">${trade.type}</span></td>
+                            <td class="text-right mono">${trade.volume}</td>
+                            <td class="small-text">${formatDate(trade.openTime)}</td>
+                            <td class="small-text">${formatDate(trade.closeTime)}</td>
+                            <td class="text-right mono ${profitClass}">${profitStr}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error(err);
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center negative">Fehler beim Laden der Daten.</td></tr>';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        function formatDate(dateStr) {
+            // Assumes yyyy.MM.dd HH:mm:ss
+            if (!dateStr) return '-';
+            return dateStr.replace(/\./g, '.'); // Already formatted in DB?
+        }
+
+        window.onclick = function (event) {
+            const modal = document.getElementById('detailsModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+
+
+    <style>
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .close-modal {
+            color: var(--text-muted);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            align-self: flex-end;
+            cursor: pointer;
+        }
+
+        .close-modal:hover,
+        .close-modal:focus {
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .table-wrapper {
+            overflow-y: auto;
+            margin-top: 15px;
+            flex-grow: 1;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .details-table th,
+        .details-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .details-table th {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-card);
+            z-index: 10;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .small-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</body>
+
+</html>

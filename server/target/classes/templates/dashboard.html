@@ -113,6 +113,52 @@
                 <div class="view-details-btn" style="padding: 0.5rem; font-size: 0.9rem;">Alle Trades →</div>
             </div>
 
+            <!-- Drawdown Monitor Tile (Compact) -->
+            <div id="drawdown-monitor-card" class="account-card" onclick="openDrawdownModal()"
+                style="cursor: pointer; border: 1px solid #ef4444; background: linear-gradient(to bottom right, #2a2e39, rgba(239, 68, 68, 0.1)); flex: 0 1 auto; min-width: 300px; max-height: 150px; display: flex; flex-direction: column; overflow: hidden;">
+                <div class="account-header" style="flex: 0 0 auto;">
+                    <span class="account-id" style="font-size: 1.1rem;">📉 Drawdown (Real)</span>
+                    <span class="status-badge online">LIVE</span>
+                </div>
+                <!-- Compact Content: Real Only -->
+                <div style="flex: 1 1 auto; overflow-y: hidden; margin-top: 5px; padding-right: 5px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <tbody id="drawdown-tile-body">
+                            <tr>
+                                <td colspan="2" style="text-align:center; padding: 10px; color: #6b6b8f;">Lade Daten...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top:auto;">Details & Demo →
+                </div>
+            </div>
+
+            <!-- Drawdown Details Modal -->
+            <div id="drawdownModal" class="modal">
+                <div class="modal-content" style="max-width: 800px; width: 90%;">
+                    <span class="close-modal" onclick="closeDrawdownModal()">×</span>
+                    <h2>📉 Drawdown Detail-Monitor (Alle Accounts)</h2>
+                    <div style="margin-top: 20px; overflow-y: auto; max-height: 70vh;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
+                                <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444;">
+                                    <th style="padding: 10px;">Account / Magic</th>
+                                    <th style="padding: 10px; text-align: right;">Drawdown €</th>
+                                    <th style="padding: 10px; text-align: right;">Drawdown %</th>
+                                    <th style="padding: 10px; text-align: right;">Open Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drawdown-modal-body">
+                                <!-- Full List inserted by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Daily Report -->
             <div class="account-card" onclick="location.href='/report/daily'"
                 style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(158, 206, 106, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
@@ -240,15 +286,17 @@
                                             style="font-size: 0.9rem; color: #a0a0c0; font-family: 'JetBrains Mono';">12345</span>
                                         <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
                                         <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                                        <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                            th:data-type="${acc.type}"
+                                            onclick="event.stopPropagation(); openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                                            title="Account bearbeiten"
+                                            style="cursor: pointer; margin-left: 5px;">✏️</span>
                                     </div>
                                 </div>
 
                                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
-                                            th:data-type="${acc.type}"
-                                            onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
-                                            title="Account bearbeiten">✏️</span>
+
                                         <!-- Error Badge -->
                                         <span th:if="${acc.errorState}" class="status-badge offline"
                                             th:title="${acc.lastErrorMsg}"
@@ -374,6 +422,13 @@
 
             </div>
 
+            <div
+                style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid #333; color: #666; font-size: 0.9rem;">
+                &copy; 2026 Trade Monitor &nbsp;|&nbsp;
+                <a href="/admin" style="color: #a0a0c0; text-decoration: none;">Admin Area</a> &nbsp;|&nbsp;
+                <a href="/open-trades" style="color: #a0a0c0; text-decoration: none;">Open Trades List</a>
+            </div>
+
             <script>
                 function sendTestEmail() {
                     if (!confirm("Test Email jetzt senden?")) return;
@@ -431,7 +486,10 @@
 
                 function reloadPage() {
                     // Don't reload if modal is open OR if we are in Edit Mode
-                    if (document.getElementById('editAccountModal').style.display !== 'block' && !isEditMode) {
+                    if (document.getElementById('editAccountModal').style.display !== 'block' &&
+                        document.getElementById('drawdownModal') &&
+                        document.getElementById('drawdownModal').style.display !== 'block' &&
+                        !isEditMode) {
                         location.reload();
                     } else {
                         // Try again in 1 second
@@ -605,7 +663,154 @@
                             banner.style.display = 'none';
                         }
                     }
+
+                    // Update Drawdown Monitor
+                    updateDrawdownMonitor();
                 });
+
+                // Drawdown Modal State
+                let currentDrawdownItems = [];
+
+                function updateDrawdownMonitor() {
+                    const tileBody = document.getElementById('drawdown-tile-body');
+
+                    fetch('/api/stats/magic-drawdowns')
+                        .then(r => r.json())
+                        .then(items => {
+                            currentDrawdownItems = items; // Store for modal
+
+                            // 1. Compact Tile: Real Only
+                            const realItems = items.filter(i => i.real);
+
+                            if (tileBody) {
+                                if (realItems.length === 0) {
+                                    tileBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding: 10px; color: #10b981;">Keine Drawdowns (Real)</td></tr>';
+                                } else {
+                                    let html = '';
+                                    realItems.forEach(item => {
+                                        const ddEur = item.currentDrawdownEur;
+
+                                        html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 2px 0;">
+                                                <div style="font-weight:600; font-size: 0.85rem; color:var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                                                    ${item.accountName}
+                                                </div>
+                                                <div style="font-size:0.7rem; color: #a0a0c0;">
+                                                    Magic ${item.magicNumber}
+                                                </div>
+                                            </td>
+                                            <td style="padding: 2px 0; text-align: right; vertical-align: middle;">
+                                                <div style="color: ${ddEur > 0 ? '#ef4444' : '#10b981'}; font-weight: bold; font-size: 0.85rem;">
+                                                    ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                                                </div>
+                                                <div style="font-size:0.7rem; color: ${item.currentDrawdownPercent > 5 ? '#ef4444' : '#888'};">
+                                                    ${item.currentDrawdownPercent.toFixed(2)}%
+                                                </div>
+                                            </td>
+                                        </tr>`;
+                                    });
+                                    tileBody.innerHTML = html;
+                                }
+                            }
+
+                            // If modal is open, update it too
+                            if (document.getElementById('drawdownModal') && document.getElementById('drawdownModal').style.display === 'block') {
+                                renderDrawdownModal();
+                            }
+                        })
+                        .catch(err => console.error(err));
+                }
+
+                function openDrawdownModal() {
+                    const m = document.getElementById('drawdownModal');
+                    if (m) {
+                        m.style.display = 'block';
+                        renderDrawdownModal();
+                    }
+                }
+
+                function closeDrawdownModal() {
+                    const m = document.getElementById('drawdownModal');
+                    if (m) m.style.display = 'none';
+                }
+
+                function renderDrawdownModal() {
+                    const tbody = document.getElementById('drawdown-modal-body');
+                    if (!tbody) return;
+
+                    if (currentDrawdownItems.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    let lastWasReal = null;
+
+                    currentDrawdownItems.forEach(item => {
+                        const isReal = item.real;
+
+                        // Insert Section Header if type changes
+                        if (lastWasReal === null || lastWasReal !== isReal) {
+                            const headerTitle = isReal ? 'REAL ACCOUNTS' : 'DEMO ACCOUNTS';
+                            const headerColor = isReal ? '#34d399' : '#94a3b8'; // Green for Real, Slate for Demo
+                            const headerBg = isReal ? 'rgba(16, 185, 129, 0.1)' : 'rgba(148, 163, 184, 0.1)';
+
+                            html += `<tr style="background: ${headerBg}; border-bottom: 1px solid #444;">
+                                <td colspan="4" style="padding: 8px 15px; font-weight: 700; color: ${headerColor}; font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase;">
+                                    ${headerTitle}
+                                </td>
+                            </tr>`;
+                        }
+                        lastWasReal = isReal;
+
+                        const typeBadge = isReal ? '<span class="account-type-badge real" style="padding: 2px 5px;">REAL</span>' : '<span class="account-type-badge demo" style="padding: 2px 5px;">DEMO</span>';
+                        const ddEur = item.currentDrawdownEur;
+                        const ddPct = item.currentDrawdownPercent;
+                        const equity = item.currentMagicEquity;
+
+                        html += `<tr style="border-bottom: 1px solid #333;">
+                            <td style="padding: 10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    ${typeBadge}
+                                    <span style="font-weight:600; font-size: 1rem;">${item.accountName}</span>
+                                </div>
+                                <div style="margin-top: 4px; font-size:0.85rem; color: #ccc;">
+                                    Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
+                                </div>
+                            </td>
+                            <td style="padding: 10px; text-align: right;">
+                                <div style="font-size: 1rem; font-weight: bold; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
+                                    ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                                </div>
+                            </td>
+                            <td style="padding: 10px; text-align: right;">
+                                <div style="font-size: 1rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
+                                    ${ddPct.toFixed(2)}%
+                                </div>
+                            </td>
+                            <td style="padding: 10px; text-align: right;">
+                                <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
+                                    ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #666;">Open Profit</div>
+                            </td>
+                        </tr>`;
+                    });
+                    tbody.innerHTML = html;
+                }
+
+                // Close modal when clicking outside
+                window.onclick = function (event) {
+                    const modal = document.getElementById('drawdownModal');
+                    if (event.target == modal) {
+                        closeDrawdownModal();
+                    }
+                    // Also handle other modals if needed
+                    const editModal = document.getElementById('editAccountModal');
+                    if (event.target == editModal) {
+                        closeEditModal();
+                    }
+                }
 
                 // Modal functions
                 function openEditModal(accountId, currentName, currentType) {
@@ -648,13 +853,6 @@
                         });
                 }
 
-                // Close modal when clicking outside
-                window.onclick = function (event) {
-                    const modal = document.getElementById('editAccountModal');
-                    if (event.target == modal) {
-                        modal.style.display = "none";
-                    }
-                }
 
                 // --- Drag and Drop Logic ---
                 let isEditMode = false;
@@ -692,166 +890,146 @@
 
                             card.addEventListener('dragstart', handleDragStart);
                             card.addEventListener('dragend', handleDragEnd);
+                            card.addEventListener('dragover', handleDragOver);
+                            card.addEventListener('drop', handleDrop);
                         });
-
-                        // Add Drop Zone listeners
-                        document.querySelectorAll('.drop-zone').forEach(zone => {
-                            zone.addEventListener('dragover', handleDragOver);
-                            zone.addEventListener('dragleave', handleDragLeave);
-                            zone.addEventListener('drop', handleDrop);
-                        });
-
                     } else {
-                        // Cancel/Reset
-                        location.reload();
+                        document.body.classList.remove('edit-mode-active');
+                        btn.textContent = "Layout bearbeiten";
+                        saveBtn.style.display = "none";
+
+                        // Hide section controls
+                        sectionControls.forEach(el => el.style.display = 'none');
+                        addSectionContainer.style.display = 'none';
+                        sectionTitles.forEach(el => el.classList.remove('editable'));
+
+                        cards.forEach(card => {
+                            card.setAttribute('draggable', 'false');
+                            card.classList.remove('draggable');
+
+                            card.removeEventListener('dragstart', handleDragStart);
+                            card.removeEventListener('dragend', handleDragEnd);
+                            card.removeEventListener('dragover', handleDragOver);
+                            card.removeEventListener('drop', handleDrop);
+                        });
+
+                        // Reload to reset positions if not saved? Or keep?
+                        // location.reload(); 
                     }
                 }
 
-                // --- Section Management ---
+                let dragSrcEl = null;
+
+                function handleDragStart(e) {
+                    this.style.opacity = '0.4';
+                    dragSrcEl = this;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', this.innerHTML);
+                    e.dataTransfer.setData('sourceId', this.getAttribute('data-id'));
+                }
+
+                function handleDragOver(e) {
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    }
+                    e.dataTransfer.dropEffect = 'move';
+                    return false;
+                }
+
+                function handleDragEnd(e) {
+                    this.style.opacity = '1';
+                    const cards = document.querySelectorAll('.account-grid .account-card');
+                    cards.forEach(card => card.classList.remove('over'));
+                }
+
+                function handleDrop(e) {
+                    if (e.stopPropagation) {
+                        e.stopPropagation();
+                    }
+
+                    if (dragSrcEl !== this) {
+                        // Swap DOM elements
+                        // A simple swap of innerHTML is not enough because we need attributes (data-id)
+                        // It's better to insertBefore
+                        const grid = this.parentNode;
+                        // Find positions
+                        const allCards = Array.from(grid.querySelectorAll('.account-card'));
+                        const srcIndex = allCards.indexOf(dragSrcEl);
+                        const targetIndex = allCards.indexOf(this);
+
+                        if (srcIndex < targetIndex) {
+                            grid.insertBefore(dragSrcEl, this.nextSibling);
+                        } else {
+                            grid.insertBefore(dragSrcEl, this);
+                        }
+                    }
+                    return false;
+                }
+
+                function saveLayout() {
+                    const sections = [];
+                    document.querySelectorAll('.dashboard-section').forEach(sec => {
+                        const secId = sec.getAttribute('data-section-id');
+                        const cardIds = [];
+                        sec.querySelectorAll('.account-card').forEach(card => {
+                            if (card.hasAttribute('data-id')) {
+                                cardIds.push(card.getAttribute('data-id'));
+                            }
+                        });
+                        sections.push({ sectionId: secId, accountIds: cardIds });
+                    });
+
+                    fetch('/api/layout/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(sections)
+                    })
+                        .then(response => {
+                            if (response.ok) {
+                                alert('Layout gespeichert!');
+                                toggleEditMode();
+                            } else {
+                                alert('Fehler beim Speichern');
+                            }
+                        });
+                }
+
+                // Section Management
                 function addNewSection() {
                     const name = prompt("Name der neuen Sektion:");
                     if (name) {
-                        fetch('/api/section/create', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: 'name=' + encodeURIComponent(name)
-                        }).then(resp => {
-                            if (resp.ok) {
-                                // For simplicity, reload to show new section. 
-                                // ideally we would append DOM here but reload ensures ID is correct etc.
-                                // But wait, if we reload we lose unsaved drag changes?
-                                // Yes. User should probably save layout first? 
-                                // Let's reload for now as "Add Section" is a structural change.
-                                location.reload();
-                            }
-                        });
+                        fetch('/api/section/create?name=' + encodeURIComponent(name), { method: 'POST' })
+                            .then(r => location.reload());
                     }
                 }
 
-                function renameSection(element) {
+                function renameSection(el) {
                     if (!isEditMode) return;
-                    const sectionDiv = element.closest('.dashboard-section');
-                    const id = sectionDiv.getAttribute('data-section-id');
-                    const oldName = element.textContent;
+                    const sectionDiv = el.closest('.dashboard-section');
+                    const sectionId = sectionDiv.getAttribute('data-section-id');
+                    const oldName = el.innerText;
                     const newName = prompt("Neuer Name:", oldName);
-
                     if (newName && newName !== oldName) {
                         fetch('/api/section/rename', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: 'id=' + id + '&name=' + encodeURIComponent(newName)
-                        }).then(resp => {
-                            if (resp.ok) element.textContent = newName;
-                        });
+                            body: 'id=' + sectionId + '&name=' + encodeURIComponent(newName)
+                        }).then(r => location.reload());
                     }
                 }
 
                 function deleteSection(btn) {
-                    if (!isEditMode) return;
+                    if (!confirm("Sektion wirklich löschen? Accounts werden in die Default-Sektion verschoben.")) return;
                     const sectionDiv = btn.closest('.dashboard-section');
-                    const id = sectionDiv.getAttribute('data-section-id');
-                    // check if empty? or allowed to delete non-empty (accounts move to other section)
+                    const sectionId = sectionDiv.getAttribute('data-section-id');
 
-                    if (confirm("Sektion löschen? Enthaltene Accounts werden verschoben.")) {
-                        fetch('/api/section/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: 'id=' + id
-                        }).then(resp => {
-                            if (resp.ok) location.reload();
-                        });
-                    }
+                    fetch('/api/section/delete?id=' + sectionId, { method: 'POST' })
+                        .then(r => location.reload());
                 }
 
-                function handleDragStart(e) {
-                    if (!isEditMode) return;
-                    this.classList.add('dragging');
-                    e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
-                    e.dataTransfer.effectAllowed = 'move';
-                }
-
-                function handleDragEnd(e) {
-                    this.classList.remove('dragging');
-                    document.querySelectorAll('.drop-zone').forEach(zone => zone.classList.remove('drag-over'));
-                }
-
-                function handleDragOver(e) {
-                    if (!isEditMode) return;
-                    e.preventDefault();
-                    this.classList.add('drag-over');
-                    return false;
-                }
-
-                function handleDragLeave(e) {
-                    this.classList.remove('drag-over');
-                }
-
-                function handleDrop(e) {
-                    if (!isEditMode) return;
-                    e.preventDefault();
-                    this.classList.remove('drag-over');
-
-                    const id = e.dataTransfer.getData('text/plain');
-                    const draggable = document.querySelector(`.account-card[data-id="${id}"]`);
-
-                    if (draggable) {
-                        const afterElement = getDragAfterElement(this, e.clientY);
-                        if (afterElement == null) {
-                            this.appendChild(draggable);
-                        } else {
-                            this.insertBefore(draggable, afterElement);
-                        }
-                    }
-                    return false;
-                }
-
-                function getDragAfterElement(container, y) {
-                    const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
-
-                    return draggableElements.reduce((closest, child) => {
-                        const box = child.getBoundingClientRect();
-                        const offset = y - box.top - box.height / 2;
-                        if (offset < 0 && offset > closest.offset) {
-                            return { offset: offset, element: child };
-                        }
-                        return closest;
-                    }, { offset: Number.NEGATIVE_INFINITY }).element;
-                }
-
-                function saveLayout() {
-                    const sections = document.querySelectorAll('.account-grid');
-                    const layoutData = {};
-
-                    sections.forEach(sec => {
-                        const sectionId = sec.getAttribute('data-section-id');
-                        const cardIds = [...sec.querySelectorAll('.account-card')].map(c => parseInt(c.getAttribute('data-id')));
-                        layoutData[sectionId] = cardIds;
-                    });
-
-                    fetch('/api/account/layout', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(layoutData)
-                    })
-                        .then(response => {
-                            if (response.ok) {
-                                location.reload();
-                            } else {
-                                alert('Fehler beim Speichern des Layouts');
-                            }
-                        })
-                        .catch(err => console.error(err));
-                }
             </script>
-            <footer>
-                <p>Auto-refresh alle 5 Sekunden | Timeout: <span th:text="${timeoutSeconds}">60</span>s | <a
-                        href="/admin">⚙️
-                        Admin</a> | <a href="#" onclick="sendTestEmail()" style="color: #6366f1;">📧
-                        Test
-                        Email</a> | <a href="#" onclick="testSiren()" style="color: #ef4444;">🚨 Test Sirene</a></p>
-            </footer>
 </body>
 
 </html>

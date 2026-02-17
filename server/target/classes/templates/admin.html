@@ -3,134 +3,238 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trade Monitor - Admin</title>
-    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <title>Admin Dashboard - Trade Monitor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #161b22;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .admin-table th,
+        .admin-table td {
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .admin-table th {
+            background-color: #21262d;
+            color: #8b949e;
+            font-weight: 600;
+        }
+
+        .admin-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .admin-table tr:hover {
+            background-color: #1c2128;
+        }
+
+        .profit-positive {
+            color: #3fb950;
+            font-weight: bold;
+        }
+
+        .profit-negative {
+            color: #f85149;
+            font-weight: bold;
+        }
+
+        .admin-nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .view-details-btn {
+            background-color: #1f6feb;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+
+        .view-details-btn:hover {
+            background-color: #388bfd;
+        }
+
+        .account-link {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .account-link:hover {
+            text-decoration: underline;
+        }
+
+        .no-accounts {
+            text-align: center;
+            padding: 40px;
+            background-color: #161b22;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+        }
+
+        .no-accounts-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #8b949e;
+        }
+
+        .action-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background-color: #161b22;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
-        <header>
-            <h1>⚙️ Admin - Datenbank Übersicht</h1>
-            <p class="subtitle">Gespeicherte Trades pro Account</p>
-        </header>
+        <h1>Admin Dashboard</h1>
 
-        <div class="stats-bar">
-            <div class="stat">
-                <span class="stat-value" th:text="${totalAccounts}">0</span>
-                <span class="stat-label">Accounts</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value" th:text="${totalOpenTrades}">0</span>
-                <span class="stat-label">Open Trades (DB)</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value" th:text="${totalClosedTrades}">0</span>
-                <span class="stat-label">Closed Trades (DB)</span>
-            </div>
-        </div>
+        <div class="action-bar">
+            <a href="/admin/logs" class="view-details-btn" style="background-color: #238636;">📜 Login Logs</a>
+            <a href="/admin/requests" class="view-details-btn" style="background-color: #8f9026;">📡 Connection Logs</a>
+            <a href="/admin/client-logs" class="view-details-btn" style="background-color: #1f6feb;">👤 Client Logs</a>
+            <a href="/" class="view-details-btn">← Zum Dashboard</a>
 
-        <div class="config-section"
-            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
-            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🔧 Globale Konfiguration</h2>
-            <form action="/admin/config" method="post"
-                style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
-                <div class="form-group">
-                    <label for="magicNumberMaxAge" style="color: #8b949e; margin-right: 10px;">Magic Numbers max. Alter
-                        (Tage):</label>
-                    <input type="number" id="magicNumberMaxAge" name="magicNumberMaxAge"
-                        th:value="${magicMaxAgeByConfig}" min="0"
-                        style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 5px 10px; border-radius: 4px;">
-                </div>
-                <div class="form-group">
-                    <label for="tradeSyncInterval" style="color: #8b949e; margin-right: 10px;">Trade Sync Monitor
-                        Intervall
-                        (Sek.):</label>
-                    <input type="number" id="tradeSyncInterval" name="tradeSyncInterval" th:value="${tradeSyncInterval}"
-                        min="0"
-                        style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 5px 10px; border-radius: 4px;">
-                </div>
-                <button type="submit"
-                    style="background-color: #238636; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
-                <div style="color: #8b949e; font-size: 0.9rem; margin-left: auto;">
-                    (0 = keine Filterung)
-                </div>
+            <form th:action="@{/logout}" method="post" style="display: inline; margin-left: auto;">
+                <button type="submit" class="view-details-btn"
+                    style="background-color: #da3633; border: none; cursor: pointer;">Ausloggen</button>
             </form>
         </div>
 
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
-            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">📧 E-Mail Konfiguration (Warnungen)</h2>
-            <form action="/admin/mail-config" method="post"
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">⚙️ Globale Einstellungen</h2>
+            <form th:action="@{/admin/config}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label for="magicNumberMaxAge" style="color: #8b949e; display: block; margin-bottom: 5px;">Max Alter
+                        Magic Number (Tage)</label>
+                    <input type="number" id="magicNumberMaxAge" name="magicNumberMaxAge"
+                        th:value="${magicMaxAgeByConfig}" min="1"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+                <div class="form-group">
+                    <label for="tradeSyncInterval" style="color: #8b949e; display: block; margin-bottom: 5px;">Trade
+                        Sync Intervall (Sekunden)</label>
+                    <input type="number" id="tradeSyncInterval" name="tradeSyncInterval" th:value="${tradeSyncInterval}"
+                        min="5"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Mail Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">📧 E-Mail Konfiguration</h2>
+            <form th:action="@{/admin/mail-config}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
 
                 <div class="form-group">
                     <label for="host" style="color: #8b949e; display: block; margin-bottom: 5px;">SMTP Host</label>
-                    <input type="text" id="host" name="host" th:value="${mailHost != '' ? mailHost : 'mail.gmx.net'}"
+                    <input type="text" id="host" name="host" th:value="${mailHost}" placeholder="smtp.example.com"
+                        required
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group">
                     <label for="port" style="color: #8b949e; display: block; margin-bottom: 5px;">SMTP Port</label>
-                    <input type="number" id="port" name="port" th:value="${mailPort}"
+                    <input type="number" id="port" name="port" th:value="${mailPort}" placeholder="587" required
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group">
-                    <label for="user" style="color: #8b949e; display: block; margin-bottom: 5px;">Benutzer
-                        (E-Mail)</label>
+                    <label for="user" style="color: #8b949e; display: block; margin-bottom: 5px;">Benutzername</label>
                     <input type="text" id="user" name="user" th:value="${mailUser}"
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group">
                     <label for="password" style="color: #8b949e; display: block; margin-bottom: 5px;">Passwort</label>
-                    <div style="display: flex; gap: 5px;">
+                    <div style="display: flex; gap: 10px;">
                         <input type="password" id="password" name="password" th:value="${mailPassword}"
-                            placeholder="********"
-                            style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
-                        <button type="button" onclick="togglePasswordVisibility()" title="Passwort anzeigen"
-                            style="background-color: #30363d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; border-radius: 4px; cursor: pointer;">
-                            👁️
-                        </button>
+                            style="flex-grow: 1; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                        <button type="button" onclick="togglePasswordVisibility()"
+                            style="background-color: #30363d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; border-radius: 4px; cursor: pointer;">👁️</button>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="from" style="color: #8b949e; display: block; margin-bottom: 5px;">Absender
-                        (From)</label>
-                    <input type="text" id="from" name="from" th:value="${mailFrom}"
+                        Address</label>
+                    <input type="email" id="from" name="from" th:value="${mailFrom}" placeholder="noreply@example.com"
+                        required
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group">
-                    <label for="to" style="color: #8b949e; display: block; margin-bottom: 5px;">Empfänger (To)</label>
-                    <input type="text" id="to" name="to" th:value="${mailTo}" placeholder="alert@example.com"
+                    <label for="to" style="color: #8b949e; display: block; margin-bottom: 5px;">Empfänger
+                        Address</label>
+                    <input type="email" id="to" name="to" th:value="${mailTo}" placeholder="admin@example.com" required
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group">
-                    <label for="maxPerDay" style="color: #8b949e; display: block; margin-bottom: 5px;">Max. Mails pro
+                    <label for="maxPerDay" style="color: #8b949e; display: block; margin-bottom: 5px;">Max Mails pro
                         Tag</label>
-                    <input type="number" id="maxPerDay" name="maxPerDay" th:value="${mailMaxPerDay}"
+                    <input type="number" id="maxPerDay" name="maxPerDay" th:value="${mailMaxPerDay}" min="1" required
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
                 <div class="form-group" style="grid-column: span 2;">
                     <button type="submit"
-                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">Speichern</button>
-                    <div style="margin-top: 10px; font-size: 0.85em; color: #8b949e;">
-                        * Änderungen werden sofort aktiv. Standard: mail.gmx.net (587).
-                    </div>
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
                 </div>
             </form>
         </div>
 
+
+        <!-- Homey Config -->
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
             <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🏠 Homey Integration</h2>
-            <form action="/admin/homey-config" method="post"
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <form th:action="@{/admin/homey-config}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
 
                 <div class="form-group">
                     <label for="homeyId" style="color: #8b949e; display: block; margin-bottom: 5px;">Homey ID</label>
@@ -246,13 +350,9 @@
         </div>
 
         <div class="no-accounts" th:if="${#lists.size(statsList) == 0}">
-            <div class="no-accounts-icon">📊</div>
+            <div class="no-accounts-icon">�</div>
             <h2>Keine Daten in der Datenbank</h2>
             <p>Es wurden noch keine Trades gespeichert.</p>
-        </div>
-
-        <div class="admin-nav">
-            <a href="/" class="view-details-btn">← Zurück zum Dashboard</a>
         </div>
 
         <footer>

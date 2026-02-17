@@ -23,7 +23,21 @@ public class ApiController {
     private AccountManager accountManager;
 
     @Autowired
+    private de.trademonitor.repository.ClientLogRepository clientLogRepository;
+
+    @Autowired
     private de.trademonitor.service.EmailService emailService;
+
+    private void logClientAction(Long accountId, String action, String message,
+            jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            String ip = request.getRemoteAddr();
+            de.trademonitor.entity.ClientLog log = new de.trademonitor.entity.ClientLog(accountId, action, ip, message);
+            clientLogRepository.save(log);
+        } catch (Exception e) {
+            System.err.println("Failed to save client log: " + e.getMessage());
+        }
+    }
 
     /**
      * Test email configuration.
@@ -44,8 +58,10 @@ public class ApiController {
      * Register a new MetaTrader account.
      */
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            logClientAction(request.getAccountId(), "REGISTER", "Broker: " + request.getBroker(), httpRequest);
             accountManager.registerAccount(
                     request.getAccountId(),
                     request.getBroker(),
@@ -55,8 +71,7 @@ public class ApiController {
                     "status", "ok",
                     "message", "Account registered successfully"));
         } catch (Exception e) {
-            // Cannot report error to account if registration fails (account might not
-            // exist)
+            logClientAction(request.getAccountId(), "REGISTER_ERROR", e.getMessage(), httpRequest);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));
@@ -69,8 +84,14 @@ public class ApiController {
      * Server checks for duplicates and only inserts new trades.
      */
     @PostMapping("/trades-init")
-    public ResponseEntity<?> initTrades(@RequestBody TradeInitRequest request) {
+    public ResponseEntity<?> initTrades(@RequestBody TradeInitRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            int openCount = request.getTrades() != null ? request.getTrades().size() : 0;
+            int closedCount = request.getClosedTrades() != null ? request.getClosedTrades().size() : 0;
+            logClientAction(request.getAccountId(), "INIT_TRADES", "Open: " + openCount + ", Closed: " + closedCount,
+                    httpRequest);
+
             // Update open trades
             accountManager.updateTrades(
                     request.getAccountId(),
@@ -85,11 +106,12 @@ public class ApiController {
 
             return ResponseEntity.ok(Map.of(
                     "status", "ok",
-                    "openTradesReceived", request.getTrades() != null ? request.getTrades().size() : 0,
-                    "closedTradesReceived", request.getClosedTrades() != null ? request.getClosedTrades().size() : 0,
+                    "openTradesReceived", openCount,
+                    "closedTradesReceived", closedCount,
                     "newTradesInserted", newTradesInserted));
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            logClientAction(request.getAccountId(), "INIT_ERROR", msg, httpRequest);
             System.err.println("ERROR in /api/trades-init: " + msg);
             e.printStackTrace();
             accountManager.reportError(request.getAccountId(), "Init Error: " + msg);
@@ -103,8 +125,15 @@ public class ApiController {
      * Receive trade updates from MetaTrader (incremental, after init).
      */
     @PostMapping("/trades")
-    public ResponseEntity<?> updateTrades(@RequestBody TradeUpdateRequest request) {
+    public ResponseEntity<?> updateTrades(@RequestBody TradeUpdateRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            int count = request.getTrades() != null ? request.getTrades().size() : 0;
+            // Only log if there are actual trades, to reduce noise? User wants to see
+            // connection attempts though.
+            // Let's log it.
+            logClientAction(request.getAccountId(), "UPDATE_TRADES", "Count: " + count, httpRequest);
+
             accountManager.updateTrades(
                     request.getAccountId(),
                     request.getTrades(),
@@ -113,8 +142,9 @@ public class ApiController {
 
             return ResponseEntity.ok(Map.of(
                     "status", "ok",
-                    "tradesReceived", request.getTrades() != null ? request.getTrades().size() : 0));
+                    "tradesReceived", count));
         } catch (Exception e) {
+            logClientAction(request.getAccountId(), "UPDATE_ERROR", e.getMessage(), httpRequest);
             accountManager.reportError(request.getAccountId(), "Update Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
@@ -126,11 +156,14 @@ public class ApiController {
      * Receive heartbeat from MetaTrader.
      */
     @PostMapping("/heartbeat")
-    public ResponseEntity<?> heartbeat(@RequestBody HeartbeatRequest request) {
+    public ResponseEntity<?> heartbeat(@RequestBody HeartbeatRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            logClientAction(request.getAccountId(), "HEARTBEAT", "Alive", httpRequest);
             accountManager.updateHeartbeat(request.getAccountId());
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (Exception e) {
+            logClientAction(request.getAccountId(), "HEARTBEAT_ERROR", e.getMessage(), httpRequest);
             accountManager.reportError(request.getAccountId(), "Heartbeat Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
@@ -151,17 +184,22 @@ public class ApiController {
      * Checks for duplicates and only inserts new trades.
      */
     @PostMapping("/history")
-    public ResponseEntity<?> updateHistory(@RequestBody HistoryUpdateRequest request) {
+    public ResponseEntity<?> updateHistory(@RequestBody HistoryUpdateRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            int count = request.getClosedTrades() != null ? request.getClosedTrades().size() : 0;
+            logClientAction(request.getAccountId(), "HISTORY_UPDATE", "Count: " + count, httpRequest);
+
             int newInserted = accountManager.updateHistory(
                     request.getAccountId(),
                     request.getClosedTrades());
 
             return ResponseEntity.ok(Map.of(
                     "status", "ok",
-                    "historyReceived", request.getClosedTrades() != null ? request.getClosedTrades().size() : 0,
+                    "historyReceived", count,
                     "newTradesInserted", newInserted));
         } catch (Exception e) {
+            logClientAction(request.getAccountId(), "HISTORY_ERROR", e.getMessage(), httpRequest);
             accountManager.reportError(request.getAccountId(), "History Error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
