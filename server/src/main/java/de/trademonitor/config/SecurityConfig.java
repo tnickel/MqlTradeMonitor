@@ -16,35 +16,37 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                // Disable CSRF for API endpoints used by EA
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**", "/css/**", "/js/**", "/images/**", "/login").permitAll()
-                        .anyRequest().authenticated())
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .defaultSuccessUrl("/", true)
-                        .permitAll())
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login?logout")
-                        .permitAll());
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                // Disable CSRF for API endpoints used by EA
+                                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers("/api/**", "/css/**", "/js/**", "/images/**", "/login",
+                                                                "/mobile/**")
+                                                .permitAll()
+                                                .anyRequest().authenticated())
+                                .formLogin(form -> form
+                                                .loginPage("/login")
+                                                .defaultSuccessUrl("/", true)
+                                                .permitAll())
+                                .logout(logout -> logout
+                                                .logoutUrl("/logout")
+                                                .logoutSuccessUrl("/login?logout")
+                                                .permitAll());
 
-        return http.build();
-    }
+                return http.build();
+        }
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        UserDetails admin = User.builder()
-                .username("admin")
-                .password(encoder.encode("password"))
-                .roles("ADMIN")
-                .build();
+        @Bean
+        public UserDetailsService userDetailsService() {
+                PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+                UserDetails admin = User.builder()
+                                .username("admin")
+                                .password(encoder.encode("password"))
+                                .roles("ADMIN")
+                                .build();
 
-        return new InMemoryUserDetailsManager(admin);
-    }
+                return new InMemoryUserDetailsManager(admin);
+        }
 }

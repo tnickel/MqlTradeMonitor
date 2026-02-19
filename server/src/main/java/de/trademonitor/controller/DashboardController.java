@@ -38,6 +38,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.HomeyService homeyService;
 
+    @Autowired
+    private de.trademonitor.service.TradeStorage tradeStorage;
+
     @PostMapping("/api/test-siren")
     @ResponseBody
     public String testSiren() {
@@ -48,6 +51,23 @@ public class DashboardController {
     /**
      * Main dashboard showing all accounts.
      */
+    @GetMapping("/mobile/drawdown")
+    public String mobileDrawdown(Model model) {
+        List<de.trademonitor.dto.MagicDrawdownItem> list = new ArrayList<>(accountManager.getMagicDrawdowns());
+
+        // Sort: Real first, then Drawdown desc
+        list.sort((a, b) -> {
+            if (a.isReal() && !b.isReal())
+                return -1;
+            if (!a.isReal() && b.isReal())
+                return 1;
+            return Double.compare(b.getCurrentDrawdownEur(), a.getCurrentDrawdownEur());
+        });
+
+        model.addAttribute("drawdowns", list);
+        return "mobile-drawdown";
+    }
+
     @GetMapping("/")
     public String dashboard(Model model) {
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
@@ -246,6 +266,25 @@ public class DashboardController {
     @org.springframework.web.bind.annotation.ResponseBody
     public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns() {
         return accountManager.getMagicDrawdowns();
+    }
+
+    /**
+     * AJAX Endpoint to get equity snapshots for the equity curve chart.
+     * Returns list of {timestamp, equity, balance} objects ordered by time.
+     */
+    @GetMapping("/api/equity-history/{accountId}")
+    @ResponseBody
+    public List<Map<String, Object>> getEquityHistory(@PathVariable long accountId) {
+        List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("timestamp", snap.getTimestamp());
+            entry.put("equity", snap.getEquity());
+            entry.put("balance", snap.getBalance());
+            result.add(entry);
+        }
+        return result;
     }
 
     /**

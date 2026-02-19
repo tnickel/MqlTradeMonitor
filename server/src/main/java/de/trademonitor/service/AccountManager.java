@@ -232,6 +232,9 @@ public class AccountManager {
             // Persist to DB
             tradeStorage.replaceOpenTrades(accountId, trades);
             tradeStorage.updateAccountMetrics(accountId, equity, balance);
+
+            // Save equity snapshot for chart (rate-limited to once per minute)
+            tradeStorage.saveEquitySnapshot(accountId, equity, balance);
         }
     }
 

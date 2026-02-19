@@ -2,16 +2,20 @@ package de.trademonitor.service;
 
 import de.trademonitor.entity.AccountEntity;
 import de.trademonitor.entity.ClosedTradeEntity;
+import de.trademonitor.entity.EquitySnapshotEntity;
 import de.trademonitor.entity.OpenTradeEntity;
 import de.trademonitor.model.ClosedTrade;
 import de.trademonitor.model.Trade;
 import de.trademonitor.repository.AccountRepository;
 import de.trademonitor.repository.ClosedTradeRepository;
+import de.trademonitor.repository.EquitySnapshotRepository;
 import de.trademonitor.repository.OpenTradeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +34,21 @@ public class TradeStorage {
 
     @Autowired
     private OpenTradeRepository openTradeRepository;
+
+    @Autowired
+    private EquitySnapshotRepository equitySnapshotRepository;
+
+    /**
+     * Timestamp format for equity snapshots (lexicographic ordering works
+     * correctly)
+     */
+    private static final DateTimeFormatter SNAPSHOT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+    /**
+     * Track last snapshot time per account to avoid saving too frequently (every
+     * 60s is enough)
+     */
+    private final java.util.concurrent.ConcurrentHashMap<Long, String> lastSnapshotTime = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Save or update account in DB.
@@ -227,8 +246,44 @@ public class TradeStorage {
         if (entity != null) {
             entity.setEquity(equity);
             entity.setBalance(balance);
-            entity.setLastSeen(java.time.LocalDateTime.now().toString());
+            entity.setLastSeen(LocalDateTime.now().toString());
             accountRepository.save(entity);
         }
+    }
+
+    /**
+     * Save an equity snapshot if at least 60 seconds have passed since the last
+     * snapshot for this account.
+     * Automatically cleans up snapshots older than 90 days.
+     */
+    @Transactional
+    public void saveEquitySnapshot(long accountId, double equity, double balance) {
+        String now = LocalDateTime.now().format(SNAPSHOT_FMT);
+
+        // Rate-limit: only save once per minute per account
+        String last = lastSnapshotTime.get(accountId);
+        if (last != null) {
+            // Compare lexicographically: format is ISO-like so it works
+            // We need at least 60 seconds difference → compare length truncated to minute
+            String nowMinute = now.substring(0, 16); // yyyy-MM-dd'T'HH:mm
+            String lastMinute = last.substring(0, 16);
+            if (nowMinute.equals(lastMinute)) {
+                return; // Same minute → skip
+            }
+        }
+
+        equitySnapshotRepository.save(new EquitySnapshotEntity(accountId, now, equity, balance));
+        lastSnapshotTime.put(accountId, now);
+
+        // Cleanup: delete snapshots older than 90 days
+        String cutoff = LocalDateTime.now().minusDays(90).format(SNAPSHOT_FMT);
+        equitySnapshotRepository.deleteOlderThan(accountId, cutoff);
+    }
+
+    /**
+     * Load all equity snapshots for an account, ordered by timestamp ascending.
+     */
+    public List<EquitySnapshotEntity> loadEquitySnapshots(long accountId) {
+        return equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
     }
 }

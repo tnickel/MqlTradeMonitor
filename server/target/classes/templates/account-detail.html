@@ -120,6 +120,24 @@
             <div class="chart-container"
                 style="position: relative; height: 300px; margin-bottom: 2rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
                 <canvas id="balance-history-chart"></canvas>
+                <!-- Equity overlay: shown prominently on right side of chart -->
+                <div id="equity-overlay" style="
+                    position: absolute;
+                    top: 12px;
+                    right: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 2px;
+                    pointer-events: none;
+                ">
+                    <span
+                        style="font-size: 0.75rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Open
+                        Equity</span>
+                    <span id="equity-overlay-value"
+                        style="font-size: 1.6rem; font-weight: bold; line-height: 1;">-</span>
+                    <span id="equity-overlay-balance" style="font-size: 0.8rem; color: #a0a0c0;"></span>
+                </div>
             </div>
 
             <!-- Statistics Grid -->
@@ -443,21 +461,6 @@
             }
 
             // 2. Calculate Balance History
-            // We know the FINAL balance (currentBalance).
-            // We work BACKWARDS from the end to find the balance at each point?
-            // OR: We calculate total profit of ALL trades, subtract from Current Balance to find Initial Balance?
-            // NOTE: Current Balance includes deposits/withdrawals that might NOT be in the trade list if they are filtered out or different type.
-            // Assumption: The trade list contains all relevant P/L operations or we only show "Cumulative P/L" curve?
-            // User requested "EquityCurve", but usually Balance Curve is what is shown for history.
-            // Let's try to reconstruct Balance relative to NOW.
-
-            // Reconstruct:
-            // Balance[Now] = CurrentBalance
-            // Balance[LastTrade] = CurrentBalance
-            // Balance[BeforeLastTrade] = Balance[LastTrade] - LastTradeProfit
-
-            // We iterate backwards through ALL trades (even those older than filter) to find the balance state.
-
             var fullBalanceHistory = [];
             var runningBalance = this.currentBalance;
 
@@ -467,76 +470,137 @@
             // Iterate BACKWARDS through sorted trades (newest to oldest)
             for (var i = this.allTrades.length - 1; i >= 0; i--) {
                 var trade = this.allTrades[i];
-                // Record state AFTER trade (which is runningBalance)
-                // Actually, the trade closed at trade.time. The balance became runningBalance AT trade.time.
-                // So (trade.time, runningBalance) is a point.
                 fullBalanceHistory.push({ x: trade.time, y: runningBalance });
-
-                // Revert balance for previous state
                 runningBalance -= trade.profit;
             }
-            // Add initial state (start of time)
             if (this.allTrades.length > 0) {
-                fullBalanceHistory.push({ x: this.allTrades[0].time - 60000, y: runningBalance }); // 1 min before first trade
+                fullBalanceHistory.push({ x: this.allTrades[0].time - 60000, y: runningBalance });
             }
 
-            // Now we have history from Now -> Past. Reverse it to be Past -> Now.
             fullBalanceHistory.reverse();
 
-            // 3. Filter points for display
-            var displayData = fullBalanceHistory.filter(p => p.x >= minTime);
+            // 3. Filter balance points for display
+            var displayData = fullBalanceHistory.filter(function (p) { return p.x >= minTime; });
 
-            // Ensure we have at least a starting point if we cut off history
-            // Find the last point BEFORE minTime to use as "Open" value
             if (displayData.length === 0 || displayData[0].x > minTime) {
-                // Find latest point <= minTime
-                var startPoint = { x: minTime, y: this.currentBalance }; // Default fallback
-                for (var i = 0; i < fullBalanceHistory.length; i++) {
-                    if (fullBalanceHistory[i].x <= minTime) {
-                        startPoint = { x: minTime, y: fullBalanceHistory[i].y }; // Balance at start of period
+                var startPoint = { x: minTime, y: this.currentBalance };
+                for (var j = 0; j < fullBalanceHistory.length; j++) {
+                    if (fullBalanceHistory[j].x <= minTime) {
+                        startPoint = { x: minTime, y: fullBalanceHistory[j].y };
                     } else {
-                        break; // optimization: fullBalanceHistory is sorted time asc
+                        break;
                     }
                 }
-                // Prepend this start point if list is empty or first point is after minTime
                 if (displayData.length === 0 || displayData[0].x > minTime) {
                     displayData.unshift(startPoint);
                 }
             }
 
-            // 4. Render Chart
-            this.render(displayData);
+            // 4. Build equity curve from snapshots
+            var equityDisplay = [];
+            var snapshots = this.equitySnapshots || [];
+
+            // Parse snapshots: timestamp is like "2026-02-19T19:00:00"
+            snapshots.forEach(function (snap) {
+                var ts = snap.timestamp.replace('T', ' ').split(/[- :]/);
+                // [year, month, day, hour, min, sec]
+                var d = new Date(ts[0], ts[1] - 1, ts[2], ts[3] || 0, ts[4] || 0, ts[5] || 0);
+                equityDisplay.push({ x: d.getTime(), y: snap.equity });
+            });
+
+            // Filter equity snapshots by time range
+            equityDisplay = equityDisplay.filter(function (p) { return p.x >= minTime; });
+
+            // Always add current live equity as last point
+            equityDisplay.push({ x: now.getTime(), y: currentEquity });
+
+            // 5. Render Chart
+            this.render(displayData, equityDisplay);
         };
 
-        HistoryChartManager.prototype.render = function (data) {
+        HistoryChartManager.prototype.render = function (data, equityData) {
             var ctx = this.canvas.getContext('2d');
-            var labels = data.map(d => new Date(d.x).toLocaleString());
-            var values = data.map(d => d.y);
+            var labels = data.map(function (d) { return new Date(d.x).toLocaleString(); });
+            var values = data.map(function (d) { return d.y; });
 
-            // Create gradient
+            // Balance gradient (blue/purple)
             var gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // primary
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
             gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+            // Equity gradient (yellow/gold)
+            var eqGradient = ctx.createLinearGradient(0, 0, 0, 300);
+            eqGradient.addColorStop(0, 'rgba(255, 200, 0, 0.25)');
+            eqGradient.addColorStop(1, 'rgba(255, 200, 0, 0.0)');
 
             if (this.chart) {
                 this.chart.destroy();
             }
 
+            // Build equity dataset
+            var equityLabels = (equityData || []).map(function (d) { return new Date(d.x).toLocaleString(); });
+            var equityValues = (equityData || []).map(function (d) { return d.y; });
+            var hasEquity = equityValues.length > 0;
+
+            var datasets = [
+                {
+                    label: 'Balance',
+                    data: values,
+                    borderColor: '#6366f1',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointRadius: data.length > 100 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.1,
+                    order: 2
+                }
+            ];
+
+            if (hasEquity) {
+                datasets.push({
+                    label: 'Equity',
+                    data: equityValues,
+                    labels: equityLabels,   // for tooltip positioning reference
+                    borderColor: '#ffc800',
+                    backgroundColor: eqGradient,
+                    borderWidth: 2.5,
+                    pointRadius: equityValues.length > 100 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.3,
+                    order: 1
+                });
+            }
+
+            // Use merged labels so both datasets share the x-axis labels
+            // We create a superset of labels sorted chronologically
+            var allLabelsSorted = Array.from(new Set(labels.concat(hasEquity ? equityLabels : [])))
+                .sort(function (a, b) {
+                    return new Date(a) - new Date(b);
+                });
+
+            // Re-map datasets to use allLabelsSorted as shared x-axis
+            // For balance: build map label->value
+            var balanceMap = {};
+            labels.forEach(function (lbl, i) { balanceMap[lbl] = values[i]; });
+            var equityMap = {};
+            if (hasEquity) {
+                equityLabels.forEach(function (lbl, i) { equityMap[lbl] = equityValues[i]; });
+            }
+
+            datasets[0].data = allLabelsSorted.map(function (lbl) { return balanceMap[lbl] !== undefined ? balanceMap[lbl] : null; });
+            datasets[0].spanGaps = true;
+            if (hasEquity) {
+                datasets[1].data = allLabelsSorted.map(function (lbl) { return equityMap[lbl] !== undefined ? equityMap[lbl] : null; });
+                datasets[1].spanGaps = true;
+            }
+
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels, // ChartJS can handle timestamps if using time adapter, but loose labels work too
-                    datasets: [{
-                        label: 'Balance',
-                        data: values, // ChartJS 3+ can take {x,y} objects if parsing is set, but simple array is safer without moment adapter
-                        borderColor: '#6366f1',
-                        backgroundColor: gradient,
-                        borderWidth: 2,
-                        pointRadius: data.length > 100 ? 0 : 3, // Hide points if too many
-                        pointHoverRadius: 5,
-                        fill: true,
-                        tension: 0.1
-                    }]
+                    labels: allLabelsSorted,
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -547,12 +611,18 @@
                     },
                     plugins: {
                         legend: {
-                            display: false
+                            display: hasEquity,
+                            labels: {
+                                color: '#a0a0c0',
+                                font: { size: 12 },
+                                boxWidth: 20,
+                                usePointStyle: true
+                            }
                         },
                         tooltip: {
                             callbacks: {
                                 label: function (context) {
-                                    return 'Balance: ' + context.parsed.y.toFixed(2);
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
                                 }
                             },
                             backgroundColor: '#252542',
@@ -576,7 +646,7 @@
                         },
                         y: {
                             ticks: {
-                                color: '#e0e0e0', // Brighter text
+                                color: '#e0e0e0',
                                 font: {
                                     size: 12,
                                     weight: 'bold'
@@ -712,6 +782,8 @@
         // Storage key
         var accountId = /*[[${account.accountId}]]*/ '0';
         var currentBalance = /*[[${account.balance}]]*/ 0.0;
+        var currentEquity = /*[[${account.equity}]]*/ 0.0;
+        var accountCurrency = /*[[${account.currency}]]*/ 'EUR';
 
         var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
 
@@ -724,40 +796,46 @@
             historyMgr = new TableManager('closed-trades-table', 'closed-trades-pagination', 'history-summary');
 
             // History Chart
-            // Need all rows from history table
             var allHistoryRows = Array.from(document.querySelectorAll('#closed-trades-table tbody tr'));
             historyChartMgr = new HistoryChartManager('balance-history-chart', currentBalance, allHistoryRows);
 
-            // Magic Chart Manager
-            magicChartMgr = new MagicChartManager('magic-charts-container');
+            // Load equity snapshots and render chart
+            fetch('/api/equity-history/' + accountId)
+                .then(function (r) { return r.json(); })
+                .catch(function () { return []; })
+                .then(function (snapshots) {
+                    historyChartMgr.equitySnapshots = snapshots;
+                    // Show equity overlay immediately with current live values
+                    updateEquityOverlay(currentEquity, currentBalance);
 
-            // Restore filter
-            var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
+                    // Magic Chart Manager
+                    magicChartMgr = new MagicChartManager('magic-charts-container');
 
-            // Filter click handlers
-            var btns = document.querySelectorAll('.filter-btn');
-            btns.forEach(btn => {
-                // Set initial active state
-                var range = btn.dataset.range;
-                if (range === savedFilter) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
+                    // Restore filter
+                    var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
 
-                btn.addEventListener('click', function () {
-                    // Update active class
-                    btns.forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
+                    // Filter click handlers
+                    var btns = document.querySelectorAll('.filter-btn');
+                    btns.forEach(function (btn) {
+                        var range = btn.dataset.range;
+                        if (range === savedFilter) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
 
-                    var r = this.dataset.range;
-                    localStorage.setItem(STORAGE_KEY_FILTER, r);
-                    applyHistoryFilter(r);
+                        btn.addEventListener('click', function () {
+                            btns.forEach(function (b) { b.classList.remove('active'); });
+                            this.classList.add('active');
+                            var r = this.dataset.range;
+                            localStorage.setItem(STORAGE_KEY_FILTER, r);
+                            applyHistoryFilter(r);
+                        });
+                    });
+
+                    // Default filter
+                    applyHistoryFilter(savedFilter);
                 });
-            });
-
-            // Default filter: Saved or Today
-            applyHistoryFilter(savedFilter);
         });
 
         function applyHistoryFilter(range) {
@@ -820,6 +898,28 @@
 
             if (periodLabelCharts) periodLabelCharts.textContent = labelText;
             if (periodLabelTable) periodLabelTable.textContent = labelText;
+        }
+
+        /**
+         * Update the equity overlay in the top-right of the chart.
+         * Shows the open equity (difference between equity and balance) prominently.
+         */
+        function updateEquityOverlay(equity, balance) {
+            var elVal = document.getElementById('equity-overlay-value');
+            var elBal = document.getElementById('equity-overlay-balance');
+            if (!elVal) return;
+
+            var diff = equity - balance;
+            var sign = diff >= 0 ? '+' : '';
+            var color = diff >= 0 ? '#10b981' : '#ffc800'; // green if positive, yellow if negative
+
+            elVal.textContent = sign + diff.toFixed(2) + ' ' + accountCurrency;
+            elVal.style.color = color;
+            elVal.style.textShadow = diff !== 0 ? ('0 0 12px ' + color + '88') : 'none';
+
+            if (elBal) {
+                elBal.textContent = 'Equity: ' + equity.toFixed(2) + ' ' + accountCurrency;
+            }
         }
 
         function updateStats(range) {
