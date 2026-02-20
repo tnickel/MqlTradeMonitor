@@ -129,7 +129,7 @@ public class GlobalConfigService {
 
     public String getHomeyId() {
         return repository.findById(KEY_HOMEY_ID).map(GlobalConfigEntity::getConfValue)
-                .orElse("64a951ea4ce9759d39b1abd3");
+                .orElse("");
     }
 
     public String getHomeyEvent() {
