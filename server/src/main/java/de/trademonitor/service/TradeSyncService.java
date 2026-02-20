@@ -80,6 +80,7 @@ public class TradeSyncService {
                 boolean accountHasWarning = false;
                 Map<Long, String> newStatuses = new HashMap<>();
 
+                Set<Long> exemptMagics = globalConfigService.getSyncExemptMagicNumbers();
                 List<Trade> realTrades = account.getOpenTrades();
                 totalRealTrades += realTrades.size();
 
@@ -88,6 +89,9 @@ public class TradeSyncService {
 
                     if (matched) {
                         newStatuses.put(realTrade.getTicket(), "MATCHED");
+                    } else if (exemptMagics.contains(realTrade.getMagicNumber())) {
+                        // Exempted magic number: mark orange but don't raise alarm
+                        newStatuses.put(realTrade.getTicket(), "EXEMPTED");
                     } else {
                         newStatuses.put(realTrade.getTicket(), "WARNING");
                         accountHasWarning = true;

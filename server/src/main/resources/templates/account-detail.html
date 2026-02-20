@@ -7,6 +7,8 @@
     <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.1'">Account Detail - Trade Monitor</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         /* Filter Buttons */
         .filter-bar {
@@ -248,6 +250,8 @@
                                         title="Matched with Demo">✅</span>
                                     <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
                                         title="No matching Demo trade!">⚠️</span>
+                                    <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
+                                        style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
                                 </span>
                             </td>
                             <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
@@ -520,8 +524,6 @@
 
         HistoryChartManager.prototype.render = function (data, equityData) {
             var ctx = this.canvas.getContext('2d');
-            var labels = data.map(function (d) { return new Date(d.x).toLocaleString(); });
-            var values = data.map(function (d) { return d.y; });
 
             // Balance gradient (blue/purple)
             var gradient = ctx.createLinearGradient(0, 0, 0, 300);
@@ -537,15 +539,14 @@
                 this.chart.destroy();
             }
 
-            // Build equity dataset
-            var equityLabels = (equityData || []).map(function (d) { return new Date(d.x).toLocaleString(); });
-            var equityValues = (equityData || []).map(function (d) { return d.y; });
-            var hasEquity = equityValues.length > 0;
+            var hasEquity = equityData && equityData.length > 0;
 
+            // Both datasets use {x: timestamp_ms, y: value} — no label merging needed.
+            // Each dataset keeps its own timestamps independently on the time-based X axis.
             var datasets = [
                 {
                     label: 'Balance',
-                    data: values,
+                    data: data.map(function (d) { return { x: d.x, y: d.y }; }),
                     borderColor: '#6366f1',
                     backgroundColor: gradient,
                     borderWidth: 2,
@@ -560,12 +561,11 @@
             if (hasEquity) {
                 datasets.push({
                     label: 'Equity',
-                    data: equityValues,
-                    labels: equityLabels,   // for tooltip positioning reference
+                    data: equityData.map(function (d) { return { x: d.x, y: d.y }; }),
                     borderColor: '#ffc800',
                     backgroundColor: eqGradient,
                     borderWidth: 2.5,
-                    pointRadius: equityValues.length > 100 ? 0 : 3,
+                    pointRadius: equityData.length > 100 ? 0 : 3,
                     pointHoverRadius: 5,
                     fill: true,
                     tension: 0.3,
@@ -573,35 +573,9 @@
                 });
             }
 
-            // Use merged labels so both datasets share the x-axis labels
-            // We create a superset of labels sorted chronologically
-            var allLabelsSorted = Array.from(new Set(labels.concat(hasEquity ? equityLabels : [])))
-                .sort(function (a, b) {
-                    return new Date(a) - new Date(b);
-                });
-
-            // Re-map datasets to use allLabelsSorted as shared x-axis
-            // For balance: build map label->value
-            var balanceMap = {};
-            labels.forEach(function (lbl, i) { balanceMap[lbl] = values[i]; });
-            var equityMap = {};
-            if (hasEquity) {
-                equityLabels.forEach(function (lbl, i) { equityMap[lbl] = equityValues[i]; });
-            }
-
-            datasets[0].data = allLabelsSorted.map(function (lbl) { return balanceMap[lbl] !== undefined ? balanceMap[lbl] : null; });
-            datasets[0].spanGaps = true;
-            if (hasEquity) {
-                datasets[1].data = allLabelsSorted.map(function (lbl) { return equityMap[lbl] !== undefined ? equityMap[lbl] : null; });
-                datasets[1].spanGaps = true;
-            }
-
             this.chart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: allLabelsSorted,
-                    datasets: datasets
-                },
+                data: { datasets: datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -621,6 +595,10 @@
                         },
                         tooltip: {
                             callbacks: {
+                                title: function (items) {
+                                    if (!items.length) return '';
+                                    return new Date(items[0].parsed.x).toLocaleString();
+                                },
                                 label: function (context) {
                                     return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
                                 }
@@ -634,8 +612,18 @@
                     },
                     scales: {
                         x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                displayFormats: {
+                                    minute: 'HH:mm',
+                                    hour: 'dd.MM HH:mm',
+                                    day: 'dd.MM.yyyy',
+                                    week: 'dd.MM.yyyy',
+                                    month: 'MM.yyyy'
+                                }
+                            },
                             ticks: {
-                                display: true,
                                 color: '#a0a0c0',
                                 maxTicksLimit: 8,
                                 maxRotation: 0
@@ -645,12 +633,11 @@
                             }
                         },
                         y: {
+                            type: 'linear',
+                            position: 'left',
                             ticks: {
-                                color: '#e0e0e0',
-                                font: {
-                                    size: 12,
-                                    weight: 'bold'
-                                },
+                                color: '#a0a0c0',
+                                font: { size: 11 },
                                 callback: function (value) { return value.toFixed(2); }
                             },
                             grid: {

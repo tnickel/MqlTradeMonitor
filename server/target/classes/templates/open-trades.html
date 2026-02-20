@@ -450,6 +450,10 @@
                                             title="Matched with Demo">✅</span>
                                         <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
                                             title="No matching Demo trade!">⚠️</span>
+                                        <span th:if="${trade.syncStatus == 'EXEMPTED'}"
+                                            title="Von Synccheck ausgenommen"
+                                            style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠
+                                            Ausgen.</span>
                                     </span>
                                 </td>
                                 <td th:text="${trade.comment}" style="color: var(--text-secondary); font-size: 0.9rem;">

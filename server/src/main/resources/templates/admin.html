@@ -281,6 +281,35 @@
             </form>
         </div>
 
+        <!-- Sync Exemptions -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🟠 Synccheck Ausnahmen (Magic Numbers)</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">
+                Magic Numbers die hier eingetragen werden, werden beim Synccheck als <strong
+                    style="color: #f97316;">ausgenommen</strong> markiert (orange) —
+                kein Alarm wird ausgelöst. Nützlich wenn z.B. ein MT4-Client sich aufgrund technischer Einschränkungen
+                nicht verbinden kann.<br>
+                <span style="color: #6b7280; font-size: 0.85rem;">Kommagetrennte Liste, z.B.:
+                    <code>12345, 67890</code></span>
+            </p>
+            <form th:action="@{/admin/sync-exemptions}" method="post"
+                style="display: flex; flex-direction: column; gap: 12px;">
+                <textarea name="magicNumbers" rows="3" id="syncExemptMagics" th:text="${syncExemptMagics}"
+                    placeholder="z.B. 12345, 67890, 11111"
+                    style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 10px; border-radius: 4px; font-family: monospace; box-sizing: border-box; resize: vertical;"></textarea>
+                <div>
+                    <button type="submit"
+                        style="background-color: #f97316; color: white; border: none; padding: 10px 24px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        Speichern
+                    </button>
+                    <span style="color: #6b7280; margin-left: 12px; font-size: 0.85rem;">
+                        Leer lassen um alle Ausnahmen zu entfernen.
+                    </span>
+                </div>
+            </form>
+        </div>
+
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
             <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">📝 Magic Number Mappings</h2>

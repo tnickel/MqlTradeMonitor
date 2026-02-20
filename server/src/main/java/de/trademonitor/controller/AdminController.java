@@ -5,7 +5,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 @RequestMapping("/admin")
@@ -111,7 +113,28 @@ public class AdminController {
 
         model.addAttribute("magicMappings", magicMappingService.getAllMappings());
 
+        // Sync Exemptions
+        java.util.Set<Long> exemptSet = globalConfigService.getSyncExemptMagicNumbers();
+        String exemptStr = exemptSet.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
+        model.addAttribute("syncExemptMagics", exemptStr);
+
         return "admin";
+    }
+
+    @PostMapping("/sync-exemptions")
+    public String saveSyncExemptions(@RequestParam(defaultValue = "") String magicNumbers) {
+        java.util.Set<Long> result = new java.util.LinkedHashSet<>();
+        for (String part : magicNumbers.split("[,\\s]+")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                try {
+                    result.add(Long.parseLong(trimmed));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        globalConfigService.setSyncExemptMagicNumbers(result);
+        return "redirect:/admin";
     }
 
     @Autowired

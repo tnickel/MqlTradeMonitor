@@ -78,6 +78,7 @@ void CreateStatusLabel();
 void UpdateStatusLabel(string text, color col);
 void LoadLastSyncTime();
 void SaveLastSyncTime(string closeTime);
+void DiagnosticWebRequestTest();
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -179,11 +180,27 @@ void InitConfig()
       SaveConfig();
    }
    
+   // --- Robust URL cleanup ---
+   // Remove trailing slash, carriage return, newline, and spaces
+   // (can sneak in from config file reads on Windows)
+   StringTrimRight(cfg_ServerURL);
+   StringTrimLeft(cfg_ServerURL);
+   // Remove any trailing slash
+   int urlLen = StringLen(cfg_ServerURL);
+   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == '/')
+      cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
+   // Remove carriage return if present at end
+   urlLen = StringLen(cfg_ServerURL);
+   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)  // CR = 13
+      cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
+   
    Print("Active config: ServerURL=", cfg_ServerURL,
+         " (len=", StringLen(cfg_ServerURL), ")",
          " UpdateInterval=", cfg_UpdateIntervalSeconds,
          " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
          " ReconnectInterval=", cfg_ReconnectIntervalSeconds,
          " MaxReconnectAttempts=", cfg_MaxReconnectAttempts);
+   Print(">>> MT4 Allowed URL must be EXACTLY: ", cfg_ServerURL, " (copy this!)");
 }
 
 //+------------------------------------------------------------------+
@@ -192,6 +209,11 @@ void InitConfig()
 int OnInit()
 {
    Print("TradeMonitorClient EA v" + EA_VERSION + " initialized");
+   
+   // === DIAGNOSTIC: Test WebRequest with a public URL ===
+   // This tells us if WebRequest works at ALL in this MT4 build.
+   // Requires 'http://worldtimeapi.org' in Tools -> Options -> Expert Advisors -> WebRequest URLs
+   DiagnosticWebRequestTest();
    
    // Load or initialize configuration
    InitConfig();
@@ -850,6 +872,9 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
    
    ResetLastError();
    
+   // Debug: print exact URL before sending
+   Print("[WebRequest] POST to: ", url, " (urlLen=", StringLen(url), " dataLen=", ArraySize(postData), " timeout=", timeout, "ms)");
+   
    // MQL4 WebRequest signature is same as MQL5
    int res = WebRequest("POST", url, headers, timeout, postData, result, resultHeaders);
    
@@ -858,11 +883,21 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
       int error = GetLastError();
       if(error == 4060)
       {
-         Print("Error: URL not allowed. Please add ", cfg_ServerURL, " to allowed URLs in Tools -> Options -> Expert Advisors");
+         Print("Error 4060: WebRequest not allowed. Enable 'WebRequest for listed URLs' in Tools -> Options -> Expert Advisors and add: ", cfg_ServerURL);
       }
+      else if(error == 5200)
+      {
+         Print("Error 5200 (INVALID_ADDRESS): URL rejected by MT4. URL was: '", url, "'");
+         Print("  Fix: In MT4 -> Tools -> Options -> Expert Advisors -> add EXACTLY: '", cfg_ServerURL, "'");
+         Print("  (check for typos, no trailing slash, must match http:// prefix with port)");
+      }
+      else if(error == 5201)
+         Print("Error 5201 (CONNECT_FAILED): Cannot reach server at ", url, " - check if server is running");
+      else if(error == 5202)
+         Print("Error 5202 (TIMEOUT): Request timed out after ", timeout, "ms - server too slow or unreachable");
       else
       {
-         Print("HTTP request failed, error: ", error, " (timeout was ", timeout, "ms)");
+         Print("HTTP request failed, error: ", error, " (timeout was ", timeout, "ms) URL: ", url);
       }
       return false;
    }
@@ -930,6 +965,71 @@ string EscapeJson(string text)
    StringReplace(result, "\r", "\\r");
    StringReplace(result, "\t", "\\t");
    return result;
+}
+
+//+------------------------------------------------------------------+
+//| Diagnostic: Extended WebRequest URL matching test                 |
+//+------------------------------------------------------------------+
+void DiagnosticTestUrl(string label, string url)
+{
+   char getData[];
+   char result[];
+   string resultHeaders;
+   string headers = "Content-Type: application/json\r\n";
+   char postData[];
+   string json = "{\"accountId\":0,\"test\":true}";
+   StringToCharArray(json, postData, 0, WHOLE_ARRAY, CP_UTF8);
+   int sz = ArraySize(postData);
+   if(sz > 0 && postData[sz-1] == 0) ArrayResize(postData, sz - 1);
+   
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, 3000, postData, result, resultHeaders);
+   int err = GetLastError();
+   
+   string status = "";
+   if(res == -1)
+   {
+      if(err == 4060) status = "ERROR 4060 (WebRequest disabled in build!)";
+      else if(err == 5200) status = "ERROR 5200 (WHITELIST MISS - URL not in allowed list)";
+      else if(err == 5201) status = "ERROR 5201 (Connect failed - server not reachable)";
+      else if(err == 5202) status = "ERROR 5202 (Timeout)";
+      else if(err == 5203) status = "ERROR 5203 (Request failed - but whitelist OK!)";
+      else status = "ERROR " + IntegerToString(err);
+   }
+   else
+      status = "HTTP " + IntegerToString(res);
+      
+   Print("[DIAG] ", label, " -> ", status, " | url='", url, "' len=", StringLen(url));
+}
+
+void DiagnosticWebRequestTest()
+{
+   Print("=== DIAGNOSTIC WebRequest Test ===");
+   string ip = "192.168.178.143";
+   
+   // --- URL info ---
+   Print("[DIAG] cfg_ServerURL = '", cfg_ServerURL, "' len=", StringLen(cfg_ServerURL));
+   for(int i = StringLen(cfg_ServerURL)-3; i < StringLen(cfg_ServerURL); i++)
+      if(i >= 0) Print("[DIAG] char[", i, "] = ", StringGetCharacter(cfg_ServerURL, i));
+   
+   // --- Test 1: Public URL (worldtimeapi.org) ---
+   // Add 'http://worldtimeapi.org' to whitelist to test internet access
+   DiagnosticTestUrl("PUBLIC  worldtimeapi.org", "http://worldtimeapi.org/api/timezone/Europe/Berlin");
+   
+   // --- Test 2: Local IP + Port (what the EA currently uses) ---
+   DiagnosticTestUrl("LOCAL   with :8080", "http://" + ip + ":8080/api/register");
+   
+   // --- Test 3: Local IP without Port (what portproxy should handle) ---
+   DiagnosticTestUrl("LOCAL   no port  ", "http://" + ip + "/api/register");
+   
+   // --- Test 4: localhost without port ---
+   DiagnosticTestUrl("LOCAL   localhost ", "http://localhost/api/register");
+   
+   // --- Test 5: 127.0.0.1 without port ---
+   DiagnosticTestUrl("LOCAL   127.0.0.1", "http://127.0.0.1/api/register");
+   
+   Print("=== DIAGNOSTIC End ===");
+   Print("[DIAG] Whitelist hint: 5200=not whitelisted, 5201=whitelisted+no reach, 5203=whitelisted+reached");
 }
 
 //+------------------------------------------------------------------+

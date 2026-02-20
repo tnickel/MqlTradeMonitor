@@ -6,6 +6,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class GlobalConfigService {
 
@@ -152,5 +157,37 @@ public class GlobalConfigService {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_API, String.valueOf(triggerApi)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
+    }
+
+    // --- Sync Exemptions ---
+
+    public static final String KEY_SYNC_EXEMPT_MAGIC_NUMBERS = "SYNC_EXEMPT_MAGIC_NUMBERS";
+
+    /**
+     * Returns the set of magic numbers excluded from the sync check.
+     * Trades with these magic numbers will get status EXEMPTED (not WARNING) and
+     * won't trigger alarms.
+     */
+    public Set<Long> getSyncExemptMagicNumbers() {
+        String raw = repository.findById(KEY_SYNC_EXEMPT_MAGIC_NUMBERS)
+                .map(GlobalConfigEntity::getConfValue).orElse("");
+        if (raw == null || raw.isBlank())
+            return Collections.emptySet();
+        Set<Long> result = new LinkedHashSet<>();
+        for (String part : raw.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                try {
+                    result.add(Long.parseLong(trimmed));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return result;
+    }
+
+    public void setSyncExemptMagicNumbers(Set<Long> magicNumbers) {
+        String value = magicNumbers.stream().map(String::valueOf).collect(Collectors.joining(","));
+        repository.save(new GlobalConfigEntity(KEY_SYNC_EXEMPT_MAGIC_NUMBERS, value));
     }
 }
