@@ -105,9 +105,11 @@ MqlTradeMonitor/
 | GET | `/api/equity-history/{accountId}` | JSON: Equity-Snapshots für Chart |
 | GET | `/api/stats/magic-drawdowns` | JSON: Drawdown-Statistiken |
 | GET | `/open-trades` | Globale Offene-Trades-Übersicht |
-| GET | `/report` | Berichte |
-| GET | `/mobile-drawdown` | Mobile Drawdown-Seite |
+| GET | `/report/{period}` | Berichte (daily/weekly/monthly) |
+| GET | `/api/report-chart/{period}` | JSON: Aggregierte Profit-Daten für Tages/Wochen/Monatscharts |
+| GET | `/mobile/drawdown` | Mobile Drawdown-Seite |
 | GET | `/admin` | Admin-Panel |
+| POST | `/admin/sync-exemptions` | Speichert Magic-Number-Ausnahmen für Synccheck |
 
 ---
 
@@ -121,7 +123,7 @@ MqlTradeMonitor/
 | `open_trades` | OpenTradeEntity | Aktuell offene Trades |
 | `dashboard_sections` | DashboardSectionEntity | Dynamische Dashboard-Sektionen |
 | `magic_mappings` | MagicMappingEntity | Magic-Number → Name/Kommentar |
-| `global_config` | GlobalConfigEntity | Admin-Einstellungen |
+| `global_config` | GlobalConfigEntity | Admin-Einstellungen (u.a. `SYNC_EXEMPT_MAGIC_NUMBERS`) |
 | `request_logs` | RequestLog | HTTP-Request-Logs |
 | `client_logs` | ClientLog | Client-Verbindungslogs |
 | `login_logs` | LoginLog | Authentifizierungs-Logs |
@@ -144,6 +146,8 @@ MqlTradeMonitor/
 - **Balance-Kurve:** Rekonstruiert aus geschlossenen Trades rückwärts von aktuellem Balance
 - **Equity-Kurve:** Gespeicherte Snapshots aus `equity_snapshots` Tabelle (max. 1x/Min.)
 - **Magic Numbers:** Identifizieren Strategien/EAs; können in Admin mit Namen/Kommentaren versehen werden
+- **Sync-Status:** Real-Trades erhalten nach Synccheck einen von 3 Stati: `MATCHED` ✅, `WARNING` ⚠️, `EXEMPTED` 🟠
+- **Sync-Ausnahmen:** Magic Numbers im Admin unter "🟠 Synccheck Ausnahmen" eintragen → kein Alarm, Anzeige orange. Config-Key: `SYNC_EXEMPT_MAGIC_NUMBERS` (kommagetrennte Zahlen)
 - **Sections:** Dashboard-Accounts sind in benannten Sektionen organisiert (DashboardSectionEntity)
 - **Filter-Ranges:** `today`, `1week`, `1month`, `thismonth`, `6months`, `thisyear`, `1year`, `all`
 - **LocalStorage Key:** `tradeMonitor_filter_{accountId}` speichert den letzten Zeitraum-Filter pro Account

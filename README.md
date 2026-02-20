@@ -40,6 +40,7 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
 *   **Dashboard (`/`)**:
     *   **Dynamisches Layout**: Anpassbare Sektionen (Erstellen, Umbenennen, Löschen).
     *   **Drag & Drop**: Verschieben von Account-Kacheln zwischen Sektionen.
+    *   **Report-Kacheln**: Tägliche, wöchentliche und monatliche Profit-Charts direkt auf dem Dashboard.
     *   **Echtzeit-Status**: Visuelle Indikatoren für Online/Offline Status.
 *   **Offene Trades (`/open-trades`)**:
     *   Dedizierte Ansicht aller offenen Positionen über alle Accounts hinweg.
@@ -50,6 +51,7 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
     *   Globale Konfiguration (z.B. Max Age für Historie).
 *   **Account-Details (`/account/{id}`)**:
     *   Detaillierte Analyse eines einzelnen Accounts.
+    *   **Übersichts-Chart**: Überlagerter Chart für Balance (linke Y-Achse) und Equity (rechte Y-Achse, gelb).
     *   Performance-Charts pro Magic Number.
     *   Historien-Tabelle.
 
@@ -160,14 +162,26 @@ Weisen Sie kryptischen Magic Numbers lesbare Namen zu.
 ### 5.2 Konfiguration
 *   **Magic Number Max Age**: Legt fest, wie viele Tage zurück die Gewinnkurven berechnet werden (Standard: 30 Tage).
 
-### 5.3 Datenbank-Stats
+### 5.3 Sync-Ausnahmen
+Verhindern Sie falsche Alarme für bestimmte Expert Advisors (z.B. bei bekannten MT4-Bugs).
+*   Tragen Sie Magic Numbers ein, die vom Sync-Check ausgenommen werden sollen.
+*   Diese EAs werden in der offenen Trade-Liste orange ("EXEMPTED") markiert und lösen keine Sync-Fehler aus.
+
+### 5.4 Datenbank-Stats
 Technische Übersicht über die gespeicherten Trades pro Account (für Diagnosezwecke).
 
 ---
 
-## 6. Installation & Erste Schritte
+## 6. Mobile Ansicht
 
-### 6.1 Server starten
+Die Anwendung bietet eine optimierte Ansicht für mobile Endgeräte:
+*   `/mobile/drawdown`: Zeigt ein Ranking aller Accounts nach dem höchsten aktuellen Drawdown an. Echtgeld-Konten werden priorisiert oben gelistet.
+
+---
+
+## 7. Installation & Erste Schritte
+
+### 7.1 Server starten
 Starten Sie die Anwendung auf Ihrem Server/PC. Das Dashboard ist standardmäßig unter `http://localhost:8080` erreichbar.
 
 ### 6.2 MetaTrader verbinden

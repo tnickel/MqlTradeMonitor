@@ -38,6 +38,7 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
 *   **Dashboard (`/`)**:
     *   **Dynamisches Layout**: Anpassbare Sektionen (Erstellen, Umbenennen, Löschen).
     *   **Drag & Drop**: Verschieben von Account-Kacheln zwischen Sektionen.
+    *   **Report-Kacheln**: Tägliche, wöchentliche und monatliche Profit-Charts direkt auf dem Dashboard.
     *   **Echtzeit-Status**: Visuelle Indikatoren für Online/Offline Status.
 *   **Offene Trades (`/open-trades`)**:
     *   Dedizierte Ansicht aller offenen Positionen über alle Accounts hinweg.
@@ -45,11 +46,15 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
 *   **Admin-Bereich (`/admin`)**:
     *   Datenbank-Statistiken pro Account.
     *   **Magic Number Mapping**: Zuweisung von lesbaren Namen zu Magic Numbers.
+    *   **Sync-Ausnahmen**: Ausnehmen bestimmter EAs vom Sync-Check (Status EXEMPTED).
     *   Globale Konfiguration (z.B. Max Age für Historie).
 *   **Account-Details (`/account/{id}`)**:
     *   Detaillierte Analyse eines einzelnen Accounts.
+    *   **Übersichts-Chart**: Überlagerter Chart für Balance (linke Y-Achse) und Equity (rechte Y-Achse, gelb).
     *   Performance-Charts pro Magic Number.
     *   Historien-Tabelle.
+*   **Mobile Ansicht (`/mobile/drawdown`)**:
+    *   Ranking aller Accounts nach höchstem Drawdown.
 
 ---
 
