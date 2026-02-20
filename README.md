@@ -102,7 +102,20 @@ Die Daten werden lokal im Ordner `./data` gespeichert:
 <img width="2056" height="602" alt="HomeyIntegration" src="https://github.com/user-attachments/assets/0d0e38d3-99f7-49f4-a28d-3473aeacbaac" />
 <img width="1361" height="1452" alt="DrawdownMonitor" src="https://github.com/user-attachments/assets/e2e9c170-2b88-49a7-afbf-cb30a6f49019" />
 <img width="2178" height="1440" alt="AdminArea" src="https://github.com/user-attachments/assets/b8743339-a6d3-4483-a222-21ac0587d59a" />
-<img width="3715" height="1550" alt="AccountDetailEquityDetail" src="https://github.com/user-attachments/assets/2afea686-2f8b-4d70-b473-d93d22d20072" />
+<img widt<img width="1844" height="1641" alt="Tagesreport" src="https://github.com/user-attachments/assets/442f66e4-7188-4d0c-8e33-e43296a609c5" />
+<img width="1895" height="1387" alt="SyncCheck" src="https://github.com/user-attachments/assets/8aeeed64-249d-420e-ad09-3479fd3c5903" />
+<img width="2068" height="1181" alt="OverviewInAdminconsole" src="https://github.com/user-attachments/assets/b7704f9c-afb6-42af-8b74-7cf9c674e637" />
+<img width="2611" height="1757" alt="Overview" src="https://github.com/user-attachments/assets/e95dd7fa-457c-4c07-908d-988acb68690a" />
+<img width="932" height="456" alt="Metatrader5 integration" src="https://github.com/user-attachments/assets/a18e2d12-262b-46b3-97bc-467129c5f477" />
+<img width="782" height="612" alt="login" src="https://github.com/user-attachments/assets/ec23118d-aa92-401f-bf1c-cd0d54bb0e41" />
+<img width="2056" height="602" alt="HomeyIntegration" src="https://github.com/user-attachments/assets/a0b91fe1-b8ef-444d-aa10-6be93d0a66af" />
+<img width="1361" height="1452" alt="DrawdownMonitor" src="https://github.com/user-attachments/assets/c9f3524b-3faf-4618-b08e-c335bf7a8125" />
+<img width="2178" height="1440" alt="AdminArea" src="https://github.com/user-attachments/assets/ed7445fd-769b-4239-8808-928a850e180b" />
+<img width="3715" height="1550" alt="AccountDetailEquityDetail" src="https://github.com/user-attachments/assets/b026c5f6-9070-4679-aee9-73bb3e345294" />
+<img width="3694" height="1664" alt="AccountDetail3" src="https://github.com/user-attachments/assets/18194ae8-8fd9-451f-9284-30466231e0eb" />
+<img width="3823" height="1692" alt="AccountDetail2" src="https://github.com/user-attachments/assets/0acebcc5-c9c6-45ab-a969-4f9ad95b18a7" />
+<img width="3827" height="1688" alt="AccountDetail1" src="https://github.com/user-attachments/assets/2006583e-f380-4859-b851-68e45adb8987" />
+h="3715" height="1550" alt="AccountDetailEquityDetail" src="https://github.com/user-attachments/assets/2afea686-2f8b-4d70-b473-d93d22d20072" />
 <img width="3694" height="1664" alt="AccountDetail3" src="https://github.com/user-attachments/assets/aaf48926-f7a3-4356-96eb-2939b264546b" />
 <img width="3823" height="1692" alt="AccountDetail2" src="https://github.com/user-attachments/assets/cd8512b4-88ce-4d56-a3d3-0b26c15d93d2" />
 <img width="3827" height="1688" alt="AccountDetail1" src="https://github.com/user-attachments/assets/ae839f1d-463f-4315-996a-f6034d3ba9a0" />
