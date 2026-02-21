@@ -135,6 +135,7 @@ public class TradeStorage {
                 entity.setCommission(trade.getCommission());
                 entity.setMagicNumber(trade.getMagicNumber());
                 entity.setComment(trade.getComment());
+                entity.setSl(trade.getSl());
                 toInsert.add(entity);
             }
         }
@@ -201,6 +202,7 @@ public class TradeStorage {
             trade.setCommission(entity.getCommission());
             trade.setMagicNumber(entity.getMagicNumber());
             trade.setComment(entity.getComment());
+            trade.setSl(entity.getSl());
             result.add(trade);
         }
         return result;

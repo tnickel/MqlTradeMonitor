@@ -31,6 +31,8 @@ public class ClosedTradeEntity {
     private double commission;
     private long magicNumber;
     private String comment;
+    @Column(nullable = true)
+    private Double sl;
 
     public ClosedTradeEntity() {
     }
@@ -154,5 +156,13 @@ public class ClosedTradeEntity {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public Double getSl() {
+        return sl;
+    }
+
+    public void setSl(Double sl) {
+        this.sl = sl;
     }
 }

@@ -41,6 +41,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.TradeStorage tradeStorage;
 
+    @Autowired
+    private de.trademonitor.service.TradeComparisonService tradeComparisonService;
+
     @PostMapping("/api/test-siren")
     @ResponseBody
     public String testSiren() {
@@ -640,6 +643,25 @@ public class DashboardController {
         model.addAttribute("period", period); // daily, weekly, monthly
 
         return "report";
+    }
+
+    @GetMapping("/trade-comparison")
+    public String tradeComparison(@RequestParam(required = false) Long accountId,
+            @RequestParam(required = false, defaultValue = "today") String period,
+            Model model) {
+        List<de.trademonitor.dto.TradeComparisonDto> comparisons = tradeComparisonService.compareTrades(accountId,
+                period);
+
+        List<Account> realAccounts = accountManager.getAccountsSortedByPrivilege().stream()
+                .filter(a -> "REAL".equalsIgnoreCase(a.getType()))
+                .collect(Collectors.toList());
+
+        model.addAttribute("comparisons", comparisons);
+        model.addAttribute("realAccounts", realAccounts);
+        model.addAttribute("selectedAccountId", accountId);
+        model.addAttribute("selectedPeriod", period);
+
+        return "trade-comparison";
     }
 
     private static class ResultComparator {

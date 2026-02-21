@@ -17,6 +17,7 @@ public class ClosedTrade {
     private double commission;
     private long magicNumber;
     private String comment;
+    private Double sl;
 
     public ClosedTrade() {
     }
@@ -124,5 +125,13 @@ public class ClosedTrade {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public Double getSl() {
+        return sl;
+    }
+
+    public void setSl(Double sl) {
+        this.sl = sl;
     }
 }

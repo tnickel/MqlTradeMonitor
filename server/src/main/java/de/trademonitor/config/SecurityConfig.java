@@ -11,10 +11,17 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+        @Value("${app.admin.username:admin}")
+        private String adminUsername;
+
+        @Value("${app.admin.password:password}")
+        private String adminPassword;
 
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,8 +49,8 @@ public class SecurityConfig {
         public UserDetailsService userDetailsService() {
                 PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
                 UserDetails admin = User.builder()
-                                .username("admin")
-                                .password(encoder.encode("password"))
+                                .username(adminUsername)
+                                .password(encoder.encode(adminPassword))
                                 .roles("ADMIN")
                                 .build();
 

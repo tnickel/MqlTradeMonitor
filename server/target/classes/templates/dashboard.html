@@ -335,15 +335,23 @@
                                         <span class="metric-value" th:text="${acc.trades}">5</span>
                                     </div>
                                 </div>
-                                <!-- Error Message Footer -->
                                 <div th:if="${acc.errorState}"
                                     style="color: #ef4444; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 5px;">
                                     <span>⚠️ <span th:text="${acc.lastErrorMsg}">Error Message</span></span>
                                 </div>
 
-                                <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn">Details
-                                    anzeigen
-                                    →</a>
+                                <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+                                    <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn"
+                                        style="flex: 1;">Details
+                                        anzeigen
+                                        →</a>
+                                    <a th:if="${acc.type == 'REAL'}"
+                                        th:href="@{/trade-comparison(accountId=${acc.accountId})}"
+                                        class="view-details-btn"
+                                        style="flex: 1; background: rgba(122, 162, 247, 0.15); border-color: rgba(122, 162, 247, 0.4); color: var(--accent);">
+                                        Trade Compare →
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -426,7 +434,8 @@
                 style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid #333; color: #666; font-size: 0.9rem;">
                 &copy; 2026 Trade Monitor &nbsp;|&nbsp;
                 <a href="/admin" style="color: #a0a0c0; text-decoration: none;">Admin Area</a> &nbsp;|&nbsp;
-                <a href="/open-trades" style="color: #a0a0c0; text-decoration: none;">Open Trades List</a>
+                <a href="/open-trades" style="color: #a0a0c0; text-decoration: none;">Open Trades List</a> &nbsp;|&nbsp;
+                <a href="/trade-comparison" style="color: #a0a0c0; text-decoration: none;">Trade-Vergleich</a>
             </div>
 
             <script>

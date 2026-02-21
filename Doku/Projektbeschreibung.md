@@ -32,6 +32,7 @@ Das System besteht aus zwei Hauptkomponenten:
     *   `/api/heartbeat`: Lebenszeichen der Clients.
     *   `/api/section/*`: Management der Dashboard-Sektionen.
     *   `/api/account/layout`: Speichern der Kachel-Anordnung.
+    *   `/trade-comparison`: Trade-Vergleichsfunktion für Real/Demo-Trades.
 
 ### 2.3 Web Dashboard
 Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen JavaScript-Funktionen.
@@ -53,6 +54,9 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
     *   **Übersichts-Chart**: Überlagerter Chart für Balance (linke Y-Achse) und Equity (rechte Y-Achse, gelb).
     *   Performance-Charts pro Magic Number.
     *   Historien-Tabelle.
+*   **Trade-Vergleich (`/trade-comparison`)**:
+    *   Analyse des Copy-Tradings zwischen Real- und Demo-Accounts.
+    *   Berechnung von Ausführungsverzögerungen (Delay in Sekunden) und Preisabweichungen (Slippage).
 *   **Mobile Ansicht (`/mobile/drawdown`)**:
     *   Ranking aller Accounts nach höchstem Drawdown.
 
