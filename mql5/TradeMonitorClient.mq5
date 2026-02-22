@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.00"
+#property version   "1.02"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -16,7 +16,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.00"
+#define EA_VERSION "1.02"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -310,7 +310,7 @@ void OnTimer()
          g_lastError = 0;
          
          statusText = "Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-         UpdateStatusLabel(statusText, clrGreen);
+         UpdateStatusLabel(statusText, clrLime);
          
          Print("Successfully registered with server");
          
@@ -361,7 +361,7 @@ void OnTimer()
    else
       statusText += "\nSync: Pending";
       
-   UpdateStatusLabel(statusText, clrGreen);
+   UpdateStatusLabel(statusText, clrLime);
    
    // Normal update cycle (only if registered and trade list was sent)
    if(g_tradeListSent)
@@ -434,7 +434,7 @@ void CreateStatusLabel()
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "MQL5 Client v" + EA_VERSION + ": Initializing...");
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, clrWhite);
-   ObjectSetInteger(0, LBL_STATUS, OBJPROP_FONTSIZE, 10);
+   ObjectSetInteger(0, LBL_STATUS, OBJPROP_FONTSIZE, 13);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_SELECTABLE, false);
    
    ChartRedraw(0);
@@ -445,7 +445,7 @@ void CreateStatusLabel()
 //+------------------------------------------------------------------+
 void UpdateStatusLabel(string text, color col)
 {
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text);
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + " \n" + text);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, col);
    ChartRedraw(0);
 }
@@ -487,7 +487,7 @@ void OnChartEvent(const int id,
          {
             isRegistered = true;
             g_extendedRetryMode = false;
-            UpdateStatusLabel("MQL5 Client: Connected", clrGreen);
+            UpdateStatusLabel("MQL5 Client: Connected", clrLime);
             Print("Manual reconnect: Successfully registered with server");
             
             if(SendInitialTradeList())
@@ -589,6 +589,11 @@ bool SendInitialTradeList()
    if(SendHttpPostWithTimeout(url, json, httpTimeoutInit))
    {
       // Remember what we synced so incremental updates only send new trades
+      // If no closed trades exist yet (e.g. new account with only a balance entry),
+      // set the sync time to "now" so future SendHistoryUpdate() calls run in
+      // incremental mode and don't spam the log with full-history scans.
+      if(latestCloseTime == "")
+         latestCloseTime = TimeToString(TimeCurrent() - 1, TIME_DATE|TIME_SECONDS);
       g_lastSyncedCloseTime = latestCloseTime;
       SaveLastSyncTime(latestCloseTime);
       Print("Last synced close time: ", latestCloseTime);
@@ -761,7 +766,18 @@ void SendHistoryUpdate()
    
    // Skip if no new trades
    if(historyJson == "[]")
+   {
+      // If we have no sync time yet (e.g. brand-new account with only a balance entry
+      // and no closed trades at all), set it to "now" so that the next call runs in
+      // incremental mode and no longer logs "Processing full history" every 5 seconds.
+      if(g_lastSyncedCloseTime == "")
+      {
+         g_lastSyncedCloseTime = TimeToString(TimeCurrent() - 1, TIME_DATE|TIME_SECONDS);
+         SaveLastSyncTime(g_lastSyncedCloseTime);
+         Print("No closed trades found - setting sync bookmark to now: ", g_lastSyncedCloseTime);
+      }
       return;
+   }
    
    // Build main JSON payload
    string json = "{";
