@@ -546,6 +546,36 @@ public class DashboardController {
         return response;
     }
 
+    private java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> getSnapshotDateFilter(
+            String period) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        switch (period.toLowerCase()) {
+            case "daily":
+                String todayStr = today.toString(); // yyyy-MM-dd
+                return s -> s.getTimestamp() != null && s.getTimestamp().startsWith(todayStr);
+            case "monthly":
+                String monthStr = today.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+                return s -> s.getTimestamp() != null && s.getTimestamp().startsWith(monthStr);
+            case "weekly":
+                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
+                int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
+                int currentYear = today.getYear();
+                return s -> {
+                    try {
+                        if (s.getTimestamp() == null)
+                            return false;
+                        java.time.LocalDateTime dt = java.time.LocalDateTime.parse(s.getTimestamp(),
+                                java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                        return dt.get(weekFields.weekOfWeekBasedYear()) == currentWeek && dt.getYear() == currentYear;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                };
+            default:
+                return s -> true;
+        }
+    }
+
     private java.util.function.Predicate<String> getDateFilter(String period) {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
@@ -620,9 +650,25 @@ public class DashboardController {
                             (stats, t) -> stats.accept(t.getProfit()),
                             java.util.DoubleSummaryStatistics::combine);
 
+            // Get equity snapshots for the period
+            java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> snapshotFilter = getSnapshotDateFilter(
+                    period);
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
+            List<Double> equityH = new ArrayList<>();
+            List<Double> balanceH = new ArrayList<>();
+
+            for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
+                if (snapshotFilter.test(snap)) {
+                    equityH.add(snap.getEquity());
+                    balanceH.add(snap.getBalance());
+                }
+            }
+
             Map<String, Object> row = new HashMap<>(acc);
             row.put("closedCount", closedStats.getCount());
             row.put("closedProfit", closedStats.getSum());
+            row.put("equityHistory", equityH);
+            row.put("balanceHistory", balanceH);
             reportData.add(row);
         }
 

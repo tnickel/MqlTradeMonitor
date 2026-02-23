@@ -267,37 +267,63 @@
             <h2>📊 Gewinn pro Magic Number <span id="magic-breakdown-period"
                     style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
 
-            <table class="trades-table">
-                <thead>
-                    <tr>
-                        <th>Magic Number</th>
-                        <th>Offene Trades</th>
-                        <th>Float. P/L</th>
-                        <th>Geschl. Trades</th>
-                        <th>Real. P/L</th>
-                        <th>Gesamt</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="mp : ${magicProfits}">
-                        <td>
-                            <strong th:text="${mp.magicNumber}">12345</strong>
-                            <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
-                                style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;" th:text="${mp.magicName}">
-                                Strategy Name
-                            </div>
-                        </td>
-                        <td th:text="${mp.openTradeCount}">3</td>
-                        <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                            th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
-                        <td th:text="${mp.closedTradeCount}">10</td>
-                        <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                            th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
-                        <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                            th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+                <div style="flex: 1 1 600px; overflow-x: auto;">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Magic Number</th>
+                                <th>Offene Trades</th>
+                                <th>Float. P/L</th>
+                                <th>Geschl. Trades</th>
+                                <th>Real. P/L</th>
+                                <th>Gesamt</th>
+                                <th>Max Real. DD (€)</th>
+                                <th>Max Eq. DD (€)</th>
+                                <th>Max Eq. DD (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="mp : ${magicProfits}">
+                                <td>
+                                    <strong th:text="${mp.magicNumber}">12345</strong>
+                                    <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
+                                        style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;"
+                                        th:text="${mp.magicName}">
+                                        Strategy Name
+                                    </div>
+                                </td>
+                                <td th:text="${mp.openTradeCount}">3</td>
+                                <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
+                                <td th:text="${mp.closedTradeCount}">10</td>
+                                <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
+                                <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
+                                <td style="color: #ef4444;"
+                                    th:text="'-' + ${#numbers.formatDecimal(mp.maxDrawdownEur, 1, 2)}">-150.00</td>
+                                <td style="color: #ef4444; font-weight: bold;"
+                                    th:text="'-' + ${#numbers.formatDecimal(mp.maxEquityDrawdownEur, 1, 2)}">-200.00
+                                </td>
+                                <td style="color: #ef4444; font-size: 0.85rem;"
+                                    th:text="${#numbers.formatDecimal(mp.maxEquityDrawdownPercent, 1, 2)} + '%'">2.00%
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Global Pie Chart Container -->
+                <div
+                    style="flex: 1 1 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card); padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;">
+                    <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.4rem; color: var(--text-secondary);">
+                        Gesamte Assets</h3>
+                    <div style="position: relative; height: 450px; width: 100%; max-width: 600px;">
+                        <canvas id="global-magic-pie-chart"
+                            th:attr="data-symbols=${account.getGlobalTradedSymbolsJson()}"></canvas>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- ======= MAGIC NUMBER PROFIT CURVES ======= -->
@@ -797,6 +823,62 @@
 
                     // Magic Chart Manager
                     magicChartMgr = new MagicChartManager('magic-charts-container');
+
+                    // Initialize Global Pie Chart for traded symbols
+                    var globalPieCanvas = document.getElementById('global-magic-pie-chart');
+                    if (globalPieCanvas) {
+                        var rawData = globalPieCanvas.getAttribute('data-symbols');
+                        if (rawData && rawData.trim() !== '' && rawData !== '{}') {
+                            try {
+                                var symbolMap = JSON.parse(rawData);
+                                var labels = Object.keys(symbolMap);
+                                var data = Object.values(symbolMap);
+
+                                // Generate distinct colors
+                                var bgColors = [
+                                    '#6366f1', '#10b981', '#f59e0b', '#ef4444',
+                                    '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6',
+                                    '#22d3ee', '#a855f7', '#d946ef', '#f43f5e',
+                                    '#f97316', '#84cc16', '#06b6d4', '#4f46e5'
+                                ];
+
+                                new Chart(globalPieCanvas, {
+                                    type: 'doughnut',
+                                    data: {
+                                        labels: labels,
+                                        datasets: [{
+                                            data: data,
+                                            backgroundColor: bgColors,
+                                            borderWidth: 0
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        cutout: '60%',
+                                        plugins: {
+                                            legend: {
+                                                display: true,
+                                                position: 'right',
+                                                labels: { color: '#d1d5db', font: { size: 11 }, boxWidth: 12 }
+                                            },
+                                            tooltip: {
+                                                callbacks: {
+                                                    label: function (context) {
+                                                        return context.label + ': ' + context.parsed + ' Trades';
+                                                    }
+                                                },
+                                                bodyFont: { size: 11 },
+                                                boxPadding: 4
+                                            }
+                                        }
+                                    }
+                                });
+                            } catch (e) {
+                                console.error("Error parsing global pie chart symbols", e, rawData);
+                            }
+                        }
+                    }
 
                     // Restore filter
                     var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';

@@ -34,7 +34,7 @@
         }
 
         .report-container {
-            max-width: 1000px;
+            max-width: 1300px;
             margin: 0 auto;
             background-color: var(--bg-card);
             border-radius: 12px;
@@ -144,6 +144,7 @@
             color: var(--accent);
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -160,39 +161,133 @@
                     <th class="text-right">Open Equity</th>
                     <th class="text-right">Closed Trades</th>
                     <th class="text-right">Closed Profit</th>
+                    <th class="text-center" style="width: 220px;">Chart</th>
                 </tr>
             </thead>
             <tbody>
-                <tr th:each="acc : ${reportData}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
-                    th:data-account-name="${acc.name}"
-                    ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
-                    <td>
-                        <span class="account-name" th:text="${acc.name}">(Name)</span>
-                        <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge real" th:if="${acc.type == 'REAL'}">REAL</span>
-                        <span class="badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
-                    </td>
-                    <td class="text-right">
-                        <span class="num-val" th:text="${acc.trades}">0</span>
-                    </td>
-                    <td class="text-right">
-                        <span class="num-val"
-                            th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
-                            th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                            USD</span>
-                    </td>
-                    <td class="text-right">
-                        <span class="num-val" th:text="${acc.closedCount}">0</span>
-                    </td>
-                    <td class="text-right">
-                        <span class="num-val"
-                            th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
-                            th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                            USD</span>
-                    </td>
-                </tr>
+                <!-- Filter REAL accounts -->
+                <th:block
+                    th:with="realAccounts=${reportData.?[type == 'REAL']}, demoAccounts=${reportData.?[type == 'DEMO']}">
+
+                    <!-- REAL HEADER -->
+                    <tr th:if="${not #lists.isEmpty(realAccounts)}">
+                        <td colspan="7" style="padding: 0; border-bottom: none;">
+                            <div
+                                style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #10b981; border-bottom: 1px solid rgba(16,185,129,0.2);">
+                                <span
+                                    style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(16,185,129,0.5));">🛡️</span>
+                                <span
+                                    style="font-weight: 800; color: #34d399; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(16,185,129,0.3);">REAL
+                                    ACCOUNTS</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- REAL ACCOUNTS LIST -->
+                    <tr th:each="acc : ${realAccounts}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
+                        th:data-account-name="${acc.name}"
+                        ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
+                        <td>
+                            <span class="account-name" th:text="${acc.name}">(Name)</span>
+                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge real">REAL</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.trades}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.closedCount}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-center" style="width: 220px; padding: 4px;">
+                            <div style="width: 100%; height: 50px; position: relative;">
+                                <canvas class="mini-chart" th:data-equity="${acc.equityHistory}"
+                                    th:data-balance="${acc.balanceHistory}"></canvas>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- SEPARATOR -->
+                    <tr th:if="${not #lists.isEmpty(realAccounts) and not #lists.isEmpty(demoAccounts)}">
+                        <td colspan="7" style="padding: 30px 0 20px 0; border: none;">
+                            <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                                <div
+                                    style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);">
+                                </div>
+                                <div
+                                    style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;">
+                                </div>
+                                <div
+                                    style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- DEMO HEADER -->
+                    <tr th:if="${not #lists.isEmpty(demoAccounts)}">
+                        <td colspan="7" style="padding: 0; border-bottom: none;">
+                            <div
+                                style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(148,163,184,0.1) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.2);">
+                                <span
+                                    style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(148,163,184,0.5));">📉</span>
+                                <span
+                                    style="font-weight: 800; color: #94a3b8; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(148,163,184,0.3);">DEMO
+                                    ACCOUNTS</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- DEMO ACCOUNTS LIST -->
+                    <tr th:each="acc : ${demoAccounts}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
+                        th:data-account-name="${acc.name}"
+                        ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
+                        <td>
+                            <span class="account-name" th:text="${acc.name}">(Name)</span>
+                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge demo">DEMO</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.trades}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.closedCount}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-center" style="width: 220px; padding: 4px;">
+                            <div style="width: 100%; height: 50px; position: relative;">
+                                <canvas class="mini-chart" th:data-equity="${acc.equityHistory}"
+                                    th:data-balance="${acc.balanceHistory}"></canvas>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
             </tbody>
         </table>
     </div>
@@ -285,6 +380,68 @@
                 closeModal();
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const canvases = document.querySelectorAll('.mini-chart');
+            canvases.forEach(canvas => {
+                const equityStr = canvas.getAttribute('data-equity');
+                const balanceStr = canvas.getAttribute('data-balance');
+                if (!equityStr || !balanceStr || equityStr === 'null' || balanceStr === 'null') return;
+
+                try {
+                    const equityData = JSON.parse(equityStr);
+                    const balanceData = JSON.parse(balanceStr);
+                    if (equityData.length === 0) return;
+
+                    const labels = equityData.map((_, i) => i);
+
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    data: equityData,
+                                    borderColor: 'rgba(234, 179, 8, 1)', // yellow (equity)
+                                    borderWidth: 1.5,
+                                    pointRadius: 0,
+                                    fill: false,
+                                    tension: 0.1
+                                },
+                                {
+                                    data: balanceData,
+                                    borderColor: 'rgba(99, 102, 241, 0.5)', // blue (balance)
+                                    borderWidth: 1.5,
+                                    pointRadius: 0,
+                                    fill: false,
+                                    tension: 0.1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { enabled: false }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    display: false,
+                                    // Optionally adjust min/max to fit graph perfectly
+                                    suggestedMin: Math.min(...equityData, ...balanceData),
+                                    suggestedMax: Math.max(...equityData, ...balanceData)
+                                }
+                            },
+                            interaction: { mode: 'index', intersect: false }
+                        }
+                    });
+                } catch (e) {
+                    console.error("Chart parsing error for canvas", canvas, e);
+                }
+            });
+        });
     </script>
 
 

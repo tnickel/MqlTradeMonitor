@@ -1,5 +1,7 @@
 package de.trademonitor.dto;
 
+import java.util.Map;
+
 /**
  * DTO for per-magic-number profit summary.
  */
@@ -12,8 +14,16 @@ public class MagicProfitEntry {
     private int openTradeCount;
     private int closedTradeCount;
 
+    private Map<String, Integer> tradedSymbols;
+    private double maxDrawdownEur;
+    private double maxDrawdownPercent;
+    private double maxEquityDrawdownEur;
+    private double maxEquityDrawdownPercent;
+
     public MagicProfitEntry(long magicNumber, String magicName, double openProfit, double closedProfit,
-            int openTradeCount, int closedTradeCount) {
+            int openTradeCount, int closedTradeCount, Map<String, Integer> tradedSymbols,
+            double maxDrawdownEur, double maxDrawdownPercent,
+            double maxEquityDrawdownEur, double maxEquityDrawdownPercent) {
         this.magicNumber = magicNumber;
         this.magicName = magicName;
         this.openProfit = openProfit;
@@ -21,6 +31,11 @@ public class MagicProfitEntry {
         this.totalProfit = openProfit + closedProfit;
         this.openTradeCount = openTradeCount;
         this.closedTradeCount = closedTradeCount;
+        this.tradedSymbols = tradedSymbols;
+        this.maxDrawdownEur = maxDrawdownEur;
+        this.maxDrawdownPercent = maxDrawdownPercent;
+        this.maxEquityDrawdownEur = maxEquityDrawdownEur;
+        this.maxEquityDrawdownPercent = maxEquityDrawdownPercent;
     }
 
     public long getMagicNumber() {
@@ -49,5 +64,34 @@ public class MagicProfitEntry {
 
     public int getClosedTradeCount() {
         return closedTradeCount;
+    }
+
+    public Map<String, Integer> getTradedSymbols() {
+        return tradedSymbols;
+    }
+
+    public double getMaxDrawdownEur() {
+        return maxDrawdownEur;
+    }
+
+    public double getMaxDrawdownPercent() {
+        return maxDrawdownPercent;
+    }
+
+    public double getMaxEquityDrawdownEur() {
+        return maxEquityDrawdownEur;
+    }
+
+    public double getMaxEquityDrawdownPercent() {
+        return maxEquityDrawdownPercent;
+    }
+
+    public String getTradedSymbolsJson() {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(tradedSymbols != null ? tradedSymbols : new java.util.HashMap<>());
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 }

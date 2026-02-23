@@ -310,8 +310,74 @@ public class Account {
                 }
             }
 
+            // 1. Gather Symbol Data
+            Map<String, Integer> tradedSymbols = new HashMap<>();
+            openTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
+                tradedSymbols.put(t.getSymbol(), tradedSymbols.getOrDefault(t.getSymbol(), 0) + 1);
+            });
+            closedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
+                tradedSymbols.put(t.getSymbol(), tradedSymbols.getOrDefault(t.getSymbol(), 0) + 1);
+            });
+
+            // 2. Calculate Maximum Historic Drawdown for this Magic Number
+            // We replay the closed trades in chronological order (oldest first).
+            // `closedTrades` is typically newest first due to DB ID sorting, but we need
+            // time-based ASC sort for accurate HWM.
+            double maxDrawdownEur = 0.0;
+            double cumulativeProfit = 0.0;
+            double highWaterMark = 0.0;
+            double maxSingleLossEur = 0.0;
+
+            List<ClosedTrade> magicClosedTrades = new ArrayList<>();
+            closedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(magicClosedTrades::add);
+
+            // Sort ascending by close time
+            magicClosedTrades.sort(Comparator.comparing(t -> t.getCloseTime() == null ? "" : t.getCloseTime()));
+
+            for (ClosedTrade ct : magicClosedTrades) {
+                cumulativeProfit += ct.getProfit();
+                if (cumulativeProfit > highWaterMark) {
+                    highWaterMark = cumulativeProfit;
+                }
+                double currentDrawdown = highWaterMark - cumulativeProfit;
+                if (currentDrawdown > maxDrawdownEur) {
+                    maxDrawdownEur = currentDrawdown;
+                }
+
+                if (ct.getProfit() < 0) {
+                    // Include commission and swap for single loss estimate
+                    double loss = Math.abs(ct.getProfit() + ct.getCommission() + ct.getSwap());
+                    if (loss > maxSingleLossEur) {
+                        maxSingleLossEur = loss;
+                    }
+                }
+            }
+
+            // Estimate Equity Drawdown: Realized DD + Max Single Loss
+            double estimatedMaxEquityDrawdownEur = maxDrawdownEur + maxSingleLossEur;
+
+            // Include currently open profit in max drawdown consideration if applicable
+            double currentTotalMagicProfit = cumulativeProfit + openProfit;
+            double currentOpenDrawdown = highWaterMark - currentTotalMagicProfit;
+            if (currentOpenDrawdown > maxDrawdownEur) {
+                maxDrawdownEur = currentOpenDrawdown;
+            }
+            if (currentOpenDrawdown > estimatedMaxEquityDrawdownEur) {
+                estimatedMaxEquityDrawdownEur = currentOpenDrawdown;
+            }
+
+            // Calculate % relative to current global balance (approximation)
+            double maxDrawdownPercent = 0.0;
+            double maxEquityDrawdownPercent = 0.0;
+            if (this.balance > 0) {
+                maxDrawdownPercent = (maxDrawdownEur / this.balance) * 100.0;
+                maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / this.balance) * 100.0;
+            }
+
             entries.add(
-                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, openCount, closedCount));
+                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, openCount, closedCount,
+                            tradedSymbols, maxDrawdownEur, maxDrawdownPercent, estimatedMaxEquityDrawdownEur,
+                            maxEquityDrawdownPercent));
         }
         return entries;
     }
@@ -324,6 +390,23 @@ public class Account {
                 .map(Trade::getSymbol)
                 .distinct()
                 .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    // Helper method for Thymeleaf to get all traded symbols across all magics
+    public String getGlobalTradedSymbolsJson() {
+        Map<String, Integer> globalSymbols = new HashMap<>();
+        if (openTrades != null) {
+            openTrades.forEach(t -> globalSymbols.put(t.getSymbol(), globalSymbols.getOrDefault(t.getSymbol(), 0) + 1));
+        }
+        if (closedTrades != null) {
+            closedTrades
+                    .forEach(t -> globalSymbols.put(t.getSymbol(), globalSymbols.getOrDefault(t.getSymbol(), 0) + 1));
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(globalSymbols);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     // Helper method for Thymeleaf: unique algo names via magic number mapping
