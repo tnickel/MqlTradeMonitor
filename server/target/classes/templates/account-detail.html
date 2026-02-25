@@ -268,7 +268,7 @@
                     style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
 
             <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
-                <div style="flex: 1 1 600px; overflow-x: auto;">
+                <div style="flex: 2 1 800px; overflow-x: auto;">
                     <table class="trades-table">
                         <thead>
                             <tr>
@@ -315,7 +315,7 @@
                 </div>
                 <!-- Global Pie Chart Container -->
                 <div
-                    style="flex: 1 1 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card); padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;">
+                    style="flex: 1 1 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card); padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;">
                     <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.4rem; color: var(--text-secondary);">
                         Gesamte Assets</h3>
                     <div style="position: relative; height: 450px; width: 100%; max-width: 600px;">
@@ -1188,6 +1188,7 @@
                 // Create Chart Elements
                 // Build chart label - Try to find a comment from the latest trade
                 var commentText = '';
+                var openProfit = 0;
                 // Or try to find it in the Magic Breakdown table?
                 // Let's look up the Magic Table for a name
                 var magicRow = Array.from(document.querySelectorAll('.magic-breakdown tbody tr')).find(r => {
@@ -1197,6 +1198,8 @@
                 if (magicRow) {
                     var nameDiv = magicRow.querySelector('div');
                     if (nameDiv) commentText = nameDiv.textContent.trim();
+                    var opCell = magicRow.querySelector('td:nth-child(3)');
+                    if (opCell) openProfit = parseFloat(opCell.textContent || 0);
                 }
 
                 var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
@@ -1218,6 +1221,31 @@
                 var canvas = document.createElement('canvas');
                 canvasWrap.appendChild(canvas);
                 wrapper.appendChild(canvasWrap);
+
+                var profitDiv = document.createElement('div');
+                profitDiv.style.textAlign = 'center';
+                profitDiv.style.paddingTop = '12px';
+                profitDiv.style.paddingBottom = '8px';
+                profitDiv.style.fontWeight = 'bold';
+                profitDiv.style.fontSize = '1.1rem';
+
+                var totalProfitSpan = document.createElement('span');
+                totalProfitSpan.textContent = 'Gesamt: ' + runProfit.toFixed(2) + ' ' + accountCurrency;
+                totalProfitSpan.style.color = runProfit >= 0 ? '#10b981' : '#ef4444';
+                profitDiv.appendChild(totalProfitSpan);
+
+                var openProfitSpan = document.createElement('span');
+                openProfitSpan.textContent = ' (Offen: ' + openProfit.toFixed(2) + ' ' + accountCurrency + ')';
+                openProfitSpan.style.color = openProfit >= 0 ? '#10b981' : '#ef4444';
+                openProfitSpan.style.fontSize = '0.9rem';
+                openProfitSpan.style.fontWeight = 'normal';
+
+                if (openProfit !== 0) {
+                    profitDiv.appendChild(openProfitSpan);
+                }
+
+                wrapper.appendChild(profitDiv);
+
                 this.container.appendChild(wrapper);
 
                 new Chart(canvas, {
@@ -1258,16 +1286,16 @@
                             x: {
                                 display: true, // Show X axis labels
                                 ticks: {
-                                    color: '#6b6b8f',
+                                    color: '#d1d5db',
                                     maxRotation: 0,
                                     maxTicksLimit: 6, // Limit ticks to avoid clutter
-                                    font: { size: 9 },
+                                    font: { size: 11 },
                                     autoSkip: true
                                 },
                                 grid: { display: false } // Keep grid hidden for cleanliness
                             },
                             y: {
-                                ticks: { color: '#6b6b8f', font: { size: 10 } },
+                                ticks: { color: '#d1d5db', font: { size: 11 } },
                                 grid: { color: 'rgba(63,63,95,0.3)' }
                             }
                         }
@@ -1409,11 +1437,11 @@
                     },
                     scales: {
                         x: {
-                            ticks: { color: '#6b6b8f', maxRotation: 45, maxTicksLimit: 20, font: { size: 11 } },
+                            ticks: { color: '#d1d5db', maxRotation: 45, maxTicksLimit: 20, font: { size: 11 } },
                             grid: { color: 'rgba(63,63,95,0.3)' }
                         },
                         y: {
-                            ticks: { color: '#6b6b8f', font: { size: 12 } },
+                            ticks: { color: '#d1d5db', font: { size: 12 } },
                             grid: { color: 'rgba(63,63,95,0.3)' }
                         }
                     }
