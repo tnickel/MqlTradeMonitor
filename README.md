@@ -154,6 +154,7 @@ Das Projekt nutzt etablierte Architektur- und Design-Patterns, um Wartbarkeit un
 <img width="782" alt="login" src="https://github.com/user-attachments/assets/0b6940bd-0185-41e9-9863-0ee88e952bd4" />
 
 </details>
+<img width="3760" height="1268" alt="image" src="https://github.com/user-attachments/assets/b47cd987-440b-4c0e-88b5-0f895baaf5e5" />
 
 
 <img width="1844" height="1641" alt="Tagesreport" src="https://github.com/user-attachments/assets/203d6278-bebe-47d1-8aac-7e719ca9cd62" />
