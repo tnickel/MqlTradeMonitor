@@ -21,6 +21,15 @@ public class GlobalConfigService {
 
     public static final String KEY_TRADE_SYNC_INTERVAL = "TRADE_SYNC_INTERVAL_SECONDS";
 
+    // Live Indicator Config Keys
+    public static final String KEY_LIVE_GREEN_MINS = "LIVE_GREEN_MINS";
+    public static final String KEY_LIVE_YELLOW_MINS = "LIVE_YELLOW_MINS";
+    public static final String KEY_LIVE_ORANGE_MINS = "LIVE_ORANGE_MINS";
+    public static final String KEY_LIVE_COLOR_GREEN = "LIVE_COLOR_GREEN";
+    public static final String KEY_LIVE_COLOR_YELLOW = "LIVE_COLOR_YELLOW";
+    public static final String KEY_LIVE_COLOR_ORANGE = "LIVE_COLOR_ORANGE";
+    public static final String KEY_LIVE_COLOR_RED = "LIVE_COLOR_RED";
+
     // Mail Config Keys
     public static final String KEY_MAIL_HOST = "MAIL_HOST";
     public static final String KEY_MAIL_PORT = "MAIL_PORT";
@@ -33,6 +42,14 @@ public class GlobalConfigService {
     // Cache the value to avoid hitting DB on every request
     private int cachedMaxAgeDays = 30; // Default 30 days
     private int cachedSyncIntervalSeconds = 60; // Default 60 seconds
+
+    private int cachedLiveGreenMins = 1;
+    private int cachedLiveYellowMins = 5;
+    private int cachedLiveOrangeMins = 60;
+    private String cachedLiveColorGreen = "#10b981";
+    private String cachedLiveColorYellow = "#f59e0b"; // Updated to lighter yellow
+    private String cachedLiveColorOrange = "#f97316"; // Orange
+    private String cachedLiveColorRed = "#ef4444";
 
     @PostConstruct
     public void init() {
@@ -54,6 +71,32 @@ public class GlobalConfigService {
                         "Invalid number format for config " + KEY_TRADE_SYNC_INTERVAL + ": " + entity.getConfValue());
             }
         });
+
+        repository.findById(KEY_LIVE_GREEN_MINS).ifPresent(entity -> {
+            try {
+                cachedLiveGreenMins = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+
+        repository.findById(KEY_LIVE_YELLOW_MINS).ifPresent(entity -> {
+            try {
+                cachedLiveYellowMins = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+
+        repository.findById(KEY_LIVE_ORANGE_MINS).ifPresent(entity -> {
+            try {
+                cachedLiveOrangeMins = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+
+        repository.findById(KEY_LIVE_COLOR_GREEN).ifPresent(entity -> cachedLiveColorGreen = entity.getConfValue());
+        repository.findById(KEY_LIVE_COLOR_YELLOW).ifPresent(entity -> cachedLiveColorYellow = entity.getConfValue());
+        repository.findById(KEY_LIVE_COLOR_ORANGE).ifPresent(entity -> cachedLiveColorOrange = entity.getConfValue());
+        repository.findById(KEY_LIVE_COLOR_RED).ifPresent(entity -> cachedLiveColorRed = entity.getConfValue());
     }
 
     public int getMagicNumberMaxAge() {
@@ -74,6 +117,55 @@ public class GlobalConfigService {
         this.cachedSyncIntervalSeconds = seconds;
         GlobalConfigEntity entity = new GlobalConfigEntity(KEY_TRADE_SYNC_INTERVAL, String.valueOf(seconds));
         repository.save(entity);
+    }
+
+    // --- Live Indicator Configuration Methods ---
+
+    public int getLiveGreenMins() {
+        return cachedLiveGreenMins;
+    }
+
+    public int getLiveYellowMins() {
+        return cachedLiveYellowMins;
+    }
+
+    public int getLiveOrangeMins() {
+        return cachedLiveOrangeMins;
+    }
+
+    public String getLiveColorGreen() {
+        return cachedLiveColorGreen;
+    }
+
+    public String getLiveColorYellow() {
+        return cachedLiveColorYellow;
+    }
+
+    public String getLiveColorOrange() {
+        return cachedLiveColorOrange;
+    }
+
+    public String getLiveColorRed() {
+        return cachedLiveColorRed;
+    }
+
+    public void saveLiveIndicatorConfig(int greenMins, int yellowMins, int orangeMins,
+            String colorGreen, String colorYellow, String colorOrange, String colorRed) {
+        this.cachedLiveGreenMins = greenMins;
+        this.cachedLiveYellowMins = yellowMins;
+        this.cachedLiveOrangeMins = orangeMins;
+        this.cachedLiveColorGreen = colorGreen;
+        this.cachedLiveColorYellow = colorYellow;
+        this.cachedLiveColorOrange = colorOrange;
+        this.cachedLiveColorRed = colorRed;
+
+        repository.save(new GlobalConfigEntity(KEY_LIVE_GREEN_MINS, String.valueOf(greenMins)));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_YELLOW_MINS, String.valueOf(yellowMins)));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_ORANGE_MINS, String.valueOf(orangeMins)));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_COLOR_GREEN, colorGreen));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_COLOR_YELLOW, colorYellow));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_COLOR_ORANGE, colorOrange));
+        repository.save(new GlobalConfigEntity(KEY_LIVE_COLOR_RED, colorRed));
     }
 
     // --- Mail Configuration Methods ---

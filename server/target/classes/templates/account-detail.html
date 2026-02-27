@@ -65,17 +65,34 @@
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span class="badg-mini" style="font-family: 'JetBrains Mono'; font-size: 1.35rem; color: #a0a0c0;"
                         th:text="'#' + ${account.accountId}">#12345</span>
-                    <span th:class="${online ? 'status-badge online' : 'status-badge offline'}"
-                        th:text="${online ? 'ONLINE' : 'OFFLINE'}">ONLINE</span>
+
                     <span th:if="${account.type == 'REAL'}" class="badge-mini real"
                         style="font-size: 0.8rem; padding: 2px 6px;">REAL</span>
                 </div>
 
-                <h1 th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}"
-                    th:style="${account.name == 'FXSSI10_KI'} ? 'margin: 5px 0 0 0; font-size: 2.5rem; color: #ffd700;' : 'margin: 5px 0 0 0; font-size: 2.5rem;'">
-                    Currency Pair / Strategy Name</h1>
+                <div style="display: flex; align-items: center; gap: 12px; margin: 5px 0 0 0;">
+                    <h1 th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}"
+                        th:style="${account.name == 'FXSSI10_KI'} ? 'margin: 0; font-size: 2.5rem; color: #ffd700;' : 'margin: 0; font-size: 2.5rem;'">
+                        Currency Pair / Strategy Name</h1>
+                    <span th:if="${account.lastSeenMins != null}" th:style="'width: 16px; height: 16px; border-radius: 50%; display: inline-block; background-color: ' + 
+                        (${account.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                        (${account.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                        (${account.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                        (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                        th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
+                    </span>
+                </div>
 
-                <p class="subtitle" th:text="${account.broker}" style="margin-top: 5px;">Broker Name</p>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                    <p class="subtitle" th:text="${account.broker}" style="margin: 0;">Broker Name</p>
+                    <span th:if="${account.lastSeenMins != null}" th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
+                        (${account.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                        (${account.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                        (${account.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                        (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                        th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
+                    </span>
+                </div>
             </div>
         </header>
 
@@ -281,10 +298,12 @@
                                 <th>Max Real. DD (€)</th>
                                 <th>Max Eq. DD (€)</th>
                                 <th>Max Eq. DD (%)</th>
+                                <th>Währungspaare</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="mp : ${magicProfits}">
+                            <tr th:each="mp : ${magicProfits}"
+                                th:data-symbols="${mp.tradedSymbols != null ? #strings.listJoin(mp.tradedSymbols.keySet(), ', ') : ''}">
                                 <td>
                                     <strong th:text="${mp.magicNumber}">12345</strong>
                                     <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
@@ -308,6 +327,17 @@
                                 </td>
                                 <td style="color: #ef4444; font-size: 0.85rem;"
                                     th:text="${#numbers.formatDecimal(mp.maxEquityDrawdownPercent, 1, 2)} + '%'">2.00%
+                                </td>
+                                <td style="max-width: 150px;">
+                                    <span th:if="${mp.tradedSymbols != null}">
+                                        <span th:each="sym, stat : ${mp.tradedSymbols.keySet()}"
+                                            th:if="${stat.index < 3}"
+                                            style="display: inline-block; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin: 2px 4px 2px 0;"
+                                            th:text="${sym}">EURUSD</span>
+                                        <span th:if="${#maps.size(mp.tradedSymbols) > 3}"
+                                            style="display: inline-block; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin: 2px 0; cursor: help;"
+                                            th:title="${#strings.listJoin(mp.tradedSymbols.keySet(), ', ')}">...</span>
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
@@ -346,7 +376,8 @@
 
         <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
         <section class="trades-section history-section">
-            <h2>📜 Geschlossene Trades Liste</h2>
+            <h2>📜 Geschlossene Trades Liste <span id="history-list-period"
+                    style="font-size: 0.9rem; color: #a0a0c0; font-weight: normal; margin-left: 10px;"></span></h2>
 
 
 
@@ -959,14 +990,54 @@
             var periodLabelCharts = document.getElementById('magic-curves-period');
             // Update Period Label in Header (Table)
             var periodLabelTable = document.getElementById('magic-breakdown-period');
+            // Update Period Label in Header (History)
+            var periodLabelHistory = document.getElementById('history-list-period');
 
             var rangeName = '';
             var btn = document.querySelector('.filter-btn[data-range="' + range + '"]');
             if (btn) rangeName = btn.textContent;
-            var labelText = rangeName ? '(' + rangeName + ')' : '';
+
+            var nowD = new Date();
+            var startD = null;
+            var endD = nowD;
+
+            switch (range) {
+                case 'today': startD = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate()); break;
+                case '1week': startD = new Date(nowD.getTime() - 7 * 24 * 3600 * 1000); break;
+                case '1month': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 1); break;
+                case 'thismonth': startD = new Date(nowD.getFullYear(), nowD.getMonth(), 1); break;
+                case '6months': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 6); break;
+                case 'thisyear': startD = new Date(nowD.getFullYear(), 0, 1); break;
+                case '1year': startD = new Date(nowD); startD.setFullYear(nowD.getFullYear() - 1); break;
+                case 'all':
+                    if (historyMgr && historyMgr.allRows && historyMgr.allRows.length > 0) {
+                        var oldestRow = historyMgr.allRows[historyMgr.allRows.length - 1];
+                        var ct = oldestRow.dataset.closeTime;
+                        if (ct) {
+                            var t = ct.split(/[- :.]/);
+                            startD = new Date(t[0], t[1] - 1, t[2]);
+                        }
+                    }
+                    break;
+            }
+
+            var dateStr = '';
+            if (startD) {
+                var fmt = function (d) {
+                    return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+                };
+                if (range === 'today') {
+                    dateStr = fmt(startD);
+                } else {
+                    dateStr = fmt(startD) + ' - ' + fmt(endD);
+                }
+            }
+
+            var labelText = rangeName ? '(' + rangeName + (dateStr ? ', ' + dateStr : '') + ')' : '';
 
             if (periodLabelCharts) periodLabelCharts.textContent = labelText;
             if (periodLabelTable) periodLabelTable.textContent = labelText;
+            if (periodLabelHistory) periodLabelHistory.textContent = labelText;
         }
 
         /**
@@ -1161,6 +1232,9 @@
             var idx = 0;
             activeMagics.sort(); // Sort by magic number
 
+            var totalAllClosedProfit = 0;
+            var totalAllOpenProfit = 0;
+
             activeMagics.forEach(magic => {
                 var trades = magicData[magic];
                 trades.sort((a, b) => a.time - b.time); // Sort by time asc
@@ -1195,11 +1269,13 @@
                     var c = r.querySelector('td:nth-child(1) strong');
                     return c && c.textContent.trim() === magic;
                 });
+                var symbolsText = '';
                 if (magicRow) {
                     var nameDiv = magicRow.querySelector('div');
                     if (nameDiv) commentText = nameDiv.textContent.trim();
                     var opCell = magicRow.querySelector('td:nth-child(3)');
                     if (opCell) openProfit = parseFloat(opCell.textContent || 0);
+                    symbolsText = magicRow.getAttribute('data-symbols') || '';
                 }
 
                 var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
@@ -1213,7 +1289,40 @@
 
                 var title = document.createElement('h3');
                 title.className = 'chart-title';
-                title.textContent = chartLabel;
+                title.style.display = 'flex';
+                title.style.alignItems = 'flex-start';
+                title.style.justifyContent = 'space-between';
+                title.style.gap = '8px';
+
+                var titleText = document.createElement('span');
+                titleText.textContent = chartLabel;
+                titleText.style.flex = '1';
+                title.appendChild(titleText);
+
+                if (symbolsText) {
+                    var symArr = symbolsText.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                    if (symArr.length > 0) {
+                        var symBadge = document.createElement('span');
+                        symBadge.style.fontSize = '0.75rem';
+                        symBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+                        symBadge.style.border = '1px solid var(--border-color)';
+                        symBadge.style.padding = '2px 6px';
+                        symBadge.style.borderRadius = '4px';
+                        symBadge.style.fontWeight = 'normal';
+                        symBadge.style.color = '#a0a0c0';
+                        symBadge.style.whiteSpace = 'nowrap';
+
+                        if (symArr.length === 1) {
+                            symBadge.textContent = symArr[0];
+                        } else {
+                            symBadge.textContent = symArr[0] + '...';
+                            symBadge.title = symArr.join(', ');
+                            symBadge.style.cursor = 'help';
+                        }
+                        title.appendChild(symBadge);
+                    }
+                }
+
                 wrapper.appendChild(title);
 
                 var canvasWrap = document.createElement('div');
@@ -1306,7 +1415,40 @@
                 wrapper.onclick = function () {
                     openChartModal(magic, colorSet.line, colorSet.bg, chartLabel, labels, values);
                 };
+
+                totalAllClosedProfit += runProfit;
+                totalAllOpenProfit += openProfit;
             });
+
+            // Add summary below the charts
+            var summaryDiv = document.createElement('div');
+            summaryDiv.style.width = '100%';
+            summaryDiv.style.marginTop = '1rem';
+            summaryDiv.style.padding = '1rem';
+            summaryDiv.style.backgroundColor = 'var(--bg-card)';
+            summaryDiv.style.border = '1px solid var(--border-color)';
+            summaryDiv.style.borderRadius = '8px';
+            summaryDiv.style.display = 'flex';
+            summaryDiv.style.justifyContent = 'space-around';
+            summaryDiv.style.flexWrap = 'wrap';
+            summaryDiv.style.gap = '1rem';
+
+            var closedSummary = document.createElement('div');
+            closedSummary.style.textAlign = 'center';
+            closedSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamtsumme (Geschlossen)</span>' +
+                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllClosedProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
+                totalAllClosedProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+            var openSummary = document.createElement('div');
+            openSummary.style.textAlign = 'center';
+            openSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamt Offene Trades Equity</span>' +
+                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllOpenProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
+                totalAllOpenProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+            summaryDiv.appendChild(closedSummary);
+            summaryDiv.appendChild(openSummary);
+
+            this.container.appendChild(summaryDiv);
         };
 
         // ============ FULLSCREEN CHART MODAL ============

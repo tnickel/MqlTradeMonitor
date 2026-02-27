@@ -257,6 +257,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   // Check if the terminal is actually connected to the broker
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+   {
+      UpdateStatusLabel("Disconnected from Broker", clrRed);
+      return;
+   }
+
    uint currentTick = GetTickCount();
    datetime now = TimeCurrent();
    

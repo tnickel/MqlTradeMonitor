@@ -79,6 +79,16 @@ public class AccountManager {
             account.setSectionId(ae.getSectionId()); // New loading
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
 
+            // Load lastSeen if available
+            if (ae.getLastSeen() != null && !ae.getLastSeen().isEmpty()) {
+                try {
+                    account.setLastSeen(LocalDateTime.parse(ae.getLastSeen()));
+                } catch (Exception e) {
+                    System.err.println(
+                            "Could not parse lastSeen for account " + ae.getAccountId() + ": " + ae.getLastSeen());
+                }
+            }
+
             // MIGRATION CHECK: If sectionID is null but we have legacy string
             if (account.getSectionId() == null) {
                 Long targetSectionId = sections.get(0).getId(); // Default to top
@@ -278,6 +288,14 @@ public class AccountManager {
             info.put("trades", account.getOpenTrades().size());
             info.put("online", account.isOnline(timeoutSeconds));
             info.put("lastSeen", account.getLastSeen());
+
+            long lastSeenMins = -1;
+            if (account.getLastSeen() != null) {
+                lastSeenMins = java.time.Duration.between(account.getLastSeen(), java.time.LocalDateTime.now())
+                        .toMinutes();
+            }
+            info.put("lastSeenMins", lastSeenMins);
+
             info.put("name", account.getName());
             info.put("type", account.getType());
             info.put("section", account.getSection());
@@ -572,6 +590,15 @@ public class AccountManager {
                         referenceBalance,
                         openPL);
                 item.setCurrentMagicEquity(openPL);
+
+                Long lastSeenMins = null;
+                if (account.getLastSeen() != null) {
+                    lastSeenMins = java.time.Duration.between(account.getLastSeen(), java.time.LocalDateTime.now())
+                            .toMinutes();
+                    item.setLastSeenString(account.getLastSeen()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+                }
+                item.setLastSeenMins(lastSeenMins);
 
                 result.add(item);
             }

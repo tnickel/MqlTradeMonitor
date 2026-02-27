@@ -353,8 +353,13 @@
                             Acc Name</h3>
                     </div>
                     <!-- Status Dot -->
-                    <div th:class="${acc.isOnline(timeoutSeconds) ? 'status-dot online' : 'status-dot offline'}"
-                        th:title="${acc.isOnline(timeoutSeconds) ? 'Online' : 'Offline'}"></div>
+                    <span th:if="${acc.lastSeenMins != null}" th:style="'width: 12px; height: 12px; border-radius: 50%; display: inline-block; background-color: ' + 
+                            (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                            (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                            (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                            (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                        th:title="(${acc.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${acc.lastSeen} != null ? ${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${acc.lastSeenMins} + ' Min)')">
+                    </span>
                 </div>
 
                 <!-- Main Metrics -->
@@ -400,7 +405,8 @@
                 <!-- Hidden Table Data for Modal -->
                 <div th:id="'trades-data-' + ${acc.accountId}" class="hidden-data">
                     <div class="account-header-bar" style="margin-bottom: 1rem; border-radius: 8px;">
-                        <span class="acc-name" th:text="${acc.name != null ? acc.name : acc.accountId}">Acc Name</span>
+                        <span class="acc-name" th:text="${acc.name != null ? acc.name : acc.accountId}">Acc
+                            Name</span>
                         <span class="acc-id" th:text="'#' + ${acc.accountId}">#123456</span>
 
                         <!-- Balance & Profit -->

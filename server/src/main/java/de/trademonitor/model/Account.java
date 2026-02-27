@@ -18,7 +18,7 @@ public class Account {
     private double equity;
     private String name;
     private String type; // "DEMO" or "REAL"
-    private LocalDateTime lastSeen;
+    private LocalDateTime lastSeen; // DO NOT DEFAULT TO NOW!
     private LocalDateTime registeredAt;
 
     private String section = "TOP"; // Default to TOP (Deprecated)
@@ -132,6 +132,20 @@ public class Account {
 
     public void setLastSeen(LocalDateTime lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+    public long getLastSeenMins() {
+        if (lastSeen == null)
+            return -1;
+        return java.time.Duration.between(lastSeen, LocalDateTime.now()).toMinutes();
+    }
+
+    public boolean getOnline() {
+        // Simple fallback for the dashboard '0 ONLINE' counter.
+        // We consider it online if lastSeen is within the last 60 minutes for this UI
+        // counter.
+        long mins = getLastSeenMins();
+        return mins >= 0 && mins <= 60;
     }
 
     public LocalDateTime getRegisteredAt() {

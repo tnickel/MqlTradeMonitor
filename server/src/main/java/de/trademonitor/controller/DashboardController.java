@@ -120,6 +120,16 @@ public class DashboardController {
         model.addAttribute("syncMetrics", tradeSyncService.getMetrics());
 
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
+
+        // Live Indicator Config
+        model.addAttribute("liveGreenMins", globalConfigService.getLiveGreenMins());
+        model.addAttribute("liveYellowMins", globalConfigService.getLiveYellowMins());
+        model.addAttribute("liveOrangeMins", globalConfigService.getLiveOrangeMins());
+        model.addAttribute("liveColorGreen", globalConfigService.getLiveColorGreen());
+        model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
+        model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
+        model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
+
         return "dashboard";
     }
 
@@ -152,6 +162,15 @@ public class DashboardController {
 
         model.addAttribute("magicMappings", magicMappingService.getAllMappings());
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
+
+        // Live Indicator Config
+        model.addAttribute("liveGreenMins", globalConfigService.getLiveGreenMins());
+        model.addAttribute("liveYellowMins", globalConfigService.getLiveYellowMins());
+        model.addAttribute("liveOrangeMins", globalConfigService.getLiveOrangeMins());
+        model.addAttribute("liveColorGreen", globalConfigService.getLiveColorGreen());
+        model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
+        model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
+        model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
 
         return "open-trades";
     }
@@ -327,6 +346,15 @@ public class DashboardController {
         // Add today's date for highlighting (format matches UI: yyyy.MM.dd)
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
         model.addAttribute("todayDate", java.time.LocalDate.now().format(formatter));
+
+        // Live Indicator Config
+        model.addAttribute("liveGreenMins", globalConfigService.getLiveGreenMins());
+        model.addAttribute("liveYellowMins", globalConfigService.getLiveYellowMins());
+        model.addAttribute("liveOrangeMins", globalConfigService.getLiveOrangeMins());
+        model.addAttribute("liveColorGreen", globalConfigService.getLiveColorGreen());
+        model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
+        model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
+        model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
 
         return "account-detail";
     }

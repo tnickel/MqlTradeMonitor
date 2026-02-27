@@ -15,6 +15,9 @@ public class MagicDrawdownItem {
     private double balanceHigh;
     private double currentMagicEquity; // balance + open profit for this magic
 
+    private Long lastSeenMins;
+    private String lastSeenString;
+
     public MagicDrawdownItem() {
     }
 
@@ -112,5 +115,21 @@ public class MagicDrawdownItem {
 
     public void setCurrentMagicEquity(double currentMagicEquity) {
         this.currentMagicEquity = currentMagicEquity;
+    }
+
+    public Long getLastSeenMins() {
+        return lastSeenMins;
+    }
+
+    public void setLastSeenMins(Long lastSeenMins) {
+        this.lastSeenMins = lastSeenMins;
+    }
+
+    public String getLastSeenString() {
+        return lastSeenString;
+    }
+
+    public void setLastSeenString(String lastSeenString) {
+        this.lastSeenString = lastSeenString;
     }
 }

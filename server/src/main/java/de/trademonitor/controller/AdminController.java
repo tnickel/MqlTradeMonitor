@@ -80,6 +80,15 @@ public class AdminController {
         model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
         model.addAttribute("tradeSyncInterval", globalConfigService.getTradeSyncIntervalSeconds());
 
+        // Live Indicator Config
+        model.addAttribute("liveGreenMins", globalConfigService.getLiveGreenMins());
+        model.addAttribute("liveYellowMins", globalConfigService.getLiveYellowMins());
+        model.addAttribute("liveOrangeMins", globalConfigService.getLiveOrangeMins());
+        model.addAttribute("liveColorGreen", globalConfigService.getLiveColorGreen());
+        model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
+        model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
+        model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
+
         // Mail Config
         model.addAttribute("mailHost", globalConfigService.getMailHost());
         model.addAttribute("mailPort", globalConfigService.getMailPort());
@@ -134,6 +143,22 @@ public class AdminController {
             }
         }
         globalConfigService.setSyncExemptMagicNumbers(result);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/live-config")
+    public String saveLiveConfig(
+            @RequestParam int liveGreenMins,
+            @RequestParam int liveYellowMins,
+            @RequestParam int liveOrangeMins,
+            @RequestParam String liveColorGreen,
+            @RequestParam String liveColorYellow,
+            @RequestParam String liveColorOrange,
+            @RequestParam String liveColorRed) {
+
+        globalConfigService.saveLiveIndicatorConfig(
+                liveGreenMins, liveYellowMins, liveOrangeMins,
+                liveColorGreen, liveColorYellow, liveColorOrange, liveColorRed);
         return "redirect:/admin";
     }
 

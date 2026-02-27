@@ -163,6 +163,85 @@
             </form>
         </div>
 
+        <!-- Live Indicator Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🟢 Live Indikator</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">Konfiguriere hier die Schwellenwerte, ab wann ein Account
+                beim letzten Kontakt (lastSeen) als Gelb oder Rot markiert wird, sowie die passenden Farben.</p>
+
+            <form th:action="@{/admin/live-config}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <!-- We split into two rows: times and colors -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label for="liveGreenMins" style="color: #8b949e; display: block; margin-bottom: 5px;">Zeit
+                                bis "Gelb" (Minuten)</label>
+                            <input type="number" id="liveGreenMins" name="liveGreenMins" th:value="${liveGreenMins}"
+                                min="1" required
+                                style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                            <small style="color: #6b7280;">Davor ist der Indikator Grün.</small>
+                        </div>
+                        <div>
+                            <label for="liveYellowMins" style="color: #8b949e; display: block; margin-bottom: 5px;">Zeit
+                                bis "Orange" (Minuten)</label>
+                            <input type="number" id="liveYellowMins" name="liveYellowMins" th:value="${liveYellowMins}"
+                                min="1" required
+                                style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                            <small style="color: #6b7280;">Davor ist der Indikator Gelb.</small>
+                        </div>
+                        <div>
+                            <label for="liveOrangeMins" style="color: #8b949e; display: block; margin-bottom: 5px;">Zeit
+                                bis "Rot" (Minuten)</label>
+                            <input type="number" id="liveOrangeMins" name="liveOrangeMins" th:value="${liveOrangeMins}"
+                                min="1" required
+                                style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                            <small style="color: #6b7280;">Ab dieser Zeit (oder wenn kein Signal vorliegt) ist es
+                                Rot.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label for="liveColorGreen"
+                                style="color: #8b949e; display: block; margin-bottom: 5px;">Farbe: Grün</label>
+                            <input type="color" id="liveColorGreen" name="liveColorGreen" th:value="${liveColorGreen}"
+                                style="width: 100%; height: 40px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 2px;">
+                        </div>
+                        <div>
+                            <label for="liveColorYellow"
+                                style="color: #8b949e; display: block; margin-bottom: 5px;">Farbe: Gelb</label>
+                            <input type="color" id="liveColorYellow" name="liveColorYellow"
+                                th:value="${liveColorYellow}"
+                                style="width: 100%; height: 40px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 2px;">
+                        </div>
+                        <div>
+                            <label for="liveColorOrange"
+                                style="color: #8b949e; display: block; margin-bottom: 5px;">Farbe: Orange</label>
+                            <input type="color" id="liveColorOrange" name="liveColorOrange"
+                                th:value="${liveColorOrange}"
+                                style="width: 100%; height: 40px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 2px;">
+                        </div>
+                        <div>
+                            <label for="liveColorRed" style="color: #8b949e; display: block; margin-bottom: 5px;">Farbe:
+                                Rot</label>
+                            <input type="color" id="liveColorRed" name="liveColorRed" th:value="${liveColorRed}"
+                                style="width: 100%; height: 40px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 2px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                </div>
+            </form>
+        </div>
+
         <!-- Mail Config -->
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">

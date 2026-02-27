@@ -151,22 +151,7 @@ header h1 {
     overflow: hidden;
 }
 
-.account-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-}
 
-.account-card.online::before {
-    background: var(--gradient-primary);
-}
-
-.account-card.offline::before {
-    background: var(--danger);
-}
 
 .account-card:hover {
     background: var(--bg-card-hover);
