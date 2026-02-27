@@ -16,6 +16,9 @@ public class AuthenticationEvents implements ApplicationListener<AbstractAuthent
     @Autowired
     private LoginLogRepository loginLogRepository;
 
+    @Autowired
+    private de.trademonitor.security.BruteForceProtectionService bruteForceProtectionService;
+
     @Override
     public void onApplicationEvent(AbstractAuthenticationEvent event) {
         String ipAddress = "Unknown";
@@ -35,6 +38,7 @@ public class AuthenticationEvents implements ApplicationListener<AbstractAuthent
             log.setSuccess(true);
             log.setDetails("Login Successful");
             loginLogRepository.save(log);
+            bruteForceProtectionService.recordSuccess(ipAddress);
         } else if (event instanceof AuthenticationFailureBadCredentialsEvent) {
             AuthenticationFailureBadCredentialsEvent failEvent = (AuthenticationFailureBadCredentialsEvent) event;
             String username = (String) failEvent.getAuthentication().getPrincipal();
@@ -46,6 +50,7 @@ public class AuthenticationEvents implements ApplicationListener<AbstractAuthent
             log.setSuccess(false);
             log.setDetails("Bad Credentials");
             loginLogRepository.save(log);
+            bruteForceProtectionService.recordFailure(ipAddress);
         }
     }
 }

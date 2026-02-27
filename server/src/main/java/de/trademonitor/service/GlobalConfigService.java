@@ -60,6 +60,25 @@ public class GlobalConfigService {
     private int cachedLogConnDays = 3;
     private int cachedLogClientDays = 3;
 
+    // Security Config Keys
+    public static final String KEY_SEC_RATE_LIMIT_ENABLED = "SEC_RATE_LIMIT_ENABLED";
+    public static final String KEY_SEC_RATE_LIMIT_PER_MIN = "SEC_RATE_LIMIT_PER_MIN";
+    public static final String KEY_SEC_BRUTE_FORCE_ENABLED = "SEC_BRUTE_FORCE_ENABLED";
+    public static final String KEY_SEC_BRUTE_FORCE_MAX_ATTEMPTS = "SEC_BRUTE_FORCE_MAX_ATTEMPTS";
+    public static final String KEY_SEC_BRUTE_FORCE_LOCKOUT_MINS = "SEC_BRUTE_FORCE_LOCKOUT_MINS";
+    public static final String KEY_SEC_HEADERS_ENABLED = "SEC_HEADERS_ENABLED";
+    public static final String KEY_SEC_MAX_SESSIONS = "SEC_MAX_SESSIONS";
+    public static final String KEY_SEC_H2_CONSOLE_ENABLED = "SEC_H2_CONSOLE_ENABLED";
+
+    private boolean cachedSecRateLimitEnabled = true;
+    private int cachedSecRateLimitPerMin = 100;
+    private boolean cachedSecBruteForceEnabled = true;
+    private int cachedSecBruteForceMaxAttempts = 5;
+    private int cachedSecBruteForceLockoutMins = 15;
+    private boolean cachedSecHeadersEnabled = true;
+    private int cachedSecMaxSessions = 3;
+    private boolean cachedSecH2ConsoleEnabled = false;
+
     @PostConstruct
     public void init() {
         // Load on startup
@@ -125,6 +144,40 @@ public class GlobalConfigService {
             } catch (NumberFormatException e) {
             }
         });
+
+        // Load Security Config
+        repository.findById(KEY_SEC_RATE_LIMIT_ENABLED)
+                .ifPresent(e -> cachedSecRateLimitEnabled = Boolean.parseBoolean(e.getConfValue()));
+        repository.findById(KEY_SEC_RATE_LIMIT_PER_MIN).ifPresent(e -> {
+            try {
+                cachedSecRateLimitPerMin = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {
+            }
+        });
+        repository.findById(KEY_SEC_BRUTE_FORCE_ENABLED)
+                .ifPresent(e -> cachedSecBruteForceEnabled = Boolean.parseBoolean(e.getConfValue()));
+        repository.findById(KEY_SEC_BRUTE_FORCE_MAX_ATTEMPTS).ifPresent(e -> {
+            try {
+                cachedSecBruteForceMaxAttempts = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {
+            }
+        });
+        repository.findById(KEY_SEC_BRUTE_FORCE_LOCKOUT_MINS).ifPresent(e -> {
+            try {
+                cachedSecBruteForceLockoutMins = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {
+            }
+        });
+        repository.findById(KEY_SEC_HEADERS_ENABLED)
+                .ifPresent(e -> cachedSecHeadersEnabled = Boolean.parseBoolean(e.getConfValue()));
+        repository.findById(KEY_SEC_MAX_SESSIONS).ifPresent(e -> {
+            try {
+                cachedSecMaxSessions = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {
+            }
+        });
+        repository.findById(KEY_SEC_H2_CONSOLE_ENABLED)
+                .ifPresent(e -> cachedSecH2ConsoleEnabled = Boolean.parseBoolean(e.getConfValue()));
     }
 
     public int getMagicNumberMaxAge() {
@@ -331,5 +384,62 @@ public class GlobalConfigService {
     public void setSyncExemptMagicNumbers(Set<Long> magicNumbers) {
         String value = magicNumbers.stream().map(String::valueOf).collect(Collectors.joining(","));
         repository.save(new GlobalConfigEntity(KEY_SYNC_EXEMPT_MAGIC_NUMBERS, value));
+    }
+
+    // --- Security Config Getters ---
+    public boolean isSecRateLimitEnabled() {
+        return cachedSecRateLimitEnabled;
+    }
+
+    public int getSecRateLimitPerMin() {
+        return cachedSecRateLimitPerMin;
+    }
+
+    public boolean isSecBruteForceEnabled() {
+        return cachedSecBruteForceEnabled;
+    }
+
+    public int getSecBruteForceMaxAttempts() {
+        return cachedSecBruteForceMaxAttempts;
+    }
+
+    public int getSecBruteForceLockoutMins() {
+        return cachedSecBruteForceLockoutMins;
+    }
+
+    public boolean isSecHeadersEnabled() {
+        return cachedSecHeadersEnabled;
+    }
+
+    public int getSecMaxSessions() {
+        return cachedSecMaxSessions;
+    }
+
+    public boolean isSecH2ConsoleEnabled() {
+        return cachedSecH2ConsoleEnabled;
+    }
+
+    public void saveSecurityConfig(boolean rateLimitEnabled, int rateLimitPerMin,
+            boolean bruteForceEnabled, int bruteForceMaxAttempts, int bruteForceLockoutMins,
+            boolean headersEnabled, int maxSessions, boolean h2ConsoleEnabled) {
+        this.cachedSecRateLimitEnabled = rateLimitEnabled;
+        this.cachedSecRateLimitPerMin = rateLimitPerMin;
+        this.cachedSecBruteForceEnabled = bruteForceEnabled;
+        this.cachedSecBruteForceMaxAttempts = bruteForceMaxAttempts;
+        this.cachedSecBruteForceLockoutMins = bruteForceLockoutMins;
+        this.cachedSecHeadersEnabled = headersEnabled;
+        this.cachedSecMaxSessions = maxSessions;
+        this.cachedSecH2ConsoleEnabled = h2ConsoleEnabled;
+
+        repository.save(new GlobalConfigEntity(KEY_SEC_RATE_LIMIT_ENABLED, String.valueOf(rateLimitEnabled)));
+        repository.save(new GlobalConfigEntity(KEY_SEC_RATE_LIMIT_PER_MIN, String.valueOf(rateLimitPerMin)));
+        repository.save(new GlobalConfigEntity(KEY_SEC_BRUTE_FORCE_ENABLED, String.valueOf(bruteForceEnabled)));
+        repository
+                .save(new GlobalConfigEntity(KEY_SEC_BRUTE_FORCE_MAX_ATTEMPTS, String.valueOf(bruteForceMaxAttempts)));
+        repository
+                .save(new GlobalConfigEntity(KEY_SEC_BRUTE_FORCE_LOCKOUT_MINS, String.valueOf(bruteForceLockoutMins)));
+        repository.save(new GlobalConfigEntity(KEY_SEC_HEADERS_ENABLED, String.valueOf(headersEnabled)));
+        repository.save(new GlobalConfigEntity(KEY_SEC_MAX_SESSIONS, String.valueOf(maxSessions)));
+        repository.save(new GlobalConfigEntity(KEY_SEC_H2_CONSOLE_ENABLED, String.valueOf(h2ConsoleEnabled)));
     }
 }

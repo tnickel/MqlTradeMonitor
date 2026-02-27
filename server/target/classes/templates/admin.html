@@ -453,6 +453,141 @@
             </form>
         </div>
 
+        <!-- Security Settings Section -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <details style="cursor: pointer;">
+                <summary
+                    style="font-size: 1.2rem; color: #e1e1e1; font-weight: bold; margin-bottom: 10px; list-style-position: inside;">
+                    🔒 Sicherheitseinstellungen (Aufklappen)
+                </summary>
+                <div style="cursor: default; padding-top: 15px; border-top: 1px solid #30363d;">
+                    <p style="color: #8b949e; margin-bottom: 1rem;">Server-Härtung gegen Angriffe. Alle Parameter sind
+                        live konfigurierbar.</p>
+
+                    <form th:action="@{/admin/security}" method="post">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+                            <!-- Rate Limiting -->
+                            <div
+                                style="background-color: #161b22; padding: 15px; border-radius: 6px; border: 1px solid #30363d;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label style="color: #e1e1e1; font-weight: bold;">⚡ Rate Limiting</label>
+                                    <label class="switch"
+                                        style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                                        <input type="checkbox" name="secRateLimitEnabled"
+                                            th:checked="${secRateLimitEnabled}" style="opacity:0; width:0; height:0;">
+                                        <span
+                                            style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;"
+                                            onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '#2ea043' : '#30363d';"
+                                            th:style="${secRateLimitEnabled} ? 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#2ea043;transition:.3s;border-radius:26px;' : 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;'"></span>
+                                    </label>
+                                </div>
+                                <p style="color: #8b949e; font-size: 0.85rem; margin-bottom: 8px;">Begrenzt Zugriffe pro
+                                    IP-Adresse pro Minute. Schützt gegen Flooding.</p>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="color: #8b949e; font-size: 0.85rem; white-space: nowrap;">Max
+                                        Req/Min:</label>
+                                    <input type="number" name="secRateLimitPerMin" th:value="${secRateLimitPerMin}"
+                                        min="10" max="10000"
+                                        style="width: 80px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; text-align: center;">
+                                </div>
+                            </div>
+
+                            <!-- Brute Force Protection -->
+                            <div
+                                style="background-color: #161b22; padding: 15px; border-radius: 6px; border: 1px solid #30363d;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label style="color: #e1e1e1; font-weight: bold;">🛡️ Brute-Force Schutz</label>
+                                    <label class="switch"
+                                        style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                                        <input type="checkbox" name="secBruteForceEnabled"
+                                            th:checked="${secBruteForceEnabled}" style="opacity:0; width:0; height:0;">
+                                        <span
+                                            style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;"
+                                            onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '#2ea043' : '#30363d';"
+                                            th:style="${secBruteForceEnabled} ? 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#2ea043;transition:.3s;border-radius:26px;' : 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;'"></span>
+                                    </label>
+                                </div>
+                                <p style="color: #8b949e; font-size: 0.85rem; margin-bottom: 8px;">Sperrt IPs nach
+                                    wiederholten fehlgeschlagenen Login-Versuchen.</p>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                    <label style="color: #8b949e; font-size: 0.85rem; white-space: nowrap;">Max
+                                        Versuche:</label>
+                                    <input type="number" name="secBruteForceMaxAttempts"
+                                        th:value="${secBruteForceMaxAttempts}" min="1" max="100"
+                                        style="width: 80px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; text-align: center;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="color: #8b949e; font-size: 0.85rem; white-space: nowrap;">Sperre
+                                        (Min):</label>
+                                    <input type="number" name="secBruteForceLockoutMins"
+                                        th:value="${secBruteForceLockoutMins}" min="1" max="1440"
+                                        style="width: 80px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; text-align: center;">
+                                </div>
+                            </div>
+
+                            <!-- Security Headers -->
+                            <div
+                                style="background-color: #161b22; padding: 15px; border-radius: 6px; border: 1px solid #30363d;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label style="color: #e1e1e1; font-weight: bold;">📋 Security Headers</label>
+                                    <label class="switch"
+                                        style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                                        <input type="checkbox" name="secHeadersEnabled"
+                                            th:checked="${secHeadersEnabled}" style="opacity:0; width:0; height:0;">
+                                        <span
+                                            style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;"
+                                            onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '#2ea043' : '#30363d';"
+                                            th:style="${secHeadersEnabled} ? 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#2ea043;transition:.3s;border-radius:26px;' : 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;'"></span>
+                                    </label>
+                                </div>
+                                <p style="color: #8b949e; font-size: 0.85rem;">CSP, X-Frame-Options,
+                                    X-Content-Type-Options, HSTS, Referrer-Policy, Permissions-Policy.</p>
+                            </div>
+
+                            <!-- Session & H2 -->
+                            <div
+                                style="background-color: #161b22; padding: 15px; border-radius: 6px; border: 1px solid #30363d;">
+                                <label
+                                    style="color: #e1e1e1; font-weight: bold; display: block; margin-bottom: 10px;">🔐
+                                    Session & Datenbank</label>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <label style="color: #8b949e; font-size: 0.85rem; white-space: nowrap;">Max
+                                        Sessions/User:</label>
+                                    <input type="number" name="secMaxSessions" th:value="${secMaxSessions}" min="1"
+                                        max="50"
+                                        style="width: 80px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; text-align: center;">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="color: #8b949e; font-size: 0.85rem;">H2-Konsole aktiviert:</label>
+                                    <label class="switch"
+                                        style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                                        <input type="checkbox" name="secH2ConsoleEnabled"
+                                            th:checked="${secH2ConsoleEnabled}" style="opacity:0; width:0; height:0;">
+                                        <span
+                                            style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;"
+                                            onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '#2ea043' : '#30363d';"
+                                            th:style="${secH2ConsoleEnabled} ? 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#2ea043;transition:.3s;border-radius:26px;' : 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;'"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; text-align: right;">
+                            <button type="submit"
+                                style="background-color: #2ea043; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                                💾 Sicherheitseinstellungen speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </details>
+        </div>
+
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
             <details style="cursor: pointer;">

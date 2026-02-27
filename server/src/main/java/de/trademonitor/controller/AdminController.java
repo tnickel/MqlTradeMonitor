@@ -139,6 +139,16 @@ public class AdminController {
         model.addAttribute("usersList", userService.getAllUsers());
         model.addAttribute("accountsList", accountRepository.findAll()); // for assigning in UI
 
+        // --- 5. Security Config ---
+        model.addAttribute("secRateLimitEnabled", globalConfigService.isSecRateLimitEnabled());
+        model.addAttribute("secRateLimitPerMin", globalConfigService.getSecRateLimitPerMin());
+        model.addAttribute("secBruteForceEnabled", globalConfigService.isSecBruteForceEnabled());
+        model.addAttribute("secBruteForceMaxAttempts", globalConfigService.getSecBruteForceMaxAttempts());
+        model.addAttribute("secBruteForceLockoutMins", globalConfigService.getSecBruteForceLockoutMins());
+        model.addAttribute("secHeadersEnabled", globalConfigService.isSecHeadersEnabled());
+        model.addAttribute("secMaxSessions", globalConfigService.getSecMaxSessions());
+        model.addAttribute("secH2ConsoleEnabled", globalConfigService.isSecH2ConsoleEnabled());
+
         return "admin";
     }
 
@@ -252,6 +262,34 @@ public class AdminController {
             @RequestParam int logConnDays,
             @RequestParam int logClientDays) {
         globalConfigService.saveLogRetentionConfig(logLoginDays, logConnDays, logClientDays);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/security")
+    public String saveSecurityConfig(
+            @RequestParam(required = false) String secRateLimitEnabled,
+            @RequestParam(defaultValue = "100") int secRateLimitPerMin,
+            @RequestParam(required = false) String secBruteForceEnabled,
+            @RequestParam(defaultValue = "5") int secBruteForceMaxAttempts,
+            @RequestParam(defaultValue = "15") int secBruteForceLockoutMins,
+            @RequestParam(required = false) String secHeadersEnabled,
+            @RequestParam(defaultValue = "3") int secMaxSessions,
+            @RequestParam(required = false) String secH2ConsoleEnabled,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            globalConfigService.saveSecurityConfig(
+                    "on".equals(secRateLimitEnabled),
+                    secRateLimitPerMin,
+                    "on".equals(secBruteForceEnabled),
+                    secBruteForceMaxAttempts,
+                    secBruteForceLockoutMins,
+                    "on".equals(secHeadersEnabled),
+                    secMaxSessions,
+                    "on".equals(secH2ConsoleEnabled));
+            redirectAttrs.addFlashAttribute("successMessage", "Sicherheitseinstellungen gespeichert.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
+        }
         return "redirect:/admin";
     }
 
