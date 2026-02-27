@@ -832,14 +832,23 @@
 
                     // Calculate sums
                     let sumDdEur = 0;
-                    let sumDdPct = 0;
                     let sumProfit = 0;
+                    let refBalance = 0;
 
                     groupItems.forEach(item => {
                         sumDdEur += item.currentDrawdownEur || 0;
-                        sumDdPct += item.currentDrawdownPercent || 0;
                         sumProfit += item.currentMagicEquity || 0;
+                        // Grab the balance from the first item (should be the same for all on the same account)
+                        if (refBalance === 0 && item.referenceBalance) {
+                            refBalance = item.referenceBalance;
+                        }
                     });
+
+                    // Calculate correct overall percentage
+                    let sumDdPct = 0;
+                    if (refBalance > 0 && sumDdEur > 0) {
+                        sumDdPct = (sumDdEur / refBalance) * 100;
+                    }
 
                     // Render Group Header
                     html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
@@ -940,14 +949,21 @@
 
                     // Calculate sums
                     let sumDdEur = 0;
-                    let sumDdPct = 0;
                     let sumProfit = 0;
+                    let refBalance = 0;
 
                     groupItems.forEach(item => {
                         sumDdEur += item.currentDrawdownEur || 0;
-                        sumDdPct += item.currentDrawdownPercent || 0;
                         sumProfit += item.currentMagicEquity || 0;
+                        if (refBalance === 0 && item.referenceBalance) {
+                            refBalance = item.referenceBalance;
+                        }
                     });
+
+                    let sumDdPct = 0;
+                    if (refBalance > 0 && sumDdEur > 0) {
+                        sumDdPct = (sumDdEur / refBalance) * 100;
+                    }
 
                     // Render Group Header
                     html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">

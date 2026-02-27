@@ -698,7 +698,9 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                outLatestCloseTime = closeTime;
             
             ENUM_DEAL_TYPE dealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(ticket, DEAL_TYPE);
-            string typeStr = (dealType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+            // In MT5, an OUT deal of type SELL means we are closing a BUY position.
+            // Therefore, if the OUT deal is SELL, the original trade was BUY.
+            string typeStr = (dealType == DEAL_TYPE_SELL) ? "BUY" : "SELL";
             
             historyJson += "{";
             historyJson += "\"ticket\":" + IntegerToString(ticket) + ",";

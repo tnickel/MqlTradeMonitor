@@ -98,6 +98,11 @@ public class AdminController {
         model.addAttribute("mailTo", globalConfigService.getMailTo());
         model.addAttribute("mailMaxPerDay", globalConfigService.getMailMaxPerDay());
 
+        // Log Retention Config
+        model.addAttribute("logLoginDays", globalConfigService.getLogLoginDays());
+        model.addAttribute("logConnDays", globalConfigService.getLogConnDays());
+        model.addAttribute("logClientDays", globalConfigService.getLogClientDays());
+
         // Homey Config
         model.addAttribute("homeyId", globalConfigService.getHomeyId());
         model.addAttribute("homeyEvent", globalConfigService.getHomeyEvent());
@@ -159,6 +164,15 @@ public class AdminController {
         globalConfigService.saveLiveIndicatorConfig(
                 liveGreenMins, liveYellowMins, liveOrangeMins,
                 liveColorGreen, liveColorYellow, liveColorOrange, liveColorRed);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/log-retention")
+    public String saveLogRetention(
+            @RequestParam int logLoginDays,
+            @RequestParam int logConnDays,
+            @RequestParam int logClientDays) {
+        globalConfigService.saveLogRetentionConfig(logLoginDays, logConnDays, logClientDays);
         return "redirect:/admin";
     }
 

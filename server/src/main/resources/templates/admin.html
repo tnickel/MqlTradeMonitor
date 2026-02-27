@@ -143,20 +143,84 @@
             <form th:action="@{/admin/config}" method="post"
                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="form-group">
-                    <label for="magicNumberMaxAge" style="color: #8b949e; display: block; margin-bottom: 5px;">Max Alter
-                        Magic Number (Tage)</label>
+                    <label for="magicNumberMaxAge" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Max Alter Magic Number (Tage)
+                        <span
+                            title="Trades, die älter als diese Anzahl an Tagen sind, werden aus der Tabelle ausgeblendet."
+                            style="cursor: help;">ℹ️</span>
+                    </label>
                     <input type="number" id="magicNumberMaxAge" name="magicNumberMaxAge"
                         th:value="${magicMaxAgeByConfig}" min="1"
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Blendet inaktive Magic Numbers
+                        aus.</small>
                 </div>
                 <div class="form-group">
-                    <label for="tradeSyncInterval" style="color: #8b949e; display: block; margin-bottom: 5px;">Trade
-                        Sync Intervall (Sekunden)</label>
+                    <label for="tradeSyncInterval" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        TradeSyncCheck Intervall (Sekunden)
+                        <span
+                            title="Dies ist die Taktung (in Sekunden) der Sicherheits-Kopierüberwachung. Alle X Sekunden prüft der Server, ob für JEDEN offenen Trade auf einem Echtgeld-Konto (REAL) exakt derselbe Trade (gleiches Währungspaar, Richtung, grobe Zeit) auch auf einem Demo-Konto existiert. Fehlt ein solches Gegenstück auf einem Demo-Konto, schlägt das System sofort Alarm (via E-Mail und Smart-Home Sirene) und markiert den 'Geister-Trade' farblich als Warnung."
+                            style="cursor: help;">ℹ️</span>
+                    </label>
                     <input type="number" id="tradeSyncInterval" name="tradeSyncInterval" th:value="${tradeSyncInterval}"
                         min="5"
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Demo-zu-Real
+                        Kopier-Überwachung.</small>
                 </div>
                 <div class="form-group" style="grid-column: span 2;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Log Retention Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🧹 Leistungs- und Speicher-Konfiguration</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">Lege fest, nach wie vielen Tagen die jeweiligen System-Logs
+                automatisch aus der Datenbank gelöscht werden sollen, um Speicherplatz zu sparen und die Performance zu
+                erhalten.</p>
+
+            <form th:action="@{/admin/log-retention}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+                <div class="form-group">
+                    <label for="logLoginDays" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Login Logs (Tage)
+                        <span title="Protokolliert jeden Anmeldeversuch am Web-Interface."
+                            style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="logLoginDays" name="logLoginDays" th:value="${logLoginDays}" min="1"
+                        required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Web-Interface Logins.</small>
+                </div>
+                <div class="form-group">
+                    <label for="logConnDays" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Connection Logs (Tage)
+                        <span
+                            title="Protokolliert jede IP-Adresse, die HTTP-Anfragen (Heartbeats/Updates) an die API sendet."
+                            style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="logConnDays" name="logConnDays" th:value="${logConnDays}" min="1" required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Heartbeats & API Anfragen.</small>
+                </div>
+                <div class="form-group">
+                    <label for="logClientDays" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Client Logs (Tage)
+                        <span title="Protokolliert Statusmeldungen, Neustarts und Fehler für die einzelnen Accounts."
+                            style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="logClientDays" name="logClientDays" th:value="${logClientDays}" min="1"
+                        required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Account Statusmeldungen.</small>
+                </div>
+
+                <div class="form-group" style="grid-column: span 3;">
                     <button type="submit"
                         style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
                 </div>

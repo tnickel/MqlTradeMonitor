@@ -39,6 +39,11 @@ public class GlobalConfigService {
     public static final String KEY_MAIL_TO = "MAIL_TO";
     public static final String KEY_MAIL_MAX_PER_DAY = "MAIL_MAX_PER_DAY";
 
+    // Log Retention Keys
+    public static final String KEY_LOG_LOGIN_DAYS = "LOG_LOGIN_DAYS";
+    public static final String KEY_LOG_CONN_DAYS = "LOG_CONN_DAYS";
+    public static final String KEY_LOG_CLIENT_DAYS = "LOG_CLIENT_DAYS";
+
     // Cache the value to avoid hitting DB on every request
     private int cachedMaxAgeDays = 30; // Default 30 days
     private int cachedSyncIntervalSeconds = 60; // Default 60 seconds
@@ -50,6 +55,10 @@ public class GlobalConfigService {
     private String cachedLiveColorYellow = "#f59e0b"; // Updated to lighter yellow
     private String cachedLiveColorOrange = "#f97316"; // Orange
     private String cachedLiveColorRed = "#ef4444";
+
+    private int cachedLogLoginDays = 360;
+    private int cachedLogConnDays = 3;
+    private int cachedLogClientDays = 3;
 
     @PostConstruct
     public void init() {
@@ -97,6 +106,25 @@ public class GlobalConfigService {
         repository.findById(KEY_LIVE_COLOR_YELLOW).ifPresent(entity -> cachedLiveColorYellow = entity.getConfValue());
         repository.findById(KEY_LIVE_COLOR_ORANGE).ifPresent(entity -> cachedLiveColorOrange = entity.getConfValue());
         repository.findById(KEY_LIVE_COLOR_RED).ifPresent(entity -> cachedLiveColorRed = entity.getConfValue());
+
+        repository.findById(KEY_LOG_LOGIN_DAYS).ifPresent(entity -> {
+            try {
+                cachedLogLoginDays = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+        repository.findById(KEY_LOG_CONN_DAYS).ifPresent(entity -> {
+            try {
+                cachedLogConnDays = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+        repository.findById(KEY_LOG_CLIENT_DAYS).ifPresent(entity -> {
+            try {
+                cachedLogClientDays = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
     }
 
     public int getMagicNumberMaxAge() {
@@ -276,6 +304,28 @@ public class GlobalConfigService {
             }
         }
         return result;
+    }
+
+    // --- Log Retention Variables ---
+    public int getLogLoginDays() {
+        return cachedLogLoginDays;
+    }
+
+    public int getLogConnDays() {
+        return cachedLogConnDays;
+    }
+
+    public int getLogClientDays() {
+        return cachedLogClientDays;
+    }
+
+    public void saveLogRetentionConfig(int loginDays, int connDays, int clientDays) {
+        this.cachedLogLoginDays = loginDays;
+        this.cachedLogConnDays = connDays;
+        this.cachedLogClientDays = clientDays;
+        repository.save(new GlobalConfigEntity(KEY_LOG_LOGIN_DAYS, String.valueOf(loginDays)));
+        repository.save(new GlobalConfigEntity(KEY_LOG_CONN_DAYS, String.valueOf(connDays)));
+        repository.save(new GlobalConfigEntity(KEY_LOG_CLIENT_DAYS, String.valueOf(clientDays)));
     }
 
     public void setSyncExemptMagicNumbers(Set<Long> magicNumbers) {
