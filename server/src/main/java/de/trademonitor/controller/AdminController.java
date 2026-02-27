@@ -34,6 +34,9 @@ public class AdminController {
     @Autowired
     private de.trademonitor.service.MagicMappingService magicMappingService;
 
+    @Autowired
+    private de.trademonitor.service.UserService userService;
+
     @GetMapping("")
     public String adminDashboard(Model model) {
         // --- 1. Admin Stats (migrated from DashboardController) ---
@@ -132,7 +135,83 @@ public class AdminController {
         String exemptStr = exemptSet.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
         model.addAttribute("syncExemptMagics", exemptStr);
 
+        // --- 4. Users ---
+        model.addAttribute("usersList", userService.getAllUsers());
+        model.addAttribute("accountsList", accountRepository.findAll()); // for assigning in UI
+
         return "admin";
+    }
+
+    @PostMapping("/create-user")
+    public String createUser(
+            @RequestParam String username,
+            @RequestParam String password,
+            @RequestParam String role,
+            @RequestParam(required = false) String allowedAccountIds,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            java.util.Set<Long> accountIds = new java.util.HashSet<>();
+            if (allowedAccountIds != null && !allowedAccountIds.trim().isEmpty()) {
+                if ("NONE".equalsIgnoreCase(allowedAccountIds.trim())) {
+                    // Empty set means no access
+                } else {
+                    for (String idStr : allowedAccountIds.split(",")) {
+                        try {
+                            accountIds.add(Long.parseLong(idStr.trim()));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            }
+            userService.createUser(username, password, role, accountIds);
+            redirectAttrs.addFlashAttribute("successMessage", "User '" + username + "' created.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Error creating user: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/update-user-accounts")
+    public String updateUserAccounts(
+            @RequestParam Long userId,
+            @RequestParam(required = false) String allowedAccountIds,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            de.trademonitor.entity.UserEntity existingUser = userService.getUserById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            java.util.Set<Long> accountIds = new java.util.HashSet<>();
+            if (allowedAccountIds != null && !allowedAccountIds.trim().isEmpty()) {
+                if ("NONE".equalsIgnoreCase(allowedAccountIds.trim())) {
+                    // Empty set means no access
+                } else {
+                    for (String idStr : allowedAccountIds.split(",")) {
+                        try {
+                            accountIds.add(Long.parseLong(idStr.trim()));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            }
+            userService.updateUser(userId, existingUser.getRole(), accountIds);
+            redirectAttrs.addFlashAttribute("successMessage",
+                    "Accounts for user '" + existingUser.getUsername() + "' updated.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Error updating user accounts: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/delete-user")
+    public String deleteUser(@RequestParam Long userId,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            userService.deleteUser(userId);
+            redirectAttrs.addFlashAttribute("successMessage", "User deleted.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Error deleting user: " + e.getMessage());
+        }
+        return "redirect:/admin";
     }
 
     @PostMapping("/sync-exemptions")

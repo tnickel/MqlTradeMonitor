@@ -1,27 +1,35 @@
 package de.trademonitor.config;
 
+import de.trademonitor.security.CustomUserDetailsService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-        @Value("${app.admin.username:admin}")
-        private String adminUsername;
+        @Autowired
+        private CustomUserDetailsService customUserDetailsService;
 
-        @Value("${app.admin.password:password}")
-        private String adminPassword;
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
+
+        @Bean
+        public DaoAuthenticationProvider authenticationProvider() {
+                DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+                authProvider.setUserDetailsService(customUserDetailsService);
+                authProvider.setPasswordEncoder(passwordEncoder());
+                return authProvider;
+        }
 
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -29,9 +37,12 @@ public class SecurityConfig {
                                 // Disable CSRF for API endpoints used by EA
                                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
                                 .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/api/**", "/css/**", "/js/**", "/images/**", "/login",
+                                                .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
+                                                                "/api/heartbeat", "/api/history", "/css/**", "/js/**",
+                                                                "/images/**", "/login",
                                                                 "/mobile/**")
                                                 .permitAll()
+                                                .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())
                                 .formLogin(form -> form
                                                 .loginPage("/login")
@@ -40,20 +51,9 @@ public class SecurityConfig {
                                 .logout(logout -> logout
                                                 .logoutUrl("/logout")
                                                 .logoutSuccessUrl("/login?logout")
-                                                .permitAll());
+                                                .permitAll())
+                                .authenticationProvider(authenticationProvider());
 
                 return http.build();
-        }
-
-        @Bean
-        public UserDetailsService userDetailsService() {
-                PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-                UserDetails admin = User.builder()
-                                .username(adminUsername)
-                                .password(encoder.encode(adminPassword))
-                                .roles("ADMIN")
-                                .build();
-
-                return new InMemoryUserDetailsManager(admin);
         }
 }

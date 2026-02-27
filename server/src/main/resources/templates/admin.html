@@ -455,38 +455,374 @@
 
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
-            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">📝 Magic Number Mappings</h2>
-            <p style="color: #8b949e; margin-bottom: 1rem;">Hier können benutzerdefinierte Namen für Magic Numbers
-                hinterlegt werden.</p>
+            <details style="cursor: pointer;">
+                <summary
+                    style="font-size: 1.2rem; color: #e1e1e1; font-weight: bold; margin-bottom: 10px; list-style-position: inside;">
+                    📝 Magic Number Mappings (Aufklappen)
+                </summary>
+                <div style="cursor: default; padding-top: 15px; border-top: 1px solid #30363d;">
+                    <p style="color: #8b949e; margin-bottom: 1rem;">Hier können benutzerdefinierte Namen für Magic
+                        Numbers
+                        hinterlegt werden.</p>
 
-            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align: left; background-color: #0d1117; color: #8b949e;">
+                                <th style="padding: 10px; border-bottom: 1px solid #30363d;">Magic Number</th>
+                                <th style="padding: 10px; border-bottom: 1px solid #30363d;">Kommentar (Custom)</th>
+                                <th style="padding: 10px; border-bottom: 1px solid #30363d;">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="mapping : ${magicMappings}" style="border-bottom: 1px solid #2a2e39;">
+                                <td th:text="${mapping.key}" style="padding: 10px; color: #c9d1d9;">12345</td>
+                                <td style="padding: 10px;">
+                                    <form th:action="@{/admin/mapping}" method="post"
+                                        style="display: flex; gap: 10px; width: 100%;">
+                                        <input type="hidden" name="magicNumber" th:value="${mapping.key}">
+                                        <input type="text" name="customComment" th:value="${mapping.value}"
+                                            style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; width: 100%;">
+                                        <button type="submit"
+                                            style="background-color: #1f6feb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">💾</button>
+                                    </form>
+                                </td>
+                                <td style="padding: 10px; color: #8b949e; font-size: 0.9rem;">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+
+        <!-- User Management Section -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">👥 Benutzerverwaltung</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">Admin-Interface zum Anlegen und Verwalten von
+                Benutzern
+                sowie deren Kontozuweisungen.</p>
+
+            <table class="data-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="text-align: left; background-color: #0d1117; color: #8b949e;">
-                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Magic Number</th>
-                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Kommentar (Custom)</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">ID</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Benutzername</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Rolle</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Zugelassene Accounts</th>
                         <th style="padding: 10px; border-bottom: 1px solid #30363d;">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="mapping : ${magicMappings}" style="border-bottom: 1px solid #2a2e39;">
-                        <td th:text="${mapping.key}" style="padding: 10px; color: #c9d1d9;">12345</td>
+                    <tr th:each="user : ${usersList}" style="border-bottom: 1px solid #2a2e39;">
+                        <td th:text="${user.id}" style="padding: 10px; color: #c9d1d9;">1</td>
+                        <td th:text="${user.username}" style="padding: 10px; color: #c9d1d9; font-weight: bold;">admin
+                        </td>
                         <td style="padding: 10px;">
-                            <form th:action="@{/admin/mapping}" method="post"
-                                style="display: flex; gap: 10px; width: 100%;">
-                                <input type="hidden" name="magicNumber" th:value="${mapping.key}">
-                                <input type="text" name="customComment" th:value="${mapping.value}"
-                                    style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; width: 100%;">
-                                <button type="submit"
-                                    style="background-color: #1f6feb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">💾</button>
-                            </form>
+                            <span th:text="${user.role}"
+                                th:style="${user.role == 'ROLE_ADMIN'} ? 'background-color:#ef4444; color:white; padding:2px 6px; border-radius:4px; font-size:0.8rem;' : 'background-color:#1f6feb; color:white; padding:2px 6px; border-radius:4px; font-size:0.8rem;'">
+                            </span>
                         </td>
                         <td style="padding: 10px; color: #8b949e; font-size: 0.9rem;">
+                            <span th:if="${#sets.isEmpty(user.allowedAccountIds)}">Alle Accounts (Admin/Keine
+                                Limits)</span>
+                            <span th:if="${not #sets.isEmpty(user.allowedAccountIds)}"
+                                th:text="${#strings.listJoin(user.allowedAccountIds, ', ')}"></span>
+                        </td>
+                        <td style="padding: 10px;">
+                            <div style="display:flex; gap: 5px;">
+                                <button type="button" th:data-userid="${user.id}" th:data-username="${user.username}"
+                                    th:data-allowed="${#strings.listJoin(user.allowedAccountIds, ',')}"
+                                    onclick="openEditUserModal(this.getAttribute('data-userid'), this.getAttribute('data-username'), this.getAttribute('data-allowed'))"
+                                    style="background-color: #1f6feb; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;"
+                                    title="Erlaubte Accounts bearbeiten">✏️ Bearbeiten</button>
+                                <form th:action="@{/admin/delete-user}" method="post"
+                                    onsubmit="return confirm('Benutzer wirklich löschen?');" style="display:inline;">
+                                    <input type="hidden" name="userId" th:value="${user.id}" />
+                                    <button type="submit"
+                                        style="background-color: #da3633; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;"
+                                        th:disabled="${user.username == 'admin'}">🗑️ Löschen</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
+
+            <h3 style="color: #c9d1d9; font-size: 1rem; border-top: 1px solid #30363d; padding-top: 15px;">➕
+                Neuen
+                Benutzer anlegen</h3>
+            <form th:action="@{/admin/create-user}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
+                <div class="form-group">
+                    <label style="color: #8b949e; display: block; margin-bottom: 5px;">Benutzername</label>
+                    <input type="text" name="username" required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+                <div class="form-group">
+                    <label style="color: #8b949e; display: block; margin-bottom: 5px;">Passwort</label>
+                    <input type="password" name="password" required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+                <div class="form-group">
+                    <label style="color: #8b949e; display: block; margin-bottom: 5px;">Rolle</label>
+                    <select name="role"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                        <option value="ROLE_USER">USER (Eingeschränkt)</option>
+                        <option value="ROLE_ADMIN">ADMIN (Vollzugriff)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label style="color: #8b949e; display: block; margin-bottom: 5px;">Erlaubte
+                        Account-IDs</label>
+                    <input type="hidden" name="allowedAccountIds" id="allowedAccountIdsInput" value="">
+
+                    <button type="button" onclick="openAccountModal()" id="accountModalBtn"
+                        style="width: 100%; background-color: #1f6feb; color: white; border: 1px solid #388bfd; padding: 8px; border-radius: 4px; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center;">
+                        <span id="accountModalBtnText">⚙️ Alle Accounts zugelassen</span>
+                        <span style="font-size: 0.8em;">▼</span>
+                    </button>
+                </div>
+                <div class="form-group">
+                    <button type="submit"
+                        style="background-color: #2ea043; color: white; border: none; padding: 9px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">Anlegen</button>
+                </div>
+            </form>
         </div>
 
+        <!-- Account Selection Modal -->
+        <div id="accountSelectionModal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;">
+            <div
+                style="background-color: #1e222d; border: 1px solid #30363d; border-radius: 8px; padding: 20px; width: 500px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+                <h3
+                    style="margin-top: 0; color: #e1e1e1; margin-bottom: 15px; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+                    🛡️ Erlaubte Accounts auswählen</h3>
+
+                <div
+                    style="overflow-y: auto; flex-grow: 1; margin-bottom: 15px; border: 1px solid #30363d; border-radius: 4px; background-color: #0d1117;">
+                    <!-- 'Select All' toggle row -->
+                    <div style="padding: 10px; border-bottom: 1px solid #30363d; display: flex; align-items: center; background-color: #161b22; cursor: pointer;"
+                        onclick="document.getElementById('selectAllAccounts').click()">
+                        <input type="checkbox" id="selectAllAccounts" onchange="toggleAllAccounts(this)"
+                            style="margin-right: 12px; cursor: pointer; transform: scale(1.2);">
+                        <label style="color: #c9d1d9; cursor: pointer; font-weight: bold; flex-grow: 1; margin: 0;">Alle
+                            auswählen / abwählen</label>
+                    </div>
+
+                    <!-- Individual Account Rows -->
+                    <div th:each="acc : ${accountsList}"
+                        style="padding: 10px; border-bottom: 1px dashed #30363d; display: flex; align-items: center; cursor: pointer;"
+                        th:attr="onclick='document.getElementById(\'chkAccount_' + ${acc.accountId} + '\').click()'">
+                        <input type="checkbox" class="account-checkbox" th:id="'chkAccount_' + ${acc.accountId}"
+                            th:value="${acc.accountId}" th:checked="${acc.type != 'REAL'}"
+                            style="margin-right: 12px; cursor: pointer; transform: scale(1.2);"
+                            onclick="event.stopPropagation(); updateSelectAllState();">
+                        <label th:for="'chkAccount_' + ${acc.accountId}"
+                            style="color: #c9d1d9; cursor: pointer; margin: 0; flex-grow: 1; display:flex; flex-direction: column;">
+                            <span style="font-weight: bold;"
+                                th:text="${acc.name != null and !#strings.isEmpty(acc.name)} ? ${acc.name} : 'Unbenannt / Kein Name: ' + ${acc.accountId}">EA
+                                Name</span>
+                            <span style="font-size: 0.85em; color: #8b949e;"
+                                th:text="'ID: ' + ${acc.accountId} + ' | ' + ${acc.broker} + ' (' + ${acc.currency} + ')'">ID:
+                                123 | Broker (USD)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div
+                    style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #30363d; padding-top: 15px;">
+                    <button type="button" onclick="closeAccountModal()"
+                        style="background-color: transparent; color: #c9d1d9; border: 1px solid #8b949e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Abbrechen</button>
+                    <button type="button" onclick="applyAccountSelection()"
+                        style="background-color: #2ea043; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Übernehmen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit User Account Modal -->
+        <div id="editUserAccountModal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;">
+            <div
+                style="background-color: #1e222d; border: 1px solid #30363d; border-radius: 8px; padding: 20px; width: 500px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+                <h3
+                    style="margin-top: 0; color: #e1e1e1; margin-bottom: 15px; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+                    🛡️ <span id="editUserTitle">Accounts für User</span></h3>
+
+                <form th:action="@{/admin/update-user-accounts}" method="post"
+                    style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
+                    <input type="hidden" name="userId" id="editUserId">
+                    <input type="hidden" name="allowedAccountIds" id="editAllowedAccountIdsInput">
+
+                    <div
+                        style="overflow-y: auto; flex-grow: 1; margin-bottom: 15px; border: 1px solid #30363d; border-radius: 4px; background-color: #0d1117;">
+                        <!-- 'Select All' toggle row -->
+                        <div style="padding: 10px; border-bottom: 1px solid #30363d; display: flex; align-items: center; background-color: #161b22; cursor: pointer;"
+                            onclick="document.getElementById('editSelectAllAccounts').click()">
+                            <input type="checkbox" id="editSelectAllAccounts" onchange="toggleAllEditAccounts(this)"
+                                style="margin-right: 12px; cursor: pointer; transform: scale(1.2);">
+                            <label
+                                style="color: #c9d1d9; cursor: pointer; font-weight: bold; flex-grow: 1; margin: 0;">Alle
+                                auswählen / abwählen</label>
+                        </div>
+
+                        <!-- Individual Account Rows -->
+                        <div th:each="acc : ${accountsList}"
+                            style="padding: 10px; border-bottom: 1px dashed #30363d; display: flex; align-items: center; cursor: pointer;"
+                            th:attr="onclick='document.getElementById(\'editChkAccount_' + ${acc.accountId} + '\').click()'">
+                            <input type="checkbox" class="edit-account-checkbox"
+                                th:id="'editChkAccount_' + ${acc.accountId}" th:value="${acc.accountId}"
+                                style="margin-right: 12px; cursor: pointer; transform: scale(1.2);"
+                                onclick="event.stopPropagation(); updateEditSelectAllState();">
+                            <label th:for="'editChkAccount_' + ${acc.accountId}"
+                                style="color: #c9d1d9; cursor: pointer; margin: 0; flex-grow: 1; display:flex; flex-direction: column;">
+                                <span style="font-weight: bold;"
+                                    th:text="${acc.name != null and !#strings.isEmpty(acc.name)} ? ${acc.name} : 'Unbenannt / Kein Name: ' + ${acc.accountId}">EA
+                                    Name</span>
+                                <span style="font-size: 0.85em; color: #8b949e;"
+                                    th:text="'ID: ' + ${acc.accountId} + ' | Type: ' + ${acc.type} + ' | ' + ${acc.broker} + ' (' + ${acc.currency} + ')'">ID:
+                                    123 | Type: DEMO | Broker (USD)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div
+                        style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #30363d; padding-top: 15px;">
+                        <button type="button" onclick="closeEditUserModal()"
+                            style="background-color: transparent; color: #c9d1d9; border: 1px solid #8b949e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Abbrechen</button>
+                        <button type="submit" onclick="applyEditUserSelection()"
+                            style="background-color: #2ea043; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            function openAccountModal() {
+                updateSelectAllState(); // To ensure master checkbox matches child checks
+                document.getElementById('accountSelectionModal').style.display = 'flex';
+            }
+
+            function closeAccountModal() {
+                document.getElementById('accountSelectionModal').style.display = 'none';
+            }
+
+            function toggleAllAccounts(masterCheckbox) {
+                const checkboxes = document.querySelectorAll('.account-checkbox');
+                checkboxes.forEach(chk => {
+                    chk.checked = masterCheckbox.checked;
+                });
+            }
+
+            function updateSelectAllState() {
+                const checkboxes = document.querySelectorAll('.account-checkbox');
+                const masterCheckbox = document.getElementById('selectAllAccounts');
+                let allChecked = true;
+                checkboxes.forEach(chk => {
+                    if (!chk.checked) allChecked = false;
+                });
+                masterCheckbox.checked = allChecked;
+            }
+
+            function applyAccountSelection() {
+                const checkboxes = document.querySelectorAll('.account-checkbox');
+                const selectedIds = [];
+                checkboxes.forEach(chk => {
+                    if (chk.checked) {
+                        selectedIds.push(chk.value);
+                    }
+                });
+
+                const hiddenInput = document.getElementById('allowedAccountIdsInput');
+                const btnText = document.getElementById('accountModalBtnText');
+
+                if (selectedIds.length === checkboxes.length) {
+                    hiddenInput.value = ""; // Empty implies "all" in backend if not strict, but CSV is safer
+                    btnText.innerHTML = "⚙️ Alle Accounts zugelassen";
+                    // Actually, if we want it explicit:
+                    hiddenInput.value = selectedIds.join(',');
+                } else if (selectedIds.length === 0) {
+                    hiddenInput.value = "NONE"; // Prevent everything
+                    btnText.innerHTML = "⚙️ 0 Accounts ausgewählt (Gesperrt)";
+                } else {
+                    hiddenInput.value = selectedIds.join(',');
+                    btnText.innerHTML = "⚙️ " + selectedIds.length + " Accounts ausgewählt";
+                }
+
+                closeAccountModal();
+            }
+
+            // Edit User Logic
+            function openEditUserModal(userId, username, allowedIdsStr) {
+                document.getElementById('editUserId').value = userId;
+                document.getElementById('editUserTitle').innerText = "Berechtigungen für '" + username + "'";
+
+                // Reset all checkboxes to false
+                const checkboxes = document.querySelectorAll('.edit-account-checkbox');
+                checkboxes.forEach(chk => chk.checked = false);
+
+                // Check allowed
+                if (allowedIdsStr && allowedIdsStr.trim() !== "") {
+                    const allowedArray = allowedIdsStr.split(',');
+                    checkboxes.forEach(chk => {
+                        if (allowedArray.includes(chk.value)) {
+                            chk.checked = true;
+                        }
+                    });
+                } else {
+                    // This means they have no limits (admin) or ALL. We'll check all.
+                    checkboxes.forEach(chk => chk.checked = true);
+                }
+
+                updateEditSelectAllState();
+                document.getElementById('editUserAccountModal').style.display = 'flex';
+            }
+
+            function closeEditUserModal() {
+                document.getElementById('editUserAccountModal').style.display = 'none';
+            }
+
+            function toggleAllEditAccounts(masterCheckbox) {
+                const checkboxes = document.querySelectorAll('.edit-account-checkbox');
+                checkboxes.forEach(chk => {
+                    chk.checked = masterCheckbox.checked;
+                });
+            }
+
+            function updateEditSelectAllState() {
+                const checkboxes = document.querySelectorAll('.edit-account-checkbox');
+                const masterCheckbox = document.getElementById('editSelectAllAccounts');
+                let allChecked = true;
+                checkboxes.forEach(chk => {
+                    if (!chk.checked) allChecked = false;
+                });
+                masterCheckbox.checked = allChecked;
+            }
+
+            function applyEditUserSelection() {
+                const checkboxes = document.querySelectorAll('.edit-account-checkbox');
+                const selectedIds = [];
+                checkboxes.forEach(chk => {
+                    if (chk.checked) {
+                        selectedIds.push(chk.value);
+                    }
+                });
+
+                const hiddenInput = document.getElementById('editAllowedAccountIdsInput');
+                if (selectedIds.length === 0) {
+                    hiddenInput.value = "NONE";
+                } else {
+                    hiddenInput.value = selectedIds.join(',');
+                }
+            }
+
+            // Initialize hidden field with "All" checked default state
+            window.onload = function () {
+                applyAccountSelection();
+                // Ensure the modal is hidden
+                closeAccountModal();
+            };
+        </script>
         <div class="admin-table-container" th:if="${#lists.size(statsList) > 0}">
             <table class="admin-table">
                 <thead>
@@ -514,7 +850,8 @@
                         <td th:text="${stats.earliestTradeDate}">-</td>
                         <td th:text="${stats.latestTradeDate}">-</td>
                         <td th:class="${stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                            th:text="${#numbers.formatDecimal(stats.totalProfit, 1, 2)} + ' ' + ${stats.currency}">0.00
+                            th:text="${#numbers.formatDecimal(stats.totalProfit, 1, 2)} + ' ' + ${stats.currency}">
+                            0.00
                         </td>
                     </tr>
                 </tbody>

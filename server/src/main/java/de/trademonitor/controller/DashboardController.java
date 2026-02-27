@@ -10,6 +10,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import de.trademonitor.security.CustomUserDetails;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,6 +21,14 @@ import java.util.stream.Collectors;
  */
 @Controller
 public class DashboardController {
+
+    private boolean isAllowedAccess(CustomUserDetails userDetails, long accountId) {
+        if (userDetails == null)
+            return false;
+        if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
+            return true;
+        return userDetails.getUserEntity().getAllowedAccountIds().contains(accountId);
+    }
 
     @Autowired
     private AccountManager accountManager;
@@ -72,8 +82,20 @@ public class DashboardController {
     }
 
     @GetMapping("/")
-    public String dashboard(Model model) {
+    public String dashboard(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
+
+        // Filter by user permissions
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            allAccounts = allAccounts.stream()
+                    .filter(acc -> {
+                        Long id = (Long) acc.get("accountId");
+                        return id != null && allowed.contains(id);
+                    })
+                    .collect(Collectors.toList());
+        }
+
         List<de.trademonitor.entity.DashboardSectionEntity> sections = accountManager.getAllSections();
 
         // Organize accounts by sectionId
@@ -130,12 +152,25 @@ public class DashboardController {
         model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
         model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
 
+        if (userDetails != null) {
+            model.addAttribute("currentUser", userDetails.getUserEntity());
+        }
+
         return "dashboard";
     }
 
     @GetMapping("/open-trades")
-    public String openTradesPage(Model model) {
+    public String openTradesPage(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         List<de.trademonitor.model.Account> sortedAccounts = accountManager.getAccountsSortedByPrivilege();
+
+        // Filter by user permissions
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            sortedAccounts = sortedAccounts.stream()
+                    .filter(acc -> allowed.contains(acc.getAccountId()))
+                    .collect(Collectors.toList());
+        }
+
         model.addAttribute("accounts", sortedAccounts);
 
         // Calculate Totals
@@ -171,6 +206,10 @@ public class DashboardController {
         model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
         model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
         model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
+
+        if (userDetails != null) {
+            model.addAttribute("currentUser", userDetails.getUserEntity());
+        }
 
         return "open-trades";
     }
@@ -277,8 +316,17 @@ public class DashboardController {
      */
     @org.springframework.web.bind.annotation.GetMapping("/api/trades/open")
     @org.springframework.web.bind.annotation.ResponseBody
-    public java.util.List<java.util.Map<String, Object>> getOpenTrades() {
-        return accountManager.getAllOpenTradesSorted();
+    public java.util.List<java.util.Map<String, Object>> getOpenTrades(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        List<Map<String, Object>> trades = accountManager.getAllOpenTradesSorted();
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            return trades.stream()
+                    .filter(t -> t.get("accountId") != null
+                            && allowed.contains(((Number) t.get("accountId")).longValue()))
+                    .collect(Collectors.toList());
+        }
+        return trades;
     }
 
     /**
@@ -286,8 +334,16 @@ public class DashboardController {
      */
     @org.springframework.web.bind.annotation.GetMapping("/api/stats/magic-drawdowns")
     @org.springframework.web.bind.annotation.ResponseBody
-    public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns() {
-        return accountManager.getMagicDrawdowns();
+    public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        List<de.trademonitor.dto.MagicDrawdownItem> drawdowns = accountManager.getMagicDrawdowns();
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            return drawdowns.stream()
+                    .filter(d -> allowed.contains(d.getAccountId()))
+                    .collect(Collectors.toList());
+        }
+        return drawdowns;
     }
 
     /**
@@ -296,7 +352,11 @@ public class DashboardController {
      */
     @GetMapping("/api/equity-history/{accountId}")
     @ResponseBody
-    public List<Map<String, Object>> getEquityHistory(@PathVariable long accountId) {
+    public ResponseEntity<?> getEquityHistory(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body("Access Denied");
+        }
         List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
@@ -306,7 +366,7 @@ public class DashboardController {
             entry.put("balance", snap.getBalance());
             result.add(entry);
         }
-        return result;
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -325,7 +385,11 @@ public class DashboardController {
      * Detail view for a specific account.
      */
     @GetMapping("/account/{accountId}")
-    public String accountDetail(@PathVariable long accountId, Model model) {
+    public String accountDetail(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable long accountId,
+            Model model) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return "redirect:/";
+        }
         Account account = accountManager.getAccount(accountId);
         if (account == null) {
             return "redirect:/";
@@ -466,21 +530,37 @@ public class DashboardController {
 
     @GetMapping("/api/report-details/{period}/{accountId}")
     @ResponseBody
-    public List<de.trademonitor.entity.ClosedTradeEntity> getReportDetails(@PathVariable String period,
+    public ResponseEntity<?> getReportDetails(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String period,
             @PathVariable Long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body("Access Denied");
+        }
         List<de.trademonitor.entity.ClosedTradeEntity> allTrades = closedTradeRepository.findByAccountId(accountId);
         java.util.function.Predicate<String> dateFilter = getDateFilter(period);
 
-        return allTrades.stream()
+        return ResponseEntity.ok(allTrades.stream()
                 .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
                 .sorted((a, b) -> b.getCloseTime().compareTo(a.getCloseTime())) // Newest first
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
     }
 
     @GetMapping("/api/report-chart/{period}")
     @ResponseBody
-    public Map<String, Object> getReportChartData(@PathVariable String period) {
+    public Map<String, Object> getReportChartData(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String period) {
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            accounts = accounts.stream()
+                    .filter(acc -> {
+                        Long id = (Long) acc.get("accountId");
+                        return id != null && allowed.contains(id);
+                    })
+                    .collect(Collectors.toList());
+        }
+
         List<Double> data;
         List<String> labels;
 
@@ -637,8 +717,20 @@ public class DashboardController {
     }
 
     @GetMapping("/report/{period}")
-    public String getReport(@PathVariable String period, Model model) {
+    public String getReport(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable String period,
+            Model model) {
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            accounts = accounts.stream()
+                    .filter(acc -> {
+                        Long id = (Long) acc.get("accountId");
+                        return id != null && allowed.contains(id);
+                    })
+                    .collect(Collectors.toList());
+        }
+
         List<Map<String, Object>> reportData = new ArrayList<>();
 
         java.time.LocalDate today = java.time.LocalDate.now();
@@ -720,15 +812,35 @@ public class DashboardController {
     }
 
     @GetMapping("/trade-comparison")
-    public String tradeComparison(@RequestParam(required = false) Long accountId,
+    public String tradeComparison(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) Long accountId,
             @RequestParam(required = false, defaultValue = "today") String period,
             Model model) {
+
+        // If user is restricted and requests an account they don't have access to
+        if (accountId != null && !isAllowedAccess(userDetails, accountId)) {
+            return "redirect:/";
+        }
+
         List<de.trademonitor.dto.TradeComparisonDto> comparisons = tradeComparisonService.compareTrades(accountId,
                 period);
 
         List<Account> realAccounts = accountManager.getAccountsSortedByPrivilege().stream()
                 .filter(a -> "REAL".equalsIgnoreCase(a.getType()))
                 .collect(Collectors.toList());
+
+        // Filter the output list if no accountId was specified
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            if (accountId == null) {
+                comparisons = comparisons.stream()
+                        .filter(c -> c.getRealTrade() != null && allowed.contains(c.getRealTrade().getAccountId()))
+                        .collect(Collectors.toList());
+            }
+            realAccounts = realAccounts.stream()
+                    .filter(a -> allowed.contains(a.getAccountId()))
+                    .collect(Collectors.toList());
+        }
 
         model.addAttribute("comparisons", comparisons);
         model.addAttribute("realAccounts", realAccounts);

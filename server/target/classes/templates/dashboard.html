@@ -45,6 +45,20 @@
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
             <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
                 style="display:none;">Speichern</button>
+            <div style="display:flex; gap:10px; align-items:center; margin-left: 10px;">
+                <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin"
+                    class="btn btn-secondary"
+                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">⚙️
+                    Admin</a>
+                <a th:if="${currentUser != null}" href="/profile" class="btn btn-secondary"
+                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">👤
+                    Profil</a>
+                <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0;">
+                    <button type="submit" class="btn btn-secondary"
+                        style="background-color: #161b22; color: #ff7b72; border: 1px solid rgba(218, 54, 51, 0.4); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;">🚪
+                        Logout</button>
+                </form>
+            </div>
         </div>
 
         <!-- Global Warning Banner -->
