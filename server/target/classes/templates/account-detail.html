@@ -380,6 +380,18 @@
                     style="font-size: 0.9rem; color: #a0a0c0; font-weight: normal; margin-left: 10px;"></span></h2>
 
 
+            <!-- Magic Number Filter Bar -->
+            <div id="magic-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}"
+                style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 1rem; padding: 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; margin-right: 8px; font-weight: bold;">🎯
+                    Magic Filter:</span>
+                <button type="button" id="magic-select-all" onclick="toggleAllMagics(true)"
+                    style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Alle</button>
+                <button type="button" id="magic-select-none" onclick="toggleAllMagics(false)"
+                    style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Keine</button>
+                <span style="width: 1px; height: 20px; background: var(--border-color); margin: 0 4px;"></span>
+                <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
 
             <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
                 <p>Keine geschlossenen Trades vorhanden</p>
@@ -408,12 +420,12 @@
                             <th>Commission</th>
                             <th>Profit</th>
                             <th>Magic</th>
-                            <th>Comment</th>
                         </tr>
                     </thead>
                     <tbody>
                         <!-- Loop all closed trades, rows will be filtered by JS -->
                         <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}"
+                            th:data-magic="${trade.magicNumber}"
                             th:classappend="${trade.closeTime != null && trade.closeTime.startsWith(todayDate)} ? 'trade-today'">
                             <td th:text="${trade.ticket}">123456789</td>
                             <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
@@ -430,7 +442,6 @@
                                 th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                 th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
                             <td th:text="${trade.magicNumber}">12345</td>
-                            <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
                         </tr>
                     </tbody>
                 </table>
@@ -933,18 +944,138 @@
                         });
                     });
 
+                    // Initialize Magic Number Filter
+                    initMagicFilter();
+
                     // Default filter
                     applyHistoryFilter(savedFilter);
                 });
         });
 
+        // ============ MAGIC NUMBER FILTER ============
+        var activeMagics = new Set(); // tracks which magic numbers are checked
+
+        function initMagicFilter() {
+            var container = document.getElementById('magic-checkboxes');
+            if (!container) return;
+
+            // Collect unique magic numbers from ALL closed trades
+            var magicSet = new Set();
+            var rows = document.querySelectorAll('#closed-trades-table tbody tr');
+            rows.forEach(function (row) {
+                var m = row.dataset.magic;
+                if (m) magicSet.add(m);
+            });
+
+            // Try to get magic names from the profit breakdown table
+            var magicNames = {};
+            document.querySelectorAll('.magic-breakdown tbody tr').forEach(function (row) {
+                var cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    var magicNum = cells[0].querySelector('strong');
+                    var magicName = cells[0].querySelector('div');
+                    if (magicNum) {
+                        var num = magicNum.textContent.trim();
+                        var name = magicName ? magicName.textContent.trim() : '';
+                        magicNames[num] = name;
+                    }
+                }
+            });
+
+            // Sort magic numbers numerically
+            var magicArray = Array.from(magicSet).sort(function (a, b) {
+                return parseInt(a) - parseInt(b);
+            });
+
+            // All checked by default
+            activeMagics = new Set(magicArray);
+
+            // Create checkboxes
+            magicArray.forEach(function (magic) {
+                var label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25); color: #c9d1d9; transition: all 0.15s; user-select: none;';
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.value = magic;
+                checkbox.className = 'magic-checkbox';
+                checkbox.style.cssText = 'cursor: pointer; accent-color: #6366f1;';
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        activeMagics.add(magic);
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    } else {
+                        activeMagics.delete(magic);
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                    reapplyHistoryFilter();
+                });
+
+                label.appendChild(checkbox);
+
+                var displayText = magic;
+                if (magicNames[magic]) {
+                    displayText = magic + ' (' + magicNames[magic] + ')';
+                }
+                var span = document.createElement('span');
+                span.textContent = displayText;
+                label.appendChild(span);
+
+                container.appendChild(label);
+            });
+        }
+
+        function toggleAllMagics(selectAll) {
+            var checkboxes = document.querySelectorAll('.magic-checkbox');
+            checkboxes.forEach(function (chk) {
+                chk.checked = selectAll;
+                var label = chk.closest('label');
+                if (selectAll) {
+                    activeMagics.add(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    }
+                } else {
+                    activeMagics.delete(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                }
+            });
+            reapplyHistoryFilter();
+        }
+
+        function getActiveMagics() {
+            return activeMagics;
+        }
+
+        // Re-apply the current time range filter + magic filter
+        function reapplyHistoryFilter() {
+            var activeBtn = document.querySelector('.filter-btn.active');
+            var range = activeBtn ? activeBtn.dataset.range : 'thismonth';
+            applyHistoryFilter(range);
+        }
+
         function applyHistoryFilter(range) {
-            // Update Table
+            // Update Table with combined time + magic filter
             if (historyMgr) {
                 var now = new Date();
                 var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                var currentMagics = getActiveMagics();
 
                 historyMgr.applyFilter(function (row) {
+                    // Magic filter
+                    var rowMagic = row.dataset.magic || '';
+                    if (currentMagics.size > 0 && !currentMagics.has(rowMagic)) {
+                        return false;
+                    }
+
+                    // Time range filter
                     var closeTimeStr = row.dataset.closeTime;
                     if (!closeTimeStr) return false;
 

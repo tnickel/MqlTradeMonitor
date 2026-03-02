@@ -145,11 +145,46 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 </head>
 
 <body>
 
     <h1 th:text="${periodTitle}">Report</h1>
+
+    <!-- ======= SCALED PERFORMANCE COMPARISON CHART ======= -->
+    <div class="report-container" style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 1.2rem; color: var(--accent);">
+                📊 Performance Vergleich <span
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(skaliert auf 10.000
+                    €)</span>
+            </h2>
+        </div>
+
+        <!-- Account Toggle Checkboxes -->
+        <div id="scaled-chart-toggles"
+            style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px;">
+            <span
+                style="color: var(--text-muted); font-size: 0.82rem; margin-right: 6px; font-weight: 600;">Filter:</span>
+            <button type="button" onclick="toggleAllScaledAccounts(true)"
+                style="background: rgba(122,162,247,0.15); color: var(--accent); border: 1px solid rgba(122,162,247,0.3); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 700;">Alle</button>
+            <button type="button" onclick="toggleAllScaledAccounts(false)"
+                style="background: rgba(247,118,142,0.15); color: var(--danger); border: 1px solid rgba(247,118,142,0.3); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 700;">Keine</button>
+            <span style="width: 1px; height: 18px; background: var(--border); margin: 0 4px;"></span>
+            <div id="scaled-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+        </div>
+
+        <!-- Chart Canvas -->
+        <div
+            style="position: relative; height: 400px; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
+            <canvas id="scaled-performance-chart"></canvas>
+        </div>
+        <div id="scaled-chart-loading"
+            style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem;">
+            ⏳ Lade Performance-Daten...
+        </div>
+    </div>
 
     <div class="report-container">
         <table>
@@ -381,7 +416,259 @@
             }
         }
 
+        // ============ SCALED PERFORMANCE CHART ============
+        var scaledChart = null;
+        var scaledChartData = [];
+
+        // Professional color palette - distinct, vibrant colors
+        var CHART_COLORS = [
+            '#6366f1', // Indigo
+            '#10b981', // Emerald
+            '#f59e0b', // Amber
+            '#ef4444', // Red
+            '#8b5cf6', // Violet
+            '#ec4899', // Pink
+            '#0ea5e9', // Sky
+            '#14b8a6', // Teal
+            '#f97316', // Orange
+            '#84cc16', // Lime
+            '#a855f7', // Purple
+            '#06b6d4', // Cyan
+            '#d946ef', // Fuchsia
+            '#22d3ee', // Light Cyan
+            '#e11d48', // Rose
+            '#4f46e5', // Deep Indigo
+            '#059669', // Dark Emerald
+            '#dc2626', // Dark Red
+            '#7c3aed', // Dark Violet
+            '#db2777'  // Dark Pink
+        ];
+
+        function loadScaledChart() {
+            var loadingEl = document.getElementById('scaled-chart-loading');
+
+            fetch('/api/report-scaled-curves/' + currentPeriod)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    scaledChartData = data;
+                    if (loadingEl) loadingEl.style.display = 'none';
+
+                    if (data.length === 0) {
+                        if (loadingEl) {
+                            loadingEl.style.display = 'block';
+                            loadingEl.textContent = 'Keine Equity-Daten für diesen Zeitraum verfügbar.';
+                        }
+                        return;
+                    }
+
+                    buildScaledCheckboxes(data);
+                    renderScaledChart(data);
+                })
+                .catch(function (err) {
+                    console.error('Failed to load scaled curves', err);
+                    if (loadingEl) {
+                        loadingEl.style.display = 'block';
+                        loadingEl.textContent = 'Fehler beim Laden der Daten.';
+                    }
+                });
+        }
+
+        function buildScaledCheckboxes(data) {
+            var container = document.getElementById('scaled-checkboxes');
+            if (!container) return;
+            container.innerHTML = '';
+
+            data.forEach(function (acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+
+                var label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; border: 1px solid ' + color + '40; background: ' + color + '18; color: #c0caf5; transition: all 0.15s; user-select: none;';
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.dataset.index = idx;
+                checkbox.className = 'scaled-account-checkbox';
+                checkbox.style.cssText = 'cursor: pointer; accent-color: ' + color + ';';
+                checkbox.addEventListener('change', function () {
+                    toggleScaledDataset(idx, this.checked);
+                    var lbl = this.closest('label');
+                    if (this.checked) {
+                        lbl.style.background = color + '18';
+                        lbl.style.borderColor = color + '40';
+                    } else {
+                        lbl.style.background = 'rgba(255,255,255,0.02)';
+                        lbl.style.borderColor = 'rgba(255,255,255,0.08)';
+                    }
+                });
+
+                // Color dot
+                var dot = document.createElement('span');
+                dot.style.cssText = 'width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; display: inline-block; flex-shrink: 0;';
+                if (isReal) {
+                    dot.style.boxShadow = '0 0 6px ' + color;
+                }
+
+                var nameSpan = document.createElement('span');
+                var displayName = acc.name;
+                if (isReal) {
+                    displayName = '🛡️ ' + displayName;
+                }
+                nameSpan.textContent = displayName;
+                nameSpan.style.fontWeight = isReal ? '700' : '400';
+
+                label.appendChild(checkbox);
+                label.appendChild(dot);
+                label.appendChild(nameSpan);
+                container.appendChild(label);
+            });
+        }
+
+        function renderScaledChart(data) {
+            var canvas = document.getElementById('scaled-performance-chart');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+
+            var datasets = data.map(function (acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+
+                // Convert timestamps to Date objects for time axis
+                var points = acc.timestamps.map(function (ts, i) {
+                    return {
+                        x: new Date(ts),
+                        y: acc.scaledEquity[i]
+                    };
+                });
+
+                return {
+                    label: acc.name + (isReal ? ' [REAL]' : ' [DEMO]'),
+                    data: points,
+                    borderColor: color,
+                    backgroundColor: color + '15',
+                    borderWidth: isReal ? 3 : 1.5,
+                    pointRadius: points.length > 80 ? 0 : (isReal ? 3 : 2),
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: color,
+                    fill: false,
+                    tension: 0.2,
+                    borderDash: isReal ? [] : [4, 2],
+                    order: isReal ? 1 : 2
+                };
+            });
+
+            if (scaledChart) {
+                scaledChart.destroy();
+            }
+
+            scaledChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false,
+                        axis: 'x'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // We use custom checkboxes instead
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1b26ee',
+                            titleColor: '#c0caf5',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#414868',
+                            borderWidth: 1,
+                            titleFont: { size: 12 },
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                            padding: 10,
+                            callbacks: {
+                                title: function (items) {
+                                    if (!items.length) return '';
+                                    return new Date(items[0].parsed.x).toLocaleString('de-DE');
+                                },
+                                label: function (context) {
+                                    return ' ' + context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' €';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                displayFormats: {
+                                    hour: 'HH:mm',
+                                    day: 'dd.MM',
+                                    week: 'dd.MM',
+                                    month: 'MMM yyyy'
+                                }
+                            },
+                            ticks: {
+                                color: '#565f89',
+                                maxTicksLimit: 10,
+                                maxRotation: 0,
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(65,72,104,0.2)',
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            ticks: {
+                                color: '#565f89',
+                                font: { size: 11, family: "'JetBrains Mono', monospace" },
+                                callback: function (value) { return value.toLocaleString('de-DE') + ' €'; }
+                            },
+                            grid: {
+                                color: 'rgba(65,72,104,0.2)',
+                                drawBorder: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleScaledDataset(index, visible) {
+            if (!scaledChart) return;
+            scaledChart.setDatasetVisibility(index, visible);
+            scaledChart.update();
+        }
+
+        function toggleAllScaledAccounts(selectAll) {
+            var checkboxes = document.querySelectorAll('.scaled-account-checkbox');
+            checkboxes.forEach(function (chk) {
+                chk.checked = selectAll;
+                var idx = parseInt(chk.dataset.index);
+                toggleScaledDataset(idx, selectAll);
+                var label = chk.closest('label');
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                if (label) {
+                    if (selectAll) {
+                        label.style.background = color + '18';
+                        label.style.borderColor = color + '40';
+                    } else {
+                        label.style.background = 'rgba(255,255,255,0.02)';
+                        label.style.borderColor = 'rgba(255,255,255,0.08)';
+                    }
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
+            // Load scaled performance chart
+            loadScaledChart();
+
+            // Existing mini-chart logic
             const canvases = document.querySelectorAll('.mini-chart');
             canvases.forEach(canvas => {
                 const equityStr = canvas.getAttribute('data-equity');

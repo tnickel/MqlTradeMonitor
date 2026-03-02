@@ -820,6 +820,82 @@ public class DashboardController {
         return "report";
     }
 
+    /**
+     * API endpoint for scaled performance comparison chart.
+     * Returns equity curves for all accounts, scaled to a 10K reference account.
+     * Scale factor = 10000 / firstBalanceInPeriod
+     */
+    @GetMapping("/api/report-scaled-curves/{period}")
+    @ResponseBody
+    public List<Map<String, Object>> getScaledCurves(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String period) {
+        List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+
+        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            accounts = accounts.stream()
+                    .filter(acc -> {
+                        Long id = (Long) acc.get("accountId");
+                        return id != null && allowed.contains(id);
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> snapshotFilter = getSnapshotDateFilter(
+                period);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Map<String, Object> acc : accounts) {
+            Long accountId = (Long) acc.get("accountId");
+            String name = (String) acc.get("name");
+            String type = (String) acc.get("type");
+            Double currentBalance = (Double) acc.get("balance");
+
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
+
+            List<String> timestamps = new ArrayList<>();
+            List<Double> scaledEquity = new ArrayList<>();
+            double scaleFactor = 1.0;
+            boolean scaleFactorSet = false;
+
+            for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
+                if (snapshotFilter.test(snap)) {
+                    if (!scaleFactorSet && snap.getBalance() > 0) {
+                        scaleFactor = 10000.0 / snap.getBalance();
+                        scaleFactorSet = true;
+                    }
+                    timestamps.add(snap.getTimestamp());
+                    scaledEquity.add(Math.round(snap.getEquity() * scaleFactor * 100.0) / 100.0);
+                }
+            }
+
+            if (!scaledEquity.isEmpty()) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("accountId", accountId);
+                entry.put("name", name != null ? name : "Account " + accountId);
+                entry.put("type", type != null ? type : "DEMO");
+                entry.put("balance", currentBalance);
+                entry.put("scaleFactor", Math.round(scaleFactor * 10000.0) / 10000.0);
+                entry.put("timestamps", timestamps);
+                entry.put("scaledEquity", scaledEquity);
+                result.add(entry);
+            }
+        }
+
+        // Sort: REAL first, then by name
+        result.sort((a, b) -> {
+            String typeA = (String) a.get("type");
+            String typeB = (String) b.get("type");
+            if (!Objects.equals(typeA, typeB)) {
+                return "REAL".equals(typeA) ? -1 : 1;
+            }
+            return ResultComparator.compare((String) a.get("name"), (String) b.get("name"));
+        });
+
+        return result;
+    }
+
     @GetMapping("/trade-comparison")
     public String tradeComparison(@AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) Long accountId,
