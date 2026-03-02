@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -16,7 +16,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.02"
+#define EA_VERSION "1.03"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -697,19 +697,46 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             if(closeTime > outLatestCloseTime)
                outLatestCloseTime = closeTime;
             
-            ENUM_DEAL_TYPE dealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(ticket, DEAL_TYPE);
-            // In MT5, an OUT deal of type SELL means we are closing a BUY position.
-            // Therefore, if the OUT deal is SELL, the original trade was BUY.
-            string typeStr = (dealType == DEAL_TYPE_SELL) ? "BUY" : "SELL";
+            // Determine the original trade direction by finding the ENTRY_IN deal
+            // for this position via DEAL_POSITION_ID. This is broker-agnostic and
+            // works correctly for all brokers (including Deriv), unlike inverting
+            // the OUT deal type which assumes standard MT5 convention.
+            string typeStr = "UNKNOWN";
+            double openPrice = HistoryDealGetDouble(ticket, DEAL_PRICE); // fallback: OUT deal price
+            string openTime = closeTime; // fallback: same as close time
+            long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
+            if(positionId > 0)
+            {
+               for(int j = 0; j < totalDeals; j++)
+               {
+                  ulong inTicket = HistoryDealGetTicket(j);
+                  if(inTicket > 0
+                     && HistoryDealGetInteger(inTicket, DEAL_POSITION_ID) == positionId
+                     && (ENUM_DEAL_ENTRY)HistoryDealGetInteger(inTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                  {
+                     ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(inTicket, DEAL_TYPE);
+                     typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                     openPrice = HistoryDealGetDouble(inTicket, DEAL_PRICE);
+                     openTime = TimeToString((datetime)HistoryDealGetInteger(inTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                     break;
+                  }
+               }
+            }
+            // Fallback: if no IN deal found, use the OUT deal type directly
+            if(typeStr == "UNKNOWN")
+            {
+               ENUM_DEAL_TYPE dealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(ticket, DEAL_TYPE);
+               typeStr = (dealType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+            }
             
             historyJson += "{";
             historyJson += "\"ticket\":" + IntegerToString(ticket) + ",";
             historyJson += "\"symbol\":\"" + HistoryDealGetString(ticket, DEAL_SYMBOL) + "\",";
             historyJson += "\"type\":\"" + typeStr + "\",";
             historyJson += "\"volume\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_VOLUME), 2) + ",";
-            historyJson += "\"openPrice\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_PRICE), 5) + ",";
+            historyJson += "\"openPrice\":" + DoubleToString(openPrice, 5) + ",";
             historyJson += "\"closePrice\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_PRICE), 5) + ",";
-            historyJson += "\"openTime\":\"" + TimeToString((datetime)HistoryDealGetInteger(ticket, DEAL_TIME), TIME_DATE|TIME_SECONDS) + "\",";
+            historyJson += "\"openTime\":\"" + openTime + "\",";
             historyJson += "\"closeTime\":\"" + closeTime + "\",";
             historyJson += "\"profit\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_PROFIT), 2) + ",";
             historyJson += "\"swap\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_SWAP), 2) + ",";

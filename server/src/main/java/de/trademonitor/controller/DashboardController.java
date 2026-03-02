@@ -281,10 +281,14 @@ public class DashboardController {
     @PostMapping("/api/account/layout")
     @ResponseBody
     public ResponseEntity<String> saveLayout(@RequestBody Map<String, List<Object>> layoutData) {
+        System.out.println("=== SAVE LAYOUT called with " + layoutData.size() + " sections ===");
+        int totalSaved = 0;
         for (Map.Entry<String, List<Object>> entry : layoutData.entrySet()) {
             try {
                 Long sectionId = Long.parseLong(entry.getKey());
                 List<Object> rawIds = entry.getValue();
+                System.out
+                        .println("  Section " + sectionId + ": " + (rawIds != null ? rawIds.size() : 0) + " accounts");
 
                 if (rawIds != null) {
                     for (int i = 0; i < rawIds.size(); i++) {
@@ -296,18 +300,23 @@ public class DashboardController {
                             try {
                                 accountId = Long.parseLong((String) idObj);
                             } catch (NumberFormatException nfe) {
-                                /* ignore */ }
+                                System.out.println("    WARN: Could not parse accountId: " + idObj);
+                            }
                         }
 
                         if (accountId != null) {
+                            System.out.println(
+                                    "    Saving account " + accountId + " -> section=" + sectionId + ", order=" + i);
                             accountManager.saveAccountSection(accountId, sectionId, i);
+                            totalSaved++;
                         }
                     }
                 }
             } catch (NumberFormatException e) {
-                // ignore invalid keys
+                System.out.println("  WARN: Could not parse sectionId key: " + entry.getKey());
             }
         }
+        System.out.println("=== SAVE LAYOUT complete: " + totalSaved + " accounts saved ===");
         return ResponseEntity.ok("Layout saved");
     }
 

@@ -369,6 +369,11 @@
                         style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
                 </div>
             </form>
+            <div style="margin-top: 10px; text-align: right;">
+                <button type="button" onclick="testEmail()"
+                    style="background-color: #1f6feb; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">📧
+                    Test Mail senden</button>
+            </div>
         </div>
 
 
@@ -414,14 +419,16 @@
                     </label>
                 </div>
 
-                <div class="form-group" style="grid-column: span 2; display: flex; gap: 10px;">
+                <div class="form-group" style="grid-column: span 2;">
                     <button type="submit"
                         style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1;">Speichern</button>
-                    <button type="button" onclick="testSiren()"
-                        style="background-color: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🚨
-                        Test Sirene</button>
                 </div>
             </form>
+            <div style="margin-top: 10px; text-align: right;">
+                <button type="button" onclick="testSiren()"
+                    style="background-color: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🚨
+                    Test Sirene</button>
+            </div>
         </div>
 
         <!-- Sync Exemptions -->
@@ -1020,6 +1027,21 @@
             fetch('/api/test-siren', { method: 'POST' })
                 .then(response => response.text())
                 .then(data => alert(data))
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+
+        function testEmail() {
+            if (!confirm("Test-Mail jetzt senden?")) return;
+
+            fetch('/api/test-email', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        alert('✅ ' + data.message);
+                    } else {
+                        alert('❌ Fehler: ' + data.message);
+                    }
+                })
                 .catch(error => alert('Netzwerkfehler: ' + error));
         }
     </script>

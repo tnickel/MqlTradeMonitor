@@ -830,6 +830,11 @@ footer a:hover {
     cursor: grabbing;
 }
 
+.account-card.over {
+    border: 2px dashed var(--accent-primary) !important;
+    background: rgba(99, 102, 241, 0.1) !important;
+}
+
 /* Edit Mode Visuals */
 body.edit-mode-active {
     background-color: #2a2a40;

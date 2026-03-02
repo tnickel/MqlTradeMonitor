@@ -1136,7 +1136,16 @@
                     card.addEventListener('dragstart', handleDragStart);
                     card.addEventListener('dragend', handleDragEnd);
                     card.addEventListener('dragover', handleDragOver);
+                    card.addEventListener('dragenter', handleDragEnter);
+                    card.addEventListener('dragleave', handleDragLeave);
                     card.addEventListener('drop', handleDrop);
+                });
+
+                // Enable grid-level drop zones (for dropping into empty sections)
+                document.querySelectorAll('.account-grid').forEach(grid => {
+                    grid.addEventListener('dragover', handleGridDragOver);
+                    grid.addEventListener('dragleave', handleGridDragLeave);
+                    grid.addEventListener('drop', handleGridDrop);
                 });
             } else {
                 document.body.classList.remove('edit-mode-active');
@@ -1155,7 +1164,16 @@
                     card.removeEventListener('dragstart', handleDragStart);
                     card.removeEventListener('dragend', handleDragEnd);
                     card.removeEventListener('dragover', handleDragOver);
+                    card.removeEventListener('dragenter', handleDragEnter);
+                    card.removeEventListener('dragleave', handleDragLeave);
                     card.removeEventListener('drop', handleDrop);
+                });
+
+                // Disable grid-level drop zones
+                document.querySelectorAll('.account-grid').forEach(grid => {
+                    grid.removeEventListener('dragover', handleGridDragOver);
+                    grid.removeEventListener('dragleave', handleGridDragLeave);
+                    grid.removeEventListener('drop', handleGridDrop);
                 });
 
                 // Reload to reset positions if not saved? Or keep?
@@ -1164,80 +1182,151 @@
         }
 
         let dragSrcEl = null;
+        let dragSrcGrid = null;
 
         function handleDragStart(e) {
             this.style.opacity = '0.4';
             dragSrcEl = this;
+            dragSrcGrid = this.closest('.account-grid');
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
-            e.dataTransfer.setData('sourceId', this.getAttribute('data-id'));
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
         }
 
         function handleDragOver(e) {
-            if (e.preventDefault) {
-                e.preventDefault();
-            }
+            e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             return false;
         }
 
+        function handleDragEnter(e) {
+            this.classList.add('over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('over');
+        }
+
         function handleDragEnd(e) {
             this.style.opacity = '1';
-            const cards = document.querySelectorAll('.account-grid .account-card');
-            cards.forEach(card => card.classList.remove('over'));
+            // Remove all 'over' classes
+            document.querySelectorAll('.account-card.over').forEach(c => c.classList.remove('over'));
+            document.querySelectorAll('.account-grid.drag-over').forEach(g => g.classList.remove('drag-over'));
         }
 
         function handleDrop(e) {
-            if (e.stopPropagation) {
-                e.stopPropagation();
-            }
+            e.preventDefault();
+            e.stopPropagation();
 
             if (dragSrcEl !== this) {
-                // Swap DOM elements
-                // A simple swap of innerHTML is not enough because we need attributes (data-id)
-                // It's better to insertBefore
-                const grid = this.parentNode;
-                // Find positions
-                const allCards = Array.from(grid.querySelectorAll('.account-card'));
-                const srcIndex = allCards.indexOf(dragSrcEl);
-                const targetIndex = allCards.indexOf(this);
+                const targetGrid = this.closest('.account-grid');
+                const sourceGrid = dragSrcGrid;
 
-                if (srcIndex < targetIndex) {
-                    grid.insertBefore(dragSrcEl, this.nextSibling);
+                if (targetGrid === sourceGrid) {
+                    // Same section: reorder
+                    const allCards = Array.from(targetGrid.querySelectorAll('.account-card'));
+                    const srcIndex = allCards.indexOf(dragSrcEl);
+                    const targetIndex = allCards.indexOf(this);
+
+                    if (srcIndex < targetIndex) {
+                        targetGrid.insertBefore(dragSrcEl, this.nextSibling);
+                    } else {
+                        targetGrid.insertBefore(dragSrcEl, this);
+                    }
                 } else {
-                    grid.insertBefore(dragSrcEl, this);
+                    // Cross-section: move card to target section at drop position
+                    targetGrid.insertBefore(dragSrcEl, this.nextSibling);
                 }
+            }
+            this.classList.remove('over');
+            return false;
+        }
+
+        // Handle drop on empty grid areas (drop zone)
+        function handleGridDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+        }
+
+        function handleGridDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleGridDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+
+            if (dragSrcEl) {
+                // Append card to this grid (at end)
+                this.appendChild(dragSrcEl);
+                dragSrcEl.style.opacity = '1';
             }
             return false;
         }
 
         function saveLayout() {
-            const sections = [];
-            document.querySelectorAll('.dashboard-section').forEach(sec => {
-                const secId = sec.getAttribute('data-section-id');
-                const cardIds = [];
-                sec.querySelectorAll('.account-card').forEach(card => {
-                    if (card.hasAttribute('data-id')) {
-                        cardIds.push(card.getAttribute('data-id'));
+            // Build map: { "sectionId": [accountId1, accountId2, ...] }
+            var layoutData = {};
+            var debugInfo = '';
+
+            // Query grids directly by their data-section-id attribute
+            var grids = document.querySelectorAll('.account-grid[data-section-id]');
+            debugInfo += 'Grids found: ' + grids.length + '\n';
+
+            grids.forEach(function (grid) {
+                var secId = grid.getAttribute('data-section-id');
+                var cardIds = [];
+
+                // Find all direct children with data-id attribute (account cards)
+                var children = grid.children;
+                debugInfo += 'Section ' + secId + ': ' + children.length + ' children\n';
+
+                for (var i = 0; i < children.length; i++) {
+                    var child = children[i];
+                    var dataId = child.getAttribute('data-id');
+                    if (dataId) {
+                        cardIds.push(dataId);
+                        debugInfo += '  -> Account ' + dataId + '\n';
                     }
-                });
-                sections.push({ sectionId: secId, accountIds: cardIds });
+                }
+
+                layoutData[secId] = cardIds;
             });
 
-            fetch('/api/layout/save', {
+            debugInfo += 'Payload: ' + JSON.stringify(layoutData);
+
+            // Show debug info if no accounts found
+            var totalAccounts = 0;
+            for (var key in layoutData) {
+                totalAccounts += layoutData[key].length;
+            }
+
+            if (totalAccounts === 0) {
+                alert('DEBUG: Keine Accounts gefunden!\n' + debugInfo);
+                return;
+            }
+
+            fetch('/api/account/layout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(sections)
+                body: JSON.stringify(layoutData)
             })
-                .then(response => {
+                .then(function (response) {
                     if (response.ok) {
                         alert('Layout gespeichert!');
                         toggleEditMode();
+                        location.reload();
                     } else {
-                        alert('Fehler beim Speichern');
+                        response.text().then(function (text) {
+                            alert('Fehler beim Speichern: ' + response.status + '\n' + text);
+                        });
                     }
+                })
+                .catch(function (error) {
+                    alert('Netzwerkfehler: ' + error);
                 });
         }
 
