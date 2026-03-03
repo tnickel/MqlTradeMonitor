@@ -157,6 +157,24 @@
                         style="font-size: 1.6rem; font-weight: bold; line-height: 1;">-</span>
                     <span id="equity-overlay-balance" style="font-size: 0.8rem; color: #a0a0c0;"></span>
                 </div>
+                <!-- Max Equity Drawdown overlay: bottom-right of chart -->
+                <div id="drawdown-overlay" style="
+                    position: absolute;
+                    bottom: 12px;
+                    right: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 1px;
+                    pointer-events: none;
+                ">
+                    <span
+                        style="font-size: 0.7rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Max
+                        Equity DD (Zeitraum)</span>
+                    <span id="drawdown-overlay-value"
+                        style="font-size: 1.2rem; font-weight: bold; color: #ef4444; line-height: 1;">-</span>
+                    <span id="drawdown-overlay-percent" style="font-size: 0.85rem; color: #ef4444;"></span>
+                </div>
             </div>
 
             <!-- Statistics Grid -->
@@ -585,7 +603,29 @@
             // Always add current live equity as last point
             equityDisplay.push({ x: now.getTime(), y: currentEquity });
 
-            // 5. Render Chart
+            // 5. Calculate Max Equity Drawdown for this time range
+            if (equityDisplay.length > 1) {
+                var peakEquity = -Infinity;
+                var maxDDEur = 0;
+                var peakAtMaxDD = 0;
+                for (var k = 0; k < equityDisplay.length; k++) {
+                    var eqVal = equityDisplay[k].y;
+                    if (eqVal > peakEquity) {
+                        peakEquity = eqVal;
+                    }
+                    var dd = peakEquity - eqVal;
+                    if (dd > maxDDEur) {
+                        maxDDEur = dd;
+                        peakAtMaxDD = peakEquity;
+                    }
+                }
+                var maxDDPct = peakAtMaxDD > 0 ? (maxDDEur / peakAtMaxDD * 100) : 0;
+                updateDrawdownOverlay(maxDDEur, maxDDPct);
+            } else {
+                updateDrawdownOverlay(0, 0);
+            }
+
+            // 6. Render Chart
             this.render(displayData, equityDisplay);
         };
 
@@ -1187,6 +1227,33 @@
 
             if (elBal) {
                 elBal.textContent = 'Equity: ' + equity.toFixed(2) + ' ' + accountCurrency;
+            }
+        }
+
+        /**
+         * Update the drawdown overlay in the bottom-right of the chart.
+         * Shows the max equity drawdown in EUR and % for the selected time range.
+         */
+        function updateDrawdownOverlay(ddEur, ddPct) {
+            var elVal = document.getElementById('drawdown-overlay-value');
+            var elPct = document.getElementById('drawdown-overlay-percent');
+            if (!elVal) return;
+
+            if (ddEur <= 0) {
+                elVal.textContent = '0.00 ' + accountCurrency;
+                elVal.style.color = '#10b981';
+                if (elPct) {
+                    elPct.textContent = '0.00%';
+                    elPct.style.color = '#10b981';
+                }
+            } else {
+                elVal.textContent = '-' + ddEur.toFixed(2) + ' ' + accountCurrency;
+                elVal.style.color = '#ef4444';
+                elVal.style.textShadow = '0 0 10px rgba(239, 68, 68, 0.4)';
+                if (elPct) {
+                    elPct.textContent = '-' + ddPct.toFixed(2) + '%';
+                    elPct.style.color = '#ef4444';
+                }
             }
         }
 
