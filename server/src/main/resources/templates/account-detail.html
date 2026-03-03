@@ -216,7 +216,7 @@
             </div>
         </section>
 
-        <!-- ======= OPEN TRADES (paginated) ======= -->
+        <!-- ======= OPEN TRADES ======= -->
         <section class="trades-section">
             <h2>📈 Offene Positionen</h2>
 
@@ -224,8 +224,7 @@
                 <p>Keine offenen Positionen</p>
             </div>
 
-            <div th:if="${#lists.size(account.openTrades) > 0}" class="paginated-table-wrapper"
-                id="open-trades-wrapper">
+            <div th:if="${#lists.size(account.openTrades) > 0}">
                 <table class="trades-table" id="open-trades-table">
                     <thead>
                         <tr>
@@ -275,7 +274,7 @@
                         </tr>
                     </tbody>
                 </table>
-                <div class="pagination-bar" id="open-trades-pagination"></div>
+
             </div>
         </section>
 
@@ -843,9 +842,7 @@
         var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
 
         document.addEventListener('DOMContentLoaded', function () {
-            // Open trades: simple pagination, no filtering (always show all open)
-            openTradesMgr = new TableManager('open-trades-table', 'open-trades-pagination', null);
-            openTradesMgr.applyFilter(null); // Just init
+            // Open trades: no pagination, all shown linearly
 
             // History trades: Setup filters
             historyMgr = new TableManager('closed-trades-table', 'closed-trades-pagination', 'history-summary');
