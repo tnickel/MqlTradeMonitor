@@ -91,6 +91,17 @@ public class TradeStorage {
     }
 
     /**
+     * Update magic min trades for a specific account.
+     */
+    public void updateAccountMagicMinTrades(long accountId, int minTrades) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setMagicMinTrades(minTrades);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Update account layout preferences.
      */
     public void updateAccountLayout(long accountId, String section, int displayOrder) {

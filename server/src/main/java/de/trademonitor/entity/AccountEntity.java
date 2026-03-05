@@ -31,6 +31,9 @@ public class AccountEntity {
     @Column(name = "magic_number_max_age")
     private Integer magicNumberMaxAge = 30; // Default 30 days
 
+    @Column(name = "magic_min_trades")
+    private Integer magicMinTrades = 5; // Default 5 trades
+
     public AccountEntity() {
     }
 
@@ -144,5 +147,13 @@ public class AccountEntity {
 
     public void setMagicNumberMaxAge(Integer magicNumberMaxAge) {
         this.magicNumberMaxAge = magicNumberMaxAge;
+    }
+
+    public Integer getMagicMinTrades() {
+        return magicMinTrades;
+    }
+
+    public void setMagicMinTrades(Integer magicMinTrades) {
+        this.magicMinTrades = magicMinTrades;
     }
 }

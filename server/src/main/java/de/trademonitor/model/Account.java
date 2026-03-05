@@ -25,6 +25,7 @@ public class Account {
     private Long sectionId;
     private int displayOrder = 0;
     private int magicNumberMaxAge = 30; // Default 30 days
+    private int magicMinTrades = 5; // Default 5 trades
 
     // Transient field for sync warning
     private boolean syncWarning;
@@ -240,6 +241,14 @@ public class Account {
         this.magicNumberMaxAge = magicNumberMaxAge;
     }
 
+    public int getMagicMinTrades() {
+        return magicMinTrades;
+    }
+
+    public void setMagicMinTrades(int magicMinTrades) {
+        this.magicMinTrades = magicMinTrades;
+    }
+
     // Closed trades history
     private List<ClosedTrade> closedTrades = new ArrayList<>();
 
@@ -259,7 +268,7 @@ public class Account {
      * Build a sorted list of per-magic-number profit entries,
      * combining open and closed trades.
      */
-    public List<MagicProfitEntry> getMagicProfitEntries(int maxAgeDays,
+    public List<MagicProfitEntry> getMagicProfitEntries(int maxAgeDays, int minTrades,
             java.util.function.Function<Long, String> nameResolver) {
         // Collect all magic numbers from both open and closed trades
         Set<Long> allMagics = new TreeSet<>();
@@ -311,6 +320,10 @@ public class Account {
             int closedCount = (int) closedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
+
+            if ((openCount + closedCount) < minTrades) {
+                continue;
+            }
 
             // Resolve name
             String magicName = nameResolver != null ? nameResolver.apply(magic) : "";
@@ -376,8 +389,10 @@ public class Account {
                 }
             }
 
-            // Estimate Equity Drawdown: Realized DD + Max Single Loss
-            double estimatedMaxEquityDrawdownEur = maxDrawdownEur + maxSingleLossEur;
+            // Prevent double-counting of single loss in max equity drawdown.
+            // Since we don't have true MAE, realized max drawdown is currently
+            // the most accurate baseline without inflating the values artificially.
+            double estimatedMaxEquityDrawdownEur = maxDrawdownEur;
 
             // Include currently open profit in max drawdown consideration if applicable
             double currentTotalMagicProfit = cumulativeProfit + openProfit;

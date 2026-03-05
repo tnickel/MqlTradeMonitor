@@ -97,16 +97,7 @@
         </header>
 
         <div class="account-summary">
-            <div class="filter-bar" id="history-filter-bar" style="flex-basis: 100%; margin-bottom: 1rem;">
-                <button class="filter-btn" data-range="today">Heute</button>
-                <button class="filter-btn" data-range="1week">1 Woche</button>
-                <button class="filter-btn" data-range="1month">1 Monat</button>
-                <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
-                <button class="filter-btn" data-range="6months">6 Monate</button>
-                <button class="filter-btn" data-range="thisyear">Dieses Jahr</button>
-                <button class="filter-btn" data-range="1year">1 Jahr</button>
-                <button class="filter-btn" data-range="all">Alles</button>
-            </div>
+            <!-- The original filter bar is removed from here -->
             <div class="summary-card">
                 <span class="summary-label">Balance</span>
                 <span class="summary-value"
@@ -131,6 +122,76 @@
                 <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
             </div>
         </div>
+
+        <!-- ======= ZENTRALER AUSWAHLFILTER ======= -->
+        <section class="trades-section central-filter-section"
+            style="border: 2px solid var(--accent-primary); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; background: rgba(99,102,241,0.05);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: var(--accent-primary); font-size: 1.25rem;">🎛️ Zentraler Auswahlfilter
+                </h3>
+                <span class="pulse-indicator"
+                    style="font-size: 0.8rem; color: #a0a0c0; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
+                    Eingaben filtern Daten sofort
+                </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Row 1: Time Range -->
+                <div>
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">1.
+                        Zeitraum wählen:</span>
+                    <div class="filter-bar" id="history-filter-bar"
+                        style="margin: 0; padding: 0; background: transparent; border: none;">
+                        <button class="filter-btn" data-range="today">Heute</button>
+                        <button class="filter-btn" data-range="1week">1 Woche</button>
+                        <button class="filter-btn" data-range="1month">1 Monat</button>
+                        <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
+                        <button class="filter-btn" data-range="6months">6 Monate</button>
+                        <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
+                        <button class="filter-btn" data-range="1year">1 Jahr</button>
+                        <button class="filter-btn" data-range="all">Alles</button>
+                    </div>
+                </div>
+
+                <!-- Row 2: Performance Thresholds -->
+                <div style="display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap;">
+                    <div>
+                        <span
+                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            2. Mindest-Trades im Zeitraum
+                            <span
+                                title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
+                                style="cursor: help;">ℹ️</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
+                                max="9999"
+                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                            <span id="minTradesFeedback"
+                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span
+                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            3. Max. Alter (Tage, ohne offene Trades)
+                            <span
+                                title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
+                                style="cursor: help;">ℹ️</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
+                                max="9999"
+                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                            <span id="maxAgeFeedback"
+                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- ======= DASHBOARD (Chart + Stats) ======= -->
         <section class="trades-section dashboard-section">
@@ -234,35 +295,19 @@
             </div>
         </section>
 
-        <!-- ======= ACCOUNT SETTINGS (per-account) ======= -->
-        <section class="trades-section" style="padding: 1rem 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <label for="magicMaxAgeInput"
-                    style="color: var(--text-secondary); font-size: 0.9rem; white-space: nowrap;">
-                    ⚙️ Max Alter Magic Number (Tage)
-                    <span
-                        title="Magic Numbers ohne offene Trades, deren letzter geschlossener Trade älter als diese Anzahl Tage ist, werden aus der Tabelle und den Kurven ausgeblendet. Dieser Wert gilt nur für diesen Account."
-                        style="cursor: help;">ℹ️</span>
-                </label>
-                <input type="number" id="magicMaxAgeInput" th:value="${magicMaxAge}" min="1" max="9999"
-                    style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
-                <button type="button" id="saveMagicMaxAgeBtn" onclick="saveMagicMaxAge()"
-                    style="background-color: #238636; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;">
-                    💾 Speichern
-                </button>
-                <span id="magicMaxAgeFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;">✓
-                    Gespeichert</span>
-
-                <span style="border-left: 1px solid var(--border-color); height: 24px; margin: 0 5px;"></span>
-
-                <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
-                    style="background-color: #b91c1c; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;"
-                    title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
-                    🗑️ Reset Trades
-                </button>
+        <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
+            <div style="display: flex; align-items: center; gap: 15px;">
                 <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
+                <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
+                    style="background-color: transparent; border: 1px solid #b91c1c; color: #b91c1c; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;"
+                    onmouseover="this.style.backgroundColor='#b91c1c'; this.style.color='white';"
+                    onmouseout="this.style.backgroundColor='transparent'; this.style.color='#b91c1c';"
+                    title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
+                    🗑️ Reset Trades Database
+                </button>
             </div>
         </section>
+
 
         <!-- ======= OPEN TRADES ======= -->
         <section class="trades-section">
@@ -655,26 +700,47 @@
                     minTime = 0;
             }
 
-            // 2. Calculate Balance History
+            // 2. Determine which trades to include based on visible magics
+            // We use historyMgr.filteredRows to know which ones are visible
+            var visibleTrades = [];
+            if (historyMgr && historyMgr.filteredRows) {
+                historyMgr.filteredRows.forEach(row => {
+                    var profitCell = row.querySelector('.profit-cell');
+                    var profit = parseFloat(profitCell ? profitCell.dataset.profit : 0);
+                    var timeStr = row.dataset.closeTime;
+                    if (timeStr) {
+                        var t = timeStr.split(/[- :.]/);
+                        var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                        visibleTrades.push({ time: date.getTime(), profit: profit });
+                    }
+                });
+            }
+
+            // Re-sort visible trades for calculation (older to newer)
+            visibleTrades.sort((a, b) => a.time - b.time);
+
+            // 3. Calculate Balance History starting from "Now" and working backwards
+            // For a filtered set, we start with the current balance and work backwards, 
+            // subtracting only the profits of the visible trades.
             var fullBalanceHistory = [];
             var runningBalance = this.currentBalance;
 
             // Add "Now" point
             fullBalanceHistory.push({ x: now.getTime(), y: runningBalance });
 
-            // Iterate BACKWARDS through sorted trades (newest to oldest)
-            for (var i = this.allTrades.length - 1; i >= 0; i--) {
-                var trade = this.allTrades[i];
+            // Iterate BACKWARDS through sorted visible trades (newest to oldest)
+            for (var i = visibleTrades.length - 1; i >= 0; i--) {
+                var trade = visibleTrades[i];
                 fullBalanceHistory.push({ x: trade.time, y: runningBalance });
-                runningBalance -= trade.profit;
+                runningBalance -= trade.profit; // Subtract profit to go backwards
             }
-            if (this.allTrades.length > 0) {
-                fullBalanceHistory.push({ x: this.allTrades[0].time - 60000, y: runningBalance });
+            if (visibleTrades.length > 0) {
+                fullBalanceHistory.push({ x: visibleTrades[0].time - 60000, y: runningBalance });
             }
 
             fullBalanceHistory.reverse();
 
-            // 3. Filter balance points for display
+            // 4. Filter balance points for display time range
             var displayData = fullBalanceHistory.filter(function (p) { return p.x >= minTime; });
 
             if (displayData.length === 0 || displayData[0].x > minTime) {
@@ -1009,61 +1075,9 @@
                     // Magic Chart Manager
                     magicChartMgr = new MagicChartManager('magic-charts-container');
 
-                    // Initialize Global Pie Chart for traded symbols
-                    var globalPieCanvas = document.getElementById('global-magic-pie-chart');
-                    if (globalPieCanvas) {
-                        var rawData = globalPieCanvas.getAttribute('data-symbols');
-                        if (rawData && rawData.trim() !== '' && rawData !== '{}') {
-                            try {
-                                var symbolMap = JSON.parse(rawData);
-                                var labels = Object.keys(symbolMap);
-                                var data = Object.values(symbolMap);
-
-                                // Generate distinct colors
-                                var bgColors = [
-                                    '#6366f1', '#10b981', '#f59e0b', '#ef4444',
-                                    '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6',
-                                    '#22d3ee', '#a855f7', '#d946ef', '#f43f5e',
-                                    '#f97316', '#84cc16', '#06b6d4', '#4f46e5'
-                                ];
-
-                                new Chart(globalPieCanvas, {
-                                    type: 'doughnut',
-                                    data: {
-                                        labels: labels,
-                                        datasets: [{
-                                            data: data,
-                                            backgroundColor: bgColors,
-                                            borderWidth: 0
-                                        }]
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        cutout: '60%',
-                                        plugins: {
-                                            legend: {
-                                                display: true,
-                                                position: 'right',
-                                                labels: { color: '#d1d5db', font: { size: 11 }, boxWidth: 12 }
-                                            },
-                                            tooltip: {
-                                                callbacks: {
-                                                    label: function (context) {
-                                                        return context.label + ': ' + context.parsed + ' Trades';
-                                                    }
-                                                },
-                                                bodyFont: { size: 11 },
-                                                boxPadding: 4
-                                            }
-                                        }
-                                    }
-                                });
-                            } catch (e) {
-                                console.error("Error parsing global pie chart symbols", e, rawData);
-                            }
-                        }
-                    }
+                    // The Global Pie Chart is now updated via updateGlobalPieChart() inside applyHistoryFilter.
+                    // We just need to initialize a global variable for it.
+                    window.globalPieChart = null;
 
                     // Restore filter
                     var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
@@ -1197,28 +1211,186 @@
             return activeMagics;
         }
 
+        // Save Min Trades and Max Age quietly without reloading
+        function setupCentralFilterListeners() {
+            var inputAge = document.getElementById('filter-max-age');
+            var inputTrades = document.getElementById('filter-min-trades');
+
+            if (inputAge) inputAge.addEventListener('change', function () {
+                saveCentralFilterPrefs();
+                reapplyHistoryFilter();
+            });
+            if (inputTrades) inputTrades.addEventListener('change', function () {
+                saveCentralFilterPrefs();
+                reapplyHistoryFilter();
+            });
+        }
+
+        function saveCentralFilterPrefs() {
+            var maxAge = document.getElementById('filter-max-age').value;
+            var minTrades = document.getElementById('filter-min-trades').value;
+
+            if (maxAge === '' || maxAge < 0) maxAge = 30;
+            if (minTrades === '' || minTrades < 0) minTrades = 0;
+
+            var fd = new URLSearchParams();
+            fd.append('magicNumberMaxAge', maxAge);
+            fd.append('magicMinTrades', minTrades);
+
+            fetch('/api/account/' + accountId + '/magic-preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: fd
+            }).then(r => {
+                if (r.ok) {
+                    var fAge = document.getElementById('maxAgeFeedback');
+                    var fTrades = document.getElementById('minTradesFeedback');
+                    if (fAge) { fAge.style.display = 'inline'; fAge.style.opacity = 1; setTimeout(() => fAge.style.opacity = 0, 2000); }
+                    if (fTrades) { fTrades.style.display = 'inline'; fTrades.style.opacity = 1; setTimeout(() => fTrades.style.opacity = 0, 2000); }
+                }
+            }).catch(e => console.error("Error saving preferences", e));
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setupCentralFilterListeners();
+        });
+
         // Re-apply the current time range filter + magic filter
         function reapplyHistoryFilter() {
             var activeBtn = document.querySelector('.filter-btn.active');
-            var range = activeBtn ? activeBtn.dataset.range : 'thismonth';
+            var range = activeBtn ? activeBtn.dataset.range : 'thisyear';
             applyHistoryFilter(range);
         }
 
         function applyHistoryFilter(range) {
-            // Update Table with combined time + magic filter
-            if (historyMgr) {
-                var now = new Date();
-                var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-                var currentMagics = getActiveMagics();
+            // STEP 1: Determine Time Window
+            var now = new Date();
+            var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-                historyMgr.applyFilter(function (row) {
-                    // Magic filter
-                    var rowMagic = row.dataset.magic || '';
-                    if (currentMagics.size > 0 && !currentMagics.has(rowMagic)) {
-                        return false;
+            function isTradeInTimeRange(tradeTs) {
+                switch (range) {
+                    case 'today': return tradeTs >= todayStart;
+                    case '1week': return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
+                    case '1month':
+                        var m = new Date(now); m.setMonth(now.getMonth() - 1); return tradeTs >= m.getTime();
+                    case 'thismonth':
+                        var tm = new Date(now.getFullYear(), now.getMonth(), 1); return tradeTs >= tm.getTime();
+                    case '6months':
+                        var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); return tradeTs >= m6.getTime();
+                    case 'thisyear':
+                        var y = new Date(now.getFullYear(), 0, 1); return tradeTs >= y.getTime();
+                    case '1year':
+                        var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); return tradeTs >= y1.getTime();
+                    case 'all': default: return true;
+                }
+            }
+
+            var timeStartTs = 0;
+            switch (range) {
+                case 'today': timeStartTs = todayStart; break;
+                case '1week': timeStartTs = now.getTime() - 7 * 24 * 3600 * 1000; break;
+                case '1month': var m = new Date(now); m.setMonth(now.getMonth() - 1); timeStartTs = m.getTime(); break;
+                case 'thismonth': timeStartTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime(); break;
+                case '6months': var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); timeStartTs = m6.getTime(); break;
+                case 'thisyear': timeStartTs = new Date(now.getFullYear(), 0, 1).getTime(); break;
+                case '1year': var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); timeStartTs = y1.getTime(); break;
+                case 'all': timeStartTs = 0; break;
+            }
+
+            // Read the configured limits from UI
+            var cfgMaxAge = parseInt(document.getElementById('filter-max-age').value) || 30;
+            var cfgMinTrades = parseInt(document.getElementById('filter-min-trades').value) || 0;
+            var cutoffDate = cfgMaxAge > 0 ? (timeStartTs - (cfgMaxAge * 24 * 3600 * 1000)) : null;
+
+            // STEP 2: Aggregate Stats per Magic (Filtered by Time)
+            var tempMagicStats = {};
+            // Also need to know if a magic has open trades, which makes it always valid for Age (but maybe not Min Trades? User says: HasOpenTrades means alive, but Min Trades still applies collectively). Let's say HasOpenTrades means age=0.
+
+            // Gather closed trades
+            if (historyMgr && historyMgr.allRows) {
+                historyMgr.allRows.forEach(row => {
+                    var magic = row.dataset.magic || '';
+                    if (!magic) return;
+
+                    var closeTimeStr = row.dataset.closeTime;
+                    if (!closeTimeStr) return;
+
+                    var t = closeTimeStr.split(/[- :.]/);
+                    var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    var tradeTs = tradeDate.getTime();
+
+                    if (!tempMagicStats[magic]) tempMagicStats[magic] = { count: 0, lastCloseTs: 0, hasOpen: false };
+
+                    if (tradeTs > tempMagicStats[magic].lastCloseTs) {
+                        tempMagicStats[magic].lastCloseTs = tradeTs;
                     }
 
-                    // Time range filter
+                    if (isTradeInTimeRange(tradeTs)) {
+                        tempMagicStats[magic].count++;
+                    }
+                });
+            }
+
+            // Gather open trades to add to trade count and mark as alive
+            var openRows = document.querySelectorAll('#open-trades-table tbody tr');
+            openRows.forEach(row => {
+                var cell = row.querySelector('td:nth-child(4)'); // 4th column is usually Magic in open trades table. Let's be safer.
+                var mSpan = row.querySelector('span[title="Magic Number"]');
+                // Wait, open trades table doesn't have dataset.magic. It has a span.
+                // It's cell index 3: <td th:text="${trade.magicNumber}">
+                var txt = '';
+                if (row.cells && row.cells.length > 3) txt = row.cells[3].textContent.trim();
+                var magic = txt || '';
+
+                if (magic && magic !== '0' && tempMagicStats[magic] !== undefined) {
+                    tempMagicStats[magic].count++; // Open trades count towards the total in this period (they are always "now")
+                    tempMagicStats[magic].hasOpen = true;
+                } else if (magic) {
+                    tempMagicStats[magic] = { count: 1, lastCloseTs: now.getTime(), hasOpen: true };
+                }
+            });
+
+            // STEP 3: Validate Magics & Update Checkboxes UI
+            var checkboxes = document.querySelectorAll('.magic-checkbox');
+            checkboxes.forEach(cb => {
+                var magic = cb.value;
+                var stats = tempMagicStats[magic] || { count: 0, lastCloseTs: 0, hasOpen: false };
+
+                var isValid = true;
+
+                // Check Min Trades
+                if (stats.count < cfgMinTrades) {
+                    isValid = false;
+                }
+
+                // Check Max Age
+                if (isValid && !stats.hasOpen && cutoffDate !== null) {
+                    if (stats.lastCloseTs < cutoffDate) {
+                        isValid = false;
+                    }
+                }
+
+                var container = cb.closest('label'); // It's usually wrapped in a label
+                if (isValid) {
+                    if (container) container.style.display = 'flex';
+                    // We don't auto-check it if they manually unchecked it before, but if it was hidden, we just show it.
+                } else {
+                    if (container) container.style.display = 'none';
+                    // If it's invalid, it cannot be active
+                    cb.checked = false;
+                }
+            });
+
+            // STEP 4: Get Active Checkboxes AFTER Validation
+            var currentMagics = getActiveMagics();
+
+            // STEP 5: Apply Filter to History Table Rows
+            if (historyMgr) {
+                historyMgr.applyFilter(function (row) {
+                    var rowMagic = row.dataset.magic || '';
+                    if (currentMagics.size === 0) return false;
+                    if (!currentMagics.has(rowMagic)) return false;
+
                     var closeTimeStr = row.dataset.closeTime;
                     if (!closeTimeStr) return false;
 
@@ -1226,21 +1398,7 @@
                     var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
                     var tradeTs = tradeDate.getTime();
 
-                    switch (range) {
-                        case 'today': return tradeTs >= todayStart;
-                        case '1week': return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
-                        case '1month':
-                            var m = new Date(now); m.setMonth(now.getMonth() - 1); return tradeTs >= m.getTime();
-                        case 'thismonth':
-                            var tm = new Date(now.getFullYear(), now.getMonth(), 1); return tradeTs >= tm.getTime();
-                        case '6months':
-                            var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); return tradeTs >= m6.getTime();
-                        case 'thisyear':
-                            var y = new Date(now.getFullYear(), 0, 1); return tradeTs >= y.getTime();
-                        case '1year':
-                            var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); return tradeTs >= y1.getTime();
-                        case 'all': default: return true;
-                    }
+                    return isTradeInTimeRange(tradeTs);
                 });
             }
 
@@ -1259,6 +1417,9 @@
             if (magicChartMgr && historyMgr) {
                 magicChartMgr.update(historyMgr.filteredRows);
             }
+
+            // Update Global Pie Chart
+            updateGlobalPieChart();
 
             // Update Period Label in Header (Charts)
             var periodLabelCharts = document.getElementById('magic-curves-period');
@@ -1416,18 +1577,85 @@
             if (elAvg) elAvg.textContent = avgWin.toFixed(2) + ' / -' + avgLoss.toFixed(2);
         }
 
+        function updateGlobalPieChart() {
+            var globalPieCanvas = document.getElementById('global-magic-pie-chart');
+            if (!globalPieCanvas || !historyMgr) return;
+
+            // Re-aggregate symbols from filtered rows
+            var symbolCounts = {};
+            historyMgr.filteredRows.forEach(row => {
+                // The table definition is: Ticket, Symbol, Type, Volume...
+                // So index 1 is Symbol.
+                var sym = '';
+                if (row.cells && row.cells.length > 1) {
+                    sym = row.cells[1].textContent.trim();
+                }
+                if (sym) {
+                    symbolCounts[sym] = (symbolCounts[sym] || 0) + 1;
+                }
+            });
+
+            var labels = Object.keys(symbolCounts);
+            var data = Object.values(symbolCounts);
+
+            if (window.globalPieChart) {
+                window.globalPieChart.destroy();
+            }
+
+            if (labels.length === 0) return;
+
+            var bgColors = [
+                '#6366f1', '#10b981', '#f59e0b', '#ef4444',
+                '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6',
+                '#22d3ee', '#a855f7', '#d946ef', '#f43f5e',
+                '#f97316', '#84cc16', '#06b6d4', '#4f46e5'
+            ];
+
+            window.globalPieChart = new Chart(globalPieCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: bgColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '60%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: { color: '#d1d5db', font: { size: 11 }, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.label + ': ' + context.parsed + ' Trades';
+                                }
+                            },
+                            bodyFont: { size: 11 },
+                            boxPadding: 4
+                        }
+                    }
+                }
+            });
+        }
+
         function updateMagicStats(range) {
             // Re-calculate statistics for the Magic Table based on historyMgr.filteredRows
             // 1. Reset counters map
             var magicStats = {}; // { magic: { closedCount: 0, closedProfit: 0.0 } }
+            var currentMagics = getActiveMagics();
 
             // 2. Aggregate from filtered history
             if (historyMgr && historyMgr.filteredRows) {
                 historyMgr.filteredRows.forEach(row => {
-                    // find magic cell - it's the 10th column (index 9)
-                    var cells = row.querySelectorAll('td');
-                    if (cells.length > 9) {
-                        var magic = cells[9].textContent.trim();
+                    var magic = row.dataset.magic;
+                    if (magic) {
                         var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
 
                         if (!magicStats[magic]) {
@@ -1445,6 +1673,13 @@
                 var magicCell = row.querySelector('td:nth-child(1) strong');
                 if (!magicCell) return;
                 var magic = magicCell.textContent.trim();
+
+                if (!currentMagics.has(magic)) {
+                    row.style.display = 'none';
+                    return; // Skip calculating stats for hidden magics
+                } else {
+                    row.style.display = 'table-row';
+                }
 
                 var stats = magicStats[magic] || { closedCount: 0, closedProfit: 0.0 };
 
@@ -1497,9 +1732,8 @@
             var magicData = {}; // { magic: [ { time, profit } ] }
 
             rows.forEach(row => {
-                var cells = row.querySelectorAll('td');
-                if (cells.length > 9) {
-                    var magic = cells[9].textContent.trim();
+                var magic = row.dataset.magic;
+                if (magic) {
                     var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
                     var timeStr = row.dataset.closeTime;
 

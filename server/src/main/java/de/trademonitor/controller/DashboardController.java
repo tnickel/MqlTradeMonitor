@@ -263,6 +263,18 @@ public class DashboardController {
     }
 
     /**
+     * AJAX Endpoint to update magic min trades for a specific account.
+     */
+    @PostMapping("/api/account/magic-min-trades")
+    @ResponseBody
+    public ResponseEntity<String> updateMagicMinTrades(
+            @RequestParam("accountId") Long accountId,
+            @RequestParam("minTrades") int minTrades) {
+        accountManager.updateMagicMinTrades(accountId, minTrades);
+        return ResponseEntity.ok("Saved");
+    }
+
+    /**
      * AJAX Endpoint to reset all trade data for a specific account.
      * Deletes open trades, closed trades, and equity snapshots.
      * The account entity itself is preserved.
@@ -430,11 +442,13 @@ public class DashboardController {
         model.addAttribute("online", account.isOnline(accountManager.getTimeoutSeconds()));
 
         int maxAge = account.getMagicNumberMaxAge();
+        int minTrades = account.getMagicMinTrades();
         Map<Long, String> mappings = magicMappingService.getAllMappings();
 
         // Pass resolver to getMagicProfitEntries
-        model.addAttribute("magicProfits", account.getMagicProfitEntries(maxAge, mappings::get));
+        model.addAttribute("magicProfits", account.getMagicProfitEntries(maxAge, minTrades, mappings::get));
         model.addAttribute("magicMaxAge", maxAge);
+        model.addAttribute("magicMinTrades", minTrades);
 
         // Build magic curve data as JSON for Chart.js
         model.addAttribute("magicCurveJson", buildMagicCurveJson(account, maxAge, mappings));

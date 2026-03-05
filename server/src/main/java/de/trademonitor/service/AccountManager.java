@@ -78,6 +78,7 @@ public class AccountManager {
             account.setSection(ae.getSection()); // Legacy loading
             account.setSectionId(ae.getSectionId()); // New loading
             account.setMagicNumberMaxAge(ae.getMagicNumberMaxAge() != null ? ae.getMagicNumberMaxAge() : 30);
+            account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
 
             // Load lastSeen if available
@@ -220,6 +221,17 @@ public class AccountManager {
         if (account != null) {
             account.setMagicNumberMaxAge(days);
             tradeStorage.updateAccountMagicMaxAge(accountId, days);
+        }
+    }
+
+    /**
+     * Update magic min trades for a specific account.
+     */
+    public void updateMagicMinTrades(long accountId, int minTrades) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setMagicMinTrades(minTrades);
+            tradeStorage.updateAccountMagicMinTrades(accountId, minTrades);
         }
     }
 
