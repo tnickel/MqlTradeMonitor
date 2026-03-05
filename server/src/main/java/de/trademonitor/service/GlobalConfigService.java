@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 @Service
 public class GlobalConfigService {
 
-    public static final String KEY_MAGIC_MAX_AGE = "MAGIC_NUMBER_MAX_AGE_DAYS";
+    // KEY_MAGIC_MAX_AGE removed — now stored per-account in AccountEntity
 
     @Autowired
     private GlobalConfigRepository repository;
@@ -45,7 +45,7 @@ public class GlobalConfigService {
     public static final String KEY_LOG_CLIENT_DAYS = "LOG_CLIENT_DAYS";
 
     // Cache the value to avoid hitting DB on every request
-    private int cachedMaxAgeDays = 30; // Default 30 days
+    // cachedMaxAgeDays removed — now stored per-account in AccountEntity
     private int cachedSyncIntervalSeconds = 60; // Default 60 seconds
 
     private int cachedLiveGreenMins = 1;
@@ -82,14 +82,7 @@ public class GlobalConfigService {
     @PostConstruct
     public void init() {
         // Load on startup
-        repository.findById(KEY_MAGIC_MAX_AGE).ifPresent(entity -> {
-            try {
-                cachedMaxAgeDays = Integer.parseInt(entity.getConfValue());
-            } catch (NumberFormatException e) {
-                System.err.println(
-                        "Invalid number format for config " + KEY_MAGIC_MAX_AGE + ": " + entity.getConfValue());
-            }
-        });
+        // Magic max age loading removed — now per-account
 
         repository.findById(KEY_TRADE_SYNC_INTERVAL).ifPresent(entity -> {
             try {
@@ -180,15 +173,7 @@ public class GlobalConfigService {
                 .ifPresent(e -> cachedSecH2ConsoleEnabled = Boolean.parseBoolean(e.getConfValue()));
     }
 
-    public int getMagicNumberMaxAge() {
-        return cachedMaxAgeDays;
-    }
-
-    public void setMagicNumberMaxAge(int days) {
-        this.cachedMaxAgeDays = days;
-        GlobalConfigEntity entity = new GlobalConfigEntity(KEY_MAGIC_MAX_AGE, String.valueOf(days));
-        repository.save(entity);
-    }
+    // getMagicNumberMaxAge() and setMagicNumberMaxAge() removed — now per-account
 
     public int getTradeSyncIntervalSeconds() {
         return cachedSyncIntervalSeconds;

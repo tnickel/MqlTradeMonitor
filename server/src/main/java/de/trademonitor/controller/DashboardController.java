@@ -250,6 +250,18 @@ public class DashboardController {
         return ResponseEntity.ok("Saved");
     }
 
+    /**
+     * AJAX Endpoint to update magic number max age for a specific account.
+     */
+    @PostMapping("/api/account/magic-max-age")
+    @ResponseBody
+    public ResponseEntity<String> updateMagicMaxAge(
+            @RequestParam("accountId") Long accountId,
+            @RequestParam("days") int days) {
+        accountManager.updateMagicNumberMaxAge(accountId, days);
+        return ResponseEntity.ok("Saved");
+    }
+
     // --- Section Management API ---
 
     @PostMapping("/api/section/create")
@@ -383,9 +395,7 @@ public class DashboardController {
      */
     @org.springframework.web.bind.annotation.PostMapping("/admin/config")
     public String updateConfig(
-            @org.springframework.web.bind.annotation.RequestParam("magicNumberMaxAge") int magicNumberMaxAge,
             @org.springframework.web.bind.annotation.RequestParam("tradeSyncInterval") int tradeSyncInterval) {
-        globalConfigService.setMagicNumberMaxAge(magicNumberMaxAge);
         globalConfigService.setTradeSyncIntervalSeconds(tradeSyncInterval);
         return "redirect:/admin";
     }
@@ -406,7 +416,7 @@ public class DashboardController {
         model.addAttribute("account", account);
         model.addAttribute("online", account.isOnline(accountManager.getTimeoutSeconds()));
 
-        int maxAge = globalConfigService.getMagicNumberMaxAge();
+        int maxAge = account.getMagicNumberMaxAge();
         Map<Long, String> mappings = magicMappingService.getAllMappings();
 
         // Pass resolver to getMagicProfitEntries
@@ -415,6 +425,9 @@ public class DashboardController {
 
         // Build magic curve data as JSON for Chart.js
         model.addAttribute("magicCurveJson", buildMagicCurveJson(account, maxAge, mappings));
+
+        // Provide accountId for AJAX save
+        model.addAttribute("accountId", account.getAccountId());
 
         // Add today's date for highlighting (format matches UI: yyyy.MM.dd)
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");

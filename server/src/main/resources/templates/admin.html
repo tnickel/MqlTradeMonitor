@@ -141,20 +141,7 @@
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
             <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">⚙️ Globale Einstellungen</h2>
             <form th:action="@{/admin/config}" method="post"
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="form-group">
-                    <label for="magicNumberMaxAge" style="color: #8b949e; display: block; margin-bottom: 5px;">
-                        Max Alter Magic Number (Tage)
-                        <span
-                            title="Trades, die älter als diese Anzahl an Tagen sind, werden aus der Tabelle ausgeblendet."
-                            style="cursor: help;">ℹ️</span>
-                    </label>
-                    <input type="number" id="magicNumberMaxAge" name="magicNumberMaxAge"
-                        th:value="${magicMaxAgeByConfig}" min="1"
-                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
-                    <small style="color: #6b7280; display: block; margin-top: 4px;">Blendet inaktive Magic Numbers
-                        aus.</small>
-                </div>
+                style="display: grid; grid-template-columns: 1fr; gap: 20px;">
                 <div class="form-group">
                     <label for="tradeSyncInterval" style="color: #8b949e; display: block; margin-bottom: 5px;">
                         TradeSyncCheck Intervall (Sekunden)
@@ -168,11 +155,15 @@
                     <small style="color: #6b7280; display: block; margin-top: 4px;">Demo-zu-Real
                         Kopier-Überwachung.</small>
                 </div>
-                <div class="form-group" style="grid-column: span 2;">
+                <div class="form-group">
                     <button type="submit"
                         style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
                 </div>
             </form>
+            <p style="color: #6b7280; font-size: 0.85rem; margin-top: 10px;">
+                💡 <em>Die Einstellung "Max Alter Magic Number" befindet sich jetzt individuell pro Account auf der
+                    jeweiligen Account-Detail-Seite.</em>
+            </p>
         </div>
 
         <!-- Log Retention Config -->

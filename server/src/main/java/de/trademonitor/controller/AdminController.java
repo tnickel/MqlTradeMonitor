@@ -80,7 +80,6 @@ public class AdminController {
         model.addAttribute("totalClosedTrades", totalClosed);
 
         // --- 2. Configuration ---
-        model.addAttribute("magicMaxAgeByConfig", globalConfigService.getMagicNumberMaxAge());
         model.addAttribute("tradeSyncInterval", globalConfigService.getTradeSyncIntervalSeconds());
 
         // Live Indicator Config

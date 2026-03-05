@@ -80,6 +80,17 @@ public class TradeStorage {
     }
 
     /**
+     * Update magic number max age for a specific account.
+     */
+    public void updateAccountMagicMaxAge(long accountId, int days) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setMagicNumberMaxAge(days);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Update account layout preferences.
      */
     public void updateAccountLayout(long accountId, String section, int displayOrder) {

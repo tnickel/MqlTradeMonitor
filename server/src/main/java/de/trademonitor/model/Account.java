@@ -24,6 +24,7 @@ public class Account {
     private String section = "TOP"; // Default to TOP (Deprecated)
     private Long sectionId;
     private int displayOrder = 0;
+    private int magicNumberMaxAge = 30; // Default 30 days
 
     // Transient field for sync warning
     private boolean syncWarning;
@@ -229,6 +230,14 @@ public class Account {
 
     public void setDisplayOrder(int displayOrder) {
         this.displayOrder = displayOrder;
+    }
+
+    public int getMagicNumberMaxAge() {
+        return magicNumberMaxAge;
+    }
+
+    public void setMagicNumberMaxAge(int magicNumberMaxAge) {
+        this.magicNumberMaxAge = magicNumberMaxAge;
     }
 
     // Closed trades history

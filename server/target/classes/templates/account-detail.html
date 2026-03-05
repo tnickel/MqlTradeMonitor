@@ -234,6 +234,27 @@
             </div>
         </section>
 
+        <!-- ======= ACCOUNT SETTINGS (per-account) ======= -->
+        <section class="trades-section" style="padding: 1rem 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <label for="magicMaxAgeInput"
+                    style="color: var(--text-secondary); font-size: 0.9rem; white-space: nowrap;">
+                    ⚙️ Max Alter Magic Number (Tage)
+                    <span
+                        title="Magic Numbers ohne offene Trades, deren letzter geschlossener Trade älter als diese Anzahl Tage ist, werden aus der Tabelle und den Kurven ausgeblendet. Dieser Wert gilt nur für diesen Account."
+                        style="cursor: help;">ℹ️</span>
+                </label>
+                <input type="number" id="magicMaxAgeInput" th:value="${magicMaxAge}" min="1" max="9999"
+                    style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                <button type="button" id="saveMagicMaxAgeBtn" onclick="saveMagicMaxAge()"
+                    style="background-color: #238636; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;">
+                    💾 Speichern
+                </button>
+                <span id="magicMaxAgeFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;">✓
+                    Gespeichert</span>
+            </div>
+        </section>
+
         <!-- ======= OPEN TRADES ======= -->
         <section class="trades-section">
             <h2>📈 Offene Positionen</h2>
@@ -473,6 +494,44 @@
     </div>
 
     <script th:inline="javascript">
+
+        // ============ PER-ACCOUNT MAGIC MAX AGE SAVE ============
+        var currentAccountId = /*[[${accountId}]]*/ 0;
+
+        function saveMagicMaxAge() {
+            var days = document.getElementById('magicMaxAgeInput').value;
+            var feedback = document.getElementById('magicMaxAgeFeedback');
+            var btn = document.getElementById('saveMagicMaxAgeBtn');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+
+            fetch('/api/account/magic-max-age', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId + '&days=' + days
+            })
+                .then(function (response) {
+                    if (response.ok) {
+                        feedback.style.display = 'inline';
+                        feedback.textContent = '✓ Gespeichert – Seite wird neu geladen...';
+                        setTimeout(function () { location.reload(); }, 800);
+                    } else {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#ef4444';
+                        feedback.textContent = '✗ Fehler beim Speichern';
+                    }
+                })
+                .catch(function () {
+                    feedback.style.display = 'inline';
+                    feedback.style.color = '#ef4444';
+                    feedback.textContent = '✗ Netzwerkfehler';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Speichern';
+                });
+        }
 
         // ============ HISTORY CHART MANAGER ============
         function HistoryChartManager(canvasId, currentBalance, allRows) {

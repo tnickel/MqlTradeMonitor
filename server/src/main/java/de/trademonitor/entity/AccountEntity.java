@@ -28,6 +28,9 @@ public class AccountEntity {
 
     private Integer displayOrder = 0; // Ascending order
 
+    @Column(name = "magic_number_max_age")
+    private Integer magicNumberMaxAge = 30; // Default 30 days
+
     public AccountEntity() {
     }
 
@@ -133,5 +136,13 @@ public class AccountEntity {
 
     public void setDisplayOrder(Integer displayOrder) {
         this.displayOrder = displayOrder;
+    }
+
+    public Integer getMagicNumberMaxAge() {
+        return magicNumberMaxAge;
+    }
+
+    public void setMagicNumberMaxAge(Integer magicNumberMaxAge) {
+        this.magicNumberMaxAge = magicNumberMaxAge;
     }
 }

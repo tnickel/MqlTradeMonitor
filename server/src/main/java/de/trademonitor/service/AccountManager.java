@@ -77,6 +77,7 @@ public class AccountManager {
             account.setType(ae.getType());
             account.setSection(ae.getSection()); // Legacy loading
             account.setSectionId(ae.getSectionId()); // New loading
+            account.setMagicNumberMaxAge(ae.getMagicNumberMaxAge() != null ? ae.getMagicNumberMaxAge() : 30);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
 
             // Load lastSeen if available
@@ -208,6 +209,17 @@ public class AccountManager {
             account.setType(type);
             // Persist
             tradeStorage.updateAccountDetails(accountId, name, type);
+        }
+    }
+
+    /**
+     * Update magic number max age for a specific account.
+     */
+    public void updateMagicNumberMaxAge(long accountId, int days) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setMagicNumberMaxAge(days);
+            tradeStorage.updateAccountMagicMaxAge(accountId, days);
         }
     }
 
