@@ -224,6 +224,21 @@ public class AccountManager {
     }
 
     /**
+     * Reset all trade data for a specific account (open trades, closed trades,
+     * equity snapshots).
+     * The account entity itself is preserved. After reset, the MetaTrader EA should
+     * do a "Reconnect Server" to re-send all data.
+     */
+    public void resetAccountTrades(long accountId) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.getOpenTrades().clear();
+            account.getClosedTrades().clear();
+        }
+        tradeStorage.resetAccountTrades(accountId);
+    }
+
+    /**
      * Save layout preference for an account.
      */
     // Deprecated signature

@@ -252,6 +252,15 @@
                 </button>
                 <span id="magicMaxAgeFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;">✓
                     Gespeichert</span>
+
+                <span style="border-left: 1px solid var(--border-color); height: 24px; margin: 0 5px;"></span>
+
+                <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
+                    style="background-color: #b91c1c; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;"
+                    title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
+                    🗑️ Reset Trades
+                </button>
+                <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
             </div>
         </section>
 
@@ -530,6 +539,44 @@
                 .finally(function () {
                     btn.disabled = false;
                     btn.textContent = '💾 Speichern';
+                });
+        }
+
+        function resetAccountTrades() {
+            if (!confirm('⚠️ ACHTUNG: Alle Trades (offen + geschlossen) und Equity-Snapshots für diesen Account werden unwiderruflich gelöscht!\n\nDanach muss im MetaTrader "Reconnect Server" gedrückt werden, damit die Daten neu übertragen werden.\n\nFortfahren?')) {
+                return;
+            }
+            var feedback = document.getElementById('resetTradesFeedback');
+            var btn = document.getElementById('resetTradesBtn');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+
+            fetch('/api/account/reset-trades', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId
+            })
+                .then(function (response) {
+                    if (response.ok) {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#3fb950';
+                        feedback.textContent = '✓ Reset erfolgreich – Seite wird neu geladen...';
+                        setTimeout(function () { location.reload(); }, 1200);
+                    } else {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#ef4444';
+                        feedback.textContent = '✗ Fehler beim Reset';
+                    }
+                })
+                .catch(function () {
+                    feedback.style.display = 'inline';
+                    feedback.style.color = '#ef4444';
+                    feedback.textContent = '✗ Netzwerkfehler';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = '🗑️ Reset Trades';
                 });
         }
 

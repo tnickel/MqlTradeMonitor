@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.03"
+#property version   "1.04"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -16,7 +16,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.03"
+#define EA_VERSION "1.04"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -704,6 +704,8 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             string typeStr = "UNKNOWN";
             double openPrice = HistoryDealGetDouble(ticket, DEAL_PRICE); // fallback: OUT deal price
             string openTime = closeTime; // fallback: same as close time
+            long magicNumber = HistoryDealGetInteger(ticket, DEAL_MAGIC); // fallback: OUT deal magic number
+            
             long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
             if(positionId > 0)
             {
@@ -718,6 +720,11 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                      typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
                      openPrice = HistoryDealGetDouble(inTicket, DEAL_PRICE);
                      openTime = TimeToString((datetime)HistoryDealGetInteger(inTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                     
+                     // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
+                     long inMagic = HistoryDealGetInteger(inTicket, DEAL_MAGIC);
+                     if(inMagic > 0) magicNumber = inMagic;
+                     
                      break;
                   }
                }
@@ -741,7 +748,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "\"profit\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_PROFIT), 2) + ",";
             historyJson += "\"swap\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_SWAP), 2) + ",";
             historyJson += "\"commission\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_COMMISSION), 2) + ",";
-            historyJson += "\"magicNumber\":" + IntegerToString(HistoryDealGetInteger(ticket, DEAL_MAGIC)) + ",";
+            historyJson += "\"magicNumber\":" + IntegerToString(magicNumber) + ",";
             historyJson += "\"comment\":\"" + EscapeJson(HistoryDealGetString(ticket, DEAL_COMMENT)) + "\"";
             historyJson += "}";
             

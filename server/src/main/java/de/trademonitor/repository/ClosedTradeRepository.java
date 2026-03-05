@@ -4,6 +4,7 @@ import de.trademonitor.entity.ClosedTradeEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,6 +18,9 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
     boolean existsByAccountIdAndTicket(long accountId, long ticket);
 
     long countByAccountId(long accountId);
+
+    @Transactional
+    void deleteByAccountId(long accountId);
 
     @Query("SELECT MIN(c.closeTime) FROM ClosedTradeEntity c WHERE c.accountId = ?1")
     String findMinCloseTimeByAccountId(long accountId);

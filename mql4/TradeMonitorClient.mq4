@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -16,7 +16,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.00"
+#define EA_VERSION "1.01"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";

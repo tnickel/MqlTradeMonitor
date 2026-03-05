@@ -25,4 +25,7 @@ public interface EquitySnapshotRepository extends JpaRepository<EquitySnapshotEn
 
     /** Count snapshots for an account. */
     long countByAccountId(long accountId);
+
+    @Transactional
+    void deleteByAccountId(long accountId);
 }

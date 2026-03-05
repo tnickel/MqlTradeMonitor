@@ -299,4 +299,24 @@ public class TradeStorage {
     public List<EquitySnapshotEntity> loadEquitySnapshots(long accountId) {
         return equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
     }
+
+    /**
+     * Delete ALL trade data for an account (open trades, closed trades, equity
+     * snapshots).
+     * The account entity itself is preserved.
+     * After this, the MetaTrader EA should do a "Reconnect Server" to re-send all
+     * data.
+     */
+    @Transactional
+    public void resetAccountTrades(long accountId) {
+        int openCount = openTradeRepository.findByAccountId(accountId).size();
+        long closedCount = closedTradeRepository.countByAccountId(accountId);
+
+        openTradeRepository.deleteByAccountId(accountId);
+        closedTradeRepository.deleteByAccountId(accountId);
+        equitySnapshotRepository.deleteByAccountId(accountId);
+
+        System.out.println("RESET Account " + accountId + ": Deleted " + openCount
+                + " open trades, " + closedCount + " closed trades, and equity snapshots.");
+    }
 }

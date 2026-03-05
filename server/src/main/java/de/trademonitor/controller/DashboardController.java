@@ -262,6 +262,19 @@ public class DashboardController {
         return ResponseEntity.ok("Saved");
     }
 
+    /**
+     * AJAX Endpoint to reset all trade data for a specific account.
+     * Deletes open trades, closed trades, and equity snapshots.
+     * The account entity itself is preserved.
+     */
+    @PostMapping("/api/account/reset-trades")
+    @ResponseBody
+    public ResponseEntity<String> resetAccountTrades(
+            @RequestParam("accountId") Long accountId) {
+        accountManager.resetAccountTrades(accountId);
+        return ResponseEntity.ok("Reset complete");
+    }
+
     // --- Section Management API ---
 
     @PostMapping("/api/section/create")
