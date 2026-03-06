@@ -74,8 +74,16 @@
 
         .account-name {
             font-weight: 700;
-            color: var(--text-primary);
-            display: block;
+            color: var(--accent);
+            display: inline-block;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: all 0.2s;
+        }
+
+        a.account-name:hover {
+            color: #fff;
+            text-decoration-color: var(--success);
         }
 
         .account-id {
@@ -223,7 +231,8 @@
                         th:data-account-name="${acc.name}"
                         ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
                         <td>
-                            <span class="account-name" th:text="${acc.name}">(Name)</span>
+                            <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
+                                th:text="${acc.name}">(Name)</a>
                             <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
                         </td>
                         <td class="text-center">
@@ -291,7 +300,8 @@
                         th:data-account-name="${acc.name}"
                         ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
                         <td>
-                            <span class="account-name" th:text="${acc.name}">(Name)</span>
+                            <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
+                                th:text="${acc.name}">(Name)</a>
                             <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
                         </td>
                         <td class="text-center">
