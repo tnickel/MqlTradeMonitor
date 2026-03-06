@@ -138,6 +138,13 @@ public class GlobalConfigService {
             }
         });
 
+        repository.findById(KEY_SYNC_ALARM_DELAY_MINS).ifPresent(entity -> {
+            try {
+                cachedSyncAlarmDelayMins = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+
         // Load Security Config
         repository.findById(KEY_SEC_RATE_LIMIT_ENABLED)
                 .ifPresent(e -> cachedSecRateLimitEnabled = Boolean.parseBoolean(e.getConfValue()));
@@ -284,10 +291,17 @@ public class GlobalConfigService {
     public static final String KEY_HOMEY_TRIGGER_SYNC = "HOMEY_TRIGGER_SYNC";
     public static final String KEY_HOMEY_TRIGGER_API = "HOMEY_TRIGGER_API";
     public static final String KEY_HOMEY_REPEAT_COUNT = "HOMEY_REPEAT_COUNT";
+    public static final String KEY_SYNC_ALARM_DELAY_MINS = "SYNC_ALARM_DELAY_MINS";
+
+    private int cachedSyncAlarmDelayMins = 5; // Default 5 minutes
 
     public String getHomeyId() {
         return repository.findById(KEY_HOMEY_ID).map(GlobalConfigEntity::getConfValue)
                 .orElse("");
+    }
+
+    public int getSyncAlarmDelayMins() {
+        return cachedSyncAlarmDelayMins;
     }
 
     public String getHomeyEvent() {
@@ -309,12 +323,14 @@ public class GlobalConfigService {
     }
 
     public void saveHomeyConfig(String homeyId, String eventName, boolean triggerSync, boolean triggerApi,
-            int repeatCount) {
+            int repeatCount, int syncAlarmDelayMins) {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_ID, homeyId));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_EVENT, eventName));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_API, String.valueOf(triggerApi)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
+        repository.save(new GlobalConfigEntity(KEY_SYNC_ALARM_DELAY_MINS, String.valueOf(syncAlarmDelayMins)));
+        this.cachedSyncAlarmDelayMins = syncAlarmDelayMins;
     }
 
     // --- Sync Exemptions ---

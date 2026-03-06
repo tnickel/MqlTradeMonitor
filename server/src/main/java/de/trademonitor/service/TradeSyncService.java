@@ -30,6 +30,7 @@ public class TradeSyncService {
 
     private long lastCheckTime = 0;
     private boolean warningEmailSent = false;
+    private Long syncErrorStartTime = null;
 
     // Metrics
     private String lastSyncStatus = "OK";
@@ -119,19 +120,28 @@ public class TradeSyncService {
 
         if (globalWarning) {
             lastSyncStatus = "WARNING";
-            if (!warningEmailSent) {
-                emailService.sendSyncWarningEmail("Trade Monitor Warnung",
-                        "Achtung: Es wurden nicht-synchronisierte Trades auf Real-Konten gefunden! Bitte Dashboard prüfen.");
+            if (syncErrorStartTime == null) {
+                syncErrorStartTime = System.currentTimeMillis();
+            }
 
-                // Trigger Homey Siren if enabled
-                if (globalConfigService.isHomeyTriggerSync()) {
-                    homeyService.triggerSiren();
+            long delayMs = globalConfigService.getSyncAlarmDelayMins() * 60L * 1000L;
+
+            if (System.currentTimeMillis() - syncErrorStartTime >= delayMs) {
+                if (!warningEmailSent) {
+                    emailService.sendSyncWarningEmail("Trade Monitor Warnung",
+                            "Achtung: Es wurden nicht-synchronisierte Trades auf Real-Konten gefunden! Bitte Dashboard prüfen.");
+
+                    // Trigger Homey Siren if enabled
+                    if (globalConfigService.isHomeyTriggerSync()) {
+                        homeyService.triggerSiren();
+                    }
+
+                    warningEmailSent = true;
                 }
-
-                warningEmailSent = true;
             }
         } else {
             lastSyncStatus = "OK";
+            syncErrorStartTime = null;
             warningEmailSent = false; // Reset latch when clear
         }
     }

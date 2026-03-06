@@ -394,6 +394,8 @@
                                 <th>Float. P/L</th>
                                 <th>Geschl. Trades</th>
                                 <th>Real. P/L</th>
+                                <th>Swap</th>
+                                <th>Komm.</th>
                                 <th>Gesamt</th>
                                 <th>Max Real. DD (€)</th>
                                 <th>Max Eq. DD (€)</th>
@@ -405,7 +407,17 @@
                             <tr th:each="mp : ${magicProfits}"
                                 th:data-symbols="${mp.tradedSymbols != null ? #strings.listJoin(mp.tradedSymbols.keySet(), ', ') : ''}">
                                 <td>
-                                    <strong th:text="${mp.magicNumber}">12345</strong>
+                                    <strong>
+                                        <a th:href="@{/account/{id}(id=${accountId}, magic=${mp.magicNumber})}"
+                                            target="_blank" class="magic-link"
+                                            title="Klicken, um Trades für diese Magic Number in neuem Tab zu öffnen"
+                                            style="color: #0ea5e9; text-decoration: none; border-bottom: 1px dashed #0ea5e9; padding-bottom: 1px; transition: color 0.2s;"
+                                            onmouseover="this.style.color='#38bdf8'; this.style.borderBottomColor='#38bdf8'"
+                                            onmouseout="this.style.color='#0ea5e9'; this.style.borderBottomColor='#0ea5e9'"
+                                            th:text="${mp.magicNumber}">
+                                            12345
+                                        </a>
+                                    </strong>
                                     <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
                                         style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;"
                                         th:text="${mp.magicName}">
@@ -418,6 +430,10 @@
                                 <td th:text="${mp.closedTradeCount}">10</td>
                                 <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
+                                <td th:style="${mp.totalSwap < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalSwap, 1, 2)}">-10.00</td>
+                                <td th:style="${mp.totalCommission < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalCommission, 1, 2)}">-5.00</td>
                                 <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
                                 <td style="color: #ef4444;"
@@ -1152,17 +1168,47 @@
                 return parseInt(a) - parseInt(b);
             });
 
-            // All checked by default
-            activeMagics = new Set(magicArray);
+            // Parse URL to check if we should auto-filter a specific magic number
+            var urlParams = new URLSearchParams(window.location.search);
+            var preselectedMagic = urlParams.get('magic');
+
+            // Set active magics either to all (default) or the preselected one
+            if (preselectedMagic && magicSet.has(preselectedMagic)) {
+                activeMagics = new Set([preselectedMagic]);
+
+                // Auto-scroll to history table smoothly
+                setTimeout(function () {
+                    var historySection = document.getElementById('closed-trades-section');
+                    if (historySection) {
+                        historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            } else {
+                activeMagics = new Set(magicArray);
+            }
 
             // Create checkboxes
             magicArray.forEach(function (magic) {
+                var isChecked = activeMagics.has(magic);
+
                 var label = document.createElement('label');
-                label.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25); color: #c9d1d9; transition: all 0.15s; user-select: none;';
+                label.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; transition: all 0.15s; user-select: none;';
+
+                if (isChecked) {
+                    label.style.background = 'rgba(99,102,241,0.12)';
+                    label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    label.style.border = '1px solid rgba(99,102,241,0.25)';
+                    label.style.color = '#c9d1d9';
+                } else {
+                    label.style.background = 'rgba(255,255,255,0.03)';
+                    label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    label.style.border = '1px solid rgba(255,255,255,0.1)';
+                    label.style.color = '#8b949e';
+                }
 
                 var checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.checked = true;
+                checkbox.checked = isChecked;
                 checkbox.value = magic;
                 checkbox.className = 'magic-checkbox';
                 checkbox.style.cssText = 'cursor: pointer; accent-color: #6366f1;';
@@ -1707,8 +1753,15 @@
                 }
 
                 // Update Total Profit (Closed + Open)
-                var totalProfit = openProfit + stats.closedProfit;
-                var totalProfitCell = row.querySelector('td:nth-child(6)');
+                // We also need to add the static Swap and Commission that are currently displayed
+                var swapCell = row.querySelector('td:nth-child(6)');
+                var swapVal = parseFloat((swapCell ? swapCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
+
+                var commCell = row.querySelector('td:nth-child(7)');
+                var commVal = parseFloat((commCell ? commCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
+
+                var totalProfit = openProfit + stats.closedProfit + swapVal + commVal;
+                var totalProfitCell = row.querySelector('td:nth-child(8)');
                 if (totalProfitCell) {
                     totalProfitCell.textContent = totalProfit.toFixed(2);
                     totalProfitCell.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';

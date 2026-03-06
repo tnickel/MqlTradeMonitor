@@ -111,6 +111,7 @@ public class AdminController {
         model.addAttribute("homeyTriggerSync", globalConfigService.isHomeyTriggerSync());
         model.addAttribute("homeyTriggerApi", globalConfigService.isHomeyTriggerApi());
         model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
+        model.addAttribute("syncAlarmDelayMins", globalConfigService.getSyncAlarmDelayMins());
 
         // --- 3. Magic Mappings ---
         java.util.Set<Long> allMagics = new java.util.HashSet<>();

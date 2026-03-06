@@ -283,6 +283,21 @@ public class DashboardController {
     }
 
     /**
+     * AJAX Endpoint to update magic preferences (max age and min trades) for a
+     * specific account.
+     */
+    @PostMapping("/api/account/{accountId}/magic-preferences")
+    @ResponseBody
+    public ResponseEntity<String> updateMagicPreferences(
+            @PathVariable("accountId") Long accountId,
+            @RequestParam("magicNumberMaxAge") int magicNumberMaxAge,
+            @RequestParam("magicMinTrades") int magicMinTrades) {
+        accountManager.updateMagicNumberMaxAge(accountId, magicNumberMaxAge);
+        accountManager.updateMagicMinTrades(accountId, magicMinTrades);
+        return ResponseEntity.ok("Saved");
+    }
+
+    /**
      * AJAX Endpoint to reset all trade data for a specific account.
      * Deletes open trades, closed trades, and equity snapshots.
      * The account entity itself is preserved.
@@ -579,9 +594,11 @@ public class DashboardController {
             @RequestParam String homeyEvent,
             @RequestParam(required = false) boolean triggerSync,
             @RequestParam(required = false) boolean triggerApi,
-            @RequestParam int repeatCount) {
+            @RequestParam int repeatCount,
+            @RequestParam(defaultValue = "5") int syncAlarmDelayMins) {
 
-        globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi, repeatCount);
+        globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi, repeatCount,
+                syncAlarmDelayMins);
         return "redirect:/admin";
     }
 

@@ -14,6 +14,9 @@ public class MagicProfitEntry {
     private int openTradeCount;
     private int closedTradeCount;
 
+    private double totalSwap;
+    private double totalCommission;
+
     private Map<String, Integer> tradedSymbols;
     private double maxDrawdownEur;
     private double maxDrawdownPercent;
@@ -21,6 +24,7 @@ public class MagicProfitEntry {
     private double maxEquityDrawdownPercent;
 
     public MagicProfitEntry(long magicNumber, String magicName, double openProfit, double closedProfit,
+            double totalSwap, double totalCommission,
             int openTradeCount, int closedTradeCount, Map<String, Integer> tradedSymbols,
             double maxDrawdownEur, double maxDrawdownPercent,
             double maxEquityDrawdownEur, double maxEquityDrawdownPercent) {
@@ -28,7 +32,9 @@ public class MagicProfitEntry {
         this.magicName = magicName;
         this.openProfit = openProfit;
         this.closedProfit = closedProfit;
-        this.totalProfit = openProfit + closedProfit;
+        this.totalSwap = totalSwap;
+        this.totalCommission = totalCommission;
+        this.totalProfit = openProfit + closedProfit + totalSwap + totalCommission;
         this.openTradeCount = openTradeCount;
         this.closedTradeCount = closedTradeCount;
         this.tradedSymbols = tradedSymbols;
@@ -56,6 +62,14 @@ public class MagicProfitEntry {
 
     public double getTotalProfit() {
         return totalProfit;
+    }
+
+    public double getTotalSwap() {
+        return totalSwap;
+    }
+
+    public double getTotalCommission() {
+        return totalCommission;
     }
 
     public int getOpenTradeCount() {

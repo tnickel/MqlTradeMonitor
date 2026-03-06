@@ -388,11 +388,20 @@
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 
-                <div class="form-group" style="grid-column: span 2;">
+                <div class="form-group">
                     <label for="repeatCount" style="color: #8b949e; display: block; margin-bottom: 5px;">Wiederholungen
                         (n-mal hupen)</label>
                     <input type="number" id="repeatCount" name="repeatCount" th:value="${homeyRepeatCount}" min="1"
                         max="100"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                </div>
+
+                <div class="form-group">
+                    <label for="syncAlarmDelayMins"
+                        style="color: #8b949e; display: block; margin-bottom: 5px;">Verzögerung für Sync-Alarm
+                        (Minuten)</label>
+                    <input type="number" id="syncAlarmDelayMins" name="syncAlarmDelayMins"
+                        th:value="${syncAlarmDelayMins}" min="0" max="1440"
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                 </div>
 

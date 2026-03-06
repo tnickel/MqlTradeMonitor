@@ -230,7 +230,7 @@ public class Account {
     }
 
     public double getTotalProfit() {
-        return openTrades.stream().mapToDouble(Trade::getProfit).sum();
+        return openTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap()).sum();
     }
 
     public String getName() {
@@ -301,7 +301,7 @@ public class Account {
     }
 
     public double getTotalHistoryProfit() {
-        return closedTrades.stream().mapToDouble(ClosedTrade::getProfit).sum();
+        return closedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission()).sum();
     }
 
     /**
@@ -350,6 +350,10 @@ public class Account {
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(Trade::getProfit)
                     .sum();
+            double openSwap = openTrades.stream()
+                    .filter(t -> t.getMagicNumber() == magic)
+                    .mapToDouble(Trade::getSwap)
+                    .sum();
             int openCount = (int) openTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
@@ -357,9 +361,20 @@ public class Account {
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(ClosedTrade::getProfit)
                     .sum();
+            double closedSwap = closedTrades.stream()
+                    .filter(t -> t.getMagicNumber() == magic)
+                    .mapToDouble(ClosedTrade::getSwap)
+                    .sum();
+            double closedCommission = closedTrades.stream()
+                    .filter(t -> t.getMagicNumber() == magic)
+                    .mapToDouble(ClosedTrade::getCommission)
+                    .sum();
             int closedCount = (int) closedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
+
+            double totalSwap = openSwap + closedSwap;
+            double totalCommission = closedCommission;
 
             if ((openCount + closedCount) < minTrades) {
                 continue;
@@ -403,6 +418,7 @@ public class Account {
             double cumulativeProfit = 0.0;
             double highWaterMark = 0.0;
             double maxSingleLossEur = 0.0;
+            double peakAtMaxDrawdown = 0.0;
 
             List<ClosedTrade> magicClosedTrades = new ArrayList<>();
             closedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(magicClosedTrades::add);
@@ -411,18 +427,19 @@ public class Account {
             magicClosedTrades.sort(Comparator.comparing(t -> t.getCloseTime() == null ? "" : t.getCloseTime()));
 
             for (ClosedTrade ct : magicClosedTrades) {
-                cumulativeProfit += ct.getProfit();
+                double netTradeProfit = ct.getProfit() + ct.getSwap() + ct.getCommission();
+                cumulativeProfit += netTradeProfit;
                 if (cumulativeProfit > highWaterMark) {
                     highWaterMark = cumulativeProfit;
                 }
                 double currentDrawdown = highWaterMark - cumulativeProfit;
                 if (currentDrawdown > maxDrawdownEur) {
                     maxDrawdownEur = currentDrawdown;
+                    peakAtMaxDrawdown = highWaterMark;
                 }
 
-                if (ct.getProfit() < 0) {
-                    // Include commission and swap for single loss estimate
-                    double loss = Math.abs(ct.getProfit() + ct.getCommission() + ct.getSwap());
+                if (netTradeProfit < 0) {
+                    double loss = Math.abs(netTradeProfit);
                     if (loss > maxSingleLossEur) {
                         maxSingleLossEur = loss;
                     }
@@ -434,26 +451,32 @@ public class Account {
             // the most accurate baseline without inflating the values artificially.
             double estimatedMaxEquityDrawdownEur = maxDrawdownEur;
 
-            // Include currently open profit in max drawdown consideration if applicable
-            double currentTotalMagicProfit = cumulativeProfit + openProfit;
+            // Include currently open net profit in max drawdown consideration if applicable
+            double currentTotalMagicProfit = cumulativeProfit + openProfit + openSwap;
             double currentOpenDrawdown = highWaterMark - currentTotalMagicProfit;
             if (currentOpenDrawdown > maxDrawdownEur) {
                 maxDrawdownEur = currentOpenDrawdown;
+                peakAtMaxDrawdown = highWaterMark;
             }
             if (currentOpenDrawdown > estimatedMaxEquityDrawdownEur) {
                 estimatedMaxEquityDrawdownEur = currentOpenDrawdown;
             }
 
-            // Calculate % relative to current global balance (approximation)
+            // Calculate % relative to peak equity at the time of the max drawdown
+            // Myfxbook Drawdown % formula: Max Drawdown / (Net Deposits + Peak Profit)
             double maxDrawdownPercent = 0.0;
             double maxEquityDrawdownPercent = 0.0;
-            if (this.balance > 0) {
-                maxDrawdownPercent = (maxDrawdownEur / this.balance) * 100.0;
-                maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / this.balance) * 100.0;
+            double netDeposits = this.balance - this.getTotalHistoryProfit();
+            double denominator = netDeposits + peakAtMaxDrawdown;
+
+            if (denominator > 0) {
+                maxDrawdownPercent = (maxDrawdownEur / denominator) * 100.0;
+                maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / denominator) * 100.0;
             }
 
             entries.add(
-                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, openCount, closedCount,
+                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, totalSwap, totalCommission,
+                            openCount, closedCount,
                             tradedSymbols, maxDrawdownEur, maxDrawdownPercent, estimatedMaxEquityDrawdownEur,
                             maxEquityDrawdownPercent));
         }
