@@ -26,6 +26,11 @@ Das System besteht aus zwei Hauptkomponenten:
 *   **Datenbank**:
     *   **H2 (File-basiert)**: Persistente Speicherung von Accounts, Trades und Historie.
     *   **Tabellen**: `accounts`, `open_trades`, `closed_trades`, `dashboard_sections`.
+*   **Services**:
+    *   **TradeSyncService**: Überwacht die Synchronisation zwischen Real- und Demo-Accounts.
+    *   **OpenProfitAlarmService**: Überwacht den Open Profit aller Accounts mit konfigurierten Schwellwerten. Löst bei Unterschreitung Email-Benachrichtigung und Homey-Sirene aus.
+    *   **EmailService**: Versendet Warn-Emails bei Sync-Problemen und Open-Profit-Alarmen.
+    *   **HomeyService**: Steuert Smart-Home-Sirene über Homey-Webhook.
 *   **API Endpoints**:
     *   `/api/register`: Account-Registrierung.
     *   `/api/trades-init` & `/api/trades`: Trade-Synchronisation.
@@ -41,6 +46,7 @@ Das Frontend ist eine server-seitig gerenderte Webanwendung mit dynamischen Java
     *   **Drag & Drop**: Verschieben von Account-Kacheln zwischen Sektionen.
     *   **Report-Kacheln**: Tägliche, wöchentliche und monatliche Profit-Charts direkt auf dem Dashboard.
     *   **Echtzeit-Status**: Visuelle Indikatoren für Online/Offline Status.
+    *   **Open Profit Alarm**: Pro Account konfigurierbar mit absolutem Schwellwert (z.B. -5000 EUR) und/oder prozentualem Drawdown (z.B. 10%). Bei Auslösung wird die Kachel rot, ein globaler Alarm-Banner erscheint oben, und es werden Email + Sirene ausgelöst.
 *   **Offene Trades (`/open-trades`)**:
     *   Dedizierte Ansicht aller offenen Positionen über alle Accounts hinweg.
     *   Aggregierte Summen (Total Equity, Total P/L).
@@ -82,6 +88,13 @@ Die Daten werden lokal im Ordner `./data` gespeichert:
 *   `trademonitor.mv.db`: H2 Datenbank-Datei.
 *   Diese Datei kann für Backups einfach kopiert werden.
 *   Zum Reset der Daten: Server stoppen und Datei löschen.
+
+### Account-Tabelle (relevante Alarm-Spalten)
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `open_profit_alarm_enabled` | BOOLEAN | Alarm aktiv/inaktiv |
+| `open_profit_alarm_abs` | DOUBLE | Absoluter Schwellwert (z.B. -5000) |
+| `open_profit_alarm_pct` | DOUBLE | Prozentualer Drawdown-Schwellwert (z.B. 10.0) |
 
 ---
 

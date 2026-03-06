@@ -121,6 +121,14 @@
                 <span class="summary-label">Open Trades</span>
                 <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
             </div>
+            <div class="summary-card" th:if="${account.openProfitAlarmEnabled}"
+                th:style="${account.openProfitAlarmTriggered ? 'border: 2px solid #ef4444; background: rgba(239,68,68,0.1);' : 'border: 2px solid #10b981; background: rgba(16,185,129,0.1);'}">
+                <span class="summary-label" style="font-weight: bold;"
+                    th:text="${account.openProfitAlarmTriggered ? '🔴 ALARM AKTIV' : '🔔 Alarm'}">🔔 Alarm</span>
+                <span class="summary-value" style="font-size: 0.95rem;"
+                    th:text="(${account.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(account.openProfitAlarmAbs, 1, 0) + ' ' + account.currency : ''}) + (${account.openProfitAlarmAbs != null && account.openProfitAlarmPct != null ? ' / ' : ''}) + (${account.openProfitAlarmPct != null ? #numbers.formatDecimal(account.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡
+                    -5000 / 10%</span>
+            </div>
         </div>
 
         <!-- ======= ZENTRALER AUSWAHLFILTER ======= -->

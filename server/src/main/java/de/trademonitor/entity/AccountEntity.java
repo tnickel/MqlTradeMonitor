@@ -34,6 +34,15 @@ public class AccountEntity {
     @Column(name = "magic_min_trades")
     private Integer magicMinTrades = 5; // Default 5 trades
 
+    @Column(name = "open_profit_alarm_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean openProfitAlarmEnabled = false;
+
+    @Column(name = "open_profit_alarm_abs")
+    private Double openProfitAlarmAbs; // e.g. -5000 (absolute min open profit)
+
+    @Column(name = "open_profit_alarm_pct")
+    private Double openProfitAlarmPct; // e.g. 10.0 (max drawdown % of balance)
+
     public AccountEntity() {
     }
 
@@ -155,5 +164,29 @@ public class AccountEntity {
 
     public void setMagicMinTrades(Integer magicMinTrades) {
         this.magicMinTrades = magicMinTrades;
+    }
+
+    public Boolean isOpenProfitAlarmEnabled() {
+        return openProfitAlarmEnabled != null ? openProfitAlarmEnabled : false;
+    }
+
+    public void setOpenProfitAlarmEnabled(Boolean openProfitAlarmEnabled) {
+        this.openProfitAlarmEnabled = openProfitAlarmEnabled;
+    }
+
+    public Double getOpenProfitAlarmAbs() {
+        return openProfitAlarmAbs;
+    }
+
+    public void setOpenProfitAlarmAbs(Double openProfitAlarmAbs) {
+        this.openProfitAlarmAbs = openProfitAlarmAbs;
+    }
+
+    public Double getOpenProfitAlarmPct() {
+        return openProfitAlarmPct;
+    }
+
+    public void setOpenProfitAlarmPct(Double openProfitAlarmPct) {
+        this.openProfitAlarmPct = openProfitAlarmPct;
     }
 }

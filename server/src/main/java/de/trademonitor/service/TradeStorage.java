@@ -68,13 +68,17 @@ public class TradeStorage {
     }
 
     /**
-     * Update account name and type.
+     * Update account name, type, and alarm config.
      */
-    public void updateAccountDetails(long accountId, String name, String type) {
+    public void updateAccountDetails(long accountId, String name, String type,
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct) {
         AccountEntity entity = accountRepository.findById(accountId).orElse(null);
         if (entity != null) {
             entity.setName(name);
             entity.setType(type);
+            entity.setOpenProfitAlarmEnabled(alarmEnabled);
+            entity.setOpenProfitAlarmAbs(alarmAbs);
+            entity.setOpenProfitAlarmPct(alarmPct);
             accountRepository.save(entity);
         }
     }

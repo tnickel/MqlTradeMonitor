@@ -81,6 +81,11 @@ public class AccountManager {
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
 
+            // Load alarm config
+            account.setOpenProfitAlarmEnabled(ae.isOpenProfitAlarmEnabled());
+            account.setOpenProfitAlarmAbs(ae.getOpenProfitAlarmAbs());
+            account.setOpenProfitAlarmPct(ae.getOpenProfitAlarmPct());
+
             // Load lastSeen if available
             if (ae.getLastSeen() != null && !ae.getLastSeen().isEmpty()) {
                 try {
@@ -203,13 +208,17 @@ public class AccountManager {
     /**
      * Update account details (Method for Dashboard).
      */
-    public void updateAccountDetails(long accountId, String name, String type) {
+    public void updateAccountDetails(long accountId, String name, String type,
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct) {
         Account account = accounts.get(accountId);
         if (account != null) {
             account.setName(name);
             account.setType(type);
+            account.setOpenProfitAlarmEnabled(alarmEnabled);
+            account.setOpenProfitAlarmAbs(alarmAbs);
+            account.setOpenProfitAlarmPct(alarmPct);
             // Persist
-            tradeStorage.updateAccountDetails(accountId, name, type);
+            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
         }
     }
 
@@ -344,6 +353,10 @@ public class AccountManager {
             info.put("syncWarning", account.isSyncWarning());
             info.put("errorState", account.isErrorState());
             info.put("lastErrorMsg", account.getLastErrorMsg());
+            info.put("openProfitAlarmEnabled", account.isOpenProfitAlarmEnabled());
+            info.put("openProfitAlarmAbs", account.getOpenProfitAlarmAbs());
+            info.put("openProfitAlarmPct", account.getOpenProfitAlarmPct());
+            info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
             result.add(info);
         }
         // Sort by online status then by account ID

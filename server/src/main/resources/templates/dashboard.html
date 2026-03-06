@@ -267,6 +267,19 @@
             });
         </script>
 
+
+        <!-- Global Open Profit Alarm Banner -->
+        <div th:if="${!alarmedAccounts.isEmpty()}" class="global-warning-banner" style="margin-bottom: 1.5rem;">
+            <span class="global-warning-icon">🚨</span>
+            <div>
+                <strong style="font-size: 1.1rem; color: #fff;">OPEN PROFIT ALARM!</strong>
+                <span th:each="acc : ${alarmedAccounts}">
+                    <br /><span style="color: #ffcccc;"
+                        th:text="'⚠️ ' + (${acc.name} != null ? ${acc.name} : ${acc.accountId}) + ': Open Profit ' + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency} + ' (Schwelle: ' + (${acc.openProfitAlarmAbs} != null ? ${#numbers.formatDecimal(acc.openProfitAlarmAbs, 1, 0)} + ' ' + ${acc.currency} : '') + (${acc.openProfitAlarmAbs != null && acc.openProfitAlarmPct != null} ? ' / ' : '') + (${acc.openProfitAlarmPct} != null ? ${#numbers.formatDecimal(acc.openProfitAlarmPct, 1, 1)} + '%' : '') + ')'"></span>
+                </span>
+            </div>
+        </div>
+
         <div id="layout-container">
             <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
                 <div class="section-header">
@@ -279,7 +292,8 @@
 
                 <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
                     <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card"
-                        th:data-online="${acc.online}" th:classappend="${acc.syncWarning ? ' warning-pulse' : ''}"
+                        th:data-online="${acc.online}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''}"
                         th:data-id="${acc.accountId}" th:data-type="${acc.type}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
@@ -301,8 +315,10 @@
                                     <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
                                     <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
                                     <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
-                                        th:data-type="${acc.type}"
-                                        onclick="event.stopPropagation(); openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-type'))"
+                                        th:data-type="${acc.type}" th:data-alarm-enabled="${acc.openProfitAlarmEnabled}"
+                                        th:data-alarm-abs="${acc.openProfitAlarmAbs}"
+                                        th:data-alarm-pct="${acc.openProfitAlarmPct}"
+                                        onclick="event.stopPropagation(); openEditModal(this)"
                                         title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">✏️</span>
                                 </div>
                             </div>
@@ -339,13 +355,20 @@
                                     USD</span>
                             </div>
                             <div class="metric">
-                                <span class="metric-label">Equity</span>
-                                <span class="metric-value"
-                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)} + ' ' + ${acc.currency}">1000
-                                    USD</span>
+                                <span class="metric-label">Alarm</span>
+                                <span th:if="${!acc.openProfitAlarmEnabled}" class="metric-value"
+                                    style="color: #555;">–</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && !acc.openProfitAlarmTriggered}"
+                                    class="metric-value" style="color: #10b981; font-size: 0.85rem;"
+                                    th:text="(${acc.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(acc.openProfitAlarmAbs, 1, 0) + ' ' + acc.currency : ''}) + (${acc.openProfitAlarmAbs != null && acc.openProfitAlarmPct != null ? ' / ' : ''}) + (${acc.openProfitAlarmPct != null ? #numbers.formatDecimal(acc.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡
+                                    -5000 / 10%</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && acc.openProfitAlarmTriggered}"
+                                    class="metric-value"
+                                    style="color: #ef4444; font-weight: bold; animation: pulse-border 1s infinite;">🔴
+                                    ALARM</span>
                             </div>
                             <div class="metric">
-                                <span class="metric-label">Profit</span>
+                                <span class="metric-label">Open Profit</span>
                                 <span
                                     th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
                                     th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
@@ -389,8 +412,8 @@
                             <th>Account</th>
                             <th>Name</th>
                             <th>Balance</th>
-                            <th>Equity</th>
-                            <th>Profit</th>
+                            <th>Alarm</th>
+                            <th>Open Profit</th>
                             <th>Trades</th>
                             <th style="text-align:center;">Sync</th>
                         </tr>
@@ -413,7 +436,14 @@
                                 </div>
                             </td>
                             <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
-                            <td th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</td>
+                            <td>
+                                <span th:if="${!acc.openProfitAlarmEnabled}"
+                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && !acc.openProfitAlarmTriggered}"
+                                    style="color: #10b981; font-size: 0.85rem;">⚡</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && acc.openProfitAlarmTriggered}"
+                                    style="color: #ef4444; font-weight: bold;">🔴</span>
+                            </td>
                             <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                 th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
                             <td th:text="${acc.trades}">5</td>
@@ -528,6 +558,24 @@
                     <option value="DEMO">Demo Account</option>
                     <option value="REAL">Real Account</option>
                 </select>
+            </div>
+
+            <hr style="border-color: #333; margin: 15px 0;">
+            <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #ef4444;">🔔 Open Profit Alarm</h3>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="editAlarmEnabled" style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="editAlarmEnabled" style="margin: 0; cursor: pointer;">Alarm aktiv</label>
+            </div>
+
+            <div class="form-group">
+                <label for="editAlarmAbs">Min. Open Profit (absolut, z.B. -5000):</label>
+                <input type="number" id="editAlarmAbs" step="1" placeholder="z.B. -5000">
+            </div>
+
+            <div class="form-group">
+                <label for="editAlarmPct">Max. Drawdown (% der Balance, z.B. 10):</label>
+                <input type="number" id="editAlarmPct" step="0.1" min="0" placeholder="z.B. 10">
             </div>
 
             <button class="save-btn" onclick="saveAccountDetails()">Speichern</button>
@@ -1058,10 +1106,20 @@
         }
 
         // Modal functions
-        function openEditModal(accountId, currentName, currentType) {
-            document.getElementById('editAccountId').value = accountId;
-            document.getElementById('editAccountName').value = currentName === 'null' ? '' : currentName;
-            document.getElementById('editAccountType').value = currentType === 'null' ? '' : currentType;
+        function openEditModal(el) {
+            document.getElementById('editAccountId').value = el.getAttribute('data-id');
+            var name = el.getAttribute('data-name');
+            document.getElementById('editAccountName').value = (name === 'null' || name === null) ? '' : name;
+            var type = el.getAttribute('data-type');
+            document.getElementById('editAccountType').value = (type === 'null' || type === null) ? '' : type;
+
+            // Alarm fields
+            var alarmEnabled = el.getAttribute('data-alarm-enabled') === 'true';
+            document.getElementById('editAlarmEnabled').checked = alarmEnabled;
+            var alarmAbs = el.getAttribute('data-alarm-abs');
+            document.getElementById('editAlarmAbs').value = (alarmAbs && alarmAbs !== 'null') ? alarmAbs : '';
+            var alarmPct = el.getAttribute('data-alarm-pct');
+            document.getElementById('editAlarmPct').value = (alarmPct && alarmPct !== 'null') ? alarmPct : '';
 
             document.getElementById('editAccountModal').style.display = 'block';
         }
@@ -1074,11 +1132,17 @@
             const accountId = document.getElementById('editAccountId').value;
             const name = document.getElementById('editAccountName').value;
             const type = document.getElementById('editAccountType').value;
+            const alarmEnabled = document.getElementById('editAlarmEnabled').checked;
+            const alarmAbs = document.getElementById('editAlarmAbs').value;
+            const alarmPct = document.getElementById('editAlarmPct').value;
 
             const formData = new FormData();
             formData.append('accountId', accountId);
             formData.append('name', name);
             formData.append('type', type);
+            formData.append('alarmEnabled', alarmEnabled);
+            if (alarmAbs) formData.append('alarmAbs', alarmAbs);
+            if (alarmPct) formData.append('alarmPct', alarmPct);
 
             fetch('/api/account/update', {
                 method: 'POST',

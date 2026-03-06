@@ -30,6 +30,14 @@ public class Account {
     // Transient field for sync warning
     private boolean syncWarning;
 
+    // Open Profit Alarm config (persisted via AccountEntity)
+    private boolean openProfitAlarmEnabled;
+    private Double openProfitAlarmAbs; // absolute min open profit, e.g. -5000
+    private Double openProfitAlarmPct; // max drawdown % of balance, e.g. 10.0
+
+    // Transient runtime field: alarm currently triggered
+    private boolean openProfitAlarmTriggered;
+
     // Transient fields for API error warning
     private String lastErrorMsg;
     private LocalDateTime lastErrorTime;
@@ -40,6 +48,38 @@ public class Account {
 
     public void setSyncWarning(boolean syncWarning) {
         this.syncWarning = syncWarning;
+    }
+
+    public boolean isOpenProfitAlarmEnabled() {
+        return openProfitAlarmEnabled;
+    }
+
+    public void setOpenProfitAlarmEnabled(boolean openProfitAlarmEnabled) {
+        this.openProfitAlarmEnabled = openProfitAlarmEnabled;
+    }
+
+    public Double getOpenProfitAlarmAbs() {
+        return openProfitAlarmAbs;
+    }
+
+    public void setOpenProfitAlarmAbs(Double openProfitAlarmAbs) {
+        this.openProfitAlarmAbs = openProfitAlarmAbs;
+    }
+
+    public Double getOpenProfitAlarmPct() {
+        return openProfitAlarmPct;
+    }
+
+    public void setOpenProfitAlarmPct(Double openProfitAlarmPct) {
+        this.openProfitAlarmPct = openProfitAlarmPct;
+    }
+
+    public boolean isOpenProfitAlarmTriggered() {
+        return openProfitAlarmTriggered;
+    }
+
+    public void setOpenProfitAlarmTriggered(boolean openProfitAlarmTriggered) {
+        this.openProfitAlarmTriggered = openProfitAlarmTriggered;
     }
 
     public String getLastErrorMsg() {

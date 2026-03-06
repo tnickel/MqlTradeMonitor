@@ -136,8 +136,13 @@ public class DashboardController {
         model.addAttribute("accountsBySection", accountsBySection);
 
         // Keep "accounts" for backward compatibility if needed for totals
-        // Keep "accounts" for backward compatibility if needed for totals
         model.addAttribute("accounts", allAccounts);
+
+        // Collect accounts with triggered open profit alarms for banner
+        List<java.util.Map<String, Object>> alarmedAccounts = allAccounts.stream()
+                .filter(acc -> Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered")))
+                .collect(Collectors.toList());
+        model.addAttribute("alarmedAccounts", alarmedAccounts);
 
         model.addAttribute("syncMetrics", tradeSyncService.getMetrics());
 
@@ -238,15 +243,18 @@ public class DashboardController {
     }
 
     /**
-     * AJAX Endpoint to update account details (name, type).
+     * AJAX Endpoint to update account details (name, type, alarm config).
      */
     @PostMapping("/api/account/update")
     @ResponseBody
     public ResponseEntity<String> updateAccountDetails(
             @RequestParam("accountId") Long accountId,
             @RequestParam("name") String name,
-            @RequestParam("type") String type) {
-        accountManager.updateAccountDetails(accountId, name, type);
+            @RequestParam("type") String type,
+            @RequestParam(value = "alarmEnabled", defaultValue = "false") boolean alarmEnabled,
+            @RequestParam(value = "alarmAbs", required = false) Double alarmAbs,
+            @RequestParam(value = "alarmPct", required = false) Double alarmPct) {
+        accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
         return ResponseEntity.ok("Saved");
     }
 
