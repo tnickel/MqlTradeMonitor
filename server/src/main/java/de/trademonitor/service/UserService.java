@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 @Service
 public class UserService {
@@ -34,6 +37,7 @@ public class UserService {
         if (existingAdminOpt.isEmpty()) {
             UserEntity admin = new UserEntity(defaultAdminUsername, passwordEncoder.encode(defaultAdminPassword),
                     "ROLE_ADMIN");
+            admin.setApiKey(generateApiKey());
             userRepository.save(admin);
             System.out.println("Initialized default admin user from properties: " + defaultAdminUsername);
         } else {
@@ -42,6 +46,9 @@ public class UserService {
             // if they forgot their password and restarted the app with default settings
             UserEntity existingAdmin = existingAdminOpt.get();
             existingAdmin.setPassword(passwordEncoder.encode(defaultAdminPassword));
+            if (existingAdmin.getApiKey() == null || existingAdmin.getApiKey().isEmpty()) {
+                existingAdmin.setApiKey(generateApiKey());
+            }
             userRepository.save(existingAdmin);
             System.out.println("Reset password for existing admin user from properties: " + defaultAdminUsername);
         }
@@ -65,6 +72,7 @@ public class UserService {
         }
         UserEntity user = new UserEntity(username, passwordEncoder.encode(rawPassword), role);
         user.setAllowedAccountIds(allowedAccountIds);
+        user.setApiKey(generateApiKey());
         return userRepository.save(user);
     }
 
@@ -83,5 +91,12 @@ public class UserService {
 
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
+    }
+
+    private String generateApiKey() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] token = new byte[32];
+        secureRandom.nextBytes(token);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 }

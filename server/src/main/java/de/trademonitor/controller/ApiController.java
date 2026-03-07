@@ -6,7 +6,10 @@ import de.trademonitor.dto.RegisterRequest;
 import de.trademonitor.dto.TradeInitRequest;
 import de.trademonitor.dto.TradeUpdateRequest;
 import de.trademonitor.service.AccountManager;
+import de.trademonitor.entity.UserEntity;
+import de.trademonitor.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +26,9 @@ public class ApiController {
     private AccountManager accountManager;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private de.trademonitor.repository.ClientLogRepository clientLogRepository;
 
     @Autowired
@@ -37,6 +43,21 @@ public class ApiController {
         } catch (Exception e) {
             System.err.println("Failed to save client log: " + e.getMessage());
         }
+    }
+
+    private boolean isAuthorized(String userKey, Long accountId) {
+        if (userKey == null || userKey.trim().isEmpty()) {
+            return false;
+        }
+        UserEntity user = userRepository.findByApiKey(userKey).orElse(null);
+        if (user == null) {
+            return false;
+        }
+        // Admins see everything, normal users must have the account allowed
+        if ("ROLE_ADMIN".equals(user.getRole())) {
+            return true;
+        }
+        return user.getAllowedAccountIds().contains(accountId);
     }
 
     /**
@@ -58,8 +79,18 @@ public class ApiController {
      * Register a new MetaTrader account.
      */
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request,
+    public ResponseEntity<?> register(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody RegisterRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            logClientAction(request.getAccountId(), "AUTH_FAILED", "Invalid or missing User Key during register",
+                    httpRequest);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
             logClientAction(request.getAccountId(), "REGISTER", "Broker: " + request.getBroker(), httpRequest);
             accountManager.registerAccount(
@@ -84,8 +115,16 @@ public class ApiController {
      * Server checks for duplicates and only inserts new trades.
      */
     @PostMapping("/trades-init")
-    public ResponseEntity<?> initTrades(@RequestBody TradeInitRequest request,
+    public ResponseEntity<?> initTrades(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody TradeInitRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
             int openCount = request.getTrades() != null ? request.getTrades().size() : 0;
             int closedCount = request.getClosedTrades() != null ? request.getClosedTrades().size() : 0;
@@ -125,8 +164,16 @@ public class ApiController {
      * Receive trade updates from MetaTrader (incremental, after init).
      */
     @PostMapping("/trades")
-    public ResponseEntity<?> updateTrades(@RequestBody TradeUpdateRequest request,
+    public ResponseEntity<?> updateTrades(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody TradeUpdateRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
             int count = request.getTrades() != null ? request.getTrades().size() : 0;
             // Only log if there are actual trades, to reduce noise? User wants to see
@@ -156,8 +203,16 @@ public class ApiController {
      * Receive heartbeat from MetaTrader.
      */
     @PostMapping("/heartbeat")
-    public ResponseEntity<?> heartbeat(@RequestBody HeartbeatRequest request,
+    public ResponseEntity<?> heartbeat(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody HeartbeatRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
             logClientAction(request.getAccountId(), "HEARTBEAT", "Alive", httpRequest);
             accountManager.updateHeartbeat(request.getAccountId());
@@ -184,8 +239,16 @@ public class ApiController {
      * Checks for duplicates and only inserts new trades.
      */
     @PostMapping("/history")
-    public ResponseEntity<?> updateHistory(@RequestBody HistoryUpdateRequest request,
+    public ResponseEntity<?> updateHistory(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody HistoryUpdateRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
             int count = request.getClosedTrades() != null ? request.getClosedTrades().size() : 0;
             logClientAction(request.getAccountId(), "HISTORY_UPDATE", "Count: " + count, httpRequest);

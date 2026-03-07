@@ -4,11 +4,12 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.01"
+#property version   "1.02"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
-input string   ServerURL = "http://192.168.178.143:8080";   // Server URL (use IP, not localhost!)
+input string   ServerURL = "https://DEINE-DOMAIN.DE:8080";   // Server URL (use HTTPS!)
+input string   InpUserKey = "";                        // User API-Key (from Admin Dashboard)
 input int      UpdateIntervalSeconds = 5;              // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
@@ -16,10 +17,11 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.01"
+#define EA_VERSION "1.02"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
+string   cfg_UserKey = "";
 int      cfg_UpdateIntervalSeconds = 0;
 int      cfg_HeartbeatIntervalSeconds = 0;
 int      cfg_ReconnectIntervalSeconds = 0;
@@ -118,6 +120,7 @@ bool LoadConfig()
       StringTrimRight(value);
       
       if(key == "ServerURL")                 cfg_ServerURL = value;
+      else if(key == "UserKey")              cfg_UserKey = value;
       else if(key == "UpdateIntervalSeconds")     cfg_UpdateIntervalSeconds = (int)StringToInteger(value);
       else if(key == "HeartbeatIntervalSeconds")  cfg_HeartbeatIntervalSeconds = (int)StringToInteger(value);
       else if(key == "ReconnectIntervalSeconds")  cfg_ReconnectIntervalSeconds = (int)StringToInteger(value);
@@ -130,7 +133,7 @@ bool LoadConfig()
 }
 
 //+------------------------------------------------------------------+
-//| Save current configuration to file.                                |
+//| Save current configuration to file (only called when generating default) |
 //+------------------------------------------------------------------+
 void SaveConfig()
 {
@@ -142,15 +145,17 @@ void SaveConfig()
    }
    
    FileWriteString(handle, "# TradeMonitorClient Configuration\r\n");
-   FileWriteString(handle, "# Auto-generated - do not edit while EA is running\r\n");
+   FileWriteString(handle, "# Auto-generated default configuration.\r\n");
+   FileWriteString(handle, "# Feel free to edit this file to change EA settings without recompiling.\r\n");
    FileWriteString(handle, "ServerURL=" + cfg_ServerURL + "\r\n");
+   FileWriteString(handle, "UserKey=" + cfg_UserKey + "\r\n");
    FileWriteString(handle, "UpdateIntervalSeconds=" + IntegerToString(cfg_UpdateIntervalSeconds) + "\r\n");
    FileWriteString(handle, "HeartbeatIntervalSeconds=" + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
    FileWriteString(handle, "ReconnectIntervalSeconds=" + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
    FileWriteString(handle, "MaxReconnectAttempts=" + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
    
    FileClose(handle);
-   Print("Configuration saved to ", CONFIG_FILE);
+   Print("Default configuration saved to ", CONFIG_FILE);
 }
 
 //+------------------------------------------------------------------+
@@ -158,25 +163,49 @@ void SaveConfig()
 //+------------------------------------------------------------------+
 void InitConfig()
 {
-   // First set defaults from input parameters
-   cfg_ServerURL = ServerURL;
-   cfg_UpdateIntervalSeconds = UpdateIntervalSeconds;
-   cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds;
-   cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds;
-   cfg_MaxReconnectAttempts = MaxReconnectAttempts;
-   
-   // Try to load from config file (overrides defaults)
    if(LoadConfig())
    {
-      // Check if user changed input parameters (different from config file values)
-      // If so, the user wants new values - save them
-      // This is detected by comparing input params with what's in the config
-      // If they differ, the user manually changed inputs -> use input values
-      // Note: this works because MQL4/5 input params are set by the user in the dialog
+      Print("Loaded configuration from ", CONFIG_FILE);
+      
+      // Check if UI inputs have been changed by the user
+      // We assume they changed if they differ from what we just loaded from the file.
+      // (This requires that the user actually enters values in the UI dialog that differ
+      // from the current file state. If they just open and close it without changes, 
+      // these will match, or they might match the default inputs).
+      bool uiChanged = false;
+      
+      if(ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080" && ServerURL != cfg_ServerURL) uiChanged = true;
+      if(InpUserKey != "" && InpUserKey != cfg_UserKey) uiChanged = true;
+      if(UpdateIntervalSeconds != 5 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
+      if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
+      if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
+      if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
+      
+      if(uiChanged)
+      {
+         Print("UI inputs differ from config file. Updating config file with new UI values.");
+         cfg_ServerURL = (ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080") ? ServerURL : cfg_ServerURL;
+         cfg_UserKey = (InpUserKey != "") ? InpUserKey : cfg_UserKey;
+         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 5) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
+         cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
+         cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
+         cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
+         
+         SaveConfig();
+      }
    }
    else
    {
-      // No config file exists, save current defaults
+      // No config file, use current UI input defaults
+      cfg_ServerURL = ServerURL;
+      cfg_UserKey = InpUserKey;
+      cfg_UpdateIntervalSeconds = UpdateIntervalSeconds;
+      cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds;
+      cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds;
+      cfg_MaxReconnectAttempts = MaxReconnectAttempts;
+      Print("Config file not found. Using UI inputs and generating a default config file.");
+      
+      // Generate the default configuration file so the user has something to edit
       SaveConfig();
    }
    
@@ -486,7 +515,10 @@ void CreateStatusLabel()
 //+------------------------------------------------------------------+
 void UpdateStatusLabel(string text, color col)
 {
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text);
+   string configInfo = "Cfg: " + cfg_ServerURL + "\n" + 
+                       "Upd: " + IntegerToString(cfg_UpdateIntervalSeconds) + "s | HB: " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "s\n" + 
+                       "ReConn: " + IntegerToString(cfg_ReconnectIntervalSeconds) + "s (Max: " + IntegerToString(cfg_MaxReconnectAttempts) + ")";
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text + "\n" + configInfo);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, col);
    ChartRedraw(0);
 }
@@ -869,6 +901,9 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
        ArrayResize(postData, size - 1);  // Remove null terminator
    
    string headers = "Content-Type: application/json\r\n";
+   if (StringLen(cfg_UserKey) > 0) {
+       headers += "X-User-Key: " + cfg_UserKey + "\r\n";
+   }
    
    ResetLastError();
    

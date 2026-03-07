@@ -21,6 +21,9 @@ public class UserEntity {
     @Column(nullable = false)
     private String role; // e.g., "ROLE_ADMIN", "ROLE_USER"
 
+    @Column(unique = true, length = 64)
+    private String apiKey;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_allowed_accounts", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "account_id")
@@ -73,5 +76,13 @@ public class UserEntity {
 
     public void setAllowedAccountIds(Set<Long> allowedAccountIds) {
         this.allowedAccountIds = allowedAccountIds;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
 }
