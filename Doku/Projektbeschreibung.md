@@ -1,227 +1,271 @@
-# Projekt-Dokumentation: MQL Trade Monitor
+# MQL Trade Monitor &mdash; Technische Projektdokumentation
 
-## 1. Übersicht
+## 1. Projektsteckbrief
 
-Das Projekt **MQL Trade Monitor** ist eine umfassende Lösung zur Überwachung und Analyse von MetaTrader 5 Trading-Konten in Echtzeit. Es bietet ein modernes Web-Dashboard zur zentralen Anzeige von Account-Metriken, offenen Positionen, historischen Daten und automatisierten Alarmen.
-
-Das System besteht aus zwei Hauptkomponenten:
-
-1. **MQL5 Expert Advisor (Client)**: Läuft im MetaTrader 5 Terminal und exportiert Account-Daten sowie Trades in Echtzeit an den Server.
-2. **Java Spring Boot Server (Backend)**: Empfängt die Daten, speichert sie in einer H2-Datenbank und stellt eine interaktive Web-Oberfläche mit umfangreichen Analyse- und Alarmfunktionen bereit.
-
-**Technologie-Stack:**
-- Java 17, Spring Boot 3.2, Spring Data JPA, Spring Security
-- H2 Database (File-basiert, Zero-Config)
-- Thymeleaf (Server-Side Rendering), Chart.js
-- MQL5 (MetaTrader 5 Expert Advisor)
-
----
-
-## 2. Architektur & Komponenten
-
-### 2.1 MQL5 Expert Advisor (`TradeMonitorClient.mq5`)
-
-Der Client agiert als Sensor innerhalb der Handelsplattform (Version 1.04).
-
-- **Funktion**: Überwacht Account-Zustand und Trades, sendet Daten per HTTP POST an den Server.
-- **Features**:
-  - **Echtzeit-Überwachung**: Sendet Balance, Equity, Margin und offene Trades.
-  - **Tick-Mode**: Schaltet automatisch auf tick-basierte Überwachung um, wenn ein Drawdown-Limit (50% des Max-Drawdowns) erreicht wird.
-  - **Verbindungsmanagement**: Automatische Reconnects mit konfigurierbaren Intervallen und Retry-Logik (MaxReconnectAttempts), Heartbeats und "Not-Aus"-Erkennung.
-  - **Historien-Export**: Inkrementelle Übertragung geschlossener Trades seit dem letzten Sync.
-  - **State-Persistenz**: GlobalVariables (`TM_TradeListSent_{AccountID}`, `TM_LastSync_{AccountID}`) und Config-Datei (`TradeMonitorClient.cfg`).
-  - **Status-Display**: Chart-Label mit Connected/Offline-Status, Account-ID, Sync-Status, Fehlercodes und Retry-Countdown.
-- **Konfiguration**: Server-URL, Update-Intervalle, Heartbeat-Intervalle, Reconnect-Parameter, Magic Number Filter (Whitelist/Blacklist).
-
-### 2.2 Java Spring Boot Server
-
-Das Herzstück der Datenverarbeitung und -aufbereitung.
-
-#### Controller (HTTP-Endpunkte)
-
-| Controller | Pfad | Beschreibung |
-|---|---|---|
-| `ApiController` | `/api/*` | REST API für MetaTrader EA-Kommunikation |
-| `DashboardController` | `/`, `/open-trades`, `/account/*` | Web-Views und AJAX-Endpoints |
-| `AdminController` | `/admin/*` | Admin-Panel (erfordert ROLE_ADMIN) |
-| `SecurityController` | `/login` | Login-Seite |
-| `UserController` | `/profile/*` | Benutzerprofil und Passwortänderung |
-
-#### Services (Geschäftslogik)
-
-| Service | Beschreibung |
+| | |
 |---|---|
-| `AccountManager` | In-Memory Account-Cache mit DB-Backing, Hauptlogik für Account- und Trade-Verwaltung |
-| `TradeStorage` | DB-Persistenz für Trades, Equity-Snapshots (Rate-limitiert: 1x/Min, Auto-Cleanup > 90 Tage) |
-| `TradeSyncService` | Überwacht Trade-Sync zwischen REAL- und DEMO-Accounts (jede Sekunde), Strict/Fallback Matching |
-| `TradeComparisonService` | Vergleicht REAL vs. DEMO Closed Trades: Slippage, Delays, Matching |
-| `OpenProfitAlarmService` | Überwacht Open Profit mit absoluten und prozentualen Schwellwerten (alle 5 Sek.) |
-| `GlobalConfigService` | Zentrale Konfigurationsverwaltung (persistiert in DB) |
-| `MagicMappingService` | Magic Number zu lesbarem Namen Mapping |
-| `EmailService` | E-Mail-Alerts mit täglichem Rate-Limit |
-| `HomeyService` | Homey Smart-Home Webhook-Integration (Sirene) |
-| `UserService` | Benutzerverwaltung mit rollenbasiertem Zugriff |
-| `LogCleanupService` | Tägliche Log-Bereinigung (2:00 Uhr, konfigurierbare Aufbewahrungsdauer) |
-
-### 2.3 Web Dashboard
-
-Das Frontend ist eine Server-Side-Rendered Webanwendung (Thymeleaf) mit dynamischen JavaScript-Modulen.
-
-- **Dashboard (`/`)**: Dynamisches Kachel-Layout mit Sektionen, Drag & Drop, Report-Kacheln (Tages-/Wochen-/Monatscharts), Echtzeit-Status-Indikatoren, Open-Profit-Alarm-Banner.
-- **Offene Trades (`/open-trades`)**: Konsolidierte Ansicht aller offenen Positionen, sortiert nach Account-Typ (REAL zuerst).
-- **Account-Details (`/account/{id}`)**: Überlagerter Balance/Equity-Chart, Performance pro Magic Number, Historien-Tabelle mit Zeitraum-Filter.
-- **Berichte (`/report/{period}`)**: Tägliche, wöchentliche und monatliche Profit-Reports.
-- **Trade-Vergleich (`/trade-comparison`)**: Analyse des Copy-Tradings zwischen REAL/DEMO mit Delay und Slippage.
-- **Admin-Bereich (`/admin`)**: DB-Statistiken, Konfiguration (Live-Indicator, Mail, Logs, Security, Homey), Magic Mappings, Benutzerverwaltung, Sync-Ausnahmen.
-- **Benutzerprofil (`/profile`)**: Passwortänderung.
-- **Mobile Ansicht (`/mobile/drawdown`)**: Ranking nach Magic-Number-Drawdown.
+| **Projekttyp** | Full-Stack Eigenentwicklung (Solo-Projekt) |
+| **Status** | Produktiv im Einsatz &mdash; ueberwacht taeglich reale Trading-Konten |
+| **Entwicklungszeit** | Laufende Weiterentwicklung seit Projektstart |
+| **Umfang** | ~60 Java-Klassen, 12 Templates, 11 DB-Tabellen, 1 MQL5-Client |
+| **Technologie** | Java 17, Spring Boot 3.2, Spring Security, JPA/Hibernate, H2, Thymeleaf, Chart.js, MQL5 |
 
 ---
 
-## 3. Datenbankschema
+## 2. Problemstellung & Loesung
 
-Die H2-Datenbank wird automatisch per JPA erstellt und verwaltet.
+### Das Problem
+Professionelle Trader mit mehreren MetaTrader 5 Konten (Real + Demo) benoetigen einen zentralen Ueberblick ueber alle Konten, automatisierte Alarme bei kritischen Drawdowns und eine lueckenlose Analyse der Copy-Trading-Qualitaet (Slippage, Delays) &mdash; Funktionen, die MetaTrader 5 nativ nicht bietet.
 
-| Tabelle | Entity | Beschreibung |
-|---|---|---|
-| `accounts` | `AccountEntity` | Account-Stammdaten: accountId, broker, currency, balance, equity, name, type (DEMO/REAL), Alarm-Konfiguration |
-| `equity_snapshots` | `EquitySnapshotEntity` | Periodische Equity-Snapshots (1x/Min, 90 Tage Aufbewahrung) |
-| `closed_trades` | `ClosedTradeEntity` | Geschlossene Trades (accountId + ticket = unique key) |
-| `open_trades` | `OpenTradeEntity` | Aktuell offene Trades |
-| `dashboard_sections` | `DashboardSectionEntity` | Dashboard-Sektionen mit Sortierung |
-| `magic_mappings` | `MagicMappingEntity` | Magic Number zu Name Mapping |
-| `global_config` | `GlobalConfigEntity` | Key-Value Konfigurationsspeicher |
-| `users` | `UserEntity` | Benutzer mit BCrypt-Passwort, Rolle und Account-Berechtigungen |
-| `request_logs` | `RequestLog` | HTTP-Request-Logs (neue IPs) |
-| `client_logs` | `ClientLog` | MetaTrader Client-Aktionslogs |
-| `login_logs` | `LoginLog` | Authentifizierungs-Logs |
-
-### Account-Entity (wichtige Felder)
-
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `accountId` | String (PK) | MetaTrader Account-ID |
-| `broker` | String | Broker-Name |
-| `currency` | String | Kontowährung |
-| `balance` / `equity` | Double | Aktueller Kontostand / Equity |
-| `name` | String | Anzeigename |
-| `type` | String | DEMO oder REAL |
-| `sectionId` | Long | Dashboard-Sektion |
-| `displayOrder` | Integer | Sortierung im Dashboard |
-| `openProfitAlarmEnabled` | Boolean | Alarm aktiv/inaktiv |
-| `openProfitAlarmAbs` | Double | Absoluter Schwellwert (z.B. -5000) |
-| `openProfitAlarmPct` | Double | Prozentualer Drawdown-Schwellwert (z.B. 10.0) |
+### Die Loesung
+Eine vollstaendig selbst entwickelte Monitoring-Plattform, die:
+- **Daten in Echtzeit erfasst** ueber einen eigens entwickelten MQL5 Expert Advisor mit ausfallsicherer Reconnect-Logik
+- **Intelligent aggregiert** durch In-Memory-Caching mit persistentem DB-Backing
+- **Anomalien automatisch erkennt** mittels konfigurierbarem Schwellwert-Monitoring und zweistufigem Trade-Matching
+- **Ueber multiple Kanaele alarmiert** (Web-Dashboard, E-Mail, Smart-Home-Sirene)
+- **Umfassende Analysen bietet** mit interaktiven Charts, Strategie-Performance-Breakdowns und Copy-Trade-Auswertungen
 
 ---
 
-## 4. Installation & Start
+## 3. Architektur
 
-### 4.1 Server
-
-1. **Voraussetzung**: Java JDK 17+ und Maven.
-2. **Build**: `mvn clean package`
-3. **Start**: `java -jar server/target/trade-monitor-server-0.12.0.jar`
-4. **Zugriff**: `http://localhost:8080`
-
-### 4.2 MetaTrader 5 Client
-
-1. `TradeMonitorClient.mq5` in das Verzeichnis `MQL5/Experts/` kopieren.
-2. Im MetaEditor kompilieren (F7).
-3. In MT5 unter *Extras > Optionen > Experten* die URL `http://localhost:8080` erlauben.
-4. Den EA auf einen Chart ziehen und "Auto-Trading" aktivieren.
-5. Der Account registriert sich automatisch und erscheint im Dashboard.
-
----
-
-## 5. Datenspeicherung & Backup
-
-- Alle Daten werden lokal im Ordner `./data` relativ zum Server-Startpunkt gespeichert.
-- Hauptdatei: `trademonitor.mv.db` (H2 Datenbank).
-- **Backup**: Server stoppen, `.db`-Datei kopieren.
-- **Reset**: Server stoppen, Datenbankdatei löschen.
-- **H2-Konsole**: Erreichbar unter `/h2-console` (konfigurierbar im Admin-Bereich).
-
----
-
-## 6. Konfiguration
-
-### 6.1 application.properties
-
-| Eigenschaft | Standardwert | Beschreibung |
-|---|---|---|
-| `server.port` | 8080 | Server-Port |
-| `spring.datasource.url` | `jdbc:h2:file:./data/trademonitor` | Datenbankpfad |
-| `account.timeout.seconds` | 60 | Timeout für Offline-Markierung |
-| `app.admin.username` | admin | Standard-Admin-Benutzername |
-| `app.admin.password` | password | Standard-Admin-Passwort |
-
-### 6.2 Dynamische Konfiguration (Admin-Panel)
-
-Alle folgenden Einstellungen werden in der DB gespeichert und sind über das Admin-Panel konfigurierbar:
-
-- **Live-Indicator**: Schwellwerte und Farben für Online-Status (grün/gelb/orange/rot)
-- **E-Mail**: SMTP-Host, Port, Benutzer, Passwort, Absender, Empfänger, tägliches Limit
-- **Log-Aufbewahrung**: Konfigurierbare Tage für Login-, Verbindungs- und Client-Logs
-- **Security**: Rate-Limiting, Brute-Force-Schutz, Security-Headers, Max Sessions, H2-Konsole
-- **Homey**: Webhook-ID, Event-Name, Trigger-Konfiguration, Alarm-Delay
-- **Sync-Ausnahmen**: Magic Numbers die vom Sync-Check ausgenommen werden
-
----
-
-## 7. Entwicklung
-
-### 7.1 Architektur-Patterns
-
-- **Backend**: Striktes Controller-Service-Repository Pattern
-- **In-Memory Cache**: AccountManager cached Accounts für schnellen Dashboard-Zugriff
-- **Scheduled Tasks**: TradeSyncService (1s), OpenProfitAlarmService (5s), LogCleanupService (täglich 2:00)
-- **Duplicate Detection**: Trades eindeutig über (accountId, ticket)
-- **Role-Based Access Control**: UserEntity.allowedAccountIds für benutzerspezifische Account-Sichtbarkeit
-
-### 7.2 Frontend
-
-- **Template Engine**: Thymeleaf (Server-Side Rendering)
-- **Charts**: Chart.js (CDN)
-- **CSS**: Vanilla CSS mit CSS Custom Properties (Dark Mode)
-- **Kein Build-Tool**: Kein Webpack, kein npm
-- **JS-Pattern**: Klassen als Function-Konstruktoren
-
-### 7.3 Projektstruktur
+### 3.1 Systemuebersicht
 
 ```
-MqlTradeMonitor/
-├── server/                          # Spring Boot Java Backend
-│   ├── pom.xml
-│   ├── data/                        # H2-Datenbankdateien
-│   └── src/main/
-│       ├── java/de/trademonitor/
-│       │   ├── TradeMonitorApplication.java
-│       │   ├── controller/          # 5 Controller
-│       │   ├── service/             # 11 Services
-│       │   ├── entity/              # 11 JPA Entities
-│       │   ├── repository/          # 11 Spring Data Repositories
-│       │   ├── dto/                 # 9 Request/Response DTOs
-│       │   ├── model/               # 3 In-Memory Modelle
-│       │   ├── security/            # UserDetails, BruteForce
-│       │   └── config/              # Security, Filter, Events
-│       └── resources/
-│           ├── templates/           # 12 Thymeleaf Templates
-│           ├── static/              # CSS, JS
-│           └── application.properties
-├── mql5/
-│   └── TradeMonitorClient.mq5       # MQL5 Expert Advisor
-├── mql4/                            # MQL4 EA (Legacy)
-└── Doku/                            # Dokumentation
+  MetaTrader 5 Terminal(s)             Spring Boot Server
+ +-----------------------+          +---------------------------+
+ | MQL5 Expert Advisor   |  REST    |  Controller Layer (5)     |
+ | - Trade Monitoring    | -------> |  - Api / Dashboard / Admin|
+ | - Heartbeat           |  HTTP    |  - Security / User        |
+ | - History Export       |  POST   +---------------------------+
+ | - Auto-Reconnect      |          |  Service Layer (11)       |
+ +-----------------------+          |  - AccountManager (Cache) |
+                                    |  - TradeSyncService       |
+                                    |  - OpenProfitAlarmService |
+                                    |  - TradeComparisonService |
+                                    |  - Email / Homey Service  |
+                                    +---------------------------+
+                                    |  Persistence Layer        |
+                                    |  - Spring Data JPA (11)   |
+                                    |  - H2 File Database       |
+                                    +---------------------------+
+                                              |
+                                    +---------------------------+
+                                    |  Web Frontend             |
+                                    |  - 12 Thymeleaf Templates |
+                                    |  - Chart.js Visualisierung|
+                                    |  - Responsive Dark UI     |
+                                    +---------------------------+
 ```
+
+### 3.2 Zentrale Architekturentscheidungen
+
+| Entscheidung | Begruendung |
+|---|---|
+| **In-Memory Cache + DB-Backing** | Dashboard-Latenz minimieren bei gleichzeitiger Datenpersistenz |
+| **H2 Embedded Database** | Zero-Config Deployment, keine externe DB-Infrastruktur noetig |
+| **Thymeleaf SSR** | Schnelle Seitenladezeiten, SEO-freundlich, kein separates Frontend-Build |
+| **Scheduled Tasks** | Entkopplung von Echtzeit-Monitoring und Request-Handling |
+| **REST API ohne Auth** | EA-Client in MQL5 hat keine Session-/Cookie-Verwaltung; Absicherung ueber Netzwerk |
+| **Dynamische Konfiguration** | Alle Parameter live aenderbar ohne Neustart ueber Admin-Panel |
 
 ---
 
-## 8. Wichtige Konventionen
+## 4. Komponenten im Detail
 
-- **Equity vs. Balance**: Equity = Balance + offene P/L (kommt direkt vom EA)
-- **Balance-Kurve**: Rekonstruiert aus geschlossenen Trades rückwärts vom aktuellen Balance
-- **Equity-Kurve**: Gespeicherte Snapshots aus `equity_snapshots` (max. 1x/Min.)
-- **Magic Numbers**: Identifizieren Strategien/EAs; können mit Namen versehen werden
-- **Sync-Status**: MATCHED, WARNING, EXEMPTED
-- **Filter-Ranges**: today, 1week, 1month, thismonth, 6months, thisyear, 1year, all
-- **LocalStorage**: `tradeMonitor_filter_{accountId}` speichert den letzten Filter
+### 4.1 MQL5 Expert Advisor (Client)
+
+Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickelt in MQL5.
+
+**Kernfunktionalitaet:**
+- Kontinuierliches Streaming von Balance, Equity, offenen und geschlossenen Trades an den Server
+- Zweistufiges Kommunikationsprotokoll: Initialer Voll-Upload (`/api/trades-init`), danach inkrementelle Deltas (`/api/trades`)
+- Heartbeat-Watchdog (`/api/heartbeat`) zur Erkennung von Verbindungsabbruechen
+
+**Robustheit & Ausfallsicherheit:**
+- Automatische Reconnects mit konfigurierbarem Exponential-Backoff (ReconnectIntervalSeconds, MaxReconnectAttempts)
+- Erweiterter Retry-Modus (15 Minuten) nach Ausschoepfung aller Reconnect-Versuche
+- State-Persistenz ueber GlobalVariables (`TM_TradeListSent_{ID}`, `TM_LastSync_{ID}`) und Config-Datei
+- Intelligenter Tick-Mode: Automatische Umschaltung auf hochaufloesende Ueberwachung bei kritischem Drawdown
+
+**Benutzer-Feedback:**
+- Chart-Label mit Live-Status: Connected/Offline, Account-ID, Sync-Status, Fehlercodes, Retry-Countdown
+
+### 4.2 Controller Layer (5 Controller)
+
+| Controller | Endpunkte | Verantwortung |
+|---|---|---|
+| **ApiController** | `POST /api/register`, `/trades-init`, `/trades`, `/heartbeat`, `/history`; `GET /api/accounts`; `POST /api/test-email` | REST-Schnittstelle fuer MetaTrader EA und AJAX |
+| **DashboardController** | `GET /`, `/open-trades`, `/account/{id}`, `/report/{period}`, `/trade-comparison`, `/mobile/drawdown`; diverse AJAX-Endpoints | Web-Views und dynamische Datenabfragen |
+| **AdminController** | `GET /admin`, `/admin/logs`, `/admin/requests`, `/admin/client-logs`; `POST /admin/create-user`, `/admin/security`, u.v.m. | Administration, Benutzerverwaltung, Konfiguration |
+| **SecurityController** | `GET /login` | Login-Seite |
+| **UserController** | `GET /profile`; `POST /profile/change-password` | Benutzerprofil und Passwortverwaltung |
+
+### 4.3 Service Layer (11 Services)
+
+| Service | Intervall | Kernaufgabe |
+|---|---|---|
+| **AccountManager** | On-Demand | In-Memory Account-Cache, Account-/Trade-Verwaltung, Sektions-Management, Magic-Number-Profit-Berechnung |
+| **TradeStorage** | On-Demand | DB-Persistenz fuer Trades und Equity-Snapshots (Rate-limitiert: 1x/Min, Auto-Cleanup >90 Tage) |
+| **TradeSyncService** | 1 Sekunde | REAL/DEMO-Sync-Check mit zweistufigem Matching (Strict: Symbol+Typ+Zeit; Fallback: Symbol+Typ+SL) |
+| **TradeComparisonService** | On-Demand | Slippage- und Delay-Analyse fuer Copy-Trading (Matching ueber 120s-Zeitfenster) |
+| **OpenProfitAlarmService** | 5 Sekunden | Schwellwert-Monitoring (absolut/prozentual) mit Latch-Logik gegen Alarm-Fluten |
+| **GlobalConfigService** | On-Demand | Zentrale Key-Value-Konfiguration (25+ Parameter), persistiert in DB |
+| **MagicMappingService** | On-Demand | Magic Number zu lesbarem Strategienamen, Auto-Discovery neuer Magic Numbers |
+| **EmailService** | On-Demand | SMTP-Alerting mit konfigurierbarem taeglichem Rate-Limit |
+| **HomeyService** | On-Demand | Smart-Home Webhook-Integration (Sirene) mit konfigurierbarer Wiederholung |
+| **UserService** | On-Demand | Benutzerverwaltung, RBAC, BCrypt-Hashing, Account-Berechtigungen |
+| **LogCleanupService** | Taeglich 2:00 | Automatische Bereinigung alter Login-/Request-/Client-Logs |
+
+### 4.4 Security Layer
+
+| Komponente | Funktion |
+|---|---|
+| **SecurityConfig** | Spring Security Konfiguration: BCrypt, CSRF (deaktiviert fuer API), URL-basierte Zugriffskontrolle |
+| **BruteForceProtectionService** | IP-basierte Login-Sperre: Konfigurierbare Fehlversuche + Sperrdauer, Auto-Cleanup alle 10 Min |
+| **RateLimitFilter** (Order 1) | Per-IP Sliding-Window Rate-Limiting (1 Min), ueberspringt API- und Static-Pfade |
+| **SecurityHeadersFilter** (Order 2) | CSP, HSTS, X-Frame-Options, X-XSS-Protection, Referrer-Policy |
+| **RequestLoggingFilter** | Audit-Log fuer neue IP-Adressen |
+| **AuthenticationEvents** | Event-Listener fuer Login-Erfolg/-Fehlschlag, speist LoginLog und BruteForce-Tracking |
+
+---
+
+## 5. Datenbankschema (11 Tabellen)
+
+| Tabelle | Entity | Besonderheit |
+|---|---|---|
+| `accounts` | `AccountEntity` | PK: accountId, Typ DEMO/REAL, pro-Account Alarm-Schwellwerte, Sektionszuordnung |
+| `equity_snapshots` | `EquitySnapshotEntity` | Index auf (accountId, timestamp), Rate-limitiert 1x/Min, Auto-Cleanup >90 Tage |
+| `closed_trades` | `ClosedTradeEntity` | Unique Key: (accountId, ticket), Duplikat-Erkennung beim Import |
+| `open_trades` | `OpenTradeEntity` | Vollstaendiger Ersatz bei jedem Update-Zyklus |
+| `users` | `UserEntity` | BCrypt-Hash, ROLE_ADMIN/ROLE_USER, `allowedAccountIds` (ElementCollection) |
+| `dashboard_sections` | `DashboardSectionEntity` | Name + displayOrder fuer Drag & Drop Layout |
+| `magic_mappings` | `MagicMappingEntity` | PK: magicNumber, Custom Label/Kommentar |
+| `global_config` | `GlobalConfigEntity` | Key-Value Store fuer 25+ konfigurierbare Parameter |
+| `login_logs` | `LoginLog` | Zeitstempel, Benutzer, IP, Erfolg/Fehlschlag, Details |
+| `request_logs` | `RequestLog` | IP, Methode, URI, Query, User-Agent, Status (max. 1000 Zeichen) |
+| `client_logs` | `ClientLog` | Account-ID, Aktion (REGISTER/UPDATE/HEARTBEAT/HISTORY), IP, Nachricht |
+
+---
+
+## 6. Algorithmen
+
+### 6.1 Trade-Sync (TradeSyncService)
+
+Zweistufiger Abgleich zwischen REAL- und DEMO-Accounts (laeuft jede Sekunde):
+
+**Stufe 1 &mdash; Strict Match:**
+- Symbol muss uebereinstimmen
+- Typ (BUY/SELL) muss uebereinstimmen
+- Open Time innerhalb von 60 Sekunden Toleranz
+
+**Stufe 2 &mdash; Fallback Match (falls Stufe 1 scheitert):**
+- Symbol muss uebereinstimmen
+- Typ muss uebereinstimmen
+- StopLoss muss exakt uebereinstimmen
+
+**Ergebnis pro Trade:** MATCHED | WARNING | EXEMPTED
+
+Bei WARNING ueber konfigurierbarer Dauer: E-Mail + Homey-Sirene
+
+### 6.2 Slippage-Analyse (TradeComparisonService)
+
+Vergleich geschlossener Trades zwischen REAL und DEMO:
+
+- **Matching:** Symbol + Typ + Open Time (120s Toleranz) ODER Symbol + Typ + StopLoss (exakt)
+- **Open/Close Delay:** Zeitdifferenz in Sekunden
+- **Open/Close Slippage:** Preisdifferenz, normalisiert fuer BUY/SELL-Richtung
+
+### 6.3 Open-Profit-Alarm (OpenProfitAlarmService)
+
+- **Absoluter Schwellwert:** Alarm wenn Open Profit < Wert (z.B. -5000 EUR)
+- **Prozentualer Schwellwert:** Alarm wenn Drawdown > x% der Balance
+- **Latch-Logik:** Alarm feuert einmalig, setzt sich erst zurueck wenn Bedingung nicht mehr zutrifft
+
+---
+
+## 7. Konfiguration
+
+### 7.1 Statisch (application.properties)
+
+```properties
+server.port=8080
+spring.datasource.url=jdbc:h2:file:./data/trademonitor
+spring.jpa.hibernate.ddl-auto=update
+account.timeout.seconds=60
+app.admin.username=admin
+app.admin.password=password
+server.tomcat.max-connections=200
+server.tomcat.threads.max=50
+```
+
+### 7.2 Dynamisch (Admin-Panel, persistiert in DB)
+
+| Kategorie | Parameter |
+|---|---|
+| **Live-Indicator** | Schwellwerte in Minuten (gruen/gelb/orange), Farben (Hex) |
+| **E-Mail** | SMTP-Host, Port, User, Password, From, To, Max/Tag |
+| **Logging** | Aufbewahrungsdauer Login/Verbindungs/Client-Logs (Tage) |
+| **Security** | Rate-Limit ein/aus + Wert, Brute-Force ein/aus + Attempts + Lockout, Headers, Max Sessions, H2-Konsole |
+| **Homey** | Webhook-ID, Event, Trigger-Quellen (Sync/API), Wiederholungen, Alarm-Delay |
+| **Sync** | Ausgenommene Magic Numbers (kommagetrennt) |
+
+---
+
+## 8. Web-Oberflaeche
+
+### Templates (12 Thymeleaf Views)
+
+| Template | URL | Beschreibung |
+|---|---|---|
+| `dashboard.html` | `/` | Hauptdashboard: Kacheln, Sektionen, Report-Charts, Live-Status, Alarm-Banner |
+| `account-detail.html` | `/account/{id}` | Balance/Equity-Overlay-Chart, Magic-Profit-Kurven, Historientabelle |
+| `open-trades.html` | `/open-trades` | Globale Uebersicht offener Positionen (REAL priorisiert) |
+| `report.html` | `/report/{period}` | Aggregierte Profit-Reports (daily/weekly/monthly) |
+| `trade-comparison.html` | `/trade-comparison` | REAL vs. DEMO Slippage/Delay-Analyse |
+| `mobile-drawdown.html` | `/mobile/drawdown` | Mobiles Drawdown-Ranking |
+| `admin.html` | `/admin` | Komplettes Admin-Panel mit allen Konfigurationen |
+| `admin-logs.html` | `/admin/logs` | Login-Audit-Logs |
+| `admin-requests.html` | `/admin/requests` | Request-Audit-Logs |
+| `admin-client-logs.html` | `/admin/client-logs` | Client-Aktions-Logs (filterbar) |
+| `profile.html` | `/profile` | Benutzerprofil, Passwortwechsel |
+| `login.html` | `/login` | Login-Formular |
+
+---
+
+## 9. Installation & Betrieb
+
+### Voraussetzungen
+- Java JDK 17+
+- Maven (fuer Build)
+
+### Build & Start
+```bash
+cd server
+mvn clean package
+java -jar target/trade-monitor-server-0.12.0.jar
+```
+
+### MetaTrader 5 Client
+1. `TradeMonitorClient.mq5` nach `MQL5/Experts/` kopieren und kompilieren
+2. Server-URL in MT5 freigeben (*Extras > Optionen > Experten*)
+3. EA auf Chart ziehen, Auto-Trading aktivieren
+4. Account erscheint automatisch im Dashboard
+
+### Backup & Reset
+- **Backup:** Server stoppen, `./data/trademonitor.mv.db` kopieren
+- **Reset:** Server stoppen, Datenbankdatei loeschen (wird beim Start neu erstellt)
+
+---
+
+## 10. Eingesetzte Patterns & Praktiken
+
+- **Controller-Service-Repository**: Strikte Schichtentrennung
+- **In-Memory Cache mit Write-Through**: Minimale Latenz bei gleichzeitiger Persistenz
+- **Scheduled Task Pattern**: Entkoppeltes Echtzeit-Monitoring (1s, 5s, taeglich)
+- **Observer/Event Pattern**: Authentication-Events fuer Audit-Logging und Brute-Force-Tracking
+- **Strategy Pattern**: Zweistufiges Trade-Matching (Strict + Fallback)
+- **Latch Pattern**: Alarm-Deduplication im Open-Profit-Monitoring
+- **Rate-Limiting**: Sliding-Window-Algorithmus per IP
+- **Duplicate Detection**: Idempotente Trade-Imports ueber Composite Key (accountId + ticket)
+- **Configuration as Code**: Key-Value Store mit UI-Editor, keine hartcodierten Werte

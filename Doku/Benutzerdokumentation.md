@@ -1,8 +1,17 @@
-# Benutzerdokumentation: MQL Trade Monitor
+# MQL Trade Monitor &mdash; Benutzerhandbuch
 
-## 1. Einführung
+## 1. Einfuehrung
 
-Der **MQL Trade Monitor** ist Ihr zentrales Dashboard zur Überwachung aller Ihrer MetaTrader 5 Konten. Diese Dokumentation führt Sie durch alle Funktionen der Web-Oberfläche.
+Der **MQL Trade Monitor** ist eine professionelle Monitoring-Plattform fuer MetaTrader 5 Trading-Konten. Dieses Handbuch fuehrt Sie durch alle Funktionen der Web-Oberflaeche.
+
+**Was die Plattform bietet:**
+- Zentrale Echtzeit-Uebersicht ueber alle Ihre MetaTrader-Konten
+- Automatische Alarmierung bei kritischem Drawdown (E-Mail, Smart-Home-Sirene, Dashboard)
+- Detaillierte Performance-Analyse pro Konto und Strategie (Magic Number)
+- Automatischer Abgleich zwischen Real- und Demo-Konten (Sync-Check)
+- Copy-Trading-Qualitaetsanalyse (Slippage, Ausfuehrungsverzoegerung)
+- Tages-, Wochen- und Monatsberichte
+- Vollstaendig konfigurierbar ueber das Admin-Panel
 
 ---
 
@@ -10,9 +19,11 @@ Der **MQL Trade Monitor** ist Ihr zentrales Dashboard zur Überwachung aller Ihr
 
 ### 2.1 Server starten
 
-1. Starten Sie die Anwendung: `java -jar server/target/trade-monitor-server-0.12.0.jar`
-2. Öffnen Sie `http://localhost:8080` im Browser.
-3. Melden Sie sich mit Ihren Zugangsdaten an (Standard: admin/password).
+```bash
+java -jar server/target/trade-monitor-server-0.12.0.jar
+```
+
+Oeffnen Sie `http://localhost:8080` im Browser und melden Sie sich an.
 
 ### 2.2 MetaTrader 5 verbinden
 
@@ -20,229 +31,253 @@ Der **MQL Trade Monitor** ist Ihr zentrales Dashboard zur Überwachung aller Ihr
 2. Kompilieren Sie den EA im MetaEditor (F7).
 3. Unter *Extras > Optionen > Experten* die URL `http://localhost:8080` erlauben.
 4. Ziehen Sie den EA auf einen Chart und aktivieren Sie "Auto-Trading".
-5. Der Account erscheint nach wenigen Sekunden im Dashboard.
+
+Der Account erscheint nach wenigen Sekunden automatisch im Dashboard. Es ist keine manuelle Konfiguration noetig &mdash; der EA registriert sich selbststaendig.
 
 ---
 
-## 3. Dashboard (`/`)
+## 3. Dashboard
 
-Das Dashboard ist die Startseite und bietet einen schnellen Überblick über alle verbundenen Accounts.
+Das Dashboard (`/`) ist die Startseite und bietet einen sofortigen Ueberblick ueber alle verbundenen Accounts.
 
 ### 3.1 Account-Kacheln
 
-Jeder verbundene Account wird als Kachel dargestellt:
+Jeder Account wird als Kachel mit folgenden Informationen dargestellt:
 
-- **Status-Indikator**: Farbiger Punkt zeigt den Online-Status an:
-  - Grün: Account ist online und aktuell
-  - Gelb: Letzte Aktualisierung liegt etwas zurück
-  - Orange: Letzte Aktualisierung liegt länger zurück
-  - Rot: Account ist offline
-- **Metriken**: Balance, Equity, Profit (heute/gesamt) und Anzahl offener Trades.
-- **Alarm-Anzeige**: Bei ausgelöstem Open-Profit-Alarm wird die Kachel rot markiert und ein globales Alarm-Banner erscheint oben auf der Seite.
-- **Details**: Klick auf die Kachel öffnet die Einzelansicht des Accounts.
+- **Live-Status-Indikator** (farbiger Punkt):
+  - **Gruen:** Account ist online und aktuell
+  - **Gelb:** Letzte Aktualisierung liegt etwas zurueck
+  - **Orange:** Letzte Aktualisierung liegt laenger zurueck
+  - **Rot:** Account ist offline
+  - Die Schwellwerte und Farben sind im Admin-Panel konfigurierbar.
+- **Metriken:** Balance, Equity, Tagesprofit, Gesamtprofit, Anzahl offener Trades
+- **Alarm-Anzeige:** Bei ausgeloestem Open-Profit-Alarm wird die Kachel rot markiert
 
 ### 3.2 Report-Kacheln
 
-Direkt im Dashboard werden tägliche, wöchentliche und monatliche Profit-Charts als eigene Kacheln angezeigt. Diese geben einen schnellen visuellen Überblick über die Performance aller Accounts.
+Direkt im Dashboard werden kompakte Tages-, Wochen- und Monats-Profit-Charts als eigene Kacheln angezeigt. Diese geben einen schnellen visuellen Ueberblick ueber die Performance aller Accounts.
 
 ### 3.3 Layout anpassen
 
-Sie können das Dashboard vollständig nach Ihren Wünschen gestalten:
+Das Dashboard-Layout ist vollstaendig personalisierbar:
 
 1. Klicken Sie oben rechts auf **"Layout bearbeiten"**.
-2. **Sektionen verwalten**:
-   - **Neue Sektion**: Klicken Sie auf `+ Neue Sektion`, um einen neuen Bereich zu erstellen.
-   - **Umbenennen**: Klicken Sie auf den Titel einer Sektion, um ihn zu ändern.
-   - **Löschen**: Klicken Sie auf das Mülleimer-Symbol. Enthaltene Accounts werden in eine andere Sektion verschoben.
-3. **Drag & Drop**: Ziehen Sie Account-Kacheln in die gewünschte Sektion oder Reihenfolge.
-4. **Speichern**: Klicken Sie auf **"Speichern"**, um die Änderungen dauerhaft zu übernehmen.
+2. **Sektionen:**
+   - *Neue Sektion:* Klicken Sie auf `+ Neue Sektion`.
+   - *Umbenennen:* Klicken Sie auf den Sektions-Titel.
+   - *Loeschen:* Klicken Sie auf das Muelleimer-Symbol (Accounts werden verschoben).
+3. **Drag & Drop:** Ziehen Sie Account-Kacheln in die gewuenschte Sektion oder Reihenfolge.
+4. Klicken Sie auf **"Speichern"** &mdash; das Layout wird serverseitig persistiert.
+
+### 3.4 Globales Alarm-Banner
+
+Wenn ein Open-Profit-Alarm oder eine Sync-Warnung aktiv ist, erscheint ein auffaelliges Banner am oberen Bildschirmrand. Ein Klick fuehrt direkt zum betroffenen Account.
 
 ---
 
-## 4. Offene Trades (`/open-trades`)
+## 4. Offene Trades
 
-Diese Ansicht zeigt **alle offenen Positionen** aller Accounts in einer Tabelle.
+Die Ansicht `/open-trades` fasst **alle offenen Positionen** aller Accounts in einer Tabelle zusammen.
 
-- **Sortierung**: Echtgeld-Konten (REAL) werden priorisiert oben angezeigt.
-- **Summen**: Oben sehen Sie die Gesamtsumme von Equity und Profit über alle Accounts.
-- **Spalten**: Account-Name, Ticket, Symbol, Typ (Buy/Sell), Volumen, Profit, Swap, Magic Number, Kommentar.
-- **Farbkodierung**: Positiver Profit wird grün, negativer rot dargestellt.
+- **Sortierung:** Echtgeld-Konten (REAL) werden priorisiert oben angezeigt.
+- **Gesamtsummen:** Aggregierte Equity und Profit ueber alle Accounts.
+- **Spalten:** Account-Name, Ticket, Symbol, Typ (Buy/Sell), Volumen, Profit, Swap, Magic Number, Kommentar.
+- **Farbkodierung:** Positiver Profit gruen, negativer rot.
 
 ---
 
-## 5. Account-Details (`/account/{id}`)
+## 5. Account-Details
 
-Klicken Sie auf einen Account im Dashboard, um zur Detailansicht zu gelangen.
+Klicken Sie auf eine Account-Kachel im Dashboard, um zur Detailansicht zu gelangen.
 
-### 5.1 Übersichts-Chart
+### 5.1 Uebersichts-Chart
 
-Ein überlagerten Chart zeigt:
-- **Balance** (linke Y-Achse): Rekonstruiert aus geschlossenen Trades.
-- **Equity** (rechte Y-Achse, gelb): Aus gespeicherten Equity-Snapshots.
+Ein ueberlagerten Chart mit zwei Y-Achsen:
+- **Balance** (linke Achse, blau): Rekonstruiert aus geschlossenen Trades.
+- **Equity** (rechte Achse, gelb): Aus periodischen Equity-Snapshots (1x pro Minute).
 
-So erkennen Sie sofort Divergenzen zwischen Balance und Equity.
+Divergenzen zwischen Balance und Equity sind sofort sichtbar.
 
 ### 5.2 Offene Positionen
 
-Liste der aktuell offenen Trades nur für diesen Account, inklusive Sync-Status:
-- **MATCHED**: Trade ist auf Real- und Demo-Konto synchronisiert.
-- **WARNING**: Trade konnte nicht auf dem Gegenkonto gefunden werden.
-- **EXEMPTED**: Trade ist vom Sync-Check ausgenommen (orange markiert).
+Liste der aktuell offenen Trades mit **Sync-Status**:
+- **MATCHED** (gruen): Trade existiert auf Real- und Demo-Konto.
+- **WARNING** (rot): Trade nur auf einem Konto gefunden.
+- **EXEMPTED** (orange): Magic Number ist vom Sync-Check ausgenommen.
 
 ### 5.3 Performance nach Strategie (Magic Number)
 
-Hier sehen Sie, welche Strategien (EAs) am profitabelsten sind:
-- **Magic Number Mapping**: Kryptische Nummern können mit lesbaren Namen versehen werden.
-- **Profit-Kurven**: Interaktive Charts für jede aktive Magic Number.
-- **Metriken**: Offener/geschlossener Profit, Swap, Commission, gehandelte Symbole.
-- **Drawdown**: Maximaler Drawdown in EUR und Prozent pro Strategie.
+Detaillierte Aufschluesselung pro Trading-Strategie:
+- **Interaktive Profit-Kurven** pro Magic Number
+- **Metriken:** Offener/geschlossener Profit, Swap, Commission, gehandelte Symbole
+- **Drawdown:** Maximaler Drawdown in EUR und Prozent
+- **Magic Number Mapping:** Kryptische Nummern koennen im Admin-Bereich mit lesbaren Namen versehen werden
 
-### 5.4 Historie
+### 5.4 Trade-Historie
 
-Liste der geschlossenen Trades mit konfigurierbarem Zeitraum-Filter:
-- Heute, 1 Woche, 1 Monat, Dieser Monat, 6 Monate, Dieses Jahr, 1 Jahr, Alles.
-- Der gewählte Filter wird pro Account im Browser gespeichert.
+Chronologische Liste aller geschlossenen Trades mit konfigurierbarem Zeitraum-Filter:
 
----
+| Filter | Zeitraum |
+|---|---|
+| Heute | Aktueller Tag |
+| 1 Woche | Letzte 7 Tage |
+| 1 Monat | Letzte 30 Tage |
+| Dieser Monat | Aktueller Kalendermonat |
+| 6 Monate | Letzte 180 Tage |
+| Dieses Jahr | Aktuelles Kalenderjahr |
+| 1 Jahr | Letzte 365 Tage |
+| Alles | Gesamte Historie |
 
-## 6. Berichte (`/report/{period}`)
-
-Aggregierte Profit-Reports über alle Accounts:
-- **Tagesbericht**: `/report/daily`
-- **Wochenbericht**: `/report/weekly`
-- **Monatsbericht**: `/report/monthly`
-
-Jeder Bericht enthält Charts mit der Performance-Entwicklung und eine tabellarische Aufschlüsselung.
-
----
-
-## 7. Trade-Vergleich (`/trade-comparison`)
-
-Analyse des Copy-Tradings zwischen Real- und Demo-Accounts:
-- **Matching**: Trades werden automatisch zwischen REAL und DEMO zugeordnet.
-- **Delay**: Ausführungsverzögerung in Sekunden (Open/Close).
-- **Slippage**: Preisabweichung zwischen Real- und Demo-Ausführung.
-- **Status**: MATCHED oder NOT FOUND.
+Der gewaehlte Filter wird pro Account im Browser gespeichert.
 
 ---
 
-## 8. Mobile Drawdown-Ansicht (`/mobile/drawdown`)
+## 6. Berichte
 
-Optimiert für unterwegs. Zeigt ein Ranking aller aktiven Strategien (Magic Numbers) nach Drawdown-Schwere sortiert:
-- Account-Name und Typ (REAL/DEMO)
-- Magic Number mit zugewiesenem Namen
+Unter `/report/{period}` finden Sie aggregierte Performance-Reports:
+
+- **Tagesbericht** (`/report/daily`): Profit pro Tag
+- **Wochenbericht** (`/report/weekly`): Profit pro Woche
+- **Monatsbericht** (`/report/monthly`): Profit pro Monat
+
+Jeder Bericht enthaelt interaktive Charts und tabellarische Aufschluesslung pro Account und Magic Number.
+
+---
+
+## 7. Trade-Vergleich (Copy-Trading-Analyse)
+
+Die Ansicht `/trade-comparison` analysiert die Qualitaet des Copy-Tradings zwischen Real- und Demo-Accounts:
+
+- **Automatisches Matching:** Geschlossene Trades werden zwischen REAL und DEMO zugeordnet.
+- **Delay-Messung:** Ausfuehrungsverzoegerung in Sekunden (Open/Close).
+- **Slippage-Berechnung:** Preisabweichung zwischen Real- und Demo-Ausfuehrung.
+- **Status:** MATCHED oder NOT FOUND fuer jeden Trade.
+
+---
+
+## 8. Mobile Drawdown-Ansicht
+
+Unter `/mobile/drawdown` finden Sie eine fuer Smartphones optimierte Ansicht:
+
+- Ranking aller aktiven Strategien (Magic Numbers) nach Drawdown-Schwere
+- Account-Name, Typ (REAL/DEMO), Magic Number mit zugewiesenem Namen
 - Aktueller Drawdown in EUR und Prozent
+
+Diese Seite ist ohne Login zugaenglich &mdash; ideal fuer schnelle Kontrolle unterwegs.
 
 ---
 
 ## 9. Open-Profit-Alarm
 
-Der Open-Profit-Alarm überwacht automatisch Ihre Konten und warnt bei kritischem Drawdown.
+Das Alarm-System ueberwacht automatisch alle Konten und warnt bei kritischem Drawdown.
 
 ### 9.1 Konfiguration (pro Account)
 
-Im Dashboard können Sie für jeden Account einen Alarm konfigurieren:
-- **Absoluter Schwellwert**: Alarm bei Open Profit unter einem Betrag (z.B. -5000 EUR).
-- **Prozentualer Schwellwert**: Alarm bei Drawdown über einem Prozentsatz der Balance (z.B. 10%).
+Im Dashboard koennen Sie fuer jeden Account individuelle Alarmgrenzen setzen:
 
-### 9.2 Alarm-Aktionen
+- **Absoluter Schwellwert:** Alarm wenn Open Profit unter Betrag faellt (z.B. -5000 EUR)
+- **Prozentualer Schwellwert:** Alarm wenn Drawdown ueber Prozentsatz der Balance steigt (z.B. 10%)
 
-Bei Auslösung:
+### 9.2 Was passiert bei Alarm?
+
 1. Die Account-Kachel im Dashboard wird rot markiert.
 2. Ein globales Alarm-Banner erscheint oben auf der Seite.
-3. Eine E-Mail-Benachrichtigung wird versendet (sofern konfiguriert).
-4. Die Homey-Sirene wird ausgelöst (sofern konfiguriert).
+3. Eine E-Mail-Benachrichtigung wird versendet (wenn SMTP konfiguriert).
+4. Die Homey-Sirene wird ausgeloest (wenn Homey konfiguriert).
 
-Der Alarm setzt sich automatisch zurück, sobald die Bedingung nicht mehr zutrifft.
-
----
-
-## 10. Benutzerprofil (`/profile`)
-
-Hier können Sie Ihr Passwort ändern:
-1. Navigieren Sie zu `/profile`.
-2. Geben Sie Ihr neues Passwort ein und bestätigen Sie es.
-3. Klicken Sie auf "Passwort ändern".
+Der Alarm setzt sich automatisch zurueck, sobald die Bedingung nicht mehr zutrifft (Latch-Logik).
 
 ---
 
-## 11. Admin-Bereich (`/admin`)
+## 10. Benutzerprofil
 
-Der Admin-Bereich ist nur für Benutzer mit der Rolle ROLE_ADMIN zugänglich.
+Unter `/profile` koennen Sie Ihr Passwort aendern:
+
+1. Neues Passwort eingeben und bestaetigen.
+2. Klick auf "Passwort aendern".
+
+---
+
+## 11. Admin-Bereich
+
+Der Admin-Bereich (`/admin`) ist nur fuer Benutzer mit der Rolle ADMIN zugaenglich.
 
 ### 11.1 Datenbank-Statistiken
 
-Übersicht über gespeicherte Trades pro Account: Anzahl offener/geschlossener Trades, Datumsbereiche, Gesamtprofit.
+Uebersicht pro Account: Anzahl offener/geschlossener Trades, Datumsbereiche, Gesamtprofit.
 
 ### 11.2 Magic Number Mapping
 
-Weisen Sie Magic Numbers lesbare Namen zu:
-1. Suchen Sie die Magic Number in der Liste.
-2. Geben Sie einen Namen im Feld "Custom Comment" ein.
-3. Klicken Sie auf "Speichern".
-4. Der Name wird überall im Dashboard angezeigt.
+Weisen Sie Magic Numbers lesbare Strategie-Namen zu:
+1. Magic Number in der Liste finden.
+2. Namen im Feld "Custom Comment" eingeben.
+3. "Speichern" klicken.
+
+Der Name erscheint ueberall: in Charts, Tabellen, Berichten und der mobilen Ansicht.
 
 ### 11.3 Benutzerverwaltung
 
-- **Benutzer erstellen**: Benutzername, Passwort, Rolle (ADMIN/USER), optionale Account-Berechtigungen.
-- **Account-Berechtigungen**: Einschränkung der sichtbaren Accounts pro Benutzer.
-- **Benutzer löschen**: Entfernt den Benutzer aus dem System.
+- **Benutzer erstellen:** Benutzername, Passwort, Rolle (ADMIN/USER).
+- **Account-Berechtigungen:** Pro Benutzer festlegen, welche Accounts sichtbar sind.
+- **Benutzer loeschen:** Entfernt den Account dauerhaft.
 
-### 11.4 Live-Indicator Konfiguration
+### 11.4 Live-Indicator
 
-Konfigurieren Sie die Schwellwerte und Farben für die Online-Status-Anzeige:
-- Grüne, gelbe und orange Schwellwerte in Minuten.
-- Benutzerdefinierte Farben für jeden Status.
+Konfigurieren Sie die Schwellwerte (in Minuten) und Farben fuer die Online-Status-Anzeige im Dashboard.
 
 ### 11.5 E-Mail-Konfiguration
 
-SMTP-Einstellungen für E-Mail-Benachrichtigungen:
-- Host, Port, Benutzer, Passwort
-- Absender- und Empfängeradresse
-- Tägliches Sendelimit
-- Test-E-Mail-Funktion
+SMTP-Einstellungen fuer E-Mail-Benachrichtigungen:
+- Server (Host, Port), Zugangsdaten (Benutzer, Passwort)
+- Absender- und Empfaengeradresse
+- Taegliches Sendelimit (verhindert Spam bei Daueralarmen)
+- **Test-E-Mail-Funktion** zum Pruefen der Konfiguration
 
 ### 11.6 Homey Smart-Home Integration
 
-Konfiguration der Homey-Webhook-Anbindung für Sirenen-Alarme:
-- Homey ID und Event-Name
-- Trigger-Quellen (Sync, API)
+Konfiguration der Webhook-Anbindung fuer Sirenen-Alarme:
+- Homey-ID und Event-Name
+- Trigger-Quellen (Sync-Warnung, API)
 - Wiederholungen und Alarm-Delay
+- **Test-Sirene-Funktion** zum Pruefen der Anbindung
 
 ### 11.7 Sync-Ausnahmen
 
-Magic Numbers die vom automatischen Sync-Check zwischen REAL/DEMO ausgenommen werden sollen (kommagetrennt). Diese Trades erhalten den Status EXEMPTED statt WARNING.
+Magic Numbers, die vom automatischen Sync-Check ausgenommen werden sollen (kommagetrennt). Diese Trades erhalten den Status EXEMPTED statt WARNING.
 
 ### 11.8 Log-Aufbewahrung
 
-Konfigurierbare Aufbewahrungsdauer für:
-- Login-Logs
-- Verbindungs-/Request-Logs
-- Client-Aktionslogs
+Konfigurierbare Aufbewahrungsdauer fuer verschiedene Log-Typen (Login, Verbindung, Client).
 
 ### 11.9 Sicherheitseinstellungen
 
-- Rate-Limiting: Anfragen pro Minute (global, per IP)
-- Brute-Force-Schutz: Max. Fehlversuche und Sperrdauer
-- Security-Headers: Aktivierung von X-Frame-Options, CSP, HSTS etc.
-- Max Sessions: Maximale gleichzeitige Sitzungen
-- H2-Konsole: Aktivierung/Deaktivierung der Datenbank-Konsole
+Alle Security-Parameter sind live konfigurierbar:
+
+| Parameter | Beschreibung |
+|---|---|
+| Rate-Limiting | Anfragen pro Minute, pro IP |
+| Brute-Force-Schutz | Max. Fehlversuche und Sperrdauer in Minuten |
+| Security-Headers | CSP, HSTS, X-Frame-Options etc. |
+| Max Sessions | Gleichzeitige Sitzungen pro Benutzer |
+| H2-Konsole | Datenbank-Konsole aktivieren/deaktivieren |
 
 ### 11.10 Logs einsehen
 
-- **Login-Logs** (`/admin/logs`): Authentifizierungsversuche mit Zeitstempel, Benutzer, IP und Ergebnis.
+- **Login-Logs** (`/admin/logs`): Wer hat sich wann von welcher IP angemeldet (Erfolg/Fehlschlag).
 - **Request-Logs** (`/admin/requests`): HTTP-Anfragen neuer IP-Adressen.
-- **Client-Logs** (`/admin/client-logs`): MetaTrader-Client-Aktionen (Register, Update, Heartbeat), optional filterbar nach Account.
+- **Client-Logs** (`/admin/client-logs`): MetaTrader-Aktionen (Register, Update, Heartbeat), filterbar nach Account.
 
 ---
 
-## 12. Häufige Fragen & Problemlösungen
+## 12. Haeufige Fragen & Problemloesungen
 
-| Problem | Lösung |
+| Problem | Loesung |
 |---|---|
 | Datenbank beim Start gesperrt | Task Manager: Java-Prozess beenden, neu starten |
 | EA kann nicht verbinden | MT5: Extras > Optionen > Experten > Server-URL erlauben |
-| Equity-Kurve leer | Erst nach ca. 1 Minute hat der Server genug Snapshots gesammelt |
-| Account erscheint nicht | Prüfen ob "Auto-Trading" im MT5 aktiviert ist |
-| E-Mail-Alarm kommt nicht | SMTP-Einstellungen im Admin-Bereich prüfen, Test-E-Mail senden |
-| Sync-Warnung trotz korrektem Setup | Magic Number unter Sync-Ausnahmen im Admin eintragen |
+| Equity-Kurve leer | Nach ca. 1 Minute hat der Server genug Snapshots gesammelt |
+| Account erscheint nicht | "Auto-Trading" im MT5 aktiviert? EA auf Chart? |
+| E-Mail-Alarm kommt nicht | SMTP-Einstellungen im Admin pruefen, Test-E-Mail senden |
+| Sync-Warnung obwohl korrekt | Magic Number unter Sync-Ausnahmen im Admin eintragen |
+| Dashboard-Layout zurueckgesetzt | Wurde das Layout nach Aenderung gespeichert? |
+| Zu viele Alarm-E-Mails | Taegliches Sendelimit im Admin-Panel reduzieren |
