@@ -41,16 +41,11 @@ public class UserService {
             userRepository.save(admin);
             System.out.println("Initialized default admin user from properties: " + defaultAdminUsername);
         } else {
-            // Update the password of the existing admin if they exist, so the user can
-            // easily log in
-            // if they forgot their password and restarted the app with default settings
             UserEntity existingAdmin = existingAdminOpt.get();
-            existingAdmin.setPassword(passwordEncoder.encode(defaultAdminPassword));
             if (existingAdmin.getApiKey() == null || existingAdmin.getApiKey().isEmpty()) {
                 existingAdmin.setApiKey(generateApiKey());
+                userRepository.save(existingAdmin);
             }
-            userRepository.save(existingAdmin);
-            System.out.println("Reset password for existing admin user from properties: " + defaultAdminUsername);
         }
     }
 

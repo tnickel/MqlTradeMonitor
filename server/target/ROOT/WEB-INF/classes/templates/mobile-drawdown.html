@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Drawdown Monitor</title>
+    <style>
+        :root {
+            --bg-body: #1a1b26;
+            --bg-card: #24283b;
+            --text-primary: #c0caf5;
+            --text-secondary: #9aa5ce;
+            --accent: #7aa2f7;
+            --danger: #f7768e;
+            --success: #9ece6a;
+            --warning: #e0af68;
+            --border: #414868;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .refresh-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border-left: 5px solid transparent;
+        }
+
+        .card.real {
+            border-left-color: var(--success);
+        }
+
+        .card.demo {
+            border-left-color: var(--text-secondary);
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .account-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .magic-info {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .dd-value {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .dd-value.negative {
+            color: var(--danger);
+        }
+
+        .dd-value.neutral {
+            color: var(--success);
+        }
+
+        .dd-percent {
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .dd-percent.high {
+            color: var(--danger);
+        }
+
+        .dd-percent.med {
+            color: var(--warning);
+        }
+
+        .dd-percent.low {
+            color: var(--success);
+        }
+
+        .equity-row {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .equity-val {
+            color: var(--text-primary);
+            float: right;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .badge.real {
+            background: rgba(158, 206, 106, 0.2);
+            color: var(--success);
+        }
+
+        .badge.demo {
+            background: rgba(169, 177, 214, 0.2);
+            color: #a9b1d6;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h2 style="margin:0;">📉 Drawdown</h2>
+        <button class="refresh-btn" onclick="fetchData()">🔄 Reload</button>
+    </div>
+
+    <div id="container">
+        <!-- Initial Server Side Render -->
+        <div th:each="item : ${drawdowns}" th:class="'card ' + (${item.real} ? 'real' : 'demo')">
+            <div class="row">
+                <div class="account-name">
+                    <span th:class="'badge ' + (${item.real} ? 'real' : 'demo')"
+                        th:text="${item.real} ? 'REAL' : 'DEMO'">REAL</span>
+                    <span th:text="${item.accountName}">Account Name</span>
+                </div>
+                <div class="dd-value" th:classappend="${item.currentDrawdownEur > 0} ? 'negative' : 'neutral'"
+                    th:text="${item.currentDrawdownEur > 0 ? '-' : ''} + ${#numbers.formatDecimal(item.currentDrawdownEur, 1, 2)} + ' €'">
+                    -0.00 €
+                </div>
+            </div>
+            <div class="row">
+                <div class="magic-info">
+                    Magic: <span th:text="${item.magicNumber}">12345</span>
+                </div>
+                <div class="dd-percent"
+                    th:classappend="${item.currentDrawdownPercent > 10} ? 'high' : (${item.currentDrawdownPercent > 5} ? 'med' : 'low')"
+                    th:text="${#numbers.formatDecimal(item.currentDrawdownPercent, 1, 2)} + '%'">
+                    0.00%
+                </div>
+            </div>
+            <div class="equity-row">
+                <span>Open Profit (Magic)</span>
+                <span class="equity-val" th:text="${#numbers.formatDecimal(item.currentMagicEquity, 1, 2)}">0.00</span>
+            </div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(drawdowns)}" class="loader">
+            Keine Daten vorhanden.
+        </div>
+    </div>
+
+    <script>
+        function fetchData() {
+            fetch('/api/stats/magic-drawdowns')
+                .then(response => response.json())
+                .then(data => {
+                    renderData(data);
+                })
+                .catch(err => {
+                    console.error('Fetch error:', err);
+                });
+        }
+
+        function renderData(data) {
+            const container = document.getElementById('container');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="loader">Keine Daten vorhanden.</div>';
+                return;
+            }
+
+            // Sort: Real First, then Descending Drawdown EUR
+            data.sort((a, b) => {
+                if (a.real && !b.real) return -1;
+                if (!a.real && b.real) return 1;
+                return b.currentDrawdownEur - a.currentDrawdownEur;
+            });
+
+            let html = '';
+            data.forEach(item => {
+                const isReal = item.real;
+                const ddEur = item.currentDrawdownEur;
+                const ddPct = item.currentDrawdownPercent;
+                const equity = item.currentMagicEquity;
+                const ddClass = ddEur > 0 ? 'negative' : 'neutral';
+                const pctClass = ddPct > 10 ? 'high' : (ddPct > 5 ? 'med' : 'low');
+
+                html += `
+                <div class="card ${isReal ? 'real' : 'demo'}">
+                    <div class="row">
+                        <div class="account-name">
+                            <span class="badge ${isReal ? 'real' : 'demo'}">${isReal ? 'REAL' : 'DEMO'}</span>
+                            ${escapeHtml(item.accountName)}
+                        </div>
+                        <div class="dd-value ${ddClass}">
+                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="magic-info">
+                            Magic: ${item.magicNumber}
+                        </div>
+                        <div class="dd-percent ${pctClass}">
+                            ${ddPct.toFixed(2)}%
+                        </div>
+                    </div>
+                    <div class="equity-row">
+                        <span>Open Profit (Magic)</span>
+                        <span class="equity-val">${equity.toFixed(2)}</span>
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return text;
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Auto Refresh every 30s
+        setInterval(fetchData, 30000);
+    </script>
+</body>
+
+</html>

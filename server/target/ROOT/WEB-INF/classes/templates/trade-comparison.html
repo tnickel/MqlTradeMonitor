@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Trade Vergleich (Slippage & Delay)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-dark: #1a1b26;
+            --bg-card: #24283b;
+            --text-primary: #c0caf5;
+            --text-muted: #565f89;
+            --accent: #7aa2f7;
+            --success: #9ece6a;
+            --danger: #f7768e;
+            --warning: #e0af68;
+            --border: #414868;
+            --hover: #2f344f;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent);
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+        }
+
+        .filter-container {
+            max-width: 1200px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .filter-container select,
+        .filter-container button {
+            padding: 8px 16px;
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .filter-container button {
+            background-color: var(--accent);
+            color: var(--bg-dark);
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .filter-container button:hover {
+            opacity: 0.9;
+        }
+
+        .comparison-container {
+            max-width: 1400px;
+            /* very wide for the table */
+            margin: 0 auto;
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 10px 8px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--hover);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .badge {
+            font-size: 0.70rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.real {
+            background-color: rgba(158, 206, 106, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(158, 206, 106, 0.3);
+        }
+
+        .badge.demo {
+            background-color: rgba(224, 175, 104, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(224, 175, 104, 0.3);
+        }
+
+        .badge.buy {
+            background-color: rgba(122, 162, 247, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(122, 162, 247, 0.3);
+        }
+
+        .badge.sell {
+            background-color: rgba(247, 118, 142, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(247, 118, 142, 0.3);
+        }
+
+        .badge.matched {
+            background-color: rgba(158, 206, 106, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(158, 206, 106, 0.3);
+        }
+
+        .badge.not-found {
+            background-color: rgba(247, 118, 142, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(247, 118, 142, 0.3);
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        .neutral {
+            color: var(--text-muted);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .back-btn {
+            display: block;
+            width: fit-content;
+            margin: 20px auto 0;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: var(--accent);
+        }
+
+        .period-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .period-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--hover);
+        }
+
+        .period-btn.active {
+            background-color: rgba(122, 162, 247, 0.15);
+            color: var(--accent);
+            border-color: rgba(122, 162, 247, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Trade Vergleich (Slippage & Delay)</h1>
+
+    <div class="filter-container">
+        <form action="/trade-comparison" method="get" id="filterForm">
+            <select name="accountId" onchange="document.getElementById('filterForm').submit()">
+                <option value="">-- Alle Real Accounts --</option>
+                <option th:each="acc : ${realAccounts}" th:value="${acc.accountId}" th:text="${acc.name}"
+                    th:selected="${acc.accountId == selectedAccountId}"></option>
+            </select>
+            <input type="hidden" name="period" id="periodInput" th:value="${selectedPeriod}" />
+        </form>
+    </div>
+
+    <div class="period-buttons" style="margin-bottom: 20px;">
+        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'today' ? 'active' : ''}"
+            onclick="setPeriod('today')">Heutige Trades</button>
+        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-week' ? 'active' : ''}"
+            onclick="setPeriod('this-week')">Diese Woche</button>
+        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-month' ? 'active' : ''}"
+            onclick="setPeriod('this-month')">Diesen Monat</button>
+        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'all' ? 'active' : ''}"
+            onclick="setPeriod('all')">Alle Trades</button>
+    </div>
+
+    <div class="comparison-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Real Account</th>
+                    <th>Demo Account</th>
+                    <th>Ticket (Real)</th>
+                    <th>Symbol</th>
+                    <th class="text-center">Type</th>
+                    <th class="text-right">Vol (Real)</th>
+                    <th>Open Time (Real)</th>
+                    <th>Open Time (Demo)</th>
+                    <th class="text-right">Open Delay (s)</th>
+                    <th class="text-right">Open Slippage</th>
+                    <th class="text-right">Close Delay (s)</th>
+                    <th class="text-right">Close Slippage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="comp : ${comparisons}">
+                    <td class="text-center">
+                        <span th:if="${comp.status == 'MATCHED'}" class="badge matched">MATCHED</span>
+                        <span th:if="${comp.status != 'MATCHED'}" class="badge not-found">NOT FOUND</span>
+                    </td>
+                    <td>
+                        <span th:text="${comp.realAccountName}"></span>
+                    </td>
+                    <td>
+                        <span th:text="${comp.demoAccountName}"></span>
+                    </td>
+                    <td class="mono" th:text="${comp.realTrade.ticket}"></td>
+                    <td class="mono" th:text="${comp.realTrade.symbol}"></td>
+                    <td class="text-center">
+                        <span class="badge" th:classappend="${comp.realTrade.type == 'BUY' ? 'buy' : 'sell'}"
+                            th:text="${comp.realTrade.type}">BUY</span>
+                    </td>
+                    <td class="text-right mono" th:text="${comp.realTrade.volume}"></td>
+                    <td class="mono neutral" th:text="${comp.realTrade.openTime}"></td>
+                    <td class="mono neutral" th:text="${comp.demoTrade != null ? comp.demoTrade.openTime : '-'}"></td>
+
+                    <td class="text-right mono"
+                        th:classappend="${comp.status == 'MATCHED' ? (comp.openDelaySeconds > 2 ? 'negative' : (comp.openDelaySeconds <= 0 ? 'positive' : 'neutral')) : ''}">
+                        <span th:text="${comp.openDelaySeconds != null ? comp.openDelaySeconds + 's' : '-'}"></span>
+                    </td>
+
+                    <td class="text-right mono"
+                        th:classappend="${comp.status == 'MATCHED' ? (comp.openSlippage > 0 ? 'negative' : (comp.openSlippage < 0 ? 'positive' : 'neutral')) : ''}">
+                        <span th:text="${comp.openSlippageFormatted != null ? comp.openSlippageFormatted : '-'}"></span>
+                    </td>
+
+                    <td class="text-right mono"
+                        th:classappend="${comp.status == 'MATCHED' ? (comp.closeDelaySeconds > 2 ? 'negative' : (comp.closeDelaySeconds <= 0 ? 'positive' : 'neutral')) : ''}">
+                        <span th:text="${comp.closeDelaySeconds != null ? comp.closeDelaySeconds + 's' : '-'}"></span>
+                    </td>
+
+                    <td class="text-right mono"
+                        th:classappend="${comp.status == 'MATCHED' ? (comp.closeSlippage > 0 ? 'negative' : (comp.closeSlippage < 0 ? 'positive' : 'neutral')) : ''}">
+                        <span
+                            th:text="${comp.closeSlippageFormatted != null ? comp.closeSlippageFormatted : '-'}"></span>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(comparisons)}">
+                    <td colspan="13" class="text-center neutral">Keine Trades gefunden.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <a href="/" class="back-btn">← Zurück zum Dashboard</a>
+
+    <script>
+        function setPeriod(period) {
+            document.getElementById('periodInput').value = period;
+            document.getElementById('filterForm').submit();
+        }
+    </script>
+</body>
+
+</html>

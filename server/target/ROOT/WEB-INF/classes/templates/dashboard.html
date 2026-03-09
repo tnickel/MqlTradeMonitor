@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Monitor - Dashboard</title>
+    <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Trade Monitor <span
+                    style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.12.0</span>
+            </h1>
+            <p class="subtitle">MetaTrader Account Übersicht</p>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-value" th:text="${#lists.size(accounts)}">0</span>
+                <span class="stat-label">Accounts</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="online-count">0</span>
+                <span class="stat-label">Online</span>
+            </div>
+            <div class="stat interactive" onclick="location.href='/open-trades'">
+                <span class="stat-value" id="total-trades">0</span>
+                <span class="stat-label">Open Trades</span>
+            </div>
+            <div class="view-controls" style="display:flex; gap:10px; align-items:center;">
+                <button id="view-btn-grid" class="view-toggle-btn active" onclick="setViewMode('grid')">
+                    <span>▦</span> Kacheln
+                </button>
+                <button id="view-btn-compact" class="view-toggle-btn" onclick="setViewMode('compact')">
+                    <span>📄</span> Kompakt
+                </button>
+                <button id="view-btn-real" class="view-toggle-btn" onclick="setViewMode('real')">
+                    <span>🛡️</span> Real Focus
+                </button>
+            </div>
+            <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
+            <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
+                style="display:none;">Speichern</button>
+            <div style="display:flex; gap:10px; align-items:center; margin-left: 10px;">
+                <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin"
+                    class="btn btn-secondary"
+                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">⚙️
+                    Admin</a>
+                <a th:if="${currentUser != null}" href="/profile" class="btn btn-secondary"
+                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">👤
+                    Profil</a>
+                <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0;">
+                    <button type="submit" class="btn btn-secondary"
+                        style="background-color: #161b22; color: #ff7b72; border: 1px solid rgba(218, 54, 51, 0.4); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;">🚪
+                        Logout</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Global Warning Banner -->
+        <div id="sync-warning-banner" class="global-warning-banner" style="display: none;">
+            <div class="global-warning-icon">⚠️</div>
+            <div>
+                <h3 style="margin:0; color: #ff6b6b; font-size:1.2rem;">WARNUNG: Trade Sync Fehler</h3>
+                <p style="margin:0;">Ein oder mehrere REAL Accounts haben Trades ohne Matching Demo Trade!</p>
+            </div>
+        </div>
+
+        <!-- Header Cards Container (Sync & Global) -->
+        <div class="header-cards-container" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+            <!-- Sync Status Card -->
+            <div class="account-card"
+                style="cursor: default; border: 1px solid #4a4e69; background: linear-gradient(to bottom right, #2a2e39, #1e222d); flex: 0 1 auto; min-width: 300px;"
+                th:if="${syncMetrics != null}">
+                <div class="account-header">
+                    <span class="account-id" style="font-size: 1.2rem;">🛡️ Sync Monitor</span>
+                    <span th:class="'status-badge ' + (${syncMetrics.status == 'OK'} ? 'online' : 'offline')"
+                        th:text="${syncMetrics.status}">OK</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Last Check</span>
+                        <span class="metric-value"
+                            th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.lastCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Next Check</span>
+                        <span class="metric-value"
+                            th:text="${syncMetrics.lastCheckTime > 0 ? #dates.format(new java.util.Date(syncMetrics.nextCheckTime), 'HH:mm:ss') : '-'}">-</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Checked Trades</span>
+                        <span class="metric-value" th:text="${syncMetrics.checkedCount}">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Interval</span>
+                        <span class="metric-value" th:text="${syncMetrics.interval + 's'}">60s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Summary Card -->
+            <div class="account-card" onclick="location.href='/open-trades'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1)); flex: 0 1 auto; min-width: 300px;">
+                <div class="account-header">
+                    <span class="account-id" style="font-size: 1.2rem;">Global</span>
+                    <span class="status-badge online">SUMME</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Trades</span>
+                        <span class="metric-value" id="global-trades-count">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Equity</span>
+                        <span class="metric-value" id="global-equity-sum">...</span>
+                    </div>
+                    <div class="metric" style="padding: 0.5rem;">
+                        <span class="metric-label">Open Profit</span>
+                        <span class="metric-value" id="global-profit-sum">0.00</span>
+                    </div>
+                </div>
+                <div class="view-details-btn" style="padding: 0.5rem; font-size: 0.9rem;">Alle Trades →</div>
+            </div>
+
+            <!-- Drawdown Monitor Tile (Compact) -->
+            <div id="drawdown-monitor-card" class="account-card" onclick="openDrawdownModal()"
+                style="cursor: pointer; border: 1px solid #ef4444; background: linear-gradient(to bottom right, #2a2e39, rgba(239, 68, 68, 0.1)); flex: 0 1 auto; min-width: 300px; max-height: 150px; display: flex; flex-direction: column; overflow: hidden;">
+                <div class="account-header" style="flex: 0 0 auto;">
+                    <span class="account-id" style="font-size: 1.1rem;">📉 Drawdown (Real)</span>
+                    <span class="status-badge online">LIVE</span>
+                </div>
+                <!-- Compact Content: Real Only -->
+                <div style="flex: 1 1 auto; overflow-y: hidden; margin-top: 5px; padding-right: 5px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <tbody id="drawdown-tile-body">
+                            <tr>
+                                <td colspan="2" style="text-align:center; padding: 10px; color: #6b6b8f;">Lade Daten...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top:auto;">Details & Demo →
+                </div>
+            </div>
+
+            <!-- Drawdown Details Modal -->
+            <div id="drawdownModal" class="modal">
+                <div class="modal-content" style="max-width: 800px; width: 90%;">
+                    <span class="close-modal" onclick="closeDrawdownModal()">×</span>
+                    <h2>📉 Drawdown Detail-Monitor (Alle Accounts)</h2>
+                    <div style="margin-top: 20px; overflow-y: auto; max-height: 70vh;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
+                                <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444;">
+                                    <th style="padding: 10px;">Account / Magic</th>
+                                    <th style="padding: 10px; text-align: right;">Drawdown €</th>
+                                    <th style="padding: 10px; text-align: right;">Drawdown %</th>
+                                    <th style="padding: 10px; text-align: right;">Open Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drawdown-modal-body">
+                                <!-- Full List inserted by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Report -->
+            <div class="account-card" onclick="location.href='/report/daily'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(158, 206, 106, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Daily</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Tagesreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-daily"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
+
+            <!-- Weekly Report -->
+            <div class="account-card" onclick="location.href='/report/weekly'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(224, 175, 104, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Weekly</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Wochenreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-weekly"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
+
+            <!-- Monthly Report -->
+            <div class="account-card" onclick="location.href='/report/monthly'"
+                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(122, 162, 247, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📅 Monthly</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Monatsreport</div>
+                </div>
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
+                    <canvas id="chart-monthly"></canvas>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
+                    Anzeigen →</div>
+            </div>
+        </div>
+
+        <script>
+            function initMiniChart(canvasId, period, color) {
+                fetch('/api/report-chart/' + period)
+                    .then(response => response.json())
+                    .then(data => {
+                        const ctx = document.getElementById(canvasId).getContext('2d');
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 60);
+                        gradient.addColorStop(0, color.replace('1)', '0.5)'));
+                        gradient.addColorStop(1, color.replace('1)', '0.0)'));
+
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: data.labels,
+                                datasets: [{
+                                    data: data.data,
+                                    borderColor: color,
+                                    backgroundColor: gradient,
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    fill: true,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                                scales: {
+                                    x: { display: false },
+                                    y: { display: false, beginAtZero: true }
+                                },
+                                layout: { padding: 0 }
+                            }
+                        });
+                    })
+                    .catch(err => console.error('Error loading chart ' + period, err));
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                initMiniChart('chart-daily', 'daily', 'rgba(158, 206, 106, 1)');   // Green
+                initMiniChart('chart-weekly', 'weekly', 'rgba(224, 175, 104, 1)'); // Yellow/Orange
+                initMiniChart('chart-monthly', 'monthly', 'rgba(122, 162, 247, 1)'); // Blue
+            });
+        </script>
+
+
+        <!-- Global Open Profit Alarm Banner -->
+        <div th:if="${!alarmedAccounts.isEmpty()}" class="global-warning-banner" style="margin-bottom: 1.5rem;">
+            <span class="global-warning-icon">🚨</span>
+            <div>
+                <strong style="font-size: 1.1rem; color: #fff;">OPEN PROFIT ALARM!</strong>
+                <span th:each="acc : ${alarmedAccounts}">
+                    <br /><span style="color: #ffcccc;"
+                        th:text="'⚠️ ' + (${acc.name} != null ? ${acc.name} : ${acc.accountId}) + ': Open Profit ' + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency} + ' (Schwelle: ' + (${acc.openProfitAlarmAbs} != null ? ${#numbers.formatDecimal(acc.openProfitAlarmAbs, 1, 0)} + ' ' + ${acc.currency} : '') + (${acc.openProfitAlarmAbs != null && acc.openProfitAlarmPct != null} ? ' / ' : '') + (${acc.openProfitAlarmPct} != null ? ${#numbers.formatDecimal(acc.openProfitAlarmPct, 1, 1)} + '%' : '') + ')'"></span>
+                </span>
+            </div>
+        </div>
+
+        <div id="layout-container">
+            <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
+                <div class="section-header">
+                    <span class="section-title" th:text="${section.name}" onclick="renameSection(this)">Section
+                        Name</span>
+                    <div class="section-controls" style="display:none;">
+                        <button class="icon-btn delete-section-btn" onclick="deleteSection(this)">🗑️</button>
+                    </div>
+                </div>
+
+                <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
+                    <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card"
+                        th:data-online="${acc.online}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''}"
+                        th:data-id="${acc.accountId}" th:data-type="${acc.type}"
+                        th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
+
+                        <!-- Account Card Content -->
+                        <div class="account-header"
+                            style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="display: flex; flex-direction: column;">
+                                <!-- Name First (Larger) -->
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
+                                        th:text="${acc.name}"
+                                        style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">(Name)</span>
+                                </div>
+
+                                <!-- ID Below (Smaller) -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="account-id" th:text="${acc.accountId}"
+                                        style="font-size: 0.9rem; color: #a0a0c0; font-family: 'JetBrains Mono';">12345</span>
+                                    <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
+                                    <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
+                                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                        th:data-type="${acc.type}" th:data-alarm-enabled="${acc.openProfitAlarmEnabled}"
+                                        th:data-alarm-abs="${acc.openProfitAlarmAbs}"
+                                        th:data-alarm-pct="${acc.openProfitAlarmPct}"
+                                        onclick="event.stopPropagation(); openEditModal(this)"
+                                        title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">✏️</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                <!-- Error Badge -->
+                                <span th:if="${acc.errorState}" class="status-badge offline"
+                                    th:title="${acc.lastErrorMsg}"
+                                    style="background-color: #ef4444; color: white; cursor: help;">ERROR</span>
+
+                                <span th:if="${!acc.online}"
+                                    style="font-size: 0.75rem; color: #6b6b8f; white-space: nowrap;"
+                                    th:text="${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')}">01.01.2024</span>
+                            </div>
+                        </div>
+
+                        <!-- Broker and Live Indicator -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="account-broker" th:text="${acc.broker}" style="margin: 0;">Broker</div>
+                            <span th:if="${acc.lastSeenMins != null}"
+                                th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
+                                    (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                                th:title="(${acc.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${acc.lastSeen} != null ? ${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${acc.lastSeenMins} + ' Min)')">
+                            </span>
+                        </div>
+                        <div class="account-metrics">
+                            <div class="metric">
+                                <span class="metric-label">Balance</span>
+                                <span class="metric-value"
+                                    th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">1000
+                                    USD</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Alarm</span>
+                                <span th:if="${!acc.openProfitAlarmEnabled}" class="metric-value"
+                                    style="color: #555;">–</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && !acc.openProfitAlarmTriggered}"
+                                    class="metric-value" style="color: #10b981; font-size: 0.85rem;"
+                                    th:text="(${acc.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(acc.openProfitAlarmAbs, 1, 0) + ' ' + acc.currency : ''}) + (${acc.openProfitAlarmAbs != null && acc.openProfitAlarmPct != null ? ' / ' : ''}) + (${acc.openProfitAlarmPct != null ? #numbers.formatDecimal(acc.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡
+                                    -5000 / 10%</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && acc.openProfitAlarmTriggered}"
+                                    class="metric-value"
+                                    style="color: #ef4444; font-weight: bold; animation: pulse-border 1s infinite;">🔴
+                                    ALARM</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Open Profit</span>
+                                <span
+                                    th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
+                                    USD</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Open Trades</span>
+                                <span class="metric-value" th:text="${acc.trades}">5</span>
+                            </div>
+                        </div>
+                        <div th:if="${acc.errorState}"
+                            style="color: #ef4444; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 5px;">
+                            <span>⚠️ <span th:text="${acc.lastErrorMsg}">Error Message</span></span>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+                            <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-details-btn"
+                                style="flex: 1;">Details
+                                anzeigen
+                                →</a>
+                            <a th:if="${acc.type == 'REAL'}" th:href="@{/trade-comparison(accountId=${acc.accountId})}"
+                                class="view-details-btn"
+                                style="flex: 1; background: rgba(122, 162, 247, 0.15); border-color: rgba(122, 162, 247, 0.4); color: var(--accent);">
+                                Trade Compare →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compact View Container -->
+        <div id="compact-view-container" style="display:none;">
+            <div th:each="section : ${sections}" class="dashboard-section" th:data-section-id="${section.id}">
+                <h3 th:text="${section.name}" class="section-title"
+                    style="margin-bottom:10px; border-bottom:1px solid #3f3f5f; padding-bottom:5px;">Section
+                </h3>
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Name</th>
+                            <th>Balance</th>
+                            <th>Alarm</th>
+                            <th>Open Profit</th>
+                            <th>Trades</th>
+                            <th style="text-align:center;">Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="acc : ${accountsBySection.get(section.id)}"
+                            th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
+                            <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span th:text="${acc.name}">Name</span>
+                                    <span th:if="${acc.lastSeenMins != null}"
+                                        th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
+                                                (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                                                (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                                                (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                                                (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                                        th:title="(${acc.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${acc.lastSeen} != null ? ${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${acc.lastSeenMins} + ' Min)')">
+                                    </span>
+                                </div>
+                            </td>
+                            <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
+                            <td>
+                                <span th:if="${!acc.openProfitAlarmEnabled}"
+                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && !acc.openProfitAlarmTriggered}"
+                                    style="color: #10b981; font-size: 0.85rem;">⚡</span>
+                                <span th:if="${acc.openProfitAlarmEnabled && acc.openProfitAlarmTriggered}"
+                                    style="color: #ef4444; font-weight: bold;">🔴</span>
+                            </td>
+                            <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
+                            <td th:text="${acc.trades}">5</td>
+                            <td style="text-align:center;">
+                                <span th:if="${acc.syncWarning}" title="Sync Error!"
+                                    style="color: #ef4444; font-size:1.2em;">⚠️</span>
+                                <span th:if="${!acc.syncWarning && acc.errorState}" title="API Error"
+                                    style="color: #ef4444; font-size:1.2em;">⛔</span>
+                                <span th:if="${!acc.syncWarning && !acc.errorState}" style="color: #10b981;">●</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="add-section-container" style="display:none; text-align: center; margin-top: 20px;">
+            <button class="add-section-btn" onclick="addNewSection()">+ Neue Sektion</button>
+        </div>
+
+        <div class="no-accounts" th:if="${#lists.size(accounts) == 0}">
+            <div class="no-accounts-icon">📊</div>
+            <h2>Keine Accounts verbunden</h2>
+            <p>Starten Sie den TradeMonitorClient EA auf MetaTrader um sich zu verbinden.</p>
+            <div class="setup-instructions">
+                <h3>Setup Anleitung:</h3>
+                <ol>
+                    <li>Kopieren Sie <code>TradeMonitorClient.mq5</code> in Ihren MQL5/Experts Ordner</li>
+                    <li>Kompilieren Sie den EA im MetaEditor</li>
+                    <li>Fügen Sie <code>http://localhost:8080</code> zu den erlaubten URLs hinzu<br>
+                        (Tools → Optionen → Expert Advisors → WebRequest erlauben)</li>
+                    <li>Starten Sie den EA auf einem Chart</li>
+                </ol>
+            </div>
+        </div>
+
+
+    </div>
+
+    <div
+        style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid #333; color: #666; font-size: 0.9rem;">
+        &copy; 2026 Trade Monitor &nbsp;|&nbsp;
+        <a href="/admin" style="color: #a0a0c0; text-decoration: none;">Admin Area</a> &nbsp;|&nbsp;
+        <a href="/open-trades" style="color: #a0a0c0; text-decoration: none;">Open Trades List</a> &nbsp;|&nbsp;
+        <a href="/trade-comparison" style="color: #a0a0c0; text-decoration: none;">Trade-Vergleich</a>
+    </div>
+
+    <script>
+        const liveColorGreen = '[[${liveColorGreen}]]';
+        const liveColorYellow = '[[${liveColorYellow}]]';
+        const liveColorOrange = '[[${liveColorOrange}]]';
+        const liveColorRed = '[[${liveColorRed}]]';
+        const liveGreenMins = parseInt('[[${liveGreenMins}]]') || 1;
+        const liveYellowMins = parseInt('[[${liveYellowMins}]]') || 5;
+        const liveOrangeMins = parseInt('[[${liveOrangeMins}]]') || 15;
+
+        function getLiveDotHtml(lastSeenMins, lastSeenString) {
+            if (lastSeenMins === null || lastSeenMins === undefined) return '';
+            let color = liveColorRed;
+            let title = 'Kein Signal empfangen';
+            if (lastSeenMins >= 0) {
+                if (lastSeenMins <= liveGreenMins) color = liveColorGreen;
+                else if (lastSeenMins <= liveYellowMins) color = liveColorYellow;
+                else if (lastSeenMins <= liveOrangeMins) color = liveColorOrange;
+                const timeStr = lastSeenString ? 'Letzter Kontakt: ' + lastSeenString : 'Letzter Kontakt';
+                title = timeStr + ' (vor ' + lastSeenMins + ' Min)';
+            }
+            return `<span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ${color};" title="${title}"></span>`;
+        }
+
+        function sendTestEmail() {
+            if (!confirm("Test Email jetzt senden?")) return;
+
+            fetch('/api/test-email', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        alert('Erfolg: ' + data.message);
+                    } else {
+                        alert('Fehler: ' + data.message);
+                    }
+                })
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+
+        function testSiren() {
+            if (!confirm("Sirene jetzt testen?")) return;
+
+            fetch('/api/test-siren', { method: 'POST' })
+                .then(response => response.text())
+                .then(data => alert(data))
+                .catch(error => alert('Netzwerkfehler: ' + error));
+        }
+    </script>
+
+    <!-- Edit Account Modal -->
+    <div id="editAccountModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditModal()">&times;</span>
+            <h2>Account bearbeiten</h2>
+            <input type="hidden" id="editAccountId">
+
+            <div class="form-group">
+                <label for="editAccountName">Name:</label>
+                <input type="text" id="editAccountName" placeholder="z.B. My Scalper Bot">
+            </div>
+
+            <div class="form-group">
+                <label for="editAccountType">Account Typ:</label>
+                <select id="editAccountType">
+                    <option value="">-- Bitte wählen --</option>
+                    <option value="DEMO">Demo Account</option>
+                    <option value="REAL">Real Account</option>
+                </select>
+            </div>
+
+            <hr style="border-color: #333; margin: 15px 0;">
+            <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #ef4444;">🔔 Open Profit Alarm</h3>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="editAlarmEnabled" style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="editAlarmEnabled" style="margin: 0; cursor: pointer;">Alarm aktiv</label>
+            </div>
+
+            <div class="form-group">
+                <label for="editAlarmAbs">Min. Open Profit (absolut, z.B. -5000):</label>
+                <input type="number" id="editAlarmAbs" step="1" placeholder="z.B. -5000">
+            </div>
+
+            <div class="form-group">
+                <label for="editAlarmPct">Max. Drawdown (% der Balance, z.B. 10):</label>
+                <input type="number" id="editAlarmPct" step="0.1" min="0" placeholder="z.B. 10">
+            </div>
+
+            <button class="save-btn" onclick="saveAccountDetails()">Speichern</button>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh page every 5 seconds
+        let reloadTimer = setTimeout(reloadPage, 5000);
+
+        function reloadPage() {
+            // Don't reload if modal is open OR if we are in Edit Mode
+            if (document.getElementById('editAccountModal').style.display !== 'block' &&
+                document.getElementById('drawdownModal') &&
+                document.getElementById('drawdownModal').style.display !== 'block' &&
+                !isEditMode) {
+                location.reload();
+            } else {
+                // Try again in 1 second
+                reloadTimer = setTimeout(reloadPage, 1000);
+            }
+        }
+
+        // --- View Mode Logic ---
+        function setViewMode(mode) {
+            const grid = document.getElementById('layout-container');
+            const compact = document.getElementById('compact-view-container');
+            const btns = document.querySelectorAll('.view-toggle-btn');
+
+            // Stats Bar filtering for Real Focus
+            const statsBar = document.querySelector('.stats-bar');
+
+            // Reset active buttons
+            btns.forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--bg-card)';
+                b.style.color = 'var(--text-secondary)';
+                b.style.borderColor = 'var(--border-color)';
+            });
+
+            // Set Active Button Style
+            const activeBtn = document.getElementById('view-btn-' + mode);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.background = 'var(--accent-primary)';
+                activeBtn.style.color = 'white';
+                activeBtn.style.borderColor = 'var(--accent-primary)';
+            }
+
+            localStorage.setItem('tradeMonitorView', mode);
+
+            // Hide/Show Logic
+            const allCards = document.querySelectorAll('.account-card');
+            const sections = document.querySelectorAll('.dashboard-section');
+
+            if (mode === 'compact') {
+                grid.style.display = 'none';
+                compact.style.display = 'block';
+                // Show stat bar
+                if (statsBar) statsBar.style.display = 'flex';
+
+            } else if (mode === 'real') {
+                grid.style.display = 'block';
+                compact.style.display = 'none';
+
+                // Filter Grid: Show ONLY REAL accounts
+                // Also hide Global Card and Sync Monitor (as user requested "only the two tiles")
+
+                allCards.forEach(card => {
+                    const type = card.getAttribute('data-type');
+                    // Check if it's a client card (has data-id)
+                    if (card.hasAttribute('data-id')) {
+                        if (type === 'REAL') {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    } else {
+                        // It's a system card (Global, Sync, etc.)
+                        // User said "nur die beiden kacheln". So hide system cards too?
+                        // "da werden dann nur die beiden kacheln für realaccounts angezeigt und natürlich auch die 3 buttons... mehr nicht."
+                        // So hide Global and Sync cards.
+                        card.style.display = 'none';
+                    }
+                });
+
+                // Hide empty sections title?
+                sections.forEach(sec => {
+                    const realCards = sec.querySelectorAll('.account-card[data-type="REAL"]');
+                    if (realCards.length > 0) {
+                        sec.style.display = 'block';
+                    } else {
+                        sec.style.display = 'none';
+                    }
+                });
+
+                // Hide Global Warning Banner?
+                const banner = document.getElementById('sync-warning-banner');
+                if (banner) banner.style.display = 'none';
+
+
+            } else {
+                // GRID (Standard)
+                grid.style.display = 'block';
+                compact.style.display = 'none';
+
+                // Show all cards
+                allCards.forEach(c => c.style.display = '');
+                sections.forEach(s => s.style.display = '');
+
+                if (statsBar) statsBar.style.display = 'flex';
+                const banner = document.getElementById('sync-warning-banner');
+                // Only show if warning present?
+                // The banner logic runs every 5s anyway.
+            }
+        }
+
+        // Restore View Preference
+        document.addEventListener('DOMContentLoaded', () => {
+            const pref = localStorage.getItem('tradeMonitorView') || 'grid';
+            setViewMode(pref);
+        });
+
+        // Calculate stats
+        document.addEventListener('DOMContentLoaded', function () {
+            const clientCards = document.querySelectorAll('.account-card:not([onclick*="open-trades"])'); // Select only client cards
+
+            let online = 0;
+            let trades = 0;
+            let totalEquity = 0.0;
+            let totalProfit = 0.0;
+            let currency = "";
+
+            clientCards.forEach(function (card) {
+                if (card.getAttribute('data-online') === 'true') online++;
+
+                // Trades (4th metric)
+                const tradeSpan = card.querySelector('.metric:nth-child(4) .metric-value');
+                if (tradeSpan) trades += parseInt(tradeSpan.textContent) || 0;
+
+                // Equity (2nd metric)
+                const equitySpan = card.querySelector('.metric:nth-child(2) .metric-value');
+                if (equitySpan) {
+                    const text = equitySpan.textContent.trim();
+                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(val)) totalEquity += val;
+                    // Try to grab currency from first card
+                    if (currency === "" && text.includes(" ")) currency = text.split(" ")[1];
+                }
+
+                // Profit (3rd metric)
+                const profitSpan = card.querySelector('.metric:nth-child(3) .metric-value');
+                if (profitSpan) {
+                    const text = profitSpan.textContent.trim();
+                    const val = parseFloat(text.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(val)) totalProfit += val;
+                }
+            });
+
+            if (currency === "") currency = "EUR"; // Default fallback
+
+            const onlineCountEl = document.getElementById('online-count');
+            if (onlineCountEl) onlineCountEl.textContent = online;
+
+            const totalTradesEl = document.getElementById('total-trades');
+            if (totalTradesEl) totalTradesEl.textContent = trades;
+
+            // Update Global Card
+            const globalTrades = document.getElementById('global-trades-count');
+            const globalEquity = document.getElementById('global-equity-sum');
+            const globalProfit = document.getElementById('global-profit-sum');
+
+            if (globalTrades) globalTrades.textContent = trades;
+            if (globalEquity) globalEquity.textContent = totalEquity.toFixed(2) + " " + currency;
+            if (globalProfit) {
+                globalProfit.textContent = (totalProfit > 0 ? "+" : "") + totalProfit.toFixed(2) + " " + currency;
+                globalProfit.className = "metric-value " + (totalProfit >= 0 ? "profit-positive" : "profit-negative");
+            }
+
+            // Global Warning Banner Logic
+            const warningCards = document.querySelectorAll('.account-card.warning-pulse');
+            const banner = document.getElementById('sync-warning-banner');
+            if (banner) {
+                if (warningCards.length > 0) {
+                    banner.style.display = 'flex';
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+
+            // Update Drawdown Monitor
+            updateDrawdownMonitor();
+        });
+
+        // Drawdown Modal State
+        let currentDrawdownItems = [];
+
+        function updateDrawdownMonitor() {
+            const tileBody = document.getElementById('drawdown-tile-body');
+
+            fetch('/api/stats/magic-drawdowns')
+                .then(r => r.json())
+                .then(items => {
+                    currentDrawdownItems = items; // Store for modal
+
+                    // 1. Compact Tile: Real Only
+                    const realItems = items.filter(i => i.real);
+
+                    if (tileBody) {
+                        if (realItems.length === 0) {
+                            tileBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding: 10px; color: #10b981;">Keine Drawdowns (Real)</td></tr>';
+                        } else {
+                            // Group by accountName
+                            const grouped = {};
+                            realItems.forEach(item => {
+                                const name = item.accountName || 'Unknown';
+                                if (!grouped[name]) {
+                                    grouped[name] = {
+                                        accountName: name,
+                                        sumDrawdownEur: 0,
+                                        sumCurrentMagicEquity: 0
+                                    };
+                                }
+                                grouped[name].sumDrawdownEur += Number(item.currentDrawdownEur || 0);
+                                grouped[name].sumCurrentMagicEquity += Number(item.currentMagicEquity || 0); // Need equity for %
+                            });
+
+                            let html = '';
+                            Object.values(grouped).forEach(group => {
+                                const ddEur = group.sumDrawdownEur;
+                                // Calc aggregated percent drawdown
+                                // totalPeak is roughly (currentEquity + currentDrawdownEur)
+                                // So: percent = (ddEur / (currentEquity + ddEur)) * 100
+                                const totalValidPeak = group.sumCurrentMagicEquity + ddEur;
+                                const aggPercent = totalValidPeak > 0 ? (ddEur / totalValidPeak) * 100 : 0;
+
+                                html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 2px 0;">
+                                                <div style="font-weight:600; font-size: 0.85rem; color:var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                                                    ${group.accountName}
+                                                </div>
+                                            </td>
+                                            <td style="padding: 2px 0; text-align: right; vertical-align: middle;">
+                                                <div style="color: ${ddEur > 0 ? '#ef4444' : '#10b981'}; font-weight: bold; font-size: 0.85rem;">
+                                                    ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                                                </div>
+                                                <div style="font-size:0.7rem; color: ${aggPercent > 5 ? '#ef4444' : '#888'};">
+                                                    ${aggPercent.toFixed(2)}%
+                                                </div>
+                                            </td>
+                                        </tr>`;
+                            });
+                            tileBody.innerHTML = html;
+                        }
+                    }
+
+                    // If modal is open, update it too
+                    if (document.getElementById('drawdownModal') && document.getElementById('drawdownModal').style.display === 'block') {
+                        renderDrawdownModal();
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+
+        function openDrawdownModal() {
+            const m = document.getElementById('drawdownModal');
+            if (m) {
+                m.style.display = 'block';
+                renderDrawdownModal();
+            }
+        }
+
+        function closeDrawdownModal() {
+            const m = document.getElementById('drawdownModal');
+            if (m) m.style.display = 'none';
+        }
+
+        function renderDrawdownModal() {
+            const tbody = document.getElementById('drawdown-modal-body');
+            if (!tbody) return;
+
+            if (currentDrawdownItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
+                return;
+            }
+
+            let html = '';
+
+            const realItems = currentDrawdownItems.filter(i => i.real);
+            const demoItems = currentDrawdownItems.filter(i => !i.real);
+
+            // Group REAL items by accountName
+            const realGroups = {};
+            realItems.forEach(item => {
+                if (!realGroups[item.accountName]) {
+                    realGroups[item.accountName] = [];
+                }
+                realGroups[item.accountName].push(item);
+            });
+
+            // Render REAL groups
+            if (realItems.length > 0) {
+                html += `
+                        <!-- Real Header -->
+                        <tr>
+                            <td colspan="4" style="padding: 0; border-bottom: none;">
+                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #10b981; border-bottom: 1px solid rgba(16,185,129,0.2);">
+                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(16,185,129,0.5));">🛡️</span>
+                                    <span style="font-weight: 800; color: #34d399; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(16,185,129,0.3);">REAL ACCOUNTS</span>
+                                </div>
+                            </td>
+                        </tr>`;
+
+                for (const accountName in realGroups) {
+                    const groupItems = realGroups[accountName];
+
+                    // Calculate sums
+                    let sumDdEur = 0;
+                    let sumProfit = 0;
+                    let refBalance = 0;
+
+                    groupItems.forEach(item => {
+                        sumDdEur += item.currentDrawdownEur || 0;
+                        sumProfit += item.currentMagicEquity || 0;
+                        // Grab the balance from the first item (should be the same for all on the same account)
+                        if (refBalance === 0 && item.referenceBalance) {
+                            refBalance = item.referenceBalance;
+                        }
+                    });
+
+                    // Calculate correct overall percentage
+                    let sumDdPct = 0;
+                    if (refBalance > 0 && sumDdEur > 0) {
+                        sumDdPct = (sumDdEur / refBalance) * 100;
+                    }
+
+                    // Render Group Header
+                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
+                                <td style="padding: 12px 15px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <span class="account-type-badge real" style="padding: 2px 5px;">REAL</span>
+                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
+                                            ${accountName}
+                                        </a>
+                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString) : ''}
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
+                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
+                                        ${sumDdPct.toFixed(2)}%
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
+                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
+                                </td>
+                            </tr>`;
+
+                    // Render items in this group
+                    groupItems.forEach(item => {
+                        const ddEur = item.currentDrawdownEur;
+                        const ddPct = item.currentDrawdownPercent;
+                        const equity = item.currentMagicEquity;
+
+                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
+                                    <td style="padding: 8px 10px 8px 30px;">
+                                        <div style="font-size:0.9rem; color: #ccc;">
+                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
+                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
+                                            ${ddPct.toFixed(2)}%
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
+                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
+                                        </div>
+                                    </td>
+                                </tr>`;
+                    });
+                }
+            }
+
+            // Render DEMO items normally -> now grouped as well
+            if (demoItems.length > 0) {
+                html += `
+                        <!-- Visual Separator -->
+                        <tr>
+                            <td colspan="4" style="padding: 30px 0 20px 0; border: none;">
+                                <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);"></div>
+                                    <div style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;"></div>
+                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Demo Header -->
+                        <tr>
+                            <td colspan="4" style="padding: 0; border-bottom: none;">
+                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(148,163,184,0.1) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.2);">
+                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(148,163,184,0.5));">📉</span>
+                                    <span style="font-weight: 800; color: #94a3b8; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(148,163,184,0.3);">DEMO ACCOUNTS</span>
+                                </div>
+                            </td>
+                        </tr>`;
+
+                // Group DEMO items by accountName
+                const demoGroups = {};
+                demoItems.forEach(item => {
+                    if (!demoGroups[item.accountName]) {
+                        demoGroups[item.accountName] = [];
+                    }
+                    demoGroups[item.accountName].push(item);
+                });
+
+                for (const accountName in demoGroups) {
+                    const groupItems = demoGroups[accountName];
+
+                    // Calculate sums
+                    let sumDdEur = 0;
+                    let sumProfit = 0;
+                    let refBalance = 0;
+
+                    groupItems.forEach(item => {
+                        sumDdEur += item.currentDrawdownEur || 0;
+                        sumProfit += item.currentMagicEquity || 0;
+                        if (refBalance === 0 && item.referenceBalance) {
+                            refBalance = item.referenceBalance;
+                        }
+                    });
+
+                    let sumDdPct = 0;
+                    if (refBalance > 0 && sumDdEur > 0) {
+                        sumDdPct = (sumDdEur / refBalance) * 100;
+                    }
+
+                    // Render Group Header
+                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
+                                <td style="padding: 12px 15px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <span class="account-type-badge demo" style="padding: 2px 5px;">DEMO</span>
+                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
+                                            ${accountName}
+                                        </a>
+                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString) : ''}
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
+                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
+                                        ${sumDdPct.toFixed(2)}%
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
+                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
+                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
+                                </td>
+                            </tr>`;
+
+                    // Render items in this group
+                    groupItems.forEach(item => {
+                        const ddEur = item.currentDrawdownEur;
+                        const ddPct = item.currentDrawdownPercent;
+                        const equity = item.currentMagicEquity;
+
+                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
+                                    <td style="padding: 8px 10px 8px 30px;">
+                                        <div style="font-size:0.9rem; color: #ccc;">
+                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
+                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
+                                            ${ddPct.toFixed(2)}%
+                                        </div>
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right;">
+                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
+                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
+                                        </div>
+                                    </td>
+                                </tr>`;
+                    });
+                }
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('drawdownModal');
+            if (event.target == modal) {
+                closeDrawdownModal();
+            }
+            // Also handle other modals if needed
+            const editModal = document.getElementById('editAccountModal');
+            if (event.target == editModal) {
+                closeEditModal();
+            }
+        }
+
+        // Modal functions
+        function openEditModal(el) {
+            document.getElementById('editAccountId').value = el.getAttribute('data-id');
+            var name = el.getAttribute('data-name');
+            document.getElementById('editAccountName').value = (name === 'null' || name === null) ? '' : name;
+            var type = el.getAttribute('data-type');
+            document.getElementById('editAccountType').value = (type === 'null' || type === null) ? '' : type;
+
+            // Alarm fields
+            var alarmEnabled = el.getAttribute('data-alarm-enabled') === 'true';
+            document.getElementById('editAlarmEnabled').checked = alarmEnabled;
+            var alarmAbs = el.getAttribute('data-alarm-abs');
+            document.getElementById('editAlarmAbs').value = (alarmAbs && alarmAbs !== 'null') ? alarmAbs : '';
+            var alarmPct = el.getAttribute('data-alarm-pct');
+            document.getElementById('editAlarmPct').value = (alarmPct && alarmPct !== 'null') ? alarmPct : '';
+
+            document.getElementById('editAccountModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editAccountModal').style.display = 'none';
+        }
+
+        function saveAccountDetails() {
+            const accountId = document.getElementById('editAccountId').value;
+            const name = document.getElementById('editAccountName').value;
+            const type = document.getElementById('editAccountType').value;
+            const alarmEnabled = document.getElementById('editAlarmEnabled').checked;
+            const alarmAbs = document.getElementById('editAlarmAbs').value;
+            const alarmPct = document.getElementById('editAlarmPct').value;
+
+            const formData = new FormData();
+            formData.append('accountId', accountId);
+            formData.append('name', name);
+            formData.append('type', type);
+            formData.append('alarmEnabled', alarmEnabled);
+            if (alarmAbs) formData.append('alarmAbs', alarmAbs);
+            if (alarmPct) formData.append('alarmPct', alarmPct);
+
+            fetch('/api/account/update', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    if (response.ok) {
+                        closeEditModal();
+                        location.reload();
+                    } else {
+                        alert('Fehler beim Speichern');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Fehler beim Speichern');
+                });
+        }
+
+
+        // --- Drag and Drop Logic ---
+        let isEditMode = false;
+
+        function navigateToAccount(url) {
+            if (!isEditMode) {
+                location.href = url;
+            }
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const btn = document.getElementById('edit-layout-btn');
+            const saveBtn = document.getElementById('save-layout-btn');
+            const cards = document.querySelectorAll('.account-grid .account-card');
+
+            // Section controls
+            const sectionControls = document.querySelectorAll('.section-controls');
+            const addSectionContainer = document.getElementById('add-section-container');
+            const sectionTitles = document.querySelectorAll('.section-title');
+
+            if (isEditMode) {
+                document.body.classList.add('edit-mode-active');
+                btn.textContent = "Abbrechen";
+                saveBtn.style.display = "inline-block";
+
+                // Show section controls
+                sectionControls.forEach(el => el.style.display = 'inline-block');
+                addSectionContainer.style.display = 'block';
+                sectionTitles.forEach(el => el.classList.add('editable'));
+
+                cards.forEach(card => {
+                    card.setAttribute('draggable', 'true');
+                    card.classList.add('draggable');
+
+                    card.addEventListener('dragstart', handleDragStart);
+                    card.addEventListener('dragend', handleDragEnd);
+                    card.addEventListener('dragover', handleDragOver);
+                    card.addEventListener('dragenter', handleDragEnter);
+                    card.addEventListener('dragleave', handleDragLeave);
+                    card.addEventListener('drop', handleDrop);
+                });
+
+                // Enable grid-level drop zones (for dropping into empty sections)
+                document.querySelectorAll('.account-grid').forEach(grid => {
+                    grid.addEventListener('dragover', handleGridDragOver);
+                    grid.addEventListener('dragleave', handleGridDragLeave);
+                    grid.addEventListener('drop', handleGridDrop);
+                });
+            } else {
+                document.body.classList.remove('edit-mode-active');
+                btn.textContent = "Layout bearbeiten";
+                saveBtn.style.display = "none";
+
+                // Hide section controls
+                sectionControls.forEach(el => el.style.display = 'none');
+                addSectionContainer.style.display = 'none';
+                sectionTitles.forEach(el => el.classList.remove('editable'));
+
+                cards.forEach(card => {
+                    card.setAttribute('draggable', 'false');
+                    card.classList.remove('draggable');
+
+                    card.removeEventListener('dragstart', handleDragStart);
+                    card.removeEventListener('dragend', handleDragEnd);
+                    card.removeEventListener('dragover', handleDragOver);
+                    card.removeEventListener('dragenter', handleDragEnter);
+                    card.removeEventListener('dragleave', handleDragLeave);
+                    card.removeEventListener('drop', handleDrop);
+                });
+
+                // Disable grid-level drop zones
+                document.querySelectorAll('.account-grid').forEach(grid => {
+                    grid.removeEventListener('dragover', handleGridDragOver);
+                    grid.removeEventListener('dragleave', handleGridDragLeave);
+                    grid.removeEventListener('drop', handleGridDrop);
+                });
+
+                // Reload to reset positions if not saved? Or keep?
+                // location.reload(); 
+            }
+        }
+
+        let dragSrcEl = null;
+        let dragSrcGrid = null;
+
+        function handleDragStart(e) {
+            this.style.opacity = '0.4';
+            dragSrcEl = this;
+            dragSrcGrid = this.closest('.account-grid');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('over');
+        }
+
+        function handleDragEnd(e) {
+            this.style.opacity = '1';
+            // Remove all 'over' classes
+            document.querySelectorAll('.account-card.over').forEach(c => c.classList.remove('over'));
+            document.querySelectorAll('.account-grid.drag-over').forEach(g => g.classList.remove('drag-over'));
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (dragSrcEl !== this) {
+                const targetGrid = this.closest('.account-grid');
+                const sourceGrid = dragSrcGrid;
+
+                if (targetGrid === sourceGrid) {
+                    // Same section: reorder
+                    const allCards = Array.from(targetGrid.querySelectorAll('.account-card'));
+                    const srcIndex = allCards.indexOf(dragSrcEl);
+                    const targetIndex = allCards.indexOf(this);
+
+                    if (srcIndex < targetIndex) {
+                        targetGrid.insertBefore(dragSrcEl, this.nextSibling);
+                    } else {
+                        targetGrid.insertBefore(dragSrcEl, this);
+                    }
+                } else {
+                    // Cross-section: move card to target section at drop position
+                    targetGrid.insertBefore(dragSrcEl, this.nextSibling);
+                }
+            }
+            this.classList.remove('over');
+            return false;
+        }
+
+        // Handle drop on empty grid areas (drop zone)
+        function handleGridDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+        }
+
+        function handleGridDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleGridDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+
+            if (dragSrcEl) {
+                // Append card to this grid (at end)
+                this.appendChild(dragSrcEl);
+                dragSrcEl.style.opacity = '1';
+            }
+            return false;
+        }
+
+        function saveLayout() {
+            // Build map: { "sectionId": [accountId1, accountId2, ...] }
+            var layoutData = {};
+            var debugInfo = '';
+
+            // Query grids directly by their data-section-id attribute
+            var grids = document.querySelectorAll('.account-grid[data-section-id]');
+            debugInfo += 'Grids found: ' + grids.length + '\n';
+
+            grids.forEach(function (grid) {
+                var secId = grid.getAttribute('data-section-id');
+                var cardIds = [];
+
+                // Find all direct children with data-id attribute (account cards)
+                var children = grid.children;
+                debugInfo += 'Section ' + secId + ': ' + children.length + ' children\n';
+
+                for (var i = 0; i < children.length; i++) {
+                    var child = children[i];
+                    var dataId = child.getAttribute('data-id');
+                    if (dataId) {
+                        cardIds.push(dataId);
+                        debugInfo += '  -> Account ' + dataId + '\n';
+                    }
+                }
+
+                layoutData[secId] = cardIds;
+            });
+
+            debugInfo += 'Payload: ' + JSON.stringify(layoutData);
+
+            // Show debug info if no accounts found
+            var totalAccounts = 0;
+            for (var key in layoutData) {
+                totalAccounts += layoutData[key].length;
+            }
+
+            if (totalAccounts === 0) {
+                alert('DEBUG: Keine Accounts gefunden!\n' + debugInfo);
+                return;
+            }
+
+            fetch('/api/account/layout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(layoutData)
+            })
+                .then(function (response) {
+                    if (response.ok) {
+                        alert('Layout gespeichert!');
+                        toggleEditMode();
+                        location.reload();
+                    } else {
+                        response.text().then(function (text) {
+                            alert('Fehler beim Speichern: ' + response.status + '\n' + text);
+                        });
+                    }
+                })
+                .catch(function (error) {
+                    alert('Netzwerkfehler: ' + error);
+                });
+        }
+
+        // Section Management
+        function addNewSection() {
+            const name = prompt("Name der neuen Sektion:");
+            if (name) {
+                fetch('/api/section/create?name=' + encodeURIComponent(name), { method: 'POST' })
+                    .then(r => location.reload());
+            }
+        }
+
+        function renameSection(el) {
+            if (!isEditMode) return;
+            const sectionDiv = el.closest('.dashboard-section');
+            const sectionId = sectionDiv.getAttribute('data-section-id');
+            const oldName = el.innerText;
+            const newName = prompt("Neuer Name:", oldName);
+            if (newName && newName !== oldName) {
+                fetch('/api/section/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + sectionId + '&name=' + encodeURIComponent(newName)
+                }).then(r => location.reload());
+            }
+        }
+
+        function deleteSection(btn) {
+            if (!confirm("Sektion wirklich löschen? Accounts werden in die Default-Sektion verschoben.")) return;
+            const sectionDiv = btn.closest('.dashboard-section');
+            const sectionId = sectionDiv.getAttribute('data-section-id');
+
+            fetch('/api/section/delete?id=' + sectionId, { method: 'POST' })
+                .then(r => location.reload());
+        }
+
+    </script>
+</body>
+
+</html>

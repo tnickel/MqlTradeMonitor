@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-dark: #1a1b26;
+            --bg-card: #24283b;
+            --text-primary: #c0caf5;
+            --text-muted: #565f89;
+            --accent: #7aa2f7;
+            --success: #9ece6a;
+            --danger: #f7768e;
+            --border: #414868;
+            --hover: #2f344f;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent);
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+        }
+
+        .report-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 12px 10px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--hover);
+        }
+
+        .account-name {
+            font-weight: 700;
+            color: var(--accent);
+            display: inline-block;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            transition: all 0.2s;
+        }
+
+        a.account-name:hover {
+            color: #fff;
+            text-decoration-color: var(--success);
+        }
+
+        .account-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.real {
+            background-color: rgba(158, 206, 106, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(158, 206, 106, 0.3);
+        }
+
+        .badge.demo {
+            background-color: rgba(224, 175, 104, 0.15);
+            color: #e0af68;
+            border: 1px solid rgba(224, 175, 104, 0.3);
+        }
+
+        .num-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        .neutral {
+            color: var(--text-muted);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .back-btn {
+            display: block;
+            width: fit-content;
+            margin: 20px auto 0;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: var(--accent);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+</head>
+
+<body>
+
+    <h1 th:text="${periodTitle}">Report</h1>
+
+    <!-- ======= SCALED PERFORMANCE COMPARISON CHART ======= -->
+    <div class="report-container" style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 1.2rem; color: var(--accent);">
+                📊 Performance Vergleich <span
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(skaliert auf 10.000
+                    €)</span>
+            </h2>
+        </div>
+
+        <!-- Account Toggle Checkboxes -->
+        <div id="scaled-chart-toggles"
+            style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px;">
+            <span
+                style="color: var(--text-muted); font-size: 0.82rem; margin-right: 6px; font-weight: 600;">Filter:</span>
+            <button type="button" onclick="toggleAllScaledAccounts(true)"
+                style="background: rgba(122,162,247,0.15); color: var(--accent); border: 1px solid rgba(122,162,247,0.3); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 700;">Alle</button>
+            <button type="button" onclick="toggleAllScaledAccounts(false)"
+                style="background: rgba(247,118,142,0.15); color: var(--danger); border: 1px solid rgba(247,118,142,0.3); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 700;">Keine</button>
+            <span style="width: 1px; height: 18px; background: var(--border); margin: 0 4px;"></span>
+            <div id="scaled-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+        </div>
+
+        <!-- Chart Canvas -->
+        <div
+            style="position: relative; height: 400px; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
+            <canvas id="scaled-performance-chart"></canvas>
+        </div>
+        <div id="scaled-chart-loading"
+            style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem;">
+            ⏳ Lade Performance-Daten...
+        </div>
+    </div>
+
+    <div class="report-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th class="text-center">Type</th>
+                    <th class="text-right">Open Trades</th>
+                    <th class="text-right">Open Equity</th>
+                    <th class="text-right">Closed Trades</th>
+                    <th class="text-right">Closed Profit</th>
+                    <th class="text-center" style="width: 220px;">Chart</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Filter REAL accounts -->
+                <th:block
+                    th:with="realAccounts=${reportData.?[type == 'REAL']}, demoAccounts=${reportData.?[type == 'DEMO']}">
+
+                    <!-- REAL HEADER -->
+                    <tr th:if="${not #lists.isEmpty(realAccounts)}">
+                        <td colspan="7" style="padding: 0; border-bottom: none;">
+                            <div
+                                style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #10b981; border-bottom: 1px solid rgba(16,185,129,0.2);">
+                                <span
+                                    style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(16,185,129,0.5));">🛡️</span>
+                                <span
+                                    style="font-weight: 800; color: #34d399; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(16,185,129,0.3);">REAL
+                                    ACCOUNTS</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- REAL ACCOUNTS LIST -->
+                    <tr th:each="acc : ${realAccounts}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
+                        th:data-account-name="${acc.name}"
+                        ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
+                        <td>
+                            <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
+                                th:text="${acc.name}">(Name)</a>
+                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge real">REAL</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.trades}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.closedCount}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-center" style="width: 220px; padding: 4px;">
+                            <div style="width: 100%; height: 50px; position: relative;">
+                                <canvas class="mini-chart" th:data-equity="${acc.equityHistory}"
+                                    th:data-balance="${acc.balanceHistory}"></canvas>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- SEPARATOR -->
+                    <tr th:if="${not #lists.isEmpty(realAccounts) and not #lists.isEmpty(demoAccounts)}">
+                        <td colspan="7" style="padding: 30px 0 20px 0; border: none;">
+                            <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                                <div
+                                    style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);">
+                                </div>
+                                <div
+                                    style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;">
+                                </div>
+                                <div
+                                    style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- DEMO HEADER -->
+                    <tr th:if="${not #lists.isEmpty(demoAccounts)}">
+                        <td colspan="7" style="padding: 0; border-bottom: none;">
+                            <div
+                                style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(148,163,184,0.1) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.2);">
+                                <span
+                                    style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(148,163,184,0.5));">📉</span>
+                                <span
+                                    style="font-weight: 800; color: #94a3b8; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(148,163,184,0.3);">DEMO
+                                    ACCOUNTS</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- DEMO ACCOUNTS LIST -->
+                    <tr th:each="acc : ${demoAccounts}" style="cursor: pointer;" th:data-account-id="${acc.accountId}"
+                        th:data-account-name="${acc.name}"
+                        ondblclick="showDetails(this.getAttribute('data-account-id'), this.getAttribute('data-account-name'))">
+                        <td>
+                            <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
+                                th:text="${acc.name}">(Name)</a>
+                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge demo">DEMO</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.trades}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val" th:text="${acc.closedCount}">0</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="num-val"
+                                th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
+                                USD</span>
+                        </td>
+                        <td class="text-center" style="width: 220px; padding: 4px;">
+                            <div style="width: 100%; height: 50px; position: relative;">
+                                <canvas class="mini-chart" th:data-equity="${acc.equityHistory}"
+                                    th:data-balance="${acc.balanceHistory}"></canvas>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
+            </tbody>
+        </table>
+    </div>
+
+    <a href="/" class="back-btn">← Zurück zum Dashboard</a>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Details</h2>
+            <div class="table-wrapper">
+                <table class="details-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th class="text-right">Vol</th>
+                            <th>Open Time</th>
+                            <th>Close Time</th>
+                            <th class="text-right">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsBody">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const currentPeriod = /*[[${period}]]*/ 'daily';
+        /*]]>*/
+
+        function showDetails(accountId, accountName) {
+            document.getElementById('modalTitle').innerText = accountName + ' - ' + currentPeriod.toUpperCase() + ' Details';
+            const tbody = document.getElementById('detailsBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">Lade Daten...</td></tr>';
+
+            document.getElementById('detailsModal').style.display = 'block';
+
+            fetch('/api/report-details/' + currentPeriod + '/' + accountId)
+                .then(response => response.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Keine Trades in diesem Zeitraum.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(trade => {
+                        const tr = document.createElement('tr');
+                        const profitClass = trade.profit >= 0 ? 'positive' : 'negative';
+                        const profitStr = trade.profit.toFixed(2);
+
+                        tr.innerHTML = `
+                            <td class="mono">${trade.ticket}</td>
+                            <td class="mono">${trade.symbol}</td>
+                            <td><span class="badge ${trade.type === 'BUY' ? 'real' : 'demo'}">${trade.type}</span></td>
+                            <td class="text-right mono">${trade.volume}</td>
+                            <td class="small-text">${formatDate(trade.openTime)}</td>
+                            <td class="small-text">${formatDate(trade.closeTime)}</td>
+                            <td class="text-right mono ${profitClass}">${profitStr}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error(err);
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center negative">Fehler beim Laden der Daten.</td></tr>';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        function formatDate(dateStr) {
+            // Assumes yyyy.MM.dd HH:mm:ss
+            if (!dateStr) return '-';
+            return dateStr.replace(/\./g, '.'); // Already formatted in DB?
+        }
+
+        window.onclick = function (event) {
+            const modal = document.getElementById('detailsModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // ============ SCALED PERFORMANCE CHART ============
+        var scaledChart = null;
+        var scaledChartData = [];
+
+        // Professional color palette - distinct, vibrant colors
+        var CHART_COLORS = [
+            '#6366f1', // Indigo
+            '#10b981', // Emerald
+            '#f59e0b', // Amber
+            '#ef4444', // Red
+            '#8b5cf6', // Violet
+            '#ec4899', // Pink
+            '#0ea5e9', // Sky
+            '#14b8a6', // Teal
+            '#f97316', // Orange
+            '#84cc16', // Lime
+            '#a855f7', // Purple
+            '#06b6d4', // Cyan
+            '#d946ef', // Fuchsia
+            '#22d3ee', // Light Cyan
+            '#e11d48', // Rose
+            '#4f46e5', // Deep Indigo
+            '#059669', // Dark Emerald
+            '#dc2626', // Dark Red
+            '#7c3aed', // Dark Violet
+            '#db2777'  // Dark Pink
+        ];
+
+        function loadScaledChart() {
+            var loadingEl = document.getElementById('scaled-chart-loading');
+
+            fetch('/api/report-scaled-curves/' + currentPeriod)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    scaledChartData = data;
+                    if (loadingEl) loadingEl.style.display = 'none';
+
+                    if (data.length === 0) {
+                        if (loadingEl) {
+                            loadingEl.style.display = 'block';
+                            loadingEl.textContent = 'Keine Equity-Daten für diesen Zeitraum verfügbar.';
+                        }
+                        return;
+                    }
+
+                    buildScaledCheckboxes(data);
+                    renderScaledChart(data);
+                })
+                .catch(function (err) {
+                    console.error('Failed to load scaled curves', err);
+                    if (loadingEl) {
+                        loadingEl.style.display = 'block';
+                        loadingEl.textContent = 'Fehler beim Laden der Daten.';
+                    }
+                });
+        }
+
+        function buildScaledCheckboxes(data) {
+            var container = document.getElementById('scaled-checkboxes');
+            if (!container) return;
+            container.innerHTML = '';
+
+            data.forEach(function (acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+
+                var label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; border: 1px solid ' + color + '40; background: ' + color + '18; color: #c0caf5; transition: all 0.15s; user-select: none;';
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.dataset.index = idx;
+                checkbox.className = 'scaled-account-checkbox';
+                checkbox.style.cssText = 'cursor: pointer; accent-color: ' + color + ';';
+                checkbox.addEventListener('change', function () {
+                    toggleScaledDataset(idx, this.checked);
+                    var lbl = this.closest('label');
+                    if (this.checked) {
+                        lbl.style.background = color + '18';
+                        lbl.style.borderColor = color + '40';
+                    } else {
+                        lbl.style.background = 'rgba(255,255,255,0.02)';
+                        lbl.style.borderColor = 'rgba(255,255,255,0.08)';
+                    }
+                });
+
+                // Color dot
+                var dot = document.createElement('span');
+                dot.style.cssText = 'width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; display: inline-block; flex-shrink: 0;';
+                if (isReal) {
+                    dot.style.boxShadow = '0 0 6px ' + color;
+                }
+
+                var nameSpan = document.createElement('span');
+                var displayName = acc.name;
+                if (isReal) {
+                    displayName = '🛡️ ' + displayName;
+                }
+                nameSpan.textContent = displayName;
+                nameSpan.style.fontWeight = isReal ? '700' : '400';
+
+                label.appendChild(checkbox);
+                label.appendChild(dot);
+                label.appendChild(nameSpan);
+                container.appendChild(label);
+            });
+        }
+
+        function renderScaledChart(data) {
+            var canvas = document.getElementById('scaled-performance-chart');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+
+            var datasets = data.map(function (acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+
+                // Convert timestamps to Date objects for time axis
+                var points = acc.timestamps.map(function (ts, i) {
+                    return {
+                        x: new Date(ts),
+                        y: acc.scaledEquity[i]
+                    };
+                });
+
+                return {
+                    label: acc.name + (isReal ? ' [REAL]' : ' [DEMO]'),
+                    data: points,
+                    borderColor: color,
+                    backgroundColor: color + '15',
+                    borderWidth: isReal ? 3 : 1.5,
+                    pointRadius: points.length > 80 ? 0 : (isReal ? 3 : 2),
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: color,
+                    fill: false,
+                    tension: 0.2,
+                    borderDash: isReal ? [] : [4, 2],
+                    order: isReal ? 1 : 2
+                };
+            });
+
+            if (scaledChart) {
+                scaledChart.destroy();
+            }
+
+            scaledChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false,
+                        axis: 'x'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // We use custom checkboxes instead
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1b26ee',
+                            titleColor: '#c0caf5',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#414868',
+                            borderWidth: 1,
+                            titleFont: { size: 12 },
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                            padding: 10,
+                            callbacks: {
+                                title: function (items) {
+                                    if (!items.length) return '';
+                                    return new Date(items[0].parsed.x).toLocaleString('de-DE');
+                                },
+                                label: function (context) {
+                                    return ' ' + context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' €';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                displayFormats: {
+                                    hour: 'HH:mm',
+                                    day: 'dd.MM',
+                                    week: 'dd.MM',
+                                    month: 'MMM yyyy'
+                                }
+                            },
+                            ticks: {
+                                color: '#565f89',
+                                maxTicksLimit: 10,
+                                maxRotation: 0,
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(65,72,104,0.2)',
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            ticks: {
+                                color: '#565f89',
+                                font: { size: 11, family: "'JetBrains Mono', monospace" },
+                                callback: function (value) { return value.toLocaleString('de-DE') + ' €'; }
+                            },
+                            grid: {
+                                color: 'rgba(65,72,104,0.2)',
+                                drawBorder: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleScaledDataset(index, visible) {
+            if (!scaledChart) return;
+            scaledChart.setDatasetVisibility(index, visible);
+            scaledChart.update();
+        }
+
+        function toggleAllScaledAccounts(selectAll) {
+            var checkboxes = document.querySelectorAll('.scaled-account-checkbox');
+            checkboxes.forEach(function (chk) {
+                chk.checked = selectAll;
+                var idx = parseInt(chk.dataset.index);
+                toggleScaledDataset(idx, selectAll);
+                var label = chk.closest('label');
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                if (label) {
+                    if (selectAll) {
+                        label.style.background = color + '18';
+                        label.style.borderColor = color + '40';
+                    } else {
+                        label.style.background = 'rgba(255,255,255,0.02)';
+                        label.style.borderColor = 'rgba(255,255,255,0.08)';
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Load scaled performance chart
+            loadScaledChart();
+
+            // Existing mini-chart logic
+            const canvases = document.querySelectorAll('.mini-chart');
+            canvases.forEach(canvas => {
+                const equityStr = canvas.getAttribute('data-equity');
+                const balanceStr = canvas.getAttribute('data-balance');
+                if (!equityStr || !balanceStr || equityStr === 'null' || balanceStr === 'null') return;
+
+                try {
+                    const equityData = JSON.parse(equityStr);
+                    const balanceData = JSON.parse(balanceStr);
+                    if (equityData.length === 0) return;
+
+                    const labels = equityData.map((_, i) => i);
+
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    data: equityData,
+                                    borderColor: 'rgba(234, 179, 8, 1)', // yellow (equity)
+                                    borderWidth: 1.5,
+                                    pointRadius: 0,
+                                    fill: false,
+                                    tension: 0.1
+                                },
+                                {
+                                    data: balanceData,
+                                    borderColor: 'rgba(99, 102, 241, 0.5)', // blue (balance)
+                                    borderWidth: 1.5,
+                                    pointRadius: 0,
+                                    fill: false,
+                                    tension: 0.1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { enabled: false }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    display: false,
+                                    // Optionally adjust min/max to fit graph perfectly
+                                    suggestedMin: Math.min(...equityData, ...balanceData),
+                                    suggestedMax: Math.max(...equityData, ...balanceData)
+                                }
+                            },
+                            interaction: { mode: 'index', intersect: false }
+                        }
+                    });
+                } catch (e) {
+                    console.error("Chart parsing error for canvas", canvas, e);
+                }
+            });
+        });
+    </script>
+
+
+    <style>
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .close-modal {
+            color: var(--text-muted);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            align-self: flex-end;
+            cursor: pointer;
+        }
+
+        .close-modal:hover,
+        .close-modal:focus {
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .table-wrapper {
+            overflow-y: auto;
+            margin-top: 15px;
+            flex-grow: 1;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .details-table th,
+        .details-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .details-table th {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-card);
+            z-index: 10;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .small-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</body>
+
+</html>

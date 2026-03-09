@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.1'">Account Detail - Trade Monitor</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        /* Filter Buttons */
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            border-color: var(--accent-primary);
+        }
+
+        .trade-comment {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .trade-today {
+            background-color: rgba(99, 102, 241, 0.12) !important;
+            /* Subtle primary tint */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Zurück zum Dashboard</a>
+
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="badg-mini" style="font-family: 'JetBrains Mono'; font-size: 1.35rem; color: #a0a0c0;"
+                        th:text="'#' + ${account.accountId}">#12345</span>
+
+                    <span th:if="${account.type == 'REAL'}" class="badge-mini real"
+                        style="font-size: 0.8rem; padding: 2px 6px;">REAL</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px; margin: 5px 0 0 0;">
+                    <h1 th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}"
+                        th:style="${account.name == 'FXSSI10_KI'} ? 'margin: 0; font-size: 2.5rem; color: #ffd700;' : 'margin: 0; font-size: 2.5rem;'">
+                        Currency Pair / Strategy Name</h1>
+                    <span th:if="${account.lastSeenMins != null}" th:style="'width: 16px; height: 16px; border-radius: 50%; display: inline-block; background-color: ' + 
+                        (${account.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                        (${account.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                        (${account.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                        (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                        th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
+                    </span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                    <p class="subtitle" th:text="${account.broker}" style="margin: 0;">Broker Name</p>
+                    <span th:if="${account.lastSeenMins != null}" th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
+                        (${account.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                        (${account.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                        (${account.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                        (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
+                        th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <div class="account-summary">
+            <!-- The original filter bar is removed from here -->
+            <div class="summary-card">
+                <span class="summary-label">Balance</span>
+                <span class="summary-value"
+                    th:text="${#numbers.formatDecimal(account.balance, 1, 2)} + ' ' + ${account.currency}">10,000.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Equity</span>
+                <span class="summary-value"
+                    th:text="${#numbers.formatDecimal(account.equity, 1, 2)} + ' ' + ${account.currency}">10,500.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Floating P/L</span>
+                <span
+                    th:class="${account.totalProfit >= 0 ? 'summary-value profit-positive' : 'summary-value profit-negative'}"
+                    th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)} + ' ' + ${account.currency}">+500.00
+                    USD</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Open Trades</span>
+                <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
+            </div>
+            <div class="summary-card" th:if="${account.openProfitAlarmEnabled}"
+                th:style="${account.openProfitAlarmTriggered ? 'border: 2px solid #ef4444; background: rgba(239,68,68,0.1);' : 'border: 2px solid #10b981; background: rgba(16,185,129,0.1);'}">
+                <span class="summary-label" style="font-weight: bold;"
+                    th:text="${account.openProfitAlarmTriggered ? '🔴 ALARM AKTIV' : '🔔 Alarm'}">🔔 Alarm</span>
+                <span class="summary-value" style="font-size: 0.95rem;"
+                    th:text="(${account.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(account.openProfitAlarmAbs, 1, 0) + ' ' + account.currency : ''}) + (${account.openProfitAlarmAbs != null && account.openProfitAlarmPct != null ? ' / ' : ''}) + (${account.openProfitAlarmPct != null ? #numbers.formatDecimal(account.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡
+                    -5000 / 10%</span>
+            </div>
+        </div>
+
+        <!-- ======= ZENTRALER AUSWAHLFILTER ======= -->
+        <section class="trades-section central-filter-section"
+            style="border: 2px solid var(--accent-primary); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; background: rgba(99,102,241,0.05);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: var(--accent-primary); font-size: 1.25rem;">🎛️ Zentraler Auswahlfilter
+                </h3>
+                <span class="pulse-indicator"
+                    style="font-size: 0.8rem; color: #a0a0c0; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
+                    Eingaben filtern Daten sofort
+                </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Row 1: Time Range -->
+                <div>
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">1.
+                        Zeitraum wählen:</span>
+                    <div class="filter-bar" id="history-filter-bar"
+                        style="margin: 0; padding: 0; background: transparent; border: none;">
+                        <button class="filter-btn" data-range="today">Heute</button>
+                        <button class="filter-btn" data-range="1week">1 Woche</button>
+                        <button class="filter-btn" data-range="1month">1 Monat</button>
+                        <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
+                        <button class="filter-btn" data-range="6months">6 Monate</button>
+                        <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
+                        <button class="filter-btn" data-range="1year">1 Jahr</button>
+                        <button class="filter-btn" data-range="all">Alles</button>
+                    </div>
+                </div>
+
+                <!-- Row 2: Performance Thresholds -->
+                <div style="display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap;">
+                    <div>
+                        <span
+                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            2. Mindest-Trades im Zeitraum
+                            <span
+                                title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
+                                style="cursor: help;">ℹ️</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
+                                max="9999"
+                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                            <span id="minTradesFeedback"
+                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span
+                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            3. Max. Alter (Tage, ohne offene Trades)
+                            <span
+                                title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
+                                style="cursor: help;">ℹ️</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
+                                max="9999"
+                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                            <span id="maxAgeFeedback"
+                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======= DASHBOARD (Chart + Stats) ======= -->
+        <section class="trades-section dashboard-section">
+            <h2>📜 Trade Historie / Dashboard</h2>
+
+            <div class="chart-container"
+                style="position: relative; height: 300px; margin-bottom: 2rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                <canvas id="balance-history-chart"></canvas>
+                <!-- Equity overlay: shown prominently on right side of chart -->
+                <div id="equity-overlay" style="
+                    position: absolute;
+                    top: 12px;
+                    right: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 2px;
+                    pointer-events: none;
+                ">
+                    <span
+                        style="font-size: 0.75rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Open
+                        Equity</span>
+                    <span id="equity-overlay-value"
+                        style="font-size: 1.6rem; font-weight: bold; line-height: 1;">-</span>
+                    <span id="equity-overlay-balance" style="font-size: 0.8rem; color: #a0a0c0;"></span>
+                </div>
+                <!-- Max Equity Drawdown overlay: bottom-right of chart -->
+                <div id="drawdown-overlay" style="
+                    position: absolute;
+                    bottom: 12px;
+                    right: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 1px;
+                    pointer-events: none;
+                ">
+                    <span
+                        style="font-size: 0.7rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Max
+                        Equity DD (Zeitraum)</span>
+                    <span id="drawdown-overlay-value"
+                        style="font-size: 1.2rem; font-weight: bold; color: #ef4444; line-height: 1;">-</span>
+                    <span id="drawdown-overlay-percent" style="font-size: 0.85rem; color: #ef4444;"></span>
+                </div>
+            </div>
+
+            <!-- Statistics Grid -->
+            <div class="stats-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Gesamtgewinn</span>
+                    <span id="stat-total-profit" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Profit
+                        Faktor</span>
+                    <span id="stat-profit-factor" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trefferquote</span>
+                    <span id="stat-win-rate" style="font-size: 1.25rem; font-weight: bold;">0%</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trades
+                        (Zeitraum)</span>
+                    <span id="stat-total-trades" style="font-size: 1.25rem; font-weight: bold;">0</span>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Ø
+                        Win / Ø Loss</span>
+                    <span id="stat-avg-win-loss" style="font-size: 1rem; font-weight: bold;">0 / 0</span>
+                </div>
+                <!-- Static / Current Stats -->
+                <div class="stat-card"
+                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
+                        Equity (Aktuell)</span>
+                    <span th:class="${account.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                        th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)}"
+                        style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                </div>
+                <div class="stat-card"
+                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
+                    <span
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
+                        Trades (Aktuell)</span>
+                    <span th:text="${#lists.size(account.openTrades)}"
+                        style="font-size: 1.25rem; font-weight: bold;">0</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
+                <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
+                    style="background-color: transparent; border: 1px solid #b91c1c; color: #b91c1c; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;"
+                    onmouseover="this.style.backgroundColor='#b91c1c'; this.style.color='white';"
+                    onmouseout="this.style.backgroundColor='transparent'; this.style.color='#b91c1c';"
+                    title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
+                    🗑️ Reset Trades Database
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ======= OPEN TRADES ======= -->
+        <section class="trades-section">
+            <h2>📈 Offene Positionen</h2>
+
+            <div th:if="${#lists.size(account.openTrades) == 0}" class="no-trades">
+                <p>Keine offenen Positionen</p>
+            </div>
+
+            <div th:if="${#lists.size(account.openTrades) > 0}">
+                <table class="trades-table" id="open-trades-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Typ</th>
+                            <th>Volume</th>
+                            <th>Open Price</th>
+                            <th>Time</th>
+                            <th>S/L</th>
+                            <th>T/P</th>
+                            <th>Swap</th>
+                            <th>Profit</th>
+                            <th>Magic</th>
+                            <th>Status.</th>
+                            <th>Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="trade : ${account.openTrades}">
+                            <td th:text="${trade.ticket}">123456789</td>
+                            <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                            <td>
+                                <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                    th:text="${trade.type}">BUY</span>
+                            </td>
+                            <td th:text="${trade.volume}">0.10</td>
+                            <td th:text="${trade.openPrice}">1.08500</td>
+                            <td th:text="${trade.openTime}">2026-02-13 12:00</td>
+                            <td th:text="${trade.stopLoss}">1.08000</td>
+                            <td th:text="${trade.takeProfit}">1.09000</td>
+                            <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                            <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                            <td th:text="${trade.magicNumber}">12345</td>
+                            <td>
+                                <span th:if="${account.type == 'REAL'}">
+                                    <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
+                                        title="Matched with Demo">✅</span>
+                                    <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
+                                        title="No matching Demo trade!">⚠️</span>
+                                    <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
+                                        style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
+                                </span>
+                            </td>
+                            <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </div>
+        </section>
+
+        <!-- ======= MAGIC NUMBER PROFIT BREAKDOWN ======= -->
+        <section class="trades-section magic-breakdown" th:if="${#lists.size(magicProfits) > 0}">
+            <h2>📊 Gewinn pro Magic Number <span id="magic-breakdown-period"
+                    style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+                <div style="flex: 2 1 800px; overflow-x: auto;">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Magic Number</th>
+                                <th>Offene Trades</th>
+                                <th>Float. P/L</th>
+                                <th>Geschl. Trades</th>
+                                <th>Real. P/L</th>
+                                <th>Swap</th>
+                                <th>Komm.</th>
+                                <th>Gesamt</th>
+                                <th>Max Real. DD (€)</th>
+                                <th>Max Eq. DD (€)</th>
+                                <th>Max Eq. DD (%)</th>
+                                <th>Währungspaare</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="mp : ${magicProfits}"
+                                th:data-symbols="${mp.tradedSymbols != null ? #strings.listJoin(mp.tradedSymbols.keySet(), ', ') : ''}">
+                                <td>
+                                    <strong>
+                                        <a th:href="@{/account/{id}(id=${accountId}, magic=${mp.magicNumber})}"
+                                            target="_blank" class="magic-link"
+                                            title="Klicken, um Trades für diese Magic Number in neuem Tab zu öffnen"
+                                            style="color: #0ea5e9; text-decoration: none; border-bottom: 1px dashed #0ea5e9; padding-bottom: 1px; transition: color 0.2s;"
+                                            onmouseover="this.style.color='#38bdf8'; this.style.borderBottomColor='#38bdf8'"
+                                            onmouseout="this.style.color='#0ea5e9'; this.style.borderBottomColor='#0ea5e9'"
+                                            th:text="${mp.magicNumber}">
+                                            12345
+                                        </a>
+                                    </strong>
+                                    <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
+                                        style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;"
+                                        th:text="${mp.magicName}">
+                                        Strategy Name
+                                    </div>
+                                </td>
+                                <td th:text="${mp.openTradeCount}">3</td>
+                                <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
+                                <td th:text="${mp.closedTradeCount}">10</td>
+                                <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
+                                <td th:style="${mp.totalSwap < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalSwap, 1, 2)}">-10.00</td>
+                                <td th:style="${mp.totalCommission < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalCommission, 1, 2)}">-5.00</td>
+                                <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
+                                <td style="color: #ef4444;"
+                                    th:text="'-' + ${#numbers.formatDecimal(mp.maxDrawdownEur, 1, 2)}">-150.00</td>
+                                <td style="color: #ef4444; font-weight: bold;"
+                                    th:text="'-' + ${#numbers.formatDecimal(mp.maxEquityDrawdownEur, 1, 2)}">-200.00
+                                </td>
+                                <td style="color: #ef4444; font-size: 0.85rem;"
+                                    th:text="${#numbers.formatDecimal(mp.maxEquityDrawdownPercent, 1, 2)} + '%'">2.00%
+                                </td>
+                                <td style="max-width: 150px;">
+                                    <span th:if="${mp.tradedSymbols != null}">
+                                        <span th:each="sym, stat : ${mp.tradedSymbols.keySet()}"
+                                            th:if="${stat.index < 3}"
+                                            style="display: inline-block; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin: 2px 4px 2px 0;"
+                                            th:text="${sym}">EURUSD</span>
+                                        <span th:if="${#maps.size(mp.tradedSymbols) > 3}"
+                                            style="display: inline-block; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin: 2px 0; cursor: help;"
+                                            th:title="${#strings.listJoin(mp.tradedSymbols.keySet(), ', ')}">...</span>
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Global Pie Chart Container -->
+                <div
+                    style="flex: 1 1 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card); padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;">
+                    <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.4rem; color: var(--text-secondary);">
+                        Gesamte Assets</h3>
+                    <div style="position: relative; height: 450px; width: 100%; max-width: 600px;">
+                        <canvas id="global-magic-pie-chart"
+                            th:attr="data-symbols=${account.getGlobalTradedSymbolsJson()}"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======= MAGIC NUMBER PROFIT CURVES ======= -->
+        <section class="trades-section magic-charts" th:if="${magicCurveJson != '{}'}">
+            <h2>📈 Gewinnkurven pro Magic Number <span id="magic-curves-period"
+                    style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
+            <div id="magic-charts-container"></div>
+        </section>
+
+        <!-- Fullscreen chart modal -->
+        <div id="chart-modal" class="chart-modal">
+            <div class="chart-modal-content">
+                <button class="chart-modal-close" id="chart-modal-close">✕</button>
+                <h2 id="chart-modal-title" class="chart-modal-title"></h2>
+                <div class="chart-modal-canvas-wrap">
+                    <canvas id="chart-modal-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
+        <section class="trades-section history-section">
+            <h2>📜 Geschlossene Trades Liste <span id="history-list-period"
+                    style="font-size: 0.9rem; color: #a0a0c0; font-weight: normal; margin-left: 10px;"></span></h2>
+
+
+            <!-- Magic Number Filter Bar -->
+            <div id="magic-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}"
+                style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 1rem; padding: 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; margin-right: 8px; font-weight: bold;">🎯
+                    Magic Filter:</span>
+                <button type="button" id="magic-select-all" onclick="toggleAllMagics(true)"
+                    style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Alle</button>
+                <button type="button" id="magic-select-none" onclick="toggleAllMagics(false)"
+                    style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Keine</button>
+                <span style="width: 1px; height: 20px; background: var(--border-color); margin: 0 4px;"></span>
+                <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
+
+            <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
+                <p>Keine geschlossenen Trades vorhanden</p>
+            </div>
+
+            <div class="history-summary" id="history-summary" th:if="${#lists.size(account.closedTrades) > 0}">
+                <span>Angezeigt: <strong id="visible-trades-count">0</strong> Trades</span>
+                <span id="visible-profit-label" class="profit-positive">
+                    Profit: <strong id="visible-profit-amount">0.00</strong> <span
+                        th:text="${account.currency}">EUR</span>
+                </span>
+            </div>
+
+            <div th:if="${#lists.size(account.closedTrades) > 0}" class="paginated-table-wrapper"
+                id="closed-trades-wrapper">
+                <table class="trades-table" id="closed-trades-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Typ</th>
+                            <th>Volume</th>
+                            <th>Close Time</th>
+                            <th>Close Price</th>
+                            <th>Swap</th>
+                            <th>Commission</th>
+                            <th>Profit</th>
+                            <th>Magic</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Loop all closed trades, rows will be filtered by JS -->
+                        <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}"
+                            th:data-magic="${trade.magicNumber}"
+                            th:classappend="${trade.closeTime != null && trade.closeTime.startsWith(todayDate)} ? 'trade-today'">
+                            <td th:text="${trade.ticket}">123456789</td>
+                            <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                            <td>
+                                <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                    th:text="${trade.type}">BUY</span>
+                            </td>
+                            <td th:text="${trade.volume}">0.10</td>
+                            <td th:text="${trade.closeTime}">2026-02-09 10:30:00</td>
+                            <td th:text="${trade.closePrice}">1.08600</td>
+                            <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                            <td th:text="${#numbers.formatDecimal(trade.commission, 1, 2)}">-0.70</td>
+                            <td class="profit-cell" th:data-profit="${trade.profit}"
+                                th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                            <td th:text="${trade.magicNumber}">12345</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination-bar" id="closed-trades-pagination"></div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Letzte Aktualisierung: <span th:text="${account.lastSeen}">2026-02-09
+                    20:30:00</span> <span style="margin-left: 10px; opacity: 0.5;">v1.1</span></p>
+        </footer>
+    </div>
+
+    <script th:inline="javascript">
+
+        // ============ PER-ACCOUNT MAGIC MAX AGE SAVE ============
+        var currentAccountId = /*[[${accountId}]]*/ 0;
+
+        function saveMagicMaxAge() {
+            var days = document.getElementById('magicMaxAgeInput').value;
+            var feedback = document.getElementById('magicMaxAgeFeedback');
+            var btn = document.getElementById('saveMagicMaxAgeBtn');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+
+            fetch('/api/account/magic-max-age', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId + '&days=' + days
+            })
+                .then(function (response) {
+                    if (response.ok) {
+                        feedback.style.display = 'inline';
+                        feedback.textContent = '✓ Gespeichert – Seite wird neu geladen...';
+                        setTimeout(function () { location.reload(); }, 800);
+                    } else {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#ef4444';
+                        feedback.textContent = '✗ Fehler beim Speichern';
+                    }
+                })
+                .catch(function () {
+                    feedback.style.display = 'inline';
+                    feedback.style.color = '#ef4444';
+                    feedback.textContent = '✗ Netzwerkfehler';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Speichern';
+                });
+        }
+
+        function resetAccountTrades() {
+            if (!confirm('⚠️ ACHTUNG: Alle Trades (offen + geschlossen) und Equity-Snapshots für diesen Account werden unwiderruflich gelöscht!\n\nDanach muss im MetaTrader "Reconnect Server" gedrückt werden, damit die Daten neu übertragen werden.\n\nFortfahren?')) {
+                return;
+            }
+            var feedback = document.getElementById('resetTradesFeedback');
+            var btn = document.getElementById('resetTradesBtn');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+
+            fetch('/api/account/reset-trades', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId
+            })
+                .then(function (response) {
+                    if (response.ok) {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#3fb950';
+                        feedback.textContent = '✓ Reset erfolgreich – Seite wird neu geladen...';
+                        setTimeout(function () { location.reload(); }, 1200);
+                    } else {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#ef4444';
+                        feedback.textContent = '✗ Fehler beim Reset';
+                    }
+                })
+                .catch(function () {
+                    feedback.style.display = 'inline';
+                    feedback.style.color = '#ef4444';
+                    feedback.textContent = '✗ Netzwerkfehler';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = '🗑️ Reset Trades';
+                });
+        }
+
+        // ============ HISTORY CHART MANAGER ============
+        function HistoryChartManager(canvasId, currentBalance, allRows) {
+            this.canvas = document.getElementById(canvasId);
+            this.currentBalance = currentBalance;
+            this.allTrades = []; // { time: timestamp, profit: float }
+            this.chart = null;
+
+            // Parse all trades once
+            // Rows are typically sorted by Close Time Descending in the HTML (backend sort)
+            // But we need to verify/sort to be sure.
+            this.parseData(allRows);
+        }
+
+        HistoryChartManager.prototype.parseData = function (rows) {
+            var data = [];
+            rows.forEach(row => {
+                var timeStr = row.dataset.closeTime;
+                var profitCell = row.querySelector('.profit-cell');
+                var profit = parseFloat(profitCell ? profitCell.dataset.profit : 0);
+
+                if (timeStr) {
+                    var t = timeStr.split(/[- :.]/);
+                    var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    data.push({
+                        time: date.getTime(),
+                        profit: profit,
+                        dateObj: date,
+                        dateStr: timeStr
+                    });
+                }
+            });
+
+            // Sort by Time Ascending for calculation
+            data.sort((a, b) => a.time - b.time);
+            this.allTrades = data;
+        };
+
+        HistoryChartManager.prototype.updateChart = function (range) {
+            if (!this.canvas) return;
+
+            // 1. Determine Start Time based on Range
+            var now = new Date();
+            var minTime = 0;
+            switch (range) {
+                case 'today':
+                    minTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    break;
+                case '1week':
+                    minTime = now.getTime() - 7 * 24 * 3600 * 1000;
+                    break;
+                case '1month':
+                    var m = new Date(now);
+                    m.setMonth(now.getMonth() - 1);
+                    minTime = m.getTime();
+                    break;
+                case 'thismonth':
+                    minTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                    break;
+                case '6months':
+                    var m6 = new Date(now);
+                    m6.setMonth(now.getMonth() - 6);
+                    minTime = m6.getTime();
+                    break;
+                case 'thisyear':
+                    minTime = new Date(now.getFullYear(), 0, 1).getTime();
+                    break;
+                case '1year':
+                    var y1 = new Date(now);
+                    y1.setFullYear(now.getFullYear() - 1);
+                    minTime = y1.getTime();
+                    break;
+                default:
+                    minTime = 0;
+            }
+
+            // 2. Determine which trades to include based on visible magics
+            // We use historyMgr.filteredRows to know which ones are visible
+            var visibleTrades = [];
+            if (historyMgr && historyMgr.filteredRows) {
+                historyMgr.filteredRows.forEach(row => {
+                    var profitCell = row.querySelector('.profit-cell');
+                    var profit = parseFloat(profitCell ? profitCell.dataset.profit : 0);
+                    var timeStr = row.dataset.closeTime;
+                    if (timeStr) {
+                        var t = timeStr.split(/[- :.]/);
+                        var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                        visibleTrades.push({ time: date.getTime(), profit: profit });
+                    }
+                });
+            }
+
+            // Re-sort visible trades for calculation (older to newer)
+            visibleTrades.sort((a, b) => a.time - b.time);
+
+            // 3. Calculate Balance History starting from "Now" and working backwards
+            // For a filtered set, we start with the current balance and work backwards, 
+            // subtracting only the profits of the visible trades.
+            var fullBalanceHistory = [];
+            var runningBalance = this.currentBalance;
+
+            // Add "Now" point
+            fullBalanceHistory.push({ x: now.getTime(), y: runningBalance });
+
+            // Iterate BACKWARDS through sorted visible trades (newest to oldest)
+            for (var i = visibleTrades.length - 1; i >= 0; i--) {
+                var trade = visibleTrades[i];
+                fullBalanceHistory.push({ x: trade.time, y: runningBalance });
+                runningBalance -= trade.profit; // Subtract profit to go backwards
+            }
+            if (visibleTrades.length > 0) {
+                fullBalanceHistory.push({ x: visibleTrades[0].time - 60000, y: runningBalance });
+            }
+
+            fullBalanceHistory.reverse();
+
+            // 4. Filter balance points for display time range
+            var displayData = fullBalanceHistory.filter(function (p) { return p.x >= minTime; });
+
+            if (displayData.length === 0 || displayData[0].x > minTime) {
+                var startPoint = { x: minTime, y: this.currentBalance };
+                for (var j = 0; j < fullBalanceHistory.length; j++) {
+                    if (fullBalanceHistory[j].x <= minTime) {
+                        startPoint = { x: minTime, y: fullBalanceHistory[j].y };
+                    } else {
+                        break;
+                    }
+                }
+                if (displayData.length === 0 || displayData[0].x > minTime) {
+                    displayData.unshift(startPoint);
+                }
+            }
+
+            // 4. Build equity curve from snapshots
+            var equityDisplay = [];
+            var snapshots = this.equitySnapshots || [];
+
+            // Parse snapshots: timestamp is like "2026-02-19T19:00:00"
+            snapshots.forEach(function (snap) {
+                var ts = snap.timestamp.replace('T', ' ').split(/[- :]/);
+                // [year, month, day, hour, min, sec]
+                var d = new Date(ts[0], ts[1] - 1, ts[2], ts[3] || 0, ts[4] || 0, ts[5] || 0);
+                equityDisplay.push({ x: d.getTime(), y: snap.equity });
+            });
+
+            // Filter equity snapshots by time range
+            equityDisplay = equityDisplay.filter(function (p) { return p.x >= minTime; });
+
+            // Always add current live equity as last point
+            equityDisplay.push({ x: now.getTime(), y: currentEquity });
+
+            // 5. Calculate Max Equity Drawdown for this time range
+            if (equityDisplay.length > 1) {
+                var peakEquity = -Infinity;
+                var maxDDEur = 0;
+                var peakAtMaxDD = 0;
+                for (var k = 0; k < equityDisplay.length; k++) {
+                    var eqVal = equityDisplay[k].y;
+                    if (eqVal > peakEquity) {
+                        peakEquity = eqVal;
+                    }
+                    var dd = peakEquity - eqVal;
+                    if (dd > maxDDEur) {
+                        maxDDEur = dd;
+                        peakAtMaxDD = peakEquity;
+                    }
+                }
+                var maxDDPct = peakAtMaxDD > 0 ? (maxDDEur / peakAtMaxDD * 100) : 0;
+                updateDrawdownOverlay(maxDDEur, maxDDPct);
+            } else {
+                updateDrawdownOverlay(0, 0);
+            }
+
+            // 6. Render Chart
+            this.render(displayData, equityDisplay);
+        };
+
+        HistoryChartManager.prototype.render = function (data, equityData) {
+            var ctx = this.canvas.getContext('2d');
+
+            // Balance gradient (blue/purple)
+            var gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+            // Equity gradient (yellow/gold)
+            var eqGradient = ctx.createLinearGradient(0, 0, 0, 300);
+            eqGradient.addColorStop(0, 'rgba(255, 200, 0, 0.25)');
+            eqGradient.addColorStop(1, 'rgba(255, 200, 0, 0.0)');
+
+            if (this.chart) {
+                this.chart.destroy();
+            }
+
+            var hasEquity = equityData && equityData.length > 0;
+
+            // Both datasets use {x: timestamp_ms, y: value} — no label merging needed.
+            // Each dataset keeps its own timestamps independently on the time-based X axis.
+            var datasets = [
+                {
+                    label: 'Balance',
+                    data: data.map(function (d) { return { x: d.x, y: d.y }; }),
+                    borderColor: '#6366f1',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointRadius: data.length > 100 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.1,
+                    order: 2
+                }
+            ];
+
+            if (hasEquity) {
+                datasets.push({
+                    label: 'Equity',
+                    data: equityData.map(function (d) { return { x: d.x, y: d.y }; }),
+                    borderColor: '#ffc800',
+                    backgroundColor: eqGradient,
+                    borderWidth: 2.5,
+                    pointRadius: equityData.length > 100 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.3,
+                    order: 1
+                });
+            }
+
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: hasEquity,
+                            labels: {
+                                color: '#a0a0c0',
+                                font: { size: 12 },
+                                boxWidth: 20,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) {
+                                    if (!items.length) return '';
+                                    return new Date(items[0].parsed.x).toLocaleString();
+                                },
+                                label: function (context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
+                                }
+                            },
+                            backgroundColor: '#252542',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#3f3f5f',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                displayFormats: {
+                                    minute: 'HH:mm',
+                                    hour: 'dd.MM HH:mm',
+                                    day: 'dd.MM.yyyy',
+                                    week: 'dd.MM.yyyy',
+                                    month: 'MM.yyyy'
+                                }
+                            },
+                            ticks: {
+                                color: '#a0a0c0',
+                                maxTicksLimit: 8,
+                                maxRotation: 0
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            ticks: {
+                                color: '#a0a0c0',
+                                font: { size: 11 },
+                                callback: function (value) { return value.toFixed(2); }
+                            },
+                            grid: {
+                                color: 'rgba(63,63,95,0.3)'
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+
+        // ============ TABLE MANAGER: FILTERING + PAGINATION ============
+
+        function TableManager(tableId, paginationId, summaryId) {
+            this.table = document.getElementById(tableId);
+            this.paginationBar = document.getElementById(paginationId);
+            this.pageSize = 30;
+            this.currentPage = 1;
+            this.allRows = [];
+
+            if (this.table) {
+                this.allRows = Array.from(this.table.querySelectorAll('tbody tr'));
+            }
+            this.filteredRows = this.allRows; // initially all
+        }
+
+        TableManager.prototype.applyFilter = function (filterFn) {
+            if (!this.table) return;
+
+            // Filter all rows
+            this.filteredRows = [];
+            var totalProfit = 0.0;
+
+            this.allRows.forEach(row => {
+                var visible = true;
+                if (filterFn) {
+                    visible = filterFn(row);
+                }
+                if (visible) {
+                    this.filteredRows.push(row);
+                    // Sum profit if history table
+                    var profitCell = row.querySelector('.profit-cell');
+                    if (profitCell) {
+                        var val = parseFloat(profitCell.dataset.profit || 0);
+                        totalProfit += val;
+                    }
+                }
+            });
+
+            // Update summary if exists
+            var countEl = document.getElementById('visible-trades-count');
+            var profitAmtEl = document.getElementById('visible-profit-amount');
+            var profitLbl = document.getElementById('visible-profit-label');
+
+            if (countEl && profitAmtEl && profitLbl) {
+                countEl.textContent = this.filteredRows.length;
+                profitAmtEl.textContent = totalProfit.toFixed(2);
+                profitLbl.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+            }
+
+            this.showPage(1);
+        };
+
+        TableManager.prototype.showPage = function (page) {
+            if (!this.table) return;
+
+            this.currentPage = page;
+            var totalPages = Math.ceil(this.filteredRows.length / this.pageSize);
+            if (totalPages === 0) totalPages = 1;
+            if (this.currentPage > totalPages) this.currentPage = totalPages;
+
+            // Hide all first
+            this.allRows.forEach(r => r.style.display = 'none');
+
+            // Show current page of filtered rows
+            var start = (this.currentPage - 1) * this.pageSize;
+            var end = start + this.pageSize;
+
+            for (var i = start; i < end && i < this.filteredRows.length; i++) {
+                this.filteredRows[i].style.display = '';
+            }
+
+            this.renderPagination(totalPages);
+        };
+
+        TableManager.prototype.renderPagination = function (totalPages) {
+            if (!this.paginationBar) return;
+
+            // Hide pagination if no pages needed (or minimal)
+            if (this.filteredRows.length <= this.pageSize) {
+                this.paginationBar.style.display = 'none';
+                return;
+            }
+            this.paginationBar.style.display = 'flex';
+            this.paginationBar.innerHTML = '';
+
+            // Left arrow
+            var leftBtn = document.createElement('button');
+            leftBtn.className = 'page-btn' + (this.currentPage <= 1 ? ' disabled' : '');
+            leftBtn.innerHTML = '◀';
+            leftBtn.disabled = this.currentPage <= 1;
+            leftBtn.onclick = () => {
+                if (this.currentPage > 1) this.showPage(this.currentPage - 1);
+            };
+            this.paginationBar.appendChild(leftBtn);
+
+            // Page info
+            var info = document.createElement('span');
+            info.className = 'page-info';
+            info.textContent = 'Seite ' + this.currentPage + ' / ' + totalPages +
+                ' (' + this.filteredRows.length + ' Trades)';
+            this.paginationBar.appendChild(info);
+
+            // Right arrow
+            var rightBtn = document.createElement('button');
+            rightBtn.className = 'page-btn' + (this.currentPage >= totalPages ? ' disabled' : '');
+            rightBtn.innerHTML = '▶';
+            rightBtn.disabled = this.currentPage >= totalPages;
+            rightBtn.onclick = () => {
+                if (this.currentPage < totalPages) this.showPage(this.currentPage + 1);
+            };
+            this.paginationBar.appendChild(rightBtn);
+        };
+
+        // Initialize managers
+        var openTradesMgr, historyMgr, historyChartMgr, magicChartMgr;
+
+        // Storage key
+        var accountId = /*[[${account.accountId}]]*/ '0';
+        var currentBalance = /*[[${account.balance}]]*/ 0.0;
+        var currentEquity = /*[[${account.equity}]]*/ 0.0;
+        var accountCurrency = /*[[${account.currency}]]*/ 'EUR';
+
+        var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Open trades: no pagination, all shown linearly
+
+            // History trades: Setup filters
+            historyMgr = new TableManager('closed-trades-table', 'closed-trades-pagination', 'history-summary');
+
+            // History Chart
+            var allHistoryRows = Array.from(document.querySelectorAll('#closed-trades-table tbody tr'));
+            historyChartMgr = new HistoryChartManager('balance-history-chart', currentBalance, allHistoryRows);
+
+            // Load equity snapshots and render chart
+            fetch('/api/equity-history/' + accountId)
+                .then(function (r) { return r.json(); })
+                .catch(function () { return []; })
+                .then(function (snapshots) {
+                    historyChartMgr.equitySnapshots = snapshots;
+                    // Show equity overlay immediately with current live values
+                    updateEquityOverlay(currentEquity, currentBalance);
+
+                    // Magic Chart Manager
+                    magicChartMgr = new MagicChartManager('magic-charts-container');
+
+                    // The Global Pie Chart is now updated via updateGlobalPieChart() inside applyHistoryFilter.
+                    // We just need to initialize a global variable for it.
+                    window.globalPieChart = null;
+
+                    // Restore filter
+                    var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
+
+                    // Filter click handlers
+                    var btns = document.querySelectorAll('.filter-btn');
+                    btns.forEach(function (btn) {
+                        var range = btn.dataset.range;
+                        if (range === savedFilter) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+
+                        btn.addEventListener('click', function () {
+                            btns.forEach(function (b) { b.classList.remove('active'); });
+                            this.classList.add('active');
+                            var r = this.dataset.range;
+                            localStorage.setItem(STORAGE_KEY_FILTER, r);
+                            applyHistoryFilter(r);
+                        });
+                    });
+
+                    // Initialize Magic Number Filter
+                    initMagicFilter();
+
+                    // Default filter
+                    applyHistoryFilter(savedFilter);
+                });
+        });
+
+        // ============ MAGIC NUMBER FILTER ============
+        var activeMagics = new Set(); // tracks which magic numbers are checked
+
+        function initMagicFilter() {
+            var container = document.getElementById('magic-checkboxes');
+            if (!container) return;
+
+            // Collect unique magic numbers from ALL closed trades
+            var magicSet = new Set();
+            var rows = document.querySelectorAll('#closed-trades-table tbody tr');
+            rows.forEach(function (row) {
+                var m = row.dataset.magic;
+                if (m) magicSet.add(m);
+            });
+
+            // Try to get magic names from the profit breakdown table
+            var magicNames = {};
+            document.querySelectorAll('.magic-breakdown tbody tr').forEach(function (row) {
+                var cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    var magicNum = cells[0].querySelector('strong');
+                    var magicName = cells[0].querySelector('div');
+                    if (magicNum) {
+                        var num = magicNum.textContent.trim();
+                        var name = magicName ? magicName.textContent.trim() : '';
+                        magicNames[num] = name;
+                    }
+                }
+            });
+
+            // Sort magic numbers numerically
+            var magicArray = Array.from(magicSet).sort(function (a, b) {
+                return parseInt(a) - parseInt(b);
+            });
+
+            // Parse URL to check if we should auto-filter a specific magic number
+            var urlParams = new URLSearchParams(window.location.search);
+            var preselectedMagic = urlParams.get('magic');
+
+            // Set active magics either to all (default) or the preselected one
+            if (preselectedMagic && magicSet.has(preselectedMagic)) {
+                activeMagics = new Set([preselectedMagic]);
+
+                // Auto-scroll to history table smoothly
+                setTimeout(function () {
+                    var historySection = document.getElementById('closed-trades-section');
+                    if (historySection) {
+                        historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            } else {
+                activeMagics = new Set(magicArray);
+            }
+
+            // Create checkboxes
+            magicArray.forEach(function (magic) {
+                var isChecked = activeMagics.has(magic);
+
+                var label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; transition: all 0.15s; user-select: none;';
+
+                if (isChecked) {
+                    label.style.background = 'rgba(99,102,241,0.12)';
+                    label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    label.style.border = '1px solid rgba(99,102,241,0.25)';
+                    label.style.color = '#c9d1d9';
+                } else {
+                    label.style.background = 'rgba(255,255,255,0.03)';
+                    label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    label.style.border = '1px solid rgba(255,255,255,0.1)';
+                    label.style.color = '#8b949e';
+                }
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = isChecked;
+                checkbox.value = magic;
+                checkbox.className = 'magic-checkbox';
+                checkbox.style.cssText = 'cursor: pointer; accent-color: #6366f1;';
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        activeMagics.add(magic);
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    } else {
+                        activeMagics.delete(magic);
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                    reapplyHistoryFilter();
+                });
+
+                label.appendChild(checkbox);
+
+                var displayText = magic;
+                if (magicNames[magic]) {
+                    displayText = magic + ' (' + magicNames[magic] + ')';
+                }
+                var span = document.createElement('span');
+                span.textContent = displayText;
+                label.appendChild(span);
+
+                container.appendChild(label);
+            });
+        }
+
+        function toggleAllMagics(selectAll) {
+            var checkboxes = document.querySelectorAll('.magic-checkbox');
+            checkboxes.forEach(function (chk) {
+                chk.checked = selectAll;
+                var label = chk.closest('label');
+                if (selectAll) {
+                    activeMagics.add(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    }
+                } else {
+                    activeMagics.delete(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                }
+            });
+            reapplyHistoryFilter();
+        }
+
+        function getActiveMagics() {
+            return activeMagics;
+        }
+
+        // Save Min Trades and Max Age quietly without reloading
+        function setupCentralFilterListeners() {
+            var inputAge = document.getElementById('filter-max-age');
+            var inputTrades = document.getElementById('filter-min-trades');
+
+            if (inputAge) inputAge.addEventListener('change', function () {
+                saveCentralFilterPrefs();
+                reapplyHistoryFilter();
+            });
+            if (inputTrades) inputTrades.addEventListener('change', function () {
+                saveCentralFilterPrefs();
+                reapplyHistoryFilter();
+            });
+        }
+
+        function saveCentralFilterPrefs() {
+            var maxAge = document.getElementById('filter-max-age').value;
+            var minTrades = document.getElementById('filter-min-trades').value;
+
+            if (maxAge === '' || maxAge < 0) maxAge = 30;
+            if (minTrades === '' || minTrades < 0) minTrades = 0;
+
+            var fd = new URLSearchParams();
+            fd.append('magicNumberMaxAge', maxAge);
+            fd.append('magicMinTrades', minTrades);
+
+            fetch('/api/account/' + accountId + '/magic-preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: fd
+            }).then(r => {
+                if (r.ok) {
+                    var fAge = document.getElementById('maxAgeFeedback');
+                    var fTrades = document.getElementById('minTradesFeedback');
+                    if (fAge) { fAge.style.display = 'inline'; fAge.style.opacity = 1; setTimeout(() => fAge.style.opacity = 0, 2000); }
+                    if (fTrades) { fTrades.style.display = 'inline'; fTrades.style.opacity = 1; setTimeout(() => fTrades.style.opacity = 0, 2000); }
+                }
+            }).catch(e => console.error("Error saving preferences", e));
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setupCentralFilterListeners();
+        });
+
+        // Re-apply the current time range filter + magic filter
+        function reapplyHistoryFilter() {
+            var activeBtn = document.querySelector('.filter-btn.active');
+            var range = activeBtn ? activeBtn.dataset.range : 'thisyear';
+            applyHistoryFilter(range);
+        }
+
+        function applyHistoryFilter(range) {
+            // STEP 1: Determine Time Window
+            var now = new Date();
+            var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+            function isTradeInTimeRange(tradeTs) {
+                switch (range) {
+                    case 'today': return tradeTs >= todayStart;
+                    case '1week': return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
+                    case '1month':
+                        var m = new Date(now); m.setMonth(now.getMonth() - 1); return tradeTs >= m.getTime();
+                    case 'thismonth':
+                        var tm = new Date(now.getFullYear(), now.getMonth(), 1); return tradeTs >= tm.getTime();
+                    case '6months':
+                        var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); return tradeTs >= m6.getTime();
+                    case 'thisyear':
+                        var y = new Date(now.getFullYear(), 0, 1); return tradeTs >= y.getTime();
+                    case '1year':
+                        var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); return tradeTs >= y1.getTime();
+                    case 'all': default: return true;
+                }
+            }
+
+            var timeStartTs = 0;
+            switch (range) {
+                case 'today': timeStartTs = todayStart; break;
+                case '1week': timeStartTs = now.getTime() - 7 * 24 * 3600 * 1000; break;
+                case '1month': var m = new Date(now); m.setMonth(now.getMonth() - 1); timeStartTs = m.getTime(); break;
+                case 'thismonth': timeStartTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime(); break;
+                case '6months': var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); timeStartTs = m6.getTime(); break;
+                case 'thisyear': timeStartTs = new Date(now.getFullYear(), 0, 1).getTime(); break;
+                case '1year': var y1 = new Date(now); y1.setFullYear(now.getFullYear() - 1); timeStartTs = y1.getTime(); break;
+                case 'all': timeStartTs = 0; break;
+            }
+
+            // Read the configured limits from UI
+            var cfgMaxAge = parseInt(document.getElementById('filter-max-age').value) || 30;
+            var cfgMinTrades = parseInt(document.getElementById('filter-min-trades').value) || 0;
+            var cutoffDate = cfgMaxAge > 0 ? (timeStartTs - (cfgMaxAge * 24 * 3600 * 1000)) : null;
+
+            // STEP 2: Aggregate Stats per Magic (Filtered by Time)
+            var tempMagicStats = {};
+            // Also need to know if a magic has open trades, which makes it always valid for Age (but maybe not Min Trades? User says: HasOpenTrades means alive, but Min Trades still applies collectively). Let's say HasOpenTrades means age=0.
+
+            // Gather closed trades
+            if (historyMgr && historyMgr.allRows) {
+                historyMgr.allRows.forEach(row => {
+                    var magic = row.dataset.magic || '';
+                    if (!magic) return;
+
+                    var closeTimeStr = row.dataset.closeTime;
+                    if (!closeTimeStr) return;
+
+                    var t = closeTimeStr.split(/[- :.]/);
+                    var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    var tradeTs = tradeDate.getTime();
+
+                    if (!tempMagicStats[magic]) tempMagicStats[magic] = { count: 0, lastCloseTs: 0, hasOpen: false };
+
+                    if (tradeTs > tempMagicStats[magic].lastCloseTs) {
+                        tempMagicStats[magic].lastCloseTs = tradeTs;
+                    }
+
+                    if (isTradeInTimeRange(tradeTs)) {
+                        tempMagicStats[magic].count++;
+                    }
+                });
+            }
+
+            // Gather open trades to add to trade count and mark as alive
+            var openRows = document.querySelectorAll('#open-trades-table tbody tr');
+            openRows.forEach(row => {
+                var cell = row.querySelector('td:nth-child(4)'); // 4th column is usually Magic in open trades table. Let's be safer.
+                var mSpan = row.querySelector('span[title="Magic Number"]');
+                // Wait, open trades table doesn't have dataset.magic. It has a span.
+                // It's cell index 3: <td th:text="${trade.magicNumber}">
+                var txt = '';
+                if (row.cells && row.cells.length > 3) txt = row.cells[3].textContent.trim();
+                var magic = txt || '';
+
+                if (magic && magic !== '0' && tempMagicStats[magic] !== undefined) {
+                    tempMagicStats[magic].count++; // Open trades count towards the total in this period (they are always "now")
+                    tempMagicStats[magic].hasOpen = true;
+                } else if (magic) {
+                    tempMagicStats[magic] = { count: 1, lastCloseTs: now.getTime(), hasOpen: true };
+                }
+            });
+
+            // STEP 3: Validate Magics & Update Checkboxes UI
+            var checkboxes = document.querySelectorAll('.magic-checkbox');
+            checkboxes.forEach(cb => {
+                var magic = cb.value;
+                var stats = tempMagicStats[magic] || { count: 0, lastCloseTs: 0, hasOpen: false };
+
+                var isValid = true;
+
+                // Check Min Trades
+                if (stats.count < cfgMinTrades) {
+                    isValid = false;
+                }
+
+                // Check Max Age
+                if (isValid && !stats.hasOpen && cutoffDate !== null) {
+                    if (stats.lastCloseTs < cutoffDate) {
+                        isValid = false;
+                    }
+                }
+
+                var container = cb.closest('label'); // It's usually wrapped in a label
+                if (isValid) {
+                    if (container) container.style.display = 'flex';
+                    // We don't auto-check it if they manually unchecked it before, but if it was hidden, we just show it.
+                } else {
+                    if (container) container.style.display = 'none';
+                    // If it's invalid, it cannot be active
+                    cb.checked = false;
+                }
+            });
+
+            // STEP 4: Get Active Checkboxes AFTER Validation
+            var currentMagics = getActiveMagics();
+
+            // STEP 5: Apply Filter to History Table Rows
+            if (historyMgr) {
+                historyMgr.applyFilter(function (row) {
+                    var rowMagic = row.dataset.magic || '';
+                    if (currentMagics.size === 0) return false;
+                    if (!currentMagics.has(rowMagic)) return false;
+
+                    var closeTimeStr = row.dataset.closeTime;
+                    if (!closeTimeStr) return false;
+
+                    var t = closeTimeStr.split(/[- :.]/);
+                    var tradeDate = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    var tradeTs = tradeDate.getTime();
+
+                    return isTradeInTimeRange(tradeTs);
+                });
+            }
+
+            // Update Chart
+            if (historyChartMgr) {
+                historyChartMgr.updateChart(range);
+            }
+
+            // Update Stats
+            updateStats(range);
+
+            // Update Magic Table
+            updateMagicStats(range);
+
+            // Update Magic Charts
+            if (magicChartMgr && historyMgr) {
+                magicChartMgr.update(historyMgr.filteredRows);
+            }
+
+            // Update Global Pie Chart
+            updateGlobalPieChart();
+
+            // Update Period Label in Header (Charts)
+            var periodLabelCharts = document.getElementById('magic-curves-period');
+            // Update Period Label in Header (Table)
+            var periodLabelTable = document.getElementById('magic-breakdown-period');
+            // Update Period Label in Header (History)
+            var periodLabelHistory = document.getElementById('history-list-period');
+
+            var rangeName = '';
+            var btn = document.querySelector('.filter-btn[data-range="' + range + '"]');
+            if (btn) rangeName = btn.textContent;
+
+            var nowD = new Date();
+            var startD = null;
+            var endD = nowD;
+
+            switch (range) {
+                case 'today': startD = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate()); break;
+                case '1week': startD = new Date(nowD.getTime() - 7 * 24 * 3600 * 1000); break;
+                case '1month': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 1); break;
+                case 'thismonth': startD = new Date(nowD.getFullYear(), nowD.getMonth(), 1); break;
+                case '6months': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 6); break;
+                case 'thisyear': startD = new Date(nowD.getFullYear(), 0, 1); break;
+                case '1year': startD = new Date(nowD); startD.setFullYear(nowD.getFullYear() - 1); break;
+                case 'all':
+                    if (historyMgr && historyMgr.allRows && historyMgr.allRows.length > 0) {
+                        var oldestRow = historyMgr.allRows[historyMgr.allRows.length - 1];
+                        var ct = oldestRow.dataset.closeTime;
+                        if (ct) {
+                            var t = ct.split(/[- :.]/);
+                            startD = new Date(t[0], t[1] - 1, t[2]);
+                        }
+                    }
+                    break;
+            }
+
+            var dateStr = '';
+            if (startD) {
+                var fmt = function (d) {
+                    return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+                };
+                if (range === 'today') {
+                    dateStr = fmt(startD);
+                } else {
+                    dateStr = fmt(startD) + ' - ' + fmt(endD);
+                }
+            }
+
+            var labelText = rangeName ? '(' + rangeName + (dateStr ? ', ' + dateStr : '') + ')' : '';
+
+            if (periodLabelCharts) periodLabelCharts.textContent = labelText;
+            if (periodLabelTable) periodLabelTable.textContent = labelText;
+            if (periodLabelHistory) periodLabelHistory.textContent = labelText;
+        }
+
+        /**
+         * Update the equity overlay in the top-right of the chart.
+         * Shows the open equity (difference between equity and balance) prominently.
+         */
+        function updateEquityOverlay(equity, balance) {
+            var elVal = document.getElementById('equity-overlay-value');
+            var elBal = document.getElementById('equity-overlay-balance');
+            if (!elVal) return;
+
+            var diff = equity - balance;
+            var sign = diff >= 0 ? '+' : '';
+            var color = diff >= 0 ? '#10b981' : '#ffc800'; // green if positive, yellow if negative
+
+            elVal.textContent = sign + diff.toFixed(2) + ' ' + accountCurrency;
+            elVal.style.color = color;
+            elVal.style.textShadow = diff !== 0 ? ('0 0 12px ' + color + '88') : 'none';
+
+            if (elBal) {
+                elBal.textContent = 'Equity: ' + equity.toFixed(2) + ' ' + accountCurrency;
+            }
+        }
+
+        /**
+         * Update the drawdown overlay in the bottom-right of the chart.
+         * Shows the max equity drawdown in EUR and % for the selected time range.
+         */
+        function updateDrawdownOverlay(ddEur, ddPct) {
+            var elVal = document.getElementById('drawdown-overlay-value');
+            var elPct = document.getElementById('drawdown-overlay-percent');
+            if (!elVal) return;
+
+            if (ddEur <= 0) {
+                elVal.textContent = '0.00 ' + accountCurrency;
+                elVal.style.color = '#10b981';
+                if (elPct) {
+                    elPct.textContent = '0.00%';
+                    elPct.style.color = '#10b981';
+                }
+            } else {
+                elVal.textContent = '-' + ddEur.toFixed(2) + ' ' + accountCurrency;
+                elVal.style.color = '#ef4444';
+                elVal.style.textShadow = '0 0 10px rgba(239, 68, 68, 0.4)';
+                if (elPct) {
+                    elPct.textContent = '-' + ddPct.toFixed(2) + '%';
+                    elPct.style.color = '#ef4444';
+                }
+            }
+        }
+
+        function updateStats(range) {
+            if (!historyMgr) return;
+
+            var trades = historyMgr.filteredRows.map(row => {
+                var profitCell = row.querySelector('.profit-cell');
+                return parseFloat(profitCell ? profitCell.dataset.profit : 0);
+            });
+
+            var totalProfit = 0;
+            var grossProfit = 0;
+            var grossLoss = 0;
+            var wins = 0;
+            var losses = 0;
+            var totalTrades = trades.length;
+
+            trades.forEach(p => {
+                totalProfit += p;
+                if (p > 0) {
+                    grossProfit += p;
+                    wins++;
+                } else {
+                    grossLoss += Math.abs(p);
+                    if (p < 0) losses++;
+                }
+            });
+
+            var profitFactor = grossLoss === 0 ? (grossProfit > 0 ? 999.99 : 0) : (grossProfit / grossLoss);
+            var winRate = totalTrades === 0 ? 0 : (wins / totalTrades) * 100;
+            var avgWin = wins === 0 ? 0 : grossProfit / wins;
+            var avgLoss = losses === 0 ? 0 : grossLoss / losses; // as positive number
+
+            // Update Stats Grid
+            var elProfit = document.getElementById('stat-total-profit');
+            if (elProfit) {
+                elProfit.textContent = totalProfit.toFixed(2);
+                elProfit.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                elProfit.style.fontSize = "1.25rem";
+                elProfit.style.fontWeight = "bold";
+            }
+
+            var elPF = document.getElementById('stat-profit-factor');
+            if (elPF) elPF.textContent = profitFactor.toFixed(2);
+
+            var elWR = document.getElementById('stat-win-rate');
+            if (elWR) elWR.textContent = winRate.toFixed(1) + '%';
+
+            var elTrades = document.getElementById('stat-total-trades');
+            if (elTrades) elTrades.textContent = totalTrades;
+
+            var elAvg = document.getElementById('stat-avg-win-loss');
+            if (elAvg) elAvg.textContent = avgWin.toFixed(2) + ' / -' + avgLoss.toFixed(2);
+        }
+
+        function updateGlobalPieChart() {
+            var globalPieCanvas = document.getElementById('global-magic-pie-chart');
+            if (!globalPieCanvas || !historyMgr) return;
+
+            // Re-aggregate symbols from filtered rows
+            var symbolCounts = {};
+            historyMgr.filteredRows.forEach(row => {
+                // The table definition is: Ticket, Symbol, Type, Volume...
+                // So index 1 is Symbol.
+                var sym = '';
+                if (row.cells && row.cells.length > 1) {
+                    sym = row.cells[1].textContent.trim();
+                }
+                if (sym) {
+                    symbolCounts[sym] = (symbolCounts[sym] || 0) + 1;
+                }
+            });
+
+            var labels = Object.keys(symbolCounts);
+            var data = Object.values(symbolCounts);
+
+            if (window.globalPieChart) {
+                window.globalPieChart.destroy();
+            }
+
+            if (labels.length === 0) return;
+
+            var bgColors = [
+                '#6366f1', '#10b981', '#f59e0b', '#ef4444',
+                '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6',
+                '#22d3ee', '#a855f7', '#d946ef', '#f43f5e',
+                '#f97316', '#84cc16', '#06b6d4', '#4f46e5'
+            ];
+
+            window.globalPieChart = new Chart(globalPieCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: bgColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '60%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: { color: '#d1d5db', font: { size: 11 }, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.label + ': ' + context.parsed + ' Trades';
+                                }
+                            },
+                            bodyFont: { size: 11 },
+                            boxPadding: 4
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateMagicStats(range) {
+            // Re-calculate statistics for the Magic Table based on historyMgr.filteredRows
+            // 1. Reset counters map
+            var magicStats = {}; // { magic: { closedCount: 0, closedProfit: 0.0 } }
+            var currentMagics = getActiveMagics();
+
+            // 2. Aggregate from filtered history
+            if (historyMgr && historyMgr.filteredRows) {
+                historyMgr.filteredRows.forEach(row => {
+                    var magic = row.dataset.magic;
+                    if (magic) {
+                        var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
+
+                        if (!magicStats[magic]) {
+                            magicStats[magic] = { closedCount: 0, closedProfit: 0.0 };
+                        }
+                        magicStats[magic].closedCount++;
+                        magicStats[magic].closedProfit += profit;
+                    }
+                });
+            }
+
+            // 3. Update the Magic Table DOM
+            var magicRows = document.querySelectorAll('.magic-breakdown tbody tr');
+            magicRows.forEach(row => {
+                var magicCell = row.querySelector('td:nth-child(1) strong');
+                if (!magicCell) return;
+                var magic = magicCell.textContent.trim();
+
+                if (!currentMagics.has(magic)) {
+                    row.style.display = 'none';
+                    return; // Skip calculating stats for hidden magics
+                } else {
+                    row.style.display = 'table-row';
+                }
+
+                var stats = magicStats[magic] || { closedCount: 0, closedProfit: 0.0 };
+
+                // Open Profit (Static, from DOM as it was originally rendered)
+                var openProfitCell = row.querySelector('td:nth-child(3)');
+                var openProfit = parseFloat(openProfitCell ? openProfitCell.textContent : 0);
+
+                // Update Closed Count
+                var closedCountCell = row.querySelector('td:nth-child(4)');
+                if (closedCountCell) closedCountCell.textContent = stats.closedCount;
+
+                // Update Closed Profit
+                var closedProfitCell = row.querySelector('td:nth-child(5)');
+                if (closedProfitCell) {
+                    closedProfitCell.textContent = stats.closedProfit.toFixed(2);
+                    closedProfitCell.className = stats.closedProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                }
+
+                // Update Total Profit (Closed + Open)
+                // We also need to add the static Swap and Commission that are currently displayed
+                var swapCell = row.querySelector('td:nth-child(6)');
+                var swapVal = parseFloat((swapCell ? swapCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
+
+                var commCell = row.querySelector('td:nth-child(7)');
+                var commVal = parseFloat((commCell ? commCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
+
+                var totalProfit = openProfit + stats.closedProfit + swapVal + commVal;
+                var totalProfitCell = row.querySelector('td:nth-child(8)');
+                if (totalProfitCell) {
+                    totalProfitCell.textContent = totalProfit.toFixed(2);
+                    totalProfitCell.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                }
+            });
+        }
+
+
+        // ============ MAGIC CHART MANAGER ============
+        function MagicChartManager(containerId) {
+            this.container = document.getElementById(containerId);
+            this.charts = {}; // { magic: ChartInstance }
+            this.colors = [
+                { line: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
+                { line: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+                { line: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+                { line: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+                { line: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
+                { line: '#ec4899', bg: 'rgba(236,72,153,0.15)' },
+                { line: '#14b8a6', bg: 'rgba(20,184,166,0.15)' },
+                { line: '#f97316', bg: 'rgba(249,115,22,0.15)' }
+            ];
+        }
+
+        MagicChartManager.prototype.update = function (rows) {
+            if (!this.container) return;
+
+            // 1. Group trades by Magic
+            var magicData = {}; // { magic: [ { time, profit } ] }
+
+            rows.forEach(row => {
+                var magic = row.dataset.magic;
+                if (magic) {
+                    var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
+                    var timeStr = row.dataset.closeTime;
+
+                    if (timeStr) {
+                        var t = timeStr.split(/[- :.]/);
+                        var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+
+                        if (!magicData[magic]) magicData[magic] = [];
+                        magicData[magic].push({ time: date.getTime(), profit: profit, dateObj: date });
+                    }
+                }
+            });
+
+            // 2. Identify active magics and existing charts
+            var activeMagics = Object.keys(magicData);
+
+            // Remove charts for magics that are no longer present in filtered data
+            // Actually, maybe we just hide them? Or destroy them.
+            // Let's destroy to keep it clean, or keep them if we want to preserve state?
+            // Re-rendering is safer for now.
+
+            this.container.innerHTML = ''; // Clear container
+            this.charts = {}; // Reset charts
+
+            if (activeMagics.length === 0) {
+                this.container.innerHTML = '<p style="text-align:center; color: var(--text-secondary); padding: 1rem;">Keine Daten für diesen Zeitraum</p>';
+                return;
+            }
+
+            // 3. Render Charts
+            var idx = 0;
+            activeMagics.sort(); // Sort by magic number
+
+            var totalAllClosedProfit = 0;
+            var totalAllOpenProfit = 0;
+
+            activeMagics.forEach(magic => {
+                var trades = magicData[magic];
+                trades.sort((a, b) => a.time - b.time); // Sort by time asc
+
+                // Calculate Cumulative Profit for this period
+                // Note: This starts at 0 for the beginning of the selected period.
+                // It does NOT show total lifetime profit if filtered. This is standard behavior for "Profit in Period".
+                var dataPoints = [];
+                var runProfit = 0;
+
+                // Add start point
+                if (trades.length > 0) {
+                    dataPoints.push({ x: trades[0].time - 60000, y: 0 });
+                }
+
+                trades.forEach(t => {
+                    runProfit += t.profit;
+                    dataPoints.push({ x: t.time, y: runProfit });
+                });
+
+                // Get Color
+                var colorSet = this.colors[idx % this.colors.length];
+                idx++;
+
+                // Create Chart Elements
+                // Build chart label - Try to find a comment from the latest trade
+                var commentText = '';
+                var openProfit = 0;
+                // Or try to find it in the Magic Breakdown table?
+                // Let's look up the Magic Table for a name
+                var magicRow = Array.from(document.querySelectorAll('.magic-breakdown tbody tr')).find(r => {
+                    var c = r.querySelector('td:nth-child(1) strong');
+                    return c && c.textContent.trim() === magic;
+                });
+                var symbolsText = '';
+                if (magicRow) {
+                    var nameDiv = magicRow.querySelector('div');
+                    if (nameDiv) commentText = nameDiv.textContent.trim();
+                    var opCell = magicRow.querySelector('td:nth-child(3)');
+                    if (opCell) openProfit = parseFloat(opCell.textContent || 0);
+                    symbolsText = magicRow.getAttribute('data-symbols') || '';
+                }
+
+                var chartLabel = 'Magic ' + magic + (commentText ? ' — ' + commentText : '');
+                var labels = dataPoints.map(d => new Date(d.x).toLocaleString());
+                var values = dataPoints.map(d => d.y);
+
+                var wrapper = document.createElement('div');
+                wrapper.className = 'chart-card';
+                wrapper.style.cursor = 'pointer';
+                wrapper.dataset.magic = magic;
+
+                var title = document.createElement('h3');
+                title.className = 'chart-title';
+                title.style.display = 'flex';
+                title.style.alignItems = 'flex-start';
+                title.style.justifyContent = 'space-between';
+                title.style.gap = '8px';
+
+                var titleText = document.createElement('span');
+                titleText.textContent = chartLabel;
+                titleText.style.flex = '1';
+                title.appendChild(titleText);
+
+                if (symbolsText) {
+                    var symArr = symbolsText.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                    if (symArr.length > 0) {
+                        var symBadge = document.createElement('span');
+                        symBadge.style.fontSize = '0.75rem';
+                        symBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+                        symBadge.style.border = '1px solid var(--border-color)';
+                        symBadge.style.padding = '2px 6px';
+                        symBadge.style.borderRadius = '4px';
+                        symBadge.style.fontWeight = 'normal';
+                        symBadge.style.color = '#a0a0c0';
+                        symBadge.style.whiteSpace = 'nowrap';
+
+                        if (symArr.length === 1) {
+                            symBadge.textContent = symArr[0];
+                        } else {
+                            symBadge.textContent = symArr[0] + '...';
+                            symBadge.title = symArr.join(', ');
+                            symBadge.style.cursor = 'help';
+                        }
+                        title.appendChild(symBadge);
+                    }
+                }
+
+                wrapper.appendChild(title);
+
+                var canvasWrap = document.createElement('div');
+                canvasWrap.className = 'chart-container';
+                var canvas = document.createElement('canvas');
+                canvasWrap.appendChild(canvas);
+                wrapper.appendChild(canvasWrap);
+
+                var profitDiv = document.createElement('div');
+                profitDiv.style.textAlign = 'center';
+                profitDiv.style.paddingTop = '12px';
+                profitDiv.style.paddingBottom = '8px';
+                profitDiv.style.fontWeight = 'bold';
+                profitDiv.style.fontSize = '1.1rem';
+
+                var totalProfitSpan = document.createElement('span');
+                totalProfitSpan.textContent = 'Gesamt: ' + runProfit.toFixed(2) + ' ' + accountCurrency;
+                totalProfitSpan.style.color = runProfit >= 0 ? '#10b981' : '#ef4444';
+                profitDiv.appendChild(totalProfitSpan);
+
+                var openProfitSpan = document.createElement('span');
+                openProfitSpan.textContent = ' (Offen: ' + openProfit.toFixed(2) + ' ' + accountCurrency + ')';
+                openProfitSpan.style.color = openProfit >= 0 ? '#10b981' : '#ef4444';
+                openProfitSpan.style.fontSize = '0.9rem';
+                openProfitSpan.style.fontWeight = 'normal';
+
+                if (openProfit !== 0) {
+                    profitDiv.appendChild(openProfitSpan);
+                }
+
+                wrapper.appendChild(profitDiv);
+
+                this.container.appendChild(wrapper);
+
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: chartLabel,
+                            data: values,
+                            borderColor: colorSet.line,
+                            backgroundColor: colorSet.bg,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return 'Profit: ' + context.parsed.y.toFixed(2);
+                                    }
+                                },
+                                backgroundColor: '#252542',
+                                titleColor: '#ffffff',
+                                bodyColor: '#a0a0c0',
+                                borderColor: '#3f3f5f',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true, // Show X axis labels
+                                ticks: {
+                                    color: '#d1d5db',
+                                    maxRotation: 0,
+                                    maxTicksLimit: 6, // Limit ticks to avoid clutter
+                                    font: { size: 11 },
+                                    autoSkip: true
+                                },
+                                grid: { display: false } // Keep grid hidden for cleanliness
+                            },
+                            y: {
+                                ticks: { color: '#d1d5db', font: { size: 11 } },
+                                grid: { color: 'rgba(63,63,95,0.3)' }
+                            }
+                        }
+                    }
+                });
+
+                // Click handler
+                wrapper.onclick = function () {
+                    openChartModal(magic, colorSet.line, colorSet.bg, chartLabel, labels, values);
+                };
+
+                totalAllClosedProfit += runProfit;
+                totalAllOpenProfit += openProfit;
+            });
+
+            // Add summary below the charts
+            var summaryDiv = document.createElement('div');
+            summaryDiv.style.width = '100%';
+            summaryDiv.style.marginTop = '1rem';
+            summaryDiv.style.padding = '1rem';
+            summaryDiv.style.backgroundColor = 'var(--bg-card)';
+            summaryDiv.style.border = '1px solid var(--border-color)';
+            summaryDiv.style.borderRadius = '8px';
+            summaryDiv.style.display = 'flex';
+            summaryDiv.style.justifyContent = 'space-around';
+            summaryDiv.style.flexWrap = 'wrap';
+            summaryDiv.style.gap = '1rem';
+
+            var closedSummary = document.createElement('div');
+            closedSummary.style.textAlign = 'center';
+            closedSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamtsumme (Geschlossen)</span>' +
+                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllClosedProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
+                totalAllClosedProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+            var openSummary = document.createElement('div');
+            openSummary.style.textAlign = 'center';
+            openSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamt Offene Trades Equity</span>' +
+                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllOpenProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
+                totalAllOpenProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+            summaryDiv.appendChild(closedSummary);
+            summaryDiv.appendChild(openSummary);
+
+            this.container.appendChild(summaryDiv);
+        };
+
+        // ============ FULLSCREEN CHART MODAL ============
+        // ============ FULLSCREEN CHART MODAL ============
+        var modalChart = null;
+        var currentMagic = null;
+
+        function openChartModal(magic, lineColor, bgColor, label, labels, data) {
+            currentMagic = magic;
+            var modal = document.getElementById('chart-modal');
+            var titleEl = document.getElementById('chart-modal-title');
+            var canvas = document.getElementById('chart-modal-canvas');
+
+            // Setup Title Editing
+            // 1. Parse current comment from label "Magic 12345 — [Comment]"
+            var magicPrefix = 'Magic ' + magic;
+            var commentText = '';
+            if (label.indexOf('—') > 0) {
+                commentText = label.split('—')[1].trim();
+            }
+
+            titleEl.innerHTML = `
+                <span>${magicPrefix}</span>
+                <span id="modal-comment-display" style="margin-left: 10px; color: #a0a0c0; font-weight: normal;">${commentText ? '— ' + commentText : ''}</span>
+                <button id="modal-edit-btn" style="background: none; border: none; cursor: pointer; color: #6366f1; margin-left: 10px; font-size: 1.2rem;">✎</button>
+                <div id="modal-edit-form" style="display: none; margin-left: 10px;">
+                    <input type="text" id="modal-comment-input" value="${commentText}" placeholder="Kommentar..." 
+                           style="background: #1e1e38; border: 1px solid #3f3f5f; color: #ffffff; padding: 4px 8px; border-radius: 4px;">
+                    <button id="modal-save-btn" style="background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px;">💾</button>
+                    <button id="modal-cancel-btn" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px;">✕</button>
+                </div>
+            `;
+
+            // Elements
+            var editBtn = document.getElementById('modal-edit-btn');
+            var editForm = document.getElementById('modal-edit-form');
+            var commentDisplay = document.getElementById('modal-comment-display');
+            var input = document.getElementById('modal-comment-input');
+            var saveBtn = document.getElementById('modal-save-btn');
+            var cancelBtn = document.getElementById('modal-cancel-btn');
+
+            // Event Handlers
+            editBtn.onclick = function () {
+                editBtn.style.display = 'none';
+                commentDisplay.style.display = 'none';
+                editForm.style.display = 'inline-flex';
+                input.focus();
+            };
+
+            cancelBtn.onclick = function () {
+                editForm.style.display = 'none';
+                editBtn.style.display = 'inline';
+                commentDisplay.style.display = 'inline';
+                input.value = commentText; // reset
+            };
+
+            saveBtn.onclick = function () {
+                var newComment = input.value.trim();
+
+                // AJAX Save
+                var formData = new FormData();
+                formData.append('magicNumber', currentMagic);
+                formData.append('customComment', newComment);
+
+                fetch('/api/mapping', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            // Update UI locally
+                            commentText = newComment;
+                            commentDisplay.textContent = newComment ? '— ' + newComment : '';
+
+                            // Close edit mode
+                            editForm.style.display = 'none';
+                            editBtn.style.display = 'inline';
+                            commentDisplay.style.display = 'inline';
+
+                            // Update Chart Title/Lable in dataset if we want (optional, requires chart update)
+                            // Ideally we would reload the page or update the main list entry too. 
+                            // For now, modal update is enough feedback.
+                        } else {
+                            alert('Fehler beim Speichern');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Netzwerkfehler');
+                    });
+            };
+
+
+            modal.classList.add('visible');
+
+            if (modalChart) { modalChart.destroy(); }
+
+            modalChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: lineColor,
+                        backgroundColor: bgColor,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        borderWidth: 2.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#a0a0c0', font: { size: 14 } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#252542',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0a0c0',
+                            borderColor: '#3f3f5f',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#d1d5db', maxRotation: 45, maxTicksLimit: 20, font: { size: 11 } },
+                            grid: { color: 'rgba(63,63,95,0.3)' }
+                        },
+                        y: {
+                            ticks: { color: '#d1d5db', font: { size: 12 } },
+                            grid: { color: 'rgba(63,63,95,0.3)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeChartModal() {
+            var modal = document.getElementById('chart-modal');
+            modal.classList.remove('visible');
+            if (modalChart) { modalChart.destroy(); modalChart = null; }
+        }
+
+        document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
+        document.getElementById('chart-modal').addEventListener('click', function (e) {
+            if (e.target === this) closeChartModal();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeChartModal();
+        });
+    </script>
+</body>
+
+</html>

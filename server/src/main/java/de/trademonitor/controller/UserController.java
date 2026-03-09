@@ -32,6 +32,8 @@ public class UserController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String newPassword,
             @RequestParam String confirmPassword,
+            jakarta.servlet.http.HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse response,
             RedirectAttributes redirectAttrs) {
 
         if (userDetails == null) {
@@ -45,9 +47,16 @@ public class UserController {
 
         try {
             userService.changePassword(userDetails.getUserEntity().getId(), newPassword);
-            redirectAttrs.addFlashAttribute("successMessage",
-                    "Passwort erfolgreich geändert. Bitte logge dich neu ein.");
-            return "redirect:/logout";
+
+            // Log out the user programmatically
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            if (auth != null) {
+                new org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler()
+                        .logout(request, response, auth);
+            }
+
+            return "redirect:/login?logout";
         } catch (Exception e) {
             redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Ändern des Passworts: " + e.getMessage());
             return "redirect:/profile";
