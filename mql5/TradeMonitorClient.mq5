@@ -33,7 +33,7 @@ uint lastHeartbeatTick = 0;
 uint lastReconnectAttemptTick = 0;
 bool isRegistered = false;
 int httpTimeout = 5000;          // 5 seconds timeout for normal requests
-int httpTimeoutInit = 180000;    // 180 seconds (3 min) timeout for initial trade list (large payload)
+int httpTimeoutInit = 300000;    // 300 seconds (5 min) timeout for initial trade list (large payload)
 
 //--- Trade list tracking
 bool g_tradeListSent = false;            // Whether full trade list was successfully sent
