@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.05"
+#property version   "1.06"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -17,7 +17,7 @@ input int      MaxReconnectAttempts = 10;               // Max reconnect attempt
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.05"
+#define EA_VERSION "1.06"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -834,7 +834,20 @@ void SendTradeUpdate()
 void SendHistoryUpdate()
 {
    string url = cfg_ServerURL + "/api/history";
-   
+
+   // Guard: if sync time is missing but init was already marked as done, the
+   // two persistence stores (GlobalVariable vs. file) are out of sync.
+   // Doing a full-history scan here would use the 5-second timeout and loop
+   // forever on large histories.  Force a clean re-init instead.
+   if(g_lastSyncedCloseTime == "")
+   {
+      Print("Warning: g_lastSyncedCloseTime empty despite g_tradeListSent=true. Forcing re-init.");
+      g_tradeListSent = false;
+      GlobalVariableSet(GV_TRADELIST_SENT, 0);
+      g_initRetryCount = 0;
+      return;
+   }
+
    // Only send trades newer than last synced close time (incremental)
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson(g_lastSyncedCloseTime, latestCloseTime);
