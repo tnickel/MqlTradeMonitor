@@ -54,6 +54,13 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.TradeComparisonService tradeComparisonService;
 
+    @ModelAttribute
+    public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
+        if (userDetails != null) {
+            model.addAttribute("currentUser", userDetails.getUserEntity());
+        }
+    }
+
     @PostMapping("/api/test-siren")
     @ResponseBody
     public String testSiren() {
@@ -491,6 +498,10 @@ public class DashboardController {
         model.addAttribute("liveColorYellow", globalConfigService.getLiveColorYellow());
         model.addAttribute("liveColorOrange", globalConfigService.getLiveColorOrange());
         model.addAttribute("liveColorRed", globalConfigService.getLiveColorRed());
+
+        if (userDetails != null) {
+            model.addAttribute("currentUser", userDetails.getUserEntity());
+        }
 
         return "account-detail";
     }

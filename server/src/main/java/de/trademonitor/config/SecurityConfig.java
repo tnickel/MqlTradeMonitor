@@ -39,7 +39,7 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
                                                                 "/api/heartbeat", "/api/history", "/css/**", "/js/**",
-                                                                "/images/**", "/login",
+                                                                "/img/**", "/login", "/impressum", "/privacy",
                                                                 "/mobile/**")
                                                 .permitAll()
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")

@@ -1,23 +1,24 @@
 /* Trade Monitor - Modern Dark Theme CSS */
 
 :root {
-    --bg-primary: #0f0f1a;
-    --bg-secondary: #1a1a2e;
-    --bg-card: #252542;
-    --bg-card-hover: #2d2d4a;
-    --text-primary: #ffffff;
-    --text-secondary: #a0a0c0;
-    --text-muted: #6b6b8f;
-    --accent-primary: #6366f1;
-    --accent-secondary: #818cf8;
+    --bg-primary: #020617;
+    --bg-secondary: rgba(15, 23, 42, 0.6);
+    --bg-card: rgba(30, 41, 59, 0.5);
+    --bg-card-hover: rgba(30, 41, 59, 0.7);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #60a5fa;
     --success: #10b981;
     --success-light: #34d399;
     --danger: #ef4444;
     --danger-light: #f87171;
     --warning: #f59e0b;
-    --border-color: #3f3f5f;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --glass-blur: blur(12px);
+    --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
 * {
@@ -27,8 +28,14 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg-primary);
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-color: var(--bg-primary);
+    background-image: 
+        linear-gradient(to bottom, rgba(2, 6, 23, 0.8), rgba(2, 6, 23, 0.95)),
+        url('/img/trading-bg.png');
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: center;
     color: var(--text-primary);
     min-height: 100vh;
     line-height: 1.6;
@@ -44,10 +51,13 @@ body {
 header {
     text-align: center;
     margin-bottom: 2rem;
-    padding: 2rem;
+    padding: 2.5rem;
     background: var(--bg-secondary);
-    border-radius: 16px;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-radius: 20px;
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
 }
 
 header h1 {
@@ -85,8 +95,11 @@ header h1 {
     margin-bottom: 2rem;
     padding: 1.5rem;
     background: var(--bg-secondary);
-    border-radius: 12px;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-radius: 16px;
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
 }
 
 .stat {
@@ -143,12 +156,15 @@ header h1 {
 
 .account-card {
     background: var(--bg-card);
-    border-radius: 16px;
-    padding: 1.5rem;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-radius: 20px;
+    padding: 1.75rem;
     border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    box-shadow: var(--shadow);
 }
 
 
@@ -316,10 +332,13 @@ header h1 {
 /* Trades Section */
 .trades-section {
     background: var(--bg-secondary);
-    padding: 2rem;
-    border-radius: 16px;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    padding: 2.5rem;
+    border-radius: 20px;
     border: 1px solid var(--border-color);
     margin-bottom: 2rem;
+    box-shadow: var(--shadow);
 }
 
 .trades-section h2 {
@@ -542,10 +561,13 @@ header h1 {
 /* Admin Table */
 .admin-table-container {
     background: var(--bg-secondary);
-    padding: 2rem;
-    border-radius: 16px;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    padding: 2.5rem;
+    border-radius: 20px;
     border: 1px solid var(--border-color);
     margin-bottom: 2rem;
+    box-shadow: var(--shadow);
     overflow-x: auto;
 }
 

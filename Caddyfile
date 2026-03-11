@@ -1,0 +1,11 @@
+# Lokale HTTPS Konfiguration für Entwicklung
+# Dieser Server horcht auf localhost:443 (https) und leitet alles an
+# das Spring Boot Backend auf localhost:8080 (http) weiter.
+# Caddy generiert sich selbständig ein lokales Vertrauens-Zertifikat.
+
+localhost {
+    # Reverse Proxy auf Spring Boot
+    reverse_proxy localhost:8080
+
+    tls internal
+}

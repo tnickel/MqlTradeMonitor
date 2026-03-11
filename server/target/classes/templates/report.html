@@ -7,59 +7,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
-            --bg-dark: #1a1b26;
-            --bg-card: #24283b;
-            --text-primary: #c0caf5;
-            --text-muted: #565f89;
-            --accent: #7aa2f7;
-            --success: #9ece6a;
-            --danger: #f7768e;
-            --border: #414868;
-            --hover: #2f344f;
+            --bg-primary: #020617;
+            --bg-secondary: rgba(15, 23, 42, 0.6);
+            --bg-card: rgba(30, 41, 59, 0.5);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass-blur: blur(12px);
         }
 
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-primary);
             font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            background-image: 
+                linear-gradient(to bottom, rgba(2, 6, 23, 0.8), rgba(2, 6, 23, 0.95)),
+                url('/img/trading-bg.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            color: var(--text-primary);
             margin: 0;
-            padding: 20px;
+            padding: 2.5rem 1rem;
+            min-height: 100vh;
         }
 
         h1 {
             text-align: center;
-            color: var(--accent);
-            margin-bottom: 2rem;
-            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 2.5rem;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
         }
 
         .report-container {
             max-width: 1300px;
-            margin: 0 auto;
-            background-color: var(--bg-card);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin: 0 auto 2rem;
+            background: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
             overflow-x: auto;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.95rem;
+            font-size: 0.9375rem;
         }
 
         th {
             text-align: left;
             color: var(--text-muted);
             font-weight: 600;
-            padding: 12px 10px;
-            border-bottom: 2px solid var(--border);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
             white-space: nowrap;
         }
 
         td {
-            padding: 12px 10px;
+            padding: 1.25rem 1rem;
             border-bottom: 1px solid var(--border);
             vertical-align: middle;
         }
@@ -69,61 +86,63 @@
         }
 
         tr:hover td {
-            background-color: var(--hover);
+            background-color: rgba(255, 255, 255, 0.02);
         }
 
         .account-name {
             font-weight: 700;
             color: var(--accent);
             display: inline-block;
-            text-decoration: underline;
-            text-underline-offset: 3px;
+            text-decoration: none;
             transition: all 0.2s;
         }
 
         a.account-name:hover {
             color: #fff;
-            text-decoration-color: var(--success);
+            transform: translateX(3px);
         }
 
         .account-id {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8125rem;
             color: var(--text-muted);
+            display: block;
+            margin-top: 0.25rem;
         }
 
         .badge {
-            font-size: 0.75rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
+            font-size: 0.6875rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.025em;
         }
 
         .badge.real {
-            background-color: rgba(158, 206, 106, 0.15);
-            color: var(--success);
-            border: 1px solid rgba(158, 206, 106, 0.3);
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .badge.demo {
-            background-color: rgba(224, 175, 104, 0.15);
-            color: #e0af68;
-            border: 1px solid rgba(224, 175, 104, 0.3);
+            background-color: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
         .num-val {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Inter', sans-serif;
             font-weight: 600;
             white-space: nowrap;
         }
 
         .positive {
-            color: var(--success);
+            color: #10b981;
         }
 
         .negative {
-            color: var(--danger);
+            color: #ef4444;
         }
 
         .neutral {
@@ -141,15 +160,22 @@
         .back-btn {
             display: block;
             width: fit-content;
-            margin: 20px auto 0;
-            color: var(--text-muted);
+            margin: 2rem auto;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
         .back-btn:hover {
-            color: var(--accent);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            transform: translateY(-1px);
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -158,7 +184,16 @@
 
 <body>
 
-    <h1 th:text="${periodTitle}">Report</h1>
+    <header style="max-width: 1300px; margin: 0 auto 2rem; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h1 th:text="${periodTitle}" style="text-align: left; margin-bottom: 0;">Report</h1>
+            <p class="subtitle" style="color: var(--text-muted); font-weight: 500; font-size: 0.9375rem; margin-top: 0.5rem;">Performance & Trading Übersicht</p>
+        </div>
+        <div th:if="${currentUser != null}" style="text-align: right; margin-top: 5px;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Eingeloggt als</div>
+            <div style="font-size: 1.05rem; color: var(--accent); font-weight: 700; margin-top: 2px;" th:text="${currentUser.username}">Username</div>
+        </div>
+    </header>
 
     <!-- ======= SCALED PERFORMANCE COMPARISON CHART ======= -->
     <div class="report-container" style="margin-bottom: 20px;">
@@ -752,19 +787,21 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(2px);
+            background-color: rgba(2, 6, 23, 0.6);
+            backdrop-filter: blur(8px);
         }
 
         .modal-content {
-            background-color: var(--bg-card);
+            background-color: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
             margin: 5% auto;
-            padding: 20px;
+            padding: 2rem;
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 20px;
             width: 90%;
-            max-width: 900px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-width: 1000px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             max-height: 80vh;
             display: flex;
             flex-direction: column;
@@ -772,22 +809,20 @@
 
         .close-modal {
             color: var(--text-muted);
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 24px;
+            font-weight: 500;
             align-self: flex-end;
             cursor: pointer;
+            transition: color 0.2s;
         }
 
-        .close-modal:hover,
-        .close-modal:focus {
-            color: var(--text-primary);
-            text-decoration: none;
+        .close-modal:hover {
+            color: #fff;
         }
 
         .table-wrapper {
             overflow-y: auto;
-            margin-top: 15px;
+            margin-top: 1.5rem;
             flex-grow: 1;
         }
 
@@ -798,27 +833,38 @@
 
         .details-table th,
         .details-table td {
-            padding: 8px;
+            padding: 1rem;
             border-bottom: 1px solid var(--border);
-            font-size: 0.9rem;
+            font-size: 0.875rem;
         }
 
         .details-table th {
             position: sticky;
             top: 0;
-            background-color: var(--bg-card);
+            background-color: #1e293b;
             z-index: 10;
         }
 
         .mono {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
         }
 
         .small-text {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
         }
     </style>
+    <footer style="margin-top: 4rem; padding: 3rem 0; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.8125rem;">
+        <div style="margin-bottom: 1.25rem;">
+            &copy; 2026 Trade Monitor &nbsp;•&nbsp; <a href="https://www.ki-software-schmiede.de" target="_blank" style="color: var(--text-secondary); text-decoration: none; font-weight: 500;">KI Software Schmiede</a>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 2rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;">
+            <a href="/impressum" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Impressum</a>
+            <a href="/privacy" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Datenschutz</a>
+            <a href="/" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Dashboard</a>
+        </div>
+    </footer>
 </body>
 
 </html>

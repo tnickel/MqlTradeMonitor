@@ -11,11 +11,17 @@
 
 <body>
     <div class="container">
-        <header>
-            <h1>🔄 Trade Monitor <span
-                    style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.12.0</span>
-            </h1>
-            <p class="subtitle">MetaTrader Account Übersicht</p>
+        <header style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h1>🔄 Trade Monitor <span
+                        style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.12.0</span>
+                </h1>
+                <p class="subtitle">MetaTrader Account Übersicht</p>
+            </div>
+            <div th:if="${currentUser != null}" style="text-align: right; margin-top: 10px;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Eingeloggt als</div>
+                <div style="font-size: 1.1rem; color: var(--accent-primary); font-weight: 700; margin-top: 2px;" th:text="${currentUser.username}">Username</div>
+            </div>
         </header>
 
         <div class="stats-bar">
@@ -483,13 +489,18 @@
 
     </div>
 
-    <div
-        style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid #333; color: #666; font-size: 0.9rem;">
-        &copy; 2026 Trade Monitor &nbsp;|&nbsp;
-        <a href="/admin" style="color: #a0a0c0; text-decoration: none;">Admin Area</a> &nbsp;|&nbsp;
-        <a href="/open-trades" style="color: #a0a0c0; text-decoration: none;">Open Trades List</a> &nbsp;|&nbsp;
-        <a href="/trade-comparison" style="color: #a0a0c0; text-decoration: none;">Trade-Vergleich</a>
-    </div>
+    <footer style="margin-top: 4rem; padding: 3rem 0; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.8125rem;">
+        <div style="margin-bottom: 1.25rem;">
+            &copy; 2026 Trade Monitor &nbsp;•&nbsp; <a href="https://www.ki-software-schmiede.de" target="_blank" style="color: var(--text-secondary); text-decoration: none; font-weight: 500;">KI Software Schmiede</a>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 2rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;">
+            <a href="/impressum" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Impressum</a>
+            <a href="/privacy" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Datenschutz</a>
+            <a href="/admin" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Admin Area</a>
+            <a href="/open-trades" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Open Trades</a>
+            <a href="/trade-comparison" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Vergleich</a>
+        </div>
+    </footer>
 
     <script>
         const liveColorGreen = '[[${liveColorGreen}]]';

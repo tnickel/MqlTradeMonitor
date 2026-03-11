@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Impressum - Trade Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
+    <style>
+        .legal-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 40px;
+            background: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        h1 { color: #fff; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        h2 { color: var(--accent-primary); margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: var(--text-secondary); }
+        .back-link { display: inline-block; margin-top: 2rem; color: var(--accent-primary); text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="legal-container">
+            <h1>Impressum</h1>
+            
+            <h2>Angaben gemäß § 5 TMG</h2>
+            <p>
+                Thomas Nickel<br>
+                Wünnenberger Weg 15<br>
+                33100 Paderborn
+            </p>
+
+            <h2>Kontakt</h2>
+            <p>
+                Telefon: 0174 5179485<br>
+                E-Mail: tnickel@gmx.de
+            </p>
+
+            <h2>Haftungsausschluss & Wichtige Hinweise</h2>
+            <p><strong>Privatseite:</strong> Dies ist eine rein private Webseite. Es erfolgt kein Verkauf von Produkten oder Dienstleistungen.</p>
+            <p><strong>Keine Garantie:</strong> Es wird keinerlei Garantie oder Gewährleistung für die Richtigkeit, Vollständigkeit oder Aktualität der bereitgestellten Informationen und Daten übernommen.</p>
+            <p><strong>Keine Handelsempfehlung:</strong> Die hier dargestellten Inhalte dienen ausschließlich der Information und stellen keine Anlageberatung oder Handelsempfehlung dar. Der Handel mit Finanzprodukten (insb. Forex/CFDs) ist mit hohen Risiken verbunden.</p>
+
+            <h2>Redaktionell verantwortlich</h2>
+            <p>
+                Thomas Nickel<br>
+                Wünnenberger Weg 15<br>
+                33100 Paderborn
+            </p>
+
+            <h2>EU-Streitschlichtung</h2>
+            <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" style="color: var(--accent-primary);">https://ec.europa.eu/consumers/odr/</a>.<br> Unsere E-Mail-Adresse finden Sie oben im Impressum.</p>
+
+            <h2>Verbraucherstreitbeilegung/Universalschlichtungsstelle</h2>
+            <p>Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+            
+            <a href="javascript:history.back()" class="back-link">← Zurück</a>
+        </div>
+    </div>
+</body>
+</html>

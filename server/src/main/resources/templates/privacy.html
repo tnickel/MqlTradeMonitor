@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Datenschutzerklärung - Trade Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
+    <style>
+        .legal-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 40px;
+            background: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        h1 { color: #fff; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        h2 { color: var(--accent-primary); margin-top: 2rem; margin-bottom: 1rem; font-size: 1.25rem; }
+        p { margin-bottom: 1rem; color: var(--text-secondary); }
+        ul { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+        li { margin-bottom: 0.5rem; }
+        .back-link { display: inline-block; margin-top: 2rem; color: var(--accent-primary); text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="legal-container">
+            <h1>Datenschutzerklärung</h1>
+            
+            <h2>1. Datenschutz auf einen Blick</h2>
+            <p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen.</p>
+
+            <h2>2. Datenerfassung auf dieser Website</h2>
+            <p>Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten können Sie dem Impressum dieser Website entnehmen.</p>
+
+            <h2>3. Zweck der Datenerfassung</h2>
+            <p>Ihre Daten werden erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten und die Nutzung des Trade Monitors zu ermöglichen. Die erhobenen Trade-Daten werden ausschließlich zum Zweck der Überwachung und Analyse Ihrer Handelsaktivitäten verwendet.</p>
+
+            <h2>4. Ihre Rechte</h2>
+            <p>Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung oder Löschung dieser Daten zu verlangen.</p>
+            
+            <h2>5. Hosting</h2>
+            <p>Wir hosten die Inhalte unserer Website bei folgendem Anbieter:</p>
+            <p><strong>Eigener Server / Externes Hosting</strong><br>
+            Die Daten werden auf einem Server in Deutschland/EU verarbeitet.</p>
+
+            <a href="javascript:history.back()" class="back-link">← Zurück</a>
+        </div>
+    </div>
+</body>
+</html>

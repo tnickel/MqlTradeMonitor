@@ -13,31 +13,37 @@
         /* Filter Buttons */
         .filter-bar {
             display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
             flex-wrap: wrap;
         }
 
         .filter-btn {
             background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
             color: var(--text-secondary);
             border: 1px solid var(--border-color);
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .filter-btn:hover {
             background: var(--bg-card-hover);
             color: var(--text-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
         }
 
         .filter-btn.active {
             background: var(--accent-primary);
             color: #ffffff;
             border-color: var(--accent-primary);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
         }
 
         .trade-comment {
@@ -46,12 +52,11 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             color: var(--text-muted);
-            font-size: 0.85rem;
+            font-size: 0.8125rem;
         }
 
         .trade-today {
-            background-color: rgba(99, 102, 241, 0.12) !important;
-            /* Subtle primary tint */
+            background-color: rgba(59, 130, 246, 0.08) !important;
         }
     </style>
 </head>
@@ -94,51 +99,51 @@
                     </span>
                 </div>
             </div>
+            <div th:if="${currentUser != null}" style="text-align: right; margin-top: 10px;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Eingeloggt als</div>
+                <div style="font-size: 1.1rem; color: var(--accent-primary); font-weight: 700; margin-top: 2px;" th:text="${currentUser.username}">Username</div>
+            </div>
         </header>
 
         <div class="account-summary">
-            <!-- The original filter bar is removed from here -->
-            <div class="summary-card">
-                <span class="summary-label">Balance</span>
-                <span class="summary-value"
-                    th:text="${#numbers.formatDecimal(account.balance, 1, 2)} + ' ' + ${account.currency}">10,000.00
-                    USD</span>
+            <div class="summary-card" style="background: var(--bg-card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: var(--shadow);">
+                <span class="summary-label" style="color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block;">Balance</span>
+                <span class="summary-value" style="font-size: 1.5rem; font-weight: 700; color: #fff;"
+                    th:text="${#numbers.formatDecimal(account.balance, 1, 2)} + ' ' + ${account.currency}">10,000.00 USD</span>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">Equity</span>
-                <span class="summary-value"
-                    th:text="${#numbers.formatDecimal(account.equity, 1, 2)} + ' ' + ${account.currency}">10,500.00
-                    USD</span>
+            <div class="summary-card" style="background: var(--bg-card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: var(--shadow);">
+                <span class="summary-label" style="color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block;">Equity</span>
+                <span class="summary-value" style="font-size: 1.5rem; font-weight: 700; color: #fff;"
+                    th:text="${#numbers.formatDecimal(account.equity, 1, 2)} + ' ' + ${account.currency}">10,500.00 USD</span>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">Floating P/L</span>
-                <span
-                    th:class="${account.totalProfit >= 0 ? 'summary-value profit-positive' : 'summary-value profit-negative'}"
-                    th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)} + ' ' + ${account.currency}">+500.00
-                    USD</span>
+            <div class="summary-card" style="background: var(--bg-card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: var(--shadow);">
+                <span class="summary-label" style="color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block;">Floating P/L</span>
+                <span th:class="${account.totalProfit >= 0 ? 'summary-value profit-positive' : 'summary-value profit-negative'}"
+                    style="font-size: 1.5rem; font-weight: 700;"
+                    th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)} + ' ' + ${account.currency}">+500.00 USD</span>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">Open Trades</span>
-                <span class="summary-value" th:text="${#lists.size(account.openTrades)}">5</span>
+            <div class="summary-card" style="background: var(--bg-card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: var(--shadow);">
+                <span class="summary-label" style="color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block;">Open Trades</span>
+                <span class="summary-value" style="font-size: 1.5rem; font-weight: 700; color: #fff;"
+                    th:text="${#lists.size(account.openTrades)}">5</span>
             </div>
             <div class="summary-card" th:if="${account.openProfitAlarmEnabled}"
-                th:style="${account.openProfitAlarmTriggered ? 'border: 2px solid #ef4444; background: rgba(239,68,68,0.1);' : 'border: 2px solid #10b981; background: rgba(16,185,129,0.1);'}">
-                <span class="summary-label" style="font-weight: bold;"
+                th:style="${account.openProfitAlarmTriggered ? 'border: 2px solid #ef4444; background: rgba(239,68,68,0.1); border-radius: 16px; padding: 1.5rem;' : 'border: 2px solid #10b981; background: rgba(16,185,129,0.1); border-radius: 16px; padding: 1.5rem;'}">
+                <span class="summary-label" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;"
                     th:text="${account.openProfitAlarmTriggered ? '🔴 ALARM AKTIV' : '🔔 Alarm'}">🔔 Alarm</span>
-                <span class="summary-value" style="font-size: 0.95rem;"
-                    th:text="(${account.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(account.openProfitAlarmAbs, 1, 0) + ' ' + account.currency : ''}) + (${account.openProfitAlarmAbs != null && account.openProfitAlarmPct != null ? ' / ' : ''}) + (${account.openProfitAlarmPct != null ? #numbers.formatDecimal(account.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡
-                    -5000 / 10%</span>
+                <span class="summary-value" style="font-size: 1rem; font-weight: 600;"
+                    th:text="(${account.openProfitAlarmAbs != null ? '⚡ ' + #numbers.formatDecimal(account.openProfitAlarmAbs, 1, 0) + ' ' + account.currency : ''}) + (${account.openProfitAlarmAbs != null && account.openProfitAlarmPct != null ? ' / ' : ''}) + (${account.openProfitAlarmPct != null ? #numbers.formatDecimal(account.openProfitAlarmPct, 1, 1) + '%' : ''})">⚡ -5000 / 10%</span>
             </div>
         </div>
 
         <!-- ======= ZENTRALER AUSWAHLFILTER ======= -->
         <section class="trades-section central-filter-section"
-            style="border: 2px solid var(--accent-primary); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; background: rgba(99,102,241,0.05);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                <h3 style="margin: 0; color: var(--accent-primary); font-size: 1.25rem;">🎛️ Zentraler Auswahlfilter
+            style="border: 1px solid var(--accent-primary); padding: 2rem; border-radius: 20px; margin-bottom: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); box-shadow: var(--shadow);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: #fff; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">🎛️ Zentraler Auswahlfilter
                 </h3>
                 <span class="pulse-indicator"
-                    style="font-size: 0.8rem; color: #a0a0c0; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
+                    style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-color); font-weight: 500;">
                     Eingaben filtern Daten sofort
                 </span>
             </div>
@@ -147,8 +152,7 @@
                 <!-- Row 1: Time Range -->
                 <div>
                     <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">1.
-                        Zeitraum wählen:</span>
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">1. Zeitraum wählen:</span>
                     <div class="filter-bar" id="history-filter-bar"
                         style="margin: 0; padding: 0; background: transparent; border: none;">
                         <button class="filter-btn" data-range="today">Heute</button>
@@ -163,38 +167,38 @@
                 </div>
 
                 <!-- Row 2: Performance Thresholds -->
-                <div style="display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap;">
+                <div style="display: flex; gap: 2.5rem; align-items: flex-end; flex-wrap: wrap;">
                     <div>
                         <span
-                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
                             2. Mindest-Trades im Zeitraum
                             <span
                                 title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
                                 style="cursor: help;">ℹ️</span>
                         </span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
                             <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
                                 max="9999"
-                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                                style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
                             <span id="minTradesFeedback"
-                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                                style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
                         </div>
                     </div>
 
                     <div>
                         <span
-                            style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;">
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
                             3. Max. Alter (Tage, ohne offene Trades)
                             <span
                                 title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
                                 style="cursor: help;">ℹ️</span>
                         </span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
                             <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
                                 max="9999"
-                                style="width: 80px; background-color: var(--bg-body); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.95rem;">
+                                style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
                             <span id="maxAgeFeedback"
-                                style="font-size: 0.85rem; color: #3fb950; display: none; opacity: 0; transition: opacity 0.3s;">✓</span>
+                                style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
                         </div>
                     </div>
                 </div>
@@ -202,17 +206,36 @@
         </section>
 
         <!-- ======= DASHBOARD (Chart + Stats) ======= -->
-        <section class="trades-section dashboard-section">
-            <h2>📜 Trade Historie / Dashboard</h2>
+        <section class="trades-section dashboard-section"
+            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+            <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📜 Trade Historie / Dashboard</h2>
 
             <div class="chart-container"
-                style="position: relative; height: 300px; margin-bottom: 2rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem;">
+                style="position: relative; height: 350px; margin-bottom: 2.5rem; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
                 <canvas id="balance-history-chart"></canvas>
                 <!-- Equity overlay: shown prominently on right side of chart -->
                 <div id="equity-overlay" style="
                     position: absolute;
-                    top: 12px;
-                    right: 16px;
+                    top: 20px;
+                    right: 24px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 4px;
+                    pointer-events: none;
+                ">
+                    <span
+                        style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Open
+                        Equity</span>
+                    <span id="equity-overlay-value"
+                        style="font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);">-</span>
+                    <span id="equity-overlay-balance" style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;"></span>
+                </div>
+                <!-- Max Equity Drawdown overlay: bottom-right of chart -->
+                <div id="drawdown-overlay" style="
+                    position: absolute;
+                    bottom: 20px;
+                    right: 24px;
                     display: flex;
                     flex-direction: column;
                     align-items: flex-end;
@@ -220,85 +243,42 @@
                     pointer-events: none;
                 ">
                     <span
-                        style="font-size: 0.75rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Open
-                        Equity</span>
-                    <span id="equity-overlay-value"
-                        style="font-size: 1.6rem; font-weight: bold; line-height: 1;">-</span>
-                    <span id="equity-overlay-balance" style="font-size: 0.8rem; color: #a0a0c0;"></span>
-                </div>
-                <!-- Max Equity Drawdown overlay: bottom-right of chart -->
-                <div id="drawdown-overlay" style="
-                    position: absolute;
-                    bottom: 12px;
-                    right: 16px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 1px;
-                    pointer-events: none;
-                ">
-                    <span
-                        style="font-size: 0.7rem; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.05em;">Max
+                        style="font-size: 0.6875rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Max
                         Equity DD (Zeitraum)</span>
                     <span id="drawdown-overlay-value"
-                        style="font-size: 1.2rem; font-weight: bold; color: #ef4444; line-height: 1;">-</span>
-                    <span id="drawdown-overlay-percent" style="font-size: 0.85rem; color: #ef4444;"></span>
+                        style="font-size: 1.5rem; font-weight: 800; color: #ef4444; line-height: 1;">-</span>
+                    <span id="drawdown-overlay-percent" style="font-size: 0.9375rem; color: #ef4444; font-weight: 600;"></span>
                 </div>
             </div>
 
             <!-- Statistics Grid -->
             <div class="stats-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 1rem;">
                 <div class="stat-card"
-                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
                     <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Gesamtgewinn</span>
-                    <span id="stat-total-profit" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Gesamtgewinn</span>
+                    <span id="stat-total-profit" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
                 </div>
                 <div class="stat-card"
-                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
                     <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Profit
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Profit
                         Faktor</span>
-                    <span id="stat-profit-factor" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                    <span id="stat-profit-factor" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
                 </div>
                 <div class="stat-card"
-                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
                     <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trefferquote</span>
-                    <span id="stat-win-rate" style="font-size: 1.25rem; font-weight: bold;">0%</span>
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trefferquote</span>
+                    <span id="stat-win-rate" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0%</span>
                 </div>
                 <div class="stat-card"
-                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
                     <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Trades
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trades
                         (Zeitraum)</span>
-                    <span id="stat-total-trades" style="font-size: 1.25rem; font-weight: bold;">0</span>
-                </div>
-                <div class="stat-card"
-                    style="background: var(--bg-card); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
-                    <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Ø
-                        Win / Ø Loss</span>
-                    <span id="stat-avg-win-loss" style="font-size: 1rem; font-weight: bold;">0 / 0</span>
-                </div>
-                <!-- Static / Current Stats -->
-                <div class="stat-card"
-                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
-                    <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
-                        Equity (Aktuell)</span>
-                    <span th:class="${account.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                        th:text="${#numbers.formatDecimal(account.totalProfit, 1, 2)}"
-                        style="font-size: 1.25rem; font-weight: bold;">0.00</span>
-                </div>
-                <div class="stat-card"
-                    style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-primary); text-align: center;">
-                    <span
-                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Open
-                        Trades (Aktuell)</span>
-                    <span th:text="${#lists.size(account.openTrades)}"
-                        style="font-size: 1.25rem; font-weight: bold;">0</span>
+                    <span id="stat-total-trades" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0</span>
                 </div>
             </div>
         </section>
@@ -2201,6 +2181,17 @@
             if (e.key === 'Escape') closeChartModal();
         });
     </script>
+    <footer style="margin-top: 4rem; padding: 3rem 0; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.8125rem;">
+        <div style="margin-bottom: 1.25rem;">
+            &copy; 2026 Trade Monitor &nbsp;•&nbsp; <a href="https://www.ki-software-schmiede.de" target="_blank" style="color: var(--text-secondary); text-decoration: none; font-weight: 500;">KI Software Schmiede</a>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 2rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;">
+            <a href="/impressum" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Impressum</a>
+            <a href="/privacy" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Datenschutz</a>
+            <a href="/" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Dashboard</a>
+            <a href="/open-trades" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Open Trades</a>
+        </div>
+    </footer>
 </body>
 
 </html>

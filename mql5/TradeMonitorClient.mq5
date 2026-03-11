@@ -669,6 +669,7 @@ string BuildOpenTradesJson()
          tradesJson += "\"takeProfit\":" + DoubleToString(PositionGetDouble(POSITION_TP), 5) + ",";
          tradesJson += "\"profit\":" + DoubleToString(PositionGetDouble(POSITION_PROFIT), 2) + ",";
          tradesJson += "\"swap\":" + DoubleToString(PositionGetDouble(POSITION_SWAP), 2) + ",";
+         tradesJson += "\"commission\":" + DoubleToString(PositionGetDouble(POSITION_COMMISSION), 2) + ",";
          tradesJson += "\"magicNumber\":" + IntegerToString(PositionGetInteger(POSITION_MAGIC)) + ",";
          tradesJson += "\"comment\":\"" + EscapeJson(PositionGetString(POSITION_COMMENT)) + "\"";
          tradesJson += "}";
@@ -729,7 +730,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             if(closeTime > outLatestCloseTime)
                outLatestCloseTime = closeTime;
             
-            // Determine the original trade direction by finding the ENTRY_IN deal
+            // Determine the original trade direction and total commission by finding the ENTRY_IN deal
             // for this position via DEAL_POSITION_ID. This is broker-agnostic and
             // works correctly for all brokers (including Deriv), unlike inverting
             // the OUT deal type which assumes standard MT5 convention.
@@ -737,27 +738,32 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             double openPrice = HistoryDealGetDouble(ticket, DEAL_PRICE); // fallback: OUT deal price
             string openTime = closeTime; // fallback: same as close time
             long magicNumber = HistoryDealGetInteger(ticket, DEAL_MAGIC); // fallback: OUT deal magic number
+            double totalCommission = HistoryDealGetDouble(ticket, DEAL_COMMISSION); // start with OUT deal commission
             
             long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
             if(positionId > 0)
             {
                for(int j = 0; j < totalDeals; j++)
                {
-                  ulong inTicket = HistoryDealGetTicket(j);
-                  if(inTicket > 0
-                     && HistoryDealGetInteger(inTicket, DEAL_POSITION_ID) == positionId
-                     && (ENUM_DEAL_ENTRY)HistoryDealGetInteger(inTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                  ulong otherTicket = HistoryDealGetTicket(j);
+                  if(otherTicket > 0 && otherTicket != ticket 
+                     && HistoryDealGetInteger(otherTicket, DEAL_POSITION_ID) == positionId)
                   {
-                     ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(inTicket, DEAL_TYPE);
-                     typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
-                     openPrice = HistoryDealGetDouble(inTicket, DEAL_PRICE);
-                     openTime = TimeToString((datetime)HistoryDealGetInteger(inTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                     // Add commissions from all deals belonging to this position (Entry, exit, etc.)
+                     totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION);
                      
-                     // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
-                     long inMagic = HistoryDealGetInteger(inTicket, DEAL_MAGIC);
-                     if(inMagic > 0) magicNumber = inMagic;
-                     
-                     break;
+                     // Find the IN deal for open data
+                     if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(otherTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                     {
+                        ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(otherTicket, DEAL_TYPE);
+                        typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                        openPrice = HistoryDealGetDouble(otherTicket, DEAL_PRICE);
+                        openTime = TimeToString((datetime)HistoryDealGetInteger(otherTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                        
+                        // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
+                        long inMagic = HistoryDealGetInteger(otherTicket, DEAL_MAGIC);
+                        if(inMagic > 0) magicNumber = inMagic;
+                     }
                   }
                }
             }
@@ -779,7 +785,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "\"closeTime\":\"" + closeTime + "\",";
             historyJson += "\"profit\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_PROFIT), 2) + ",";
             historyJson += "\"swap\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_SWAP), 2) + ",";
-            historyJson += "\"commission\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_COMMISSION), 2) + ",";
+            historyJson += "\"commission\":" + DoubleToString(totalCommission, 2) + ",";
             historyJson += "\"magicNumber\":" + IntegerToString(magicNumber) + ",";
             historyJson += "\"comment\":\"" + EscapeJson(HistoryDealGetString(ticket, DEAL_COMMENT)) + "\"";
             historyJson += "}";

@@ -10,4 +10,14 @@ public class SecurityController {
     public String login() {
         return "login";
     }
+
+    @GetMapping("/impressum")
+    public String impressum() {
+        return "impressum";
+    }
+
+    @GetMapping("/privacy")
+    public String privacy() {
+        return "privacy";
+    }
 }

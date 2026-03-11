@@ -705,6 +705,7 @@ string BuildOpenTradesJson()
              tradesJson += "\"takeProfit\":" + DoubleToString(OrderTakeProfit(), 5) + ",";
              tradesJson += "\"profit\":" + DoubleToString(OrderProfit(), 2) + ",";
              tradesJson += "\"swap\":" + DoubleToString(OrderSwap(), 2) + ",";
+             tradesJson += "\"commission\":" + DoubleToString(OrderCommission(), 2) + ",";
              tradesJson += "\"magicNumber\":" + IntegerToString(OrderMagicNumber()) + ",";
              tradesJson += "\"comment\":\"" + EscapeJson(OrderComment()) + "\"";
              tradesJson += "}";
