@@ -89,7 +89,9 @@ public class DashboardController {
     }
 
     @GetMapping("/")
-    public String dashboard(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
+    public String dashboard(@AuthenticationPrincipal CustomUserDetails userDetails, 
+                           @RequestAttribute(value = "isMobile", required = false) Boolean isMobile,
+                           Model model) {
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
 
         // Filter by user permissions
@@ -113,6 +115,7 @@ public class DashboardController {
             accountsBySection.put(sec.getId(), new ArrayList<>());
         }
 
+        int totalTradesCount = 0;
         for (java.util.Map<String, Object> acc : allAccounts) {
             Long sectionId = (Long) acc.get("sectionId");
             // Fallback if null (should handled by migration, but safety check)
@@ -125,6 +128,12 @@ public class DashboardController {
             } else if (!sections.isEmpty()) {
                 // Fallback to first section
                 accountsBySection.get(sections.get(0).getId()).add(acc);
+            }
+
+            // Sum up trades for mobile overview
+            Integer tradeCount = (Integer) acc.get("trades");
+            if (tradeCount != null) {
+                totalTradesCount += tradeCount;
             }
         }
 
@@ -144,6 +153,7 @@ public class DashboardController {
 
         // Keep "accounts" for backward compatibility if needed for totals
         model.addAttribute("accounts", allAccounts);
+        model.addAttribute("totalTrades", totalTradesCount);
 
         // Collect accounts with triggered open profit alarms for banner
         List<java.util.Map<String, Object>> alarmedAccounts = allAccounts.stream()
@@ -168,11 +178,16 @@ public class DashboardController {
             model.addAttribute("currentUser", userDetails.getUserEntity());
         }
 
+        if (Boolean.TRUE.equals(isMobile)) {
+            return "mobile-dashboard";
+        }
         return "dashboard";
     }
 
     @GetMapping("/open-trades")
-    public String openTradesPage(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
+    public String openTradesPage(@AuthenticationPrincipal CustomUserDetails userDetails, 
+                                @RequestAttribute(value = "isMobile", required = false) Boolean isMobile,
+                                Model model) {
         List<de.trademonitor.model.Account> sortedAccounts = accountManager.getAccountsSortedByPrivilege();
 
         // Filter by user permissions
@@ -186,13 +201,13 @@ public class DashboardController {
         model.addAttribute("accounts", sortedAccounts);
 
         // Calculate Totals
-        int totalTrades = 0;
+        int totalTradesCount = 0;
         double totalEquity = 0;
         double totalProfit = 0;
         String currency = "EUR"; // Default fallback
 
         for (de.trademonitor.model.Account acc : sortedAccounts) {
-            totalTrades += acc.getOpenTrades().size();
+            totalTradesCount += acc.getOpenTrades().size();
             // Only sum online accounts or all? Usually all is safer for "current state"
             // But if account is offline, equity might be stale. Decision: Show all.
             totalEquity += acc.getEquity();
@@ -202,7 +217,7 @@ public class DashboardController {
             }
         }
 
-        model.addAttribute("totalTrades", totalTrades);
+        model.addAttribute("totalTrades", totalTradesCount);
         model.addAttribute("totalEquity", totalEquity);
         model.addAttribute("totalProfit", totalProfit);
         model.addAttribute("currency", currency);
@@ -223,6 +238,9 @@ public class DashboardController {
             model.addAttribute("currentUser", userDetails.getUserEntity());
         }
 
+        if (Boolean.TRUE.equals(isMobile)) {
+            return "mobile-open-trades";
+        }
         return "open-trades";
     }
 

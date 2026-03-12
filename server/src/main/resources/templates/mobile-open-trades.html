@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trade Monitor - Open Trades (Mobile)</title>
+    <link rel="stylesheet" th:href="@{/css/mobile.css(v=1)}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .trade-row {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .trade-row:active {
+            background: var(--bg-card-hover);
+        }
+
+        .trade-main {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .trade-symbol {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .symbol-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .trade-profit {
+            text-align: right;
+            font-weight: 700;
+            font-size: 1.125rem;
+        }
+
+        .trade-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .summary-banner {
+            background: var(--accent);
+            color: white;
+            padding: 1.25rem;
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .acc-group-header {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="mobile-container">
+        <header class="mobile-header">
+            <div>
+                <h1>💼 Offene Trades</h1>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">Übersicht aller Positionen</div>
+            </div>
+            <a href="/" style="text-decoration: none; font-size: 1.5rem;">🏠</a>
+        </header>
+
+        <!-- Global Summary -->
+        <div class="summary-banner">
+            <div>
+                <div style="font-size: 0.75rem; opacity: 0.9; text-transform: uppercase;">Gesamt Profit</div>
+                <div style="font-size: 1.5rem; font-weight: 800;" 
+                     th:text="(${totalProfit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(totalProfit, 1, 2)} + ' ' + ${currency}">+0.00 EUR</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; opacity: 0.9; text-transform: uppercase;">Trades</div>
+                <div style="font-size: 1.5rem; font-weight: 800;" th:text="${totalTrades}">0</div>
+            </div>
+        </div>
+
+        <!-- Account-wise grouped trades -->
+        <div th:each="acc : ${accounts}" th:if="${!#lists.isEmpty(acc.openTrades)}">
+            <div class="acc-group-header">
+                <span th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : acc.accountId}">Account Name</span>
+                <span style="float: right;" th:text="${acc.type}">REAL</span>
+            </div>
+
+            <div th:each="trade : ${acc.openTrades}" class="trade-row">
+                <div class="trade-main">
+                    <div class="trade-symbol">
+                        <span th:text="${trade.type == 'BUY' ? '🔵' : '🔴'}" style="font-size: 0.8rem;"></span>
+                        <span th:text="${trade.symbol}">EURUSD</span>
+                        <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;" 
+                              th:text="'(' + ${trade.volume} + ')'"> (0.10)</span>
+                    </div>
+                    <div class="symbol-meta">
+                        Magic: <span th:text="${trade.magicNumber}">12345</span>
+                        <span th:if="${magicMappings.get(trade.magicNumber) != null}" 
+                              th:text="' • ' + ${magicMappings.get(trade.magicNumber)}"> • Algo Name</span>
+                    </div>
+                </div>
+                <div class="trade-profit">
+                    <div th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                         th:text="(${trade.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(trade.profit, 1, 2)}">+50.00</div>
+                    <div class="trade-meta" th:text="${trade.openTime}">12:00:00</div>
+                </div>
+            </div>
+        </div>
+
+        <div th:if="${totalTrades == 0}" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+            <h3>Keine offenen Trades</h3>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="/" class="nav-item">
+                <span class="nav-icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="/open-trades" class="nav-item active">
+                <span class="nav-icon">💼</span>
+                <span>Trades</span>
+            </a>
+            <a href="/mobile/drawdown" class="nav-item">
+                <span class="nav-icon">📉</span>
+                <span>Drawdown</span>
+            </a>
+            <a th:if="${currentUser.role == 'ROLE_ADMIN'}" href="/admin" class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                <span>Admin</span>
+            </a>
+        </nav>
+    </div>
+
+    <script>
+        // Auto refresh every 10 seconds
+        setTimeout(() => location.reload(), 10000);
+    </script>
+</body>
+
+</html>

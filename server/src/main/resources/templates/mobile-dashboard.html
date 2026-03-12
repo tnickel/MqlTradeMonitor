@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trade Monitor - Mobile Dashboard</title>
+    <link rel="stylesheet" th:href="@{/css/mobile.css(v=1)}">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="mobile-container">
+        <header class="mobile-header">
+            <div>
+                <h1>🔄 Trade Monitor</h1>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);" th:text="'v0.12.0 • ' + ${currentUser.username}">v0.12.0 • Admin</div>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a href="/profile" class="nav-icon">👤</a>
+                <form th:action="@{/logout}" method="post" style="display: inline;">
+                    <button type="submit" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0;">🚪</button>
+                </form>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="account-card" style="margin-bottom: 0; padding: 1rem;">
+                <div class="metric-label">Online Accounts</div>
+                <div class="metric-value" th:text="${#lists.size(accounts)}">0</div>
+            </div>
+            <div class="account-card" style="margin-bottom: 0; padding: 1rem;" onclick="location.href='/open-trades'">
+                <div class="metric-label">Open Trades</div>
+                <div class="metric-value" th:text="${totalTrades != null ? totalTrades : '...'}">0</div>
+            </div>
+        </div>
+
+        <!-- Global Alert -->
+        <div th:if="${!alarmedAccounts.isEmpty()}" class="alert-banner" onclick="location.href='#alerts'">
+            <span style="margin-right: 0.75rem; font-size: 1.25rem;">🚨</span>
+            <div>
+                <strong>OPEN PROFIT ALARM!</strong>
+                <div style="font-size: 0.75rem;" th:text="${#lists.size(alarmedAccounts)} + ' Account(s) betroffen'">1 Account betroffen</div>
+            </div>
+        </div>
+
+        <!-- Account List by Section -->
+        <div th:each="section : ${sections}">
+            <h2 class="section-title" th:text="${section.name}">Section Name</h2>
+            
+            <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card" 
+                 th:onclick="'location.href=\'/account/' + ${acc.accountId} + '\''">
+                
+                <div class="card-top">
+                    <div class="acc-info">
+                        <div class="acc-name">
+                            <span class="status-indicator" 
+                                  th:style="'background-color: ' + 
+                                    (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
+                                    (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"></span>
+                            <span th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : acc.accountId}">Account Name</span>
+                        </div>
+                        <div class="acc-meta">
+                            <span th:text="${acc.type}">REAL</span> • <span th:text="${acc.broker}">Broker</span>
+                        </div>
+                    </div>
+                    <div th:if="${acc.openProfitAlarmTriggered}" style="color: var(--danger); font-size: 1.25rem;">🚨</div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-label">Balance</div>
+                        <div class="metric-value" th:text="${#numbers.formatDecimal(acc.balance, 1, 2)} + ' ' + ${acc.currency}">10,000 EUR</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Open Profit</div>
+                        <div class="profit-value" th:classappend="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                             th:text="(${acc.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+500 EUR</div>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <div style="color: var(--text-secondary); font-size: 0.7rem;">
+                        Last: <span th:text="${acc.lastSeenMins >= 0 ? acc.lastSeenMins + 'm ago' : 'Offline'}">5m ago</span>
+                    </div>
+                    <a th:href="@{/account/{id}(id=${acc.accountId})}" class="view-btn">Details</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="/" class="nav-item active">
+                <span class="nav-icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="/open-trades" class="nav-item">
+                <span class="nav-icon">💼</span>
+                <span>Trades</span>
+            </a>
+            <a href="/mobile/drawdown" class="nav-item">
+                <span class="nav-icon">📉</span>
+                <span>Drawdown</span>
+            </a>
+            <a th:if="${currentUser.role == 'ROLE_ADMIN'}" href="/admin" class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                <span>Admin</span>
+            </a>
+        </nav>
+    </div>
+
+    <script th:inline="javascript">
+        // Auto refresh every 10 seconds on mobile
+        setTimeout(() => location.reload(), 10000);
+    </script>
+</body>
+
+</html>

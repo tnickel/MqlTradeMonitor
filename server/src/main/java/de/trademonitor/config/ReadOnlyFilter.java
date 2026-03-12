@@ -37,12 +37,14 @@ public class ReadOnlyFilter extends OncePerRequestFilter {
         if (auth != null && auth.getPrincipal() instanceof CustomUserDetails) {
             CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
             if ("ROLE_DEMO".equals(userDetails.getUserEntity().getRole())) {
-                // Allow logout
-                if (request.getRequestURI().endsWith("/logout")) {
+                // Allow logout, login and demo-login POST requests
+                String uri = request.getRequestURI();
+                if (uri.endsWith("/logout") || uri.endsWith("/login") || uri.endsWith("/demo-login")) {
                     filterChain.doFilter(request, response);
                     return;
                 }
                 
+                System.out.println("DEBUG: Blocking non-GET request for demo user: " + method + " " + uri);
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Demo user cannot modify data.");
                 return;
             }
