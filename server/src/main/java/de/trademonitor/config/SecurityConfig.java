@@ -10,52 +10,57 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-        @Autowired
-        private CustomUserDetailsService customUserDetailsService;
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
 
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
+    @Autowired
+    private ReadOnlyFilter readOnlyFilter;
 
-        @Bean
-        public DaoAuthenticationProvider authenticationProvider() {
-                DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-                authProvider.setUserDetailsService(customUserDetailsService);
-                authProvider.setPasswordEncoder(passwordEncoder());
-                return authProvider;
-        }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-        @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-                http
-                                // Disable CSRF for API endpoints used by EA
-                                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
-                                                                "/api/heartbeat", "/api/history", "/css/**", "/js/**",
-                                                                "/img/**", "/login", "/impressum", "/privacy",
-                                                                "/mobile/**")
-                                                .permitAll()
-                                                .requestMatchers("/admin/**").hasRole("ADMIN")
-                                                .anyRequest().authenticated())
-                                .formLogin(form -> form
-                                                .loginPage("/login")
-                                                .defaultSuccessUrl("/", true)
-                                                .permitAll())
-                                .logout(logout -> logout
-                                                .logoutRequestMatcher(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/logout"))
-                                                .logoutSuccessUrl("/login?logout")
-                                                .permitAll())
-                                .authenticationProvider(authenticationProvider());
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(customUserDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
 
-                return http.build();
-        }
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                // Disable CSRF for API endpoints used by EA
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+                .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
+                                "/api/heartbeat", "/api/history", "/css/**", "/js/**",
+                                "/img/**", "/login", "/demo-login", "/impressum", "/privacy",
+                                "/mobile/**")
+                        .permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated())
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/", true)
+                        .permitAll())
+                .logout(logout -> logout
+                        .logoutRequestMatcher(
+                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                        "/logout"))
+                        .logoutSuccessUrl("/login?logout")
+                        .permitAll())
+                .authenticationProvider(authenticationProvider());
+
+        return http.build();
+    }
 }

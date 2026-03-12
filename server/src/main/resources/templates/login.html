@@ -308,7 +308,17 @@
                 </div>
 
                 <button type="submit" class="btn-submit">Sign In &nbsp;→</button>
+                <button type="button" class="btn-submit" onclick="submitDemoLogin()" style="background: linear-gradient(135deg, #475569, #334155); margin-top: 0.75rem;">
+                    Try Demo &nbsp;🚀
+                </button>
             </form>
+
+            <form id="demoLoginForm" th:action="@{/demo-login}" method="post" style="display: none;"></form>
+            <script>
+                function submitDemoLogin() {
+                    document.getElementById('demoLoginForm').submit();
+                }
+            </script>
 
             <div class="card-footer" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 0.75rem;">
                 <div style="font-size: 0.8125rem; color: #64748b;">

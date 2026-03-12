@@ -45,6 +45,11 @@ public class UserController {
             return "redirect:/profile";
         }
 
+        if ("ROLE_DEMO".equals(userDetails.getUserEntity().getRole())) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Demo-User können ihr Passwort nicht ändern!");
+            return "redirect:/profile";
+        }
+
         try {
             userService.changePassword(userDetails.getUserEntity().getId(), newPassword);
 
