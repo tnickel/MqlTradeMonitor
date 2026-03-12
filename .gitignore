@@ -1,0 +1,6 @@
+*.class
+*.jar
+
+# Sensible Infrastruktur-Dokumentation (Server-spezifisch)
+Doku/sicherheits_log.md
+Doku/tips.md
