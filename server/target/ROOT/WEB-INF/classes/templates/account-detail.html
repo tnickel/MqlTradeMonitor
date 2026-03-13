@@ -319,6 +319,7 @@
                             <th>T/P</th>
                             <th>Swap</th>
                             <th>Profit</th>
+                            <th>Drawdown</th>
                             <th>Magic</th>
                             <th>Status.</th>
                             <th>Comment</th>
@@ -340,6 +341,10 @@
                             <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
                             <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                 th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                            <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                th:text="${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'" 
+                                style="font-style: italic; opacity: 0.8;">
+                                -1.00%</td>
                             <td th:text="${trade.magicNumber}">12345</td>
                             <td>
                                 <span th:if="${account.type == 'REAL'}">
@@ -542,6 +547,20 @@
                     </tbody>
                 </table>
                 <div class="pagination-bar" id="closed-trades-pagination"></div>
+                
+                <div style="text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.8;">
+                        <span th:if="${accountTradeCount > 0}">
+                            Bereit zum Export: <strong th:text="${accountTradeCount}">0</strong> Trades 
+                            <span th:if="${accountTradeStart != null && accountTradeEnd != null}" 
+                                  th:text="'(' + ${accountTradeStart} + ' bis ' + ${accountTradeEnd} + ')'"></span>
+                        </span>
+                        <span th:if="${accountTradeCount == 0}">Keine Trades für diesen Account vorhanden.</span>
+                    </div>
+                    <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px;">
+                        <span>📥</span> Export all Trades (CSV)
+                    </button>
+                </div>
             </div>
         </section>
 

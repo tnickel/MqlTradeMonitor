@@ -29,6 +29,7 @@ public class OpenTradeEntity {
     private double swap;
     private long magicNumber;
     private String comment;
+    private Double maxDrawdown; // Worst profit reached so far
 
     public OpenTradeEntity() {
     }
@@ -144,5 +145,13 @@ public class OpenTradeEntity {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public Double getMaxDrawdown() {
+        return maxDrawdown;
+    }
+
+    public void setMaxDrawdown(Double maxDrawdown) {
+        this.maxDrawdown = maxDrawdown;
     }
 }

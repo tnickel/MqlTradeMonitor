@@ -80,7 +80,10 @@
                 <h1>💼 Offene Trades</h1>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">Übersicht aller Positionen</div>
             </div>
-            <a href="/" style="text-decoration: none; font-size: 1.5rem;">🏠</a>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <button onclick="location.reload()" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0;">🔄</button>
+                <a href="/" style="text-decoration: none; font-size: 1.5rem;">🏠</a>
+            </div>
         </header>
 
         <!-- Global Summary -->
@@ -120,6 +123,10 @@
                 <div class="trade-profit">
                     <div th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                          th:text="(${trade.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(trade.profit, 1, 2)}">+50.00</div>
+                    <div th:if="${trade.maxDrawdown != null}"
+                         th:classappend="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                         style="font-size: 0.75rem; opacity: 0.7; font-style: italic;"
+                         th:text="'DD: ' + ${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'">DD: -1.00%</div>
                     <div class="trade-meta" th:text="${trade.openTime}">12:00:00</div>
                 </div>
             </div>
@@ -130,15 +137,17 @@
             <h3>Keine offenen Trades</h3>
         </div>
 
+        <div style="text-align: center; margin: 2rem 0;">
+            <button onclick="location.reload()" style="background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); padding: 12px 24px; border-radius: 8px; font-weight: 600; width: 100%;">
+                🔄 Seite aktualisieren
+            </button>
+        </div>
+
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
-            <a href="/" class="nav-item">
-                <span class="nav-icon">📊</span>
-                <span>Dashboard</span>
-            </a>
-            <a href="/open-trades" class="nav-item active">
-                <span class="nav-icon">💼</span>
-                <span>Trades</span>
+            <a href="/report/daily" class="nav-item active">
+                <span class="nav-icon">📋</span>
+                <span>Report</span>
             </a>
             <a href="/mobile/drawdown" class="nav-item">
                 <span class="nav-icon">📉</span>
@@ -152,8 +161,7 @@
     </div>
 
     <script>
-        // Auto refresh every 10 seconds
-        setTimeout(() => location.reload(), 10000);
+        // Manual refresh only
     </script>
 </body>
 

@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Persists trade data to H2 database.
@@ -182,8 +183,16 @@ public class TradeStorage {
      */
     @Transactional
     public void replaceOpenTrades(long accountId, List<Trade> trades) {
+        // Load existing open trades to preserve maxDrawdown
+        List<OpenTradeEntity> existingEntities = openTradeRepository.findByAccountId(accountId);
+        Map<Long, Double> existingDrawdowns = new java.util.HashMap<>();
+        for (OpenTradeEntity e : existingEntities) {
+            existingDrawdowns.put(e.getTicket(), e.getMaxDrawdown());
+        }
+
         openTradeRepository.deleteByAccountId(accountId);
         openTradeRepository.flush(); // Force DELETE to DB before inserting new records
+        
         if (trades != null) {
             List<OpenTradeEntity> entities = new ArrayList<>();
             for (Trade trade : trades) {
@@ -201,6 +210,21 @@ public class TradeStorage {
                 entity.setSwap(trade.getSwap());
                 entity.setMagicNumber(trade.getMagicNumber());
                 entity.setComment(trade.getComment());
+                
+                // Track max drawdown (MAE)
+                double currentProfit = trade.getProfit();
+                double prevMaxDD = existingDrawdowns.getOrDefault(trade.getTicket(), 0.0);
+                // If it's the first time we see this trade, current profit is our baseline
+                // Drawdown is stored as a negative value (worst profit)
+                if (!existingDrawdowns.containsKey(trade.getTicket())) {
+                    entity.setMaxDrawdown(currentProfit);
+                } else {
+                    entity.setMaxDrawdown(Math.min(prevMaxDD, currentProfit));
+                }
+                
+                // Propagate to in-memory model for immediate UI update
+                trade.setMaxDrawdown(entity.getMaxDrawdown());
+                
                 entities.add(entity);
             }
             openTradeRepository.saveAll(entities);
@@ -254,6 +278,7 @@ public class TradeStorage {
             trade.setSwap(entity.getSwap());
             trade.setMagicNumber(entity.getMagicNumber());
             trade.setComment(entity.getComment());
+            trade.setMaxDrawdown(entity.getMaxDrawdown());
             result.add(trade);
         }
         return result;

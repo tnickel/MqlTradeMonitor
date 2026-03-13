@@ -51,6 +51,9 @@
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
             <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
                 style="display:none;">Speichern</button>
+            <button class="view-toggle-btn" onclick="location.reload()" style="background: var(--bg-card); color: var(--text-secondary); border-color: var(--border-color); margin-right: 5px;">
+                <span>🔄</span> Refresh
+            </button>
             <div style="display:flex; gap:10px; align-items:center; margin-left: 10px;">
                 <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin"
                     class="btn btn-secondary"
@@ -179,60 +182,37 @@
                 </div>
             </div>
 
-            <!-- Daily Report -->
-            <div class="account-card" onclick="location.href='/report/daily'"
-                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(158, 206, 106, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
+            <!-- Report Card -->
+            <div class="account-card" style="border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(99, 102, 241, 0.1)); flex: 0 1 auto; min-width: 300px; position: relative; overflow: hidden;">
                 <div class="account-header" style="position: relative; z-index: 2;">
-                    <span class="account-id" style="font-size: 1.2rem;">📅 Daily</span>
-                    <div style="font-size: 0.8rem; color: #a0a0c0;">Tagesreport</div>
+                    <span class="account-id" style="font-size: 1.2rem;">📊 Reports</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Performance & Trading Übersicht</div>
                 </div>
-                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
-                    <canvas id="chart-daily"></canvas>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px; position: relative; z-index: 2;">
+                    <div style="display: flex; gap: 8px;">
+                        <a href="/report/daily" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0;">📅 Daily</a>
+                        <a href="/report/weekly" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0;">📅 Weekly</a>
+                        <a href="/report/monthly" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0;">📅 Monthly</a>
+                    </div>
                 </div>
-                <div class="view-details-btn"
-                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
-                    Anzeigen →</div>
-            </div>
-
-            <!-- Weekly Report -->
-            <div class="account-card" onclick="location.href='/report/weekly'"
-                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(224, 175, 104, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
-                <div class="account-header" style="position: relative; z-index: 2;">
-                    <span class="account-id" style="font-size: 1.2rem;">📅 Weekly</span>
-                    <div style="font-size: 0.8rem; color: #a0a0c0;">Wochenreport</div>
+                
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.3;">
+                    <canvas id="chart-combined-report"></canvas>
                 </div>
-                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
-                    <canvas id="chart-weekly"></canvas>
-                </div>
-                <div class="view-details-btn"
-                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
-                    Anzeigen →</div>
-            </div>
-
-            <!-- Monthly Report -->
-            <div class="account-card" onclick="location.href='/report/monthly'"
-                style="cursor: pointer; border: 1px solid var(--accent-primary); background: linear-gradient(to bottom right, var(--bg-card), rgba(122, 162, 247, 0.1)); flex: 0 1 auto; min-width: 200px; position: relative; overflow: hidden;">
-                <div class="account-header" style="position: relative; z-index: 2;">
-                    <span class="account-id" style="font-size: 1.2rem;">📅 Monthly</span>
-                    <div style="font-size: 0.8rem; color: #a0a0c0;">Monatsreport</div>
-                </div>
-                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.5;">
-                    <canvas id="chart-monthly"></canvas>
-                </div>
-                <div class="view-details-btn"
-                    style="padding: 0.5rem; font-size: 0.9rem; position: relative; z-index: 2; margin-top: 40px;">
-                    Anzeigen →</div>
             </div>
         </div>
 
         <script>
-            function initMiniChart(canvasId, period, color) {
-                fetch('/api/report-chart/' + period)
+            function initCombinedChart() {
+                fetch('/api/report-chart/weekly')
                     .then(response => response.json())
                     .then(data => {
-                        const ctx = document.getElementById(canvasId).getContext('2d');
+                        const canvas = document.getElementById('chart-combined-report');
+                        if (!canvas) return;
+                        const ctx = canvas.getContext('2d');
+                        const color = 'rgba(122, 162, 247, 1)';
 
-                        // Create gradient
                         const gradient = ctx.createLinearGradient(0, 0, 0, 60);
                         gradient.addColorStop(0, color.replace('1)', '0.5)'));
                         gradient.addColorStop(1, color.replace('1)', '0.0)'));
@@ -263,13 +243,11 @@
                             }
                         });
                     })
-                    .catch(err => console.error('Error loading chart ' + period, err));
+                    .catch(err => console.error('Error loading combined chart', err));
             }
 
             document.addEventListener('DOMContentLoaded', () => {
-                initMiniChart('chart-daily', 'daily', 'rgba(158, 206, 106, 1)');   // Green
-                initMiniChart('chart-weekly', 'weekly', 'rgba(224, 175, 104, 1)'); // Yellow/Orange
-                initMiniChart('chart-monthly', 'monthly', 'rgba(122, 162, 247, 1)'); // Blue
+                initCombinedChart();
             });
         </script>
 
@@ -487,6 +465,25 @@
         </div>
 
 
+        <div style="text-align: center; margin-top: 2rem; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+            <div style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.8;">
+                <span th:if="${globalTradeCount > 0}">
+                    Bereit zum Export: <strong th:text="${globalTradeCount}">0</strong> Trades 
+                    <span th:if="${globalTradeStart != null && globalTradeEnd != null}" 
+                          th:text="'(' + ${globalTradeStart} + ' bis ' + ${globalTradeEnd} + ')'"></span>
+                </span>
+                <span th:if="${globalTradeCount == 0}">Keine Trades zum Exportieren vorhanden.</span>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 15px;">
+                <button class="view-toggle-btn" onclick="window.location.href='/api/trades/export/csv'" th:disabled="${globalTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; min-width: 200px;">
+                    <span>📥</span> Export all Trades
+                </button>
+                <button class="view-toggle-btn" onclick="location.reload()" style="background: var(--bg-card); color: var(--text-secondary); border-color: var(--border-color); padding: 10px 20px;">
+                    <span>🔄</span> Seite aktualisieren
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <footer style="margin-top: 4rem; padding: 3rem 0; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.8125rem;">
@@ -594,20 +591,8 @@
     </div>
 
     <script>
-        // Auto-refresh page every 5 seconds
-        let reloadTimer = setTimeout(reloadPage, 5000);
-
         function reloadPage() {
-            // Don't reload if modal is open OR if we are in Edit Mode
-            if (document.getElementById('editAccountModal').style.display !== 'block' &&
-                document.getElementById('drawdownModal') &&
-                document.getElementById('drawdownModal').style.display !== 'block' &&
-                !isEditMode) {
-                location.reload();
-            } else {
-                // Try again in 1 second
-                reloadTimer = setTimeout(reloadPage, 1000);
-            }
+            location.reload();
         }
 
         // --- View Mode Logic ---

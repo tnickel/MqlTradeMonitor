@@ -345,6 +345,7 @@
     <div class="container-fluid" style="padding-top: 2rem;">
 
         <a href="/" class="back-btn">← Zurück zum Dashboard</a>
+        <button onclick="location.reload()" class="back-btn" style="margin-left: 10px;">🔄 Aktualisieren</button>
 
         <header class="header-summary">
             <div>
@@ -469,6 +470,7 @@
                                 <th>Open Price</th>
                                 <th>Time</th>
                                 <th>Profit</th>
+                                <th>Drawdown</th>
                                 <th>Magic</th>
                                 <th>Algo Name</th>
                                 <th>Status</th>
@@ -489,6 +491,10 @@
                                 <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}" style="font-weight: bold;">
                                     +50.00</td>
+                                <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                    th:text="${#numbers.formatDecimal((trade.maxDrawdown / acc.balance) * 100, 1, 2)} + '%'" 
+                                    style="font-style: italic; opacity: 0.8;">
+                                    -1.00%</td>
                                 <td th:text="${trade.magicNumber}">12345</td>
                                 <td th:text="${magicMappings.getOrDefault(trade.magicNumber, '-')}">-</td>
                                 <td>
@@ -516,7 +522,10 @@
                 style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
                 <h2>Keine offenen Trades</h2>
                 <p>Aktuell sind keine Positionen in den verbundenen Accounts geöffnet.</p>
-            </div>
+        </div>
+
+        <div style="text-align: center; margin: 3rem 0;">
+            <button onclick="location.reload()" class="back-btn" style="padding: 1rem 2rem; font-size: 1.1rem;">🔄 Seite aktualisieren</button>
         </div>
     </div>
 
@@ -536,13 +545,8 @@
     </div>
 
     <script>
-        // Auto-refresh every 10 seconds
-        setTimeout(function () {
-            // Only reload if modal is NOT open to avoid UX interruption
-            if (!document.getElementById('detail-modal').classList.contains('active')) {
-                location.reload();
-            }
-        }, 10000);
+        // Manual refresh only
+    </script>
 
         function openDetailModal(accountId) {
             const dataDiv = document.getElementById('trades-data-' + accountId);

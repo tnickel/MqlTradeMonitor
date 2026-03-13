@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Drawdown Monitor</title>
+    <link rel="stylesheet" th:href="@{/css/mobile.css(v=1)}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-body: #1a1b26;
@@ -153,6 +155,7 @@
 </head>
 
 <body>
+<div style="padding-bottom: 80px;">
 
     <div class="header">
         <h2 style="margin:0;">📉 Drawdown</h2>
@@ -191,6 +194,10 @@
 
         <div th:if="${#lists.isEmpty(drawdowns)}" class="loader">
             Keine Daten vorhanden.
+        </div>
+
+        <div style="text-align: center; margin: 2rem 0;">
+            <button class="refresh-btn" onclick="fetchData()" style="width: 100%; padding: 12px;">🔄 Daten aktualisieren</button>
         </div>
     </div>
 
@@ -268,9 +275,25 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Auto Refresh every 30s
-        setInterval(fetchData, 30000);
+        // Manual refresh only
     </script>
+
+    </div><!-- End of scrollable padding div -->
+
+    <nav class="bottom-nav">
+        <a href="/report/daily" class="nav-item">
+            <span class="nav-icon">📋</span>
+            <span>Report</span>
+        </a>
+        <a href="/mobile/drawdown" class="nav-item active">
+            <span class="nav-icon">📉</span>
+            <span>Drawdown</span>
+        </a>
+        <a th:if="${currentUser.role == 'ROLE_ADMIN'}" href="/admin" class="nav-item">
+            <span class="nav-icon">⚙️</span>
+            <span>Admin</span>
+        </a>
+    </nav>
 </body>
 
 </html>

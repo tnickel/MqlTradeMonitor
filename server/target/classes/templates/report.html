@@ -177,6 +177,30 @@
             color: #fff;
             transform: translateY(-1px);
         }
+
+        .period-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .period-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
@@ -186,7 +210,17 @@
 
     <header style="max-width: 1300px; margin: 0 auto 2rem; display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-            <h1 th:text="${periodTitle}" style="text-align: left; margin-bottom: 0;">Report</h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <h1 th:text="${periodTitle}" style="text-align: left; margin-bottom: 0;">Report</h1>
+                <div style="margin-left: 15px; padding: 4px 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--accent); font-weight: 600;">
+                    <span th:text="${startDate}">01.01.2026</span> - <span th:text="${endDate}">31.01.2026</span>
+                </div>
+                <div class="period-switcher" style="display: flex; gap: 8px; margin-top: 2px; margin-left: 15px;">
+                    <a th:href="@{/report/daily}" th:classappend="${period == 'daily' ? 'active' : ''}" class="period-btn">Daily</a>
+                    <a th:href="@{/report/weekly}" th:classappend="${period == 'weekly' ? 'active' : ''}" class="period-btn">Weekly</a>
+                    <a th:href="@{/report/monthly}" th:classappend="${period == 'monthly' ? 'active' : ''}" class="period-btn">Monthly</a>
+                </div>
+            </div>
             <p class="subtitle" style="color: var(--text-muted); font-weight: 500; font-size: 0.9375rem; margin-top: 0.5rem;">Performance & Trading Übersicht</p>
         </div>
         <div th:if="${currentUser != null}" style="text-align: right; margin-top: 5px;">
@@ -235,10 +269,8 @@
                 <tr>
                     <th>Account</th>
                     <th class="text-center">Type</th>
-                    <th class="text-right">Open Trades</th>
-                    <th class="text-right">Open Equity</th>
-                    <th class="text-right">Closed Trades</th>
-                    <th class="text-right">Closed Profit</th>
+                    <th class="text-right">Trades</th>
+                    <th class="text-right">Profit</th>
                     <th class="text-center" style="width: 220px;">Chart</th>
                 </tr>
             </thead>
@@ -274,22 +306,19 @@
                             <span class="badge real">REAL</span>
                         </td>
                         <td class="text-right">
-                            <span class="num-val" th:text="${acc.trades}">0</span>
+                            <div class="num-val" th:text="${acc.closedCount}">0</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                <span th:text="${acc.trades}">0</span> Open
+                            </div>
                         </td>
                         <td class="text-right">
-                            <span class="num-val"
-                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
-                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                                USD</span>
-                        </td>
-                        <td class="text-right">
-                            <span class="num-val" th:text="${acc.closedCount}">0</span>
-                        </td>
-                        <td class="text-right">
-                            <span class="num-val"
+                            <div class="num-val"
                                 th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
-                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                                USD</span>
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00 USD</div>
+                            <div style="font-size: 0.75rem; margin-top: 2px;"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}">
+                                <span th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">0.00</span> Open
+                            </div>
                         </td>
                         <td class="text-center" style="width: 220px; padding: 4px;">
                             <div style="width: 100%; height: 50px; position: relative;">
@@ -343,22 +372,19 @@
                             <span class="badge demo">DEMO</span>
                         </td>
                         <td class="text-right">
-                            <span class="num-val" th:text="${acc.trades}">0</span>
+                            <div class="num-val" th:text="${acc.closedCount}">0</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                <span th:text="${acc.trades}">0</span> Open
+                            </div>
                         </td>
                         <td class="text-right">
-                            <span class="num-val"
-                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}"
-                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                                USD</span>
-                        </td>
-                        <td class="text-right">
-                            <span class="num-val" th:text="${acc.closedCount}">0</span>
-                        </td>
-                        <td class="text-right">
-                            <span class="num-val"
+                            <div class="num-val"
                                 th:classappend="${acc.closedProfit == 0 ? 'neutral' : (acc.closedProfit > 0 ? 'positive' : 'negative')}"
-                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00
-                                USD</span>
+                                th:text="${#numbers.formatDecimal(acc.closedProfit, 1, 2)} + ' ' + ${acc.currency}">0.00 USD</div>
+                            <div style="font-size: 0.75rem; margin-top: 2px;"
+                                th:classappend="${acc.profit == 0 ? 'neutral' : (acc.profit > 0 ? 'positive' : 'negative')}">
+                                <span th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">0.00</span> Open
+                            </div>
                         </td>
                         <td class="text-center" style="width: 220px; padding: 4px;">
                             <div style="width: 100%; height: 50px; position: relative;">

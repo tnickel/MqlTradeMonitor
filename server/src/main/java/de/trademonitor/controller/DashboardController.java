@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import de.trademonitor.security.CustomUserDetails;
 
 import java.util.*;
@@ -162,6 +163,20 @@ public class DashboardController {
         model.addAttribute("alarmedAccounts", alarmedAccounts);
 
         model.addAttribute("syncMetrics", tradeSyncService.getMetrics());
+
+        // Global Export Stats
+        List<Long> allowedAccountIds = allAccounts.stream()
+                .map(acc -> (Long) acc.get("accountId"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (!allowedAccountIds.isEmpty()) {
+            model.addAttribute("globalTradeCount", closedTradeRepository.countByAccountIds(allowedAccountIds));
+            model.addAttribute("globalTradeStart", closedTradeRepository.findMinCloseTimeByAccountIds(allowedAccountIds));
+            model.addAttribute("globalTradeEnd", closedTradeRepository.findMaxCloseTimeByAccountIds(allowedAccountIds));
+        } else {
+            model.addAttribute("globalTradeCount", 0);
+        }
 
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
 
@@ -508,6 +523,11 @@ public class DashboardController {
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
         model.addAttribute("todayDate", java.time.LocalDate.now().format(formatter));
 
+        // Account Export Stats
+        model.addAttribute("accountTradeCount", closedTradeRepository.countByAccountId(accountId));
+        model.addAttribute("accountTradeStart", closedTradeRepository.findMinCloseTimeByAccountId(accountId));
+        model.addAttribute("accountTradeEnd", closedTradeRepository.findMaxCloseTimeByAccountId(accountId));
+
         // Live Indicator Config
         model.addAttribute("liveGreenMins", globalConfigService.getLiveGreenMins());
         model.addAttribute("liveYellowMins", globalConfigService.getLiveYellowMins());
@@ -821,7 +841,7 @@ public class DashboardController {
 
     @GetMapping("/report/{period}")
     public String getReport(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable String period,
-            Model model) {
+            Model model, HttpServletRequest request) {
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
@@ -837,25 +857,35 @@ public class DashboardController {
         List<Map<String, Object>> reportData = new ArrayList<>();
 
         java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-        // Determine period title (filter logic moved to helper)
+        java.time.LocalDate startDt = today;
+        java.time.LocalDate endDt = today;
+
         String periodTitle = "";
         switch (period.toLowerCase()) {
             case "daily":
-                periodTitle = "Tagesreport (" + today.format(dateFormatter) + ")";
-                break;
-            case "monthly":
-                periodTitle = "Monatsreport (" + today.getMonth() + " " + today.getYear() + ")";
+                periodTitle = "Tagesreport";
+                startDt = today;
+                endDt = today;
                 break;
             case "weekly":
-                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
-                int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
-                periodTitle = "Wochenreport (KW " + currentWeek + ")";
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                startDt = today.with(fieldISO, 1);
+                endDt = today.with(fieldISO, 7);
+                periodTitle = "Wochenreport";
+                break;
+            case "monthly":
+                startDt = today.withDayOfMonth(1);
+                endDt = today.withDayOfMonth(today.lengthOfMonth());
+                periodTitle = "Monatsreport";
                 break;
             default:
                 periodTitle = "Report (" + period + ")";
         }
+
+        model.addAttribute("startDate", startDt.format(dateFormatter));
+        model.addAttribute("endDate", endDt.format(dateFormatter));
 
         java.util.function.Predicate<String> dateFilter = getDateFilter(period);
 
@@ -911,6 +941,10 @@ public class DashboardController {
         model.addAttribute("periodTitle", periodTitle);
         model.addAttribute("period", period); // daily, weekly, monthly
 
+        Boolean isMobile = (Boolean) request.getAttribute("isMobile");
+        if (isMobile != null && isMobile) {
+            return "mobile-report";
+        }
         return "report";
     }
 

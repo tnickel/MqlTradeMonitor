@@ -18,6 +18,7 @@ public class Trade {
     private double swap;
     private long magicNumber;
     private String comment;
+    private Double maxDrawdown = 0.0;
 
     public Trade() {
     }
@@ -117,6 +118,14 @@ public class Trade {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public Double getMaxDrawdown() {
+        return maxDrawdown;
+    }
+
+    public void setMaxDrawdown(Double maxDrawdown) {
+        this.maxDrawdown = maxDrawdown;
     }
 
     // Transient field for sync status (MATCHED, WARNING, etc.)

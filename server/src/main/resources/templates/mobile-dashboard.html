@@ -17,7 +17,8 @@
                 <h1>🔄 Trade Monitor</h1>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);" th:text="'v0.12.0 • ' + ${currentUser.username}">v0.12.0 • Admin</div>
             </div>
-            <div style="display: flex; gap: 0.75rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <button onclick="location.reload()" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0;">🔄</button>
                 <a href="/profile" class="nav-icon">👤</a>
                 <form th:action="@{/logout}" method="post" style="display: inline;">
                     <button type="submit" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0;">🚪</button>
@@ -92,15 +93,17 @@
             </div>
         </div>
 
+        <div style="text-align: center; margin: 2rem 0;">
+            <button onclick="location.reload()" style="background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); padding: 12px 24px; border-radius: 8px; font-weight: 600; width: 100%;">
+                🔄 Seite aktualisieren
+            </button>
+        </div>
+
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
-            <a href="/" class="nav-item active">
-                <span class="nav-icon">📊</span>
-                <span>Dashboard</span>
-            </a>
-            <a href="/open-trades" class="nav-item">
-                <span class="nav-icon">💼</span>
-                <span>Trades</span>
+            <a href="/report/daily" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span>Report</span>
             </a>
             <a href="/mobile/drawdown" class="nav-item">
                 <span class="nav-icon">📉</span>
@@ -114,8 +117,7 @@
     </div>
 
     <script th:inline="javascript">
-        // Auto refresh every 10 seconds on mobile
-        setTimeout(() => location.reload(), 10000);
+        // Manual refresh only
     </script>
 </body>
 

@@ -28,5 +28,14 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
     @Query("SELECT MAX(c.closeTime) FROM ClosedTradeEntity c WHERE c.accountId = ?1")
     String findMaxCloseTimeByAccountId(long accountId);
 
+    @Query("SELECT MIN(c.closeTime) FROM ClosedTradeEntity c WHERE c.accountId IN ?1")
+    String findMinCloseTimeByAccountIds(java.util.Collection<Long> accountIds);
+
+    @Query("SELECT MAX(c.closeTime) FROM ClosedTradeEntity c WHERE c.accountId IN ?1")
+    String findMaxCloseTimeByAccountIds(java.util.Collection<Long> accountIds);
+
+    @Query("SELECT COUNT(c) FROM ClosedTradeEntity c WHERE c.accountId IN ?1")
+    long countByAccountIds(java.util.Collection<Long> accountIds);
+
     java.util.Optional<ClosedTradeEntity> findFirstByMagicNumber(Long magicNumber);
 }
