@@ -215,6 +215,43 @@ public class DashboardController {
 
         model.addAttribute("accounts", sortedAccounts);
 
+        // Group trades by Magic Number for each account
+        Map<Long, Map<Long, List<de.trademonitor.model.Trade>>> accountGroupedTrades = new LinkedHashMap<>();
+        Map<Long, Map<Long, Map<String, Object>>> accountGroupSummaries = new LinkedHashMap<>();
+        Map<Long, String> magicMappings = magicMappingService.getAllMappings();
+
+        for (de.trademonitor.model.Account acc : sortedAccounts) {
+            Map<Long, List<de.trademonitor.model.Trade>> grouped = acc.getOpenTrades().stream()
+                    .collect(Collectors.groupingBy(de.trademonitor.model.Trade::getMagicNumber, LinkedHashMap::new, Collectors.toList()));
+            accountGroupedTrades.put(acc.getAccountId(), grouped);
+
+            Map<Long, Map<String, Object>> summaries = new LinkedHashMap<>();
+            for (Map.Entry<Long, List<de.trademonitor.model.Trade>> entry : grouped.entrySet()) {
+                Long magic = entry.getKey();
+                List<de.trademonitor.model.Trade> trades = entry.getValue();
+                
+                double sumLots = trades.stream().mapToDouble(de.trademonitor.model.Trade::getVolume).sum();
+                double sumProfit = trades.stream().mapToDouble(t -> t.getProfit() + t.getSwap()).sum();
+                double sumDrawdown = trades.stream()
+                    .mapToDouble(t -> (t.getMaxDrawdown() != null ? t.getMaxDrawdown() : 0.0))
+                    .sum();
+                
+                Map<String, Object> groupSummary = new HashMap<>();
+                groupSummary.put("magic", magic);
+                groupSummary.put("name", magicMappings.getOrDefault(magic, "Magic " + magic));
+                groupSummary.put("sumLots", sumLots);
+                groupSummary.put("sumProfit", sumProfit);
+                groupSummary.put("sumDrawdown", sumDrawdown);
+                groupSummary.put("sumDrawdownPct", acc.getBalance() > 0 ? (sumDrawdown / acc.getBalance()) * 100.0 : 0.0);
+                
+                summaries.put(magic, groupSummary);
+            }
+            accountGroupSummaries.put(acc.getAccountId(), summaries);
+        }
+
+        model.addAttribute("accountGroupedTrades", accountGroupedTrades);
+        model.addAttribute("accountGroupSummaries", accountGroupSummaries);
+
         // Calculate Totals
         int totalTradesCount = 0;
         double totalEquity = 0;
@@ -237,7 +274,7 @@ public class DashboardController {
         model.addAttribute("totalProfit", totalProfit);
         model.addAttribute("currency", currency);
 
-        model.addAttribute("magicMappings", magicMappingService.getAllMappings());
+        model.addAttribute("magicMappings", magicMappings);
         model.addAttribute("timeoutSeconds", accountManager.getTimeoutSeconds());
 
         // Live Indicator Config
@@ -507,6 +544,35 @@ public class DashboardController {
         int maxAge = account.getMagicNumberMaxAge();
         int minTrades = account.getMagicMinTrades();
         Map<Long, String> mappings = magicMappingService.getAllMappings();
+        // Group trades by Magic Number for this account
+        Map<Long, List<de.trademonitor.model.Trade>> groupedTrades = account.getOpenTrades().stream()
+                .collect(Collectors.groupingBy(de.trademonitor.model.Trade::getMagicNumber, LinkedHashMap::new, Collectors.toList()));
+        
+        Map<Long, Map<String, Object>> groupSummaries = new LinkedHashMap<>();
+        for (Map.Entry<Long, List<de.trademonitor.model.Trade>> entry : groupedTrades.entrySet()) {
+            Long magic = entry.getKey();
+            List<de.trademonitor.model.Trade> trades = entry.getValue();
+            
+            double sumLots = trades.stream().mapToDouble(de.trademonitor.model.Trade::getVolume).sum();
+            double sumProfit = trades.stream().mapToDouble(t -> t.getProfit() + t.getSwap()).sum();
+            double sumDrawdown = trades.stream()
+                .mapToDouble(t -> (t.getMaxDrawdown() != null ? t.getMaxDrawdown() : 0.0))
+                .sum();
+            
+            Map<String, Object> groupSummary = new HashMap<>();
+            groupSummary.put("magic", magic);
+            groupSummary.put("name", mappings.getOrDefault(magic, "Magic " + magic));
+            groupSummary.put("sumLots", sumLots);
+            groupSummary.put("sumProfit", sumProfit);
+            groupSummary.put("sumDrawdown", sumDrawdown);
+            groupSummary.put("sumDrawdownPct", account.getBalance() > 0 ? (sumDrawdown / account.getBalance()) * 100.0 : 0.0);
+            
+            groupSummaries.put(magic, groupSummary);
+        }
+        
+        model.addAttribute("groupedTrades", groupedTrades);
+        model.addAttribute("groupSummaries", groupSummaries);
+        model.addAttribute("magicMappings", mappings);
 
         // Pass resolver to getMagicProfitEntries
         model.addAttribute("magicProfits", account.getMagicProfitEntries(maxAge, minTrades, mappings::get));

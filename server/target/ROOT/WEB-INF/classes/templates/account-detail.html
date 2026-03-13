@@ -326,38 +326,57 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="trade : ${account.openTrades}">
-                            <td th:text="${trade.ticket}">123456789</td>
-                            <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
-                            <td>
-                                <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
-                                    th:text="${trade.type}">BUY</span>
-                            </td>
-                            <td th:text="${trade.volume}">0.10</td>
-                            <td th:text="${trade.openPrice}">1.08500</td>
-                            <td th:text="${trade.openTime}">2026-02-13 12:00</td>
-                            <td th:text="${trade.stopLoss}">1.08000</td>
-                            <td th:text="${trade.takeProfit}">1.09000</td>
-                            <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
-                            <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
-                            <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                th:text="${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'" 
-                                style="font-style: italic; opacity: 0.8;">
-                                -1.00%</td>
-                            <td th:text="${trade.magicNumber}">12345</td>
-                            <td>
-                                <span th:if="${account.type == 'REAL'}">
-                                    <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
-                                        title="Matched with Demo">✅</span>
-                                    <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
-                                        title="No matching Demo trade!">⚠️</span>
-                                    <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
-                                        style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
-                                </span>
-                            </td>
-                            <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
-                        </tr>
+                        <th:block th:each="groupEntry : ${groupedTrades}">
+                            <th:block th:with="groupSummary=${groupSummaries.get(groupEntry.key)}">
+                                <!-- Group Header Row -->
+                                <tr style="background: rgba(255, 255, 255, 0.05); font-weight: bold; border-left: 4px solid var(--accent-primary);">
+                                    <td colspan="3" style="color: var(--accent-primary);">
+                                        <span th:text="${groupSummary.name}">Algo Name</span>
+                                        <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 10px;" th:text="'(Magic: ' + ${groupEntry.key} + ')'">(Magic: 12345)</span>
+                                    </td>
+                                    <td th:text="${#numbers.formatDecimal(groupSummary.sumLots, 1, 2)}">1.00</td>
+                                    <td colspan="5"></td>
+                                    <td th:class="${groupSummary.sumProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                        th:text="${#numbers.formatDecimal(groupSummary.sumProfit, 1, 2)}">+100.00</td>
+                                    <td th:class="${groupSummary.sumDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                        th:text="${#numbers.formatDecimal(groupSummary.sumDrawdownPct, 1, 2)} + '%'">-1.5%</td>
+                                    <td colspan="3"></td>
+                                </tr>
+                                <!-- Individual Trades in Group -->
+                                <tr th:each="trade : ${groupEntry.value}">
+                                    <td th:text="${trade.ticket}">123456789</td>
+                                    <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                                    <td>
+                                        <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                            th:text="${trade.type}">BUY</span>
+                                    </td>
+                                    <td th:text="${trade.volume}">0.10</td>
+                                    <td th:text="${trade.openPrice}">1.08500</td>
+                                    <td th:text="${trade.openTime}">2026-02-13 12:00</td>
+                                    <td th:text="${trade.stopLoss}">1.08000</td>
+                                    <td th:text="${trade.takeProfit}">1.09000</td>
+                                    <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                                    <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                        th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                                    <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                        th:text="${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'" 
+                                        style="font-style: italic; opacity: 0.8;">
+                                        -1.00%</td>
+                                    <td th:text="${trade.magicNumber}">12345</td>
+                                    <td>
+                                        <span th:if="${account.type == 'REAL'}">
+                                            <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
+                                                title="Matched with Demo">✅</span>
+                                            <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
+                                                title="No matching Demo trade!">⚠️</span>
+                                            <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
+                                                style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
+                                        </span>
+                                    </td>
+                                    <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                                </tr>
+                            </th:block>
+                        </th:block>
                     </tbody>
                 </table>
 

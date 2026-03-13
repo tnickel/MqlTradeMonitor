@@ -106,29 +106,45 @@
                 <span style="float: right;" th:text="${acc.type}">REAL</span>
             </div>
 
-            <div th:each="trade : ${acc.openTrades}" class="trade-row">
-                <div class="trade-main">
-                    <div class="trade-symbol">
-                        <span th:text="${trade.type == 'BUY' ? '🔵' : '🔴'}" style="font-size: 0.8rem;"></span>
-                        <span th:text="${trade.symbol}">EURUSD</span>
-                        <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;" 
-                              th:text="'(' + ${trade.volume} + ')'"> (0.10)</span>
+            <div th:each="groupEntry : ${accountGroupedTrades.get(acc.accountId)}" style="border-bottom: 2px solid rgba(255, 255, 255, 0.1);">
+                <th:block th:with="groupSummary=${accountGroupSummaries.get(acc.accountId).get(groupEntry.key)}">
+                    <!-- Magic Group Header (Mobile) -->
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--accent); font-size: 0.8rem; font-weight: 700;">
+                        <div style="color: var(--accent);">
+                            <span th:text="${groupSummary.name}">Algo Name</span>
+                            <span style="opacity: 0.6; margin-left: 5px; font-weight: 400;" th:text="'(#' + ${groupEntry.key} + ')'">#12345</span>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <span><span style="opacity: 0.6;">V:</span> <span th:text="${#numbers.formatDecimal(groupSummary.sumLots, 1, 2)}">1.00</span></span>
+                            <span th:class="${groupSummary.sumProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                  th:text="(${groupSummary.sumProfit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(groupSummary.sumProfit, 1, 2)}">+100.00</span>
+                        </div>
                     </div>
-                    <div class="symbol-meta">
-                        Magic: <span th:text="${trade.magicNumber}">12345</span>
-                        <span th:if="${magicMappings.get(trade.magicNumber) != null}" 
-                              th:text="' • ' + ${magicMappings.get(trade.magicNumber)}"> • Algo Name</span>
+
+                    <!-- Individual Trades -->
+                    <div th:each="trade : ${groupEntry.value}" class="trade-row">
+                        <div class="trade-main">
+                            <div class="trade-symbol">
+                                <span th:text="${trade.type == 'BUY' ? '🔵' : '🔴'}" style="font-size: 0.8rem;"></span>
+                                <span th:text="${trade.symbol}">EURUSD</span>
+                                <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;" 
+                                      th:text="'(' + ${trade.volume} + ')'"> (0.10)</span>
+                            </div>
+                            <div class="symbol-meta">
+                                Magic: <span th:text="${trade.magicNumber}">12345</span>
+                            </div>
+                        </div>
+                        <div class="trade-profit">
+                            <div th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                 th:text="(${trade.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(trade.profit, 1, 2)}">+50.00</div>
+                            <div th:if="${trade.maxDrawdown != null}"
+                                 th:classappend="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                 style="font-size: 0.75rem; opacity: 0.7; font-style: italic;"
+                                 th:text="'DD: ' + ${#numbers.formatDecimal((trade.maxDrawdown / acc.balance) * 100, 1, 2)} + '%'">DD: -1.00%</div>
+                            <div class="trade-meta" th:text="${trade.openTime}">12:00:00</div>
+                        </div>
                     </div>
-                </div>
-                <div class="trade-profit">
-                    <div th:classappend="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                         th:text="(${trade.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(trade.profit, 1, 2)}">+50.00</div>
-                    <div th:if="${trade.maxDrawdown != null}"
-                         th:classappend="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
-                         style="font-size: 0.75rem; opacity: 0.7; font-style: italic;"
-                         th:text="'DD: ' + ${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'">DD: -1.00%</div>
-                    <div class="trade-meta" th:text="${trade.openTime}">12:00:00</div>
-                </div>
+                </th:block>
             </div>
         </div>
 
