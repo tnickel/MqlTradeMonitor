@@ -538,6 +538,8 @@ public class DashboardController {
         if (account == null) {
             return "redirect:/";
         }
+        // Apply broker-specific commission correction factor
+        account.setCommissionFactor(globalConfigService.getBrokerCommissionFactor(account.getBroker()));
         model.addAttribute("account", account);
         model.addAttribute("online", account.isOnline(accountManager.getTimeoutSeconds()));
 

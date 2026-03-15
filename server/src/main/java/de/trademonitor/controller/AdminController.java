@@ -149,6 +149,9 @@ public class AdminController {
         model.addAttribute("secMaxSessions", globalConfigService.getSecMaxSessions());
         model.addAttribute("secH2ConsoleEnabled", globalConfigService.isSecH2ConsoleEnabled());
 
+        // --- 6. Broker Commission Factors ---
+        model.addAttribute("brokerCommFactors", globalConfigService.getAllBrokerCommFactors());
+
         return "admin";
     }
 
@@ -287,6 +290,39 @@ public class AdminController {
                     secMaxSessions,
                     "on".equals(secH2ConsoleEnabled));
             redirectAttrs.addFlashAttribute("successMessage", "Sicherheitseinstellungen gespeichert.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/broker-comm-factor")
+    public String saveBrokerCommFactor(
+            @RequestParam String brokerName,
+            @RequestParam double factor,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            if (brokerName == null || brokerName.trim().isEmpty()) {
+                redirectAttrs.addFlashAttribute("errorMessage", "Broker-Name darf nicht leer sein.");
+            } else {
+                globalConfigService.saveBrokerCommFactor(brokerName.trim(), factor);
+                redirectAttrs.addFlashAttribute("successMessage",
+                        "Commission Faktor für '" + brokerName.trim() + "' gespeichert.");
+            }
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/broker-comm-factor/delete")
+    public String deleteBrokerCommFactor(
+            @RequestParam String brokerName,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            globalConfigService.deleteBrokerCommFactor(brokerName);
+            redirectAttrs.addFlashAttribute("successMessage",
+                    "Commission Faktor für '" + brokerName + "' gelöscht.");
         } catch (Exception e) {
             redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
         }

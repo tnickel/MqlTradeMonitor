@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -78,6 +80,10 @@ public class GlobalConfigService {
     private boolean cachedSecHeadersEnabled = true;
     private int cachedSecMaxSessions = 3;
     private boolean cachedSecH2ConsoleEnabled = false;
+
+    // Broker Commission Factor
+    public static final String KEY_BROKER_COMM_FACTOR_PREFIX = "BROKER_COMM_FACTOR.";
+    private Map<String, Double> cachedBrokerCommFactors = new LinkedHashMap<>();
 
     @PostConstruct
     public void init() {
@@ -178,6 +184,21 @@ public class GlobalConfigService {
         });
         repository.findById(KEY_SEC_H2_CONSOLE_ENABLED)
                 .ifPresent(e -> cachedSecH2ConsoleEnabled = Boolean.parseBoolean(e.getConfValue()));
+
+        // Load Broker Commission Factors
+        repository.findAll().forEach(entity -> {
+            if (entity.getConfKey().startsWith(KEY_BROKER_COMM_FACTOR_PREFIX)) {
+                String brokerName = entity.getConfKey().substring(KEY_BROKER_COMM_FACTOR_PREFIX.length());
+                try {
+                    cachedBrokerCommFactors.put(brokerName, Double.parseDouble(entity.getConfValue()));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        });
+        // Pre-populate Tickmill Ltd with factor 2.0 if not already configured
+        if (!cachedBrokerCommFactors.containsKey("Tickmill Ltd")) {
+            saveBrokerCommFactor("Tickmill Ltd", 2.0);
+        }
     }
 
     // getMagicNumberMaxAge() and setMagicNumberMaxAge() removed — now per-account
@@ -442,5 +463,39 @@ public class GlobalConfigService {
         repository.save(new GlobalConfigEntity(KEY_SEC_HEADERS_ENABLED, String.valueOf(headersEnabled)));
         repository.save(new GlobalConfigEntity(KEY_SEC_MAX_SESSIONS, String.valueOf(maxSessions)));
         repository.save(new GlobalConfigEntity(KEY_SEC_H2_CONSOLE_ENABLED, String.valueOf(h2ConsoleEnabled)));
+    }
+
+    // --- Broker Commission Factor Methods ---
+
+    /**
+     * Returns the commission factor for the given broker name.
+     * If no factor is configured, returns 1.0 (no change).
+     */
+    public double getBrokerCommissionFactor(String brokerName) {
+        if (brokerName == null || brokerName.isEmpty()) return 1.0;
+        return cachedBrokerCommFactors.getOrDefault(brokerName, 1.0);
+    }
+
+    /**
+     * Returns all configured broker commission factors (for admin UI).
+     */
+    public Map<String, Double> getAllBrokerCommFactors() {
+        return new LinkedHashMap<>(cachedBrokerCommFactors);
+    }
+
+    /**
+     * Saves a broker commission factor to DB and cache.
+     */
+    public void saveBrokerCommFactor(String brokerName, double factor) {
+        cachedBrokerCommFactors.put(brokerName, factor);
+        repository.save(new GlobalConfigEntity(KEY_BROKER_COMM_FACTOR_PREFIX + brokerName, String.valueOf(factor)));
+    }
+
+    /**
+     * Deletes a broker commission factor from DB and cache.
+     */
+    public void deleteBrokerCommFactor(String brokerName) {
+        cachedBrokerCommFactors.remove(brokerName);
+        repository.deleteById(KEY_BROKER_COMM_FACTOR_PREFIX + brokerName);
     }
 }

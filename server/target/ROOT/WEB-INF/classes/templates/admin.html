@@ -595,6 +595,75 @@
             </details>
         </div>
 
+        <!-- Broker Commission Factor -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">💱 Broker Commission Faktor</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">
+                Manche Broker (z.B. Tickmill) melden in MT5 nur die <strong>halbe</strong> Commission pro Trade.
+                Hier kann ein Korrekturfaktor pro Broker gesetzt werden. Wird kein Faktor gesetzt, bleibt die Commission unverändert (Faktor = 1.0).
+                <br>
+                <span style="color: #6b7280; font-size: 0.85rem;">Der Broker-Name muss exakt dem Namen aus dem MT5-Account entsprechen (z.B. <code>Tickmill-Live</code>).</span>
+            </p>
+
+            <table class="data-table" style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="text-align: left; background-color: #0d1117; color: #8b949e;">
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Broker Name</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Faktor</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #30363d;">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="entry : ${brokerCommFactors}" style="border-bottom: 1px solid #2a2e39;">
+                        <td style="padding: 10px; color: #c9d1d9; font-weight: bold;" th:text="${entry.key}">Tickmill-Live</td>
+                        <td style="padding: 10px;">
+                            <form th:action="@{/admin/broker-comm-factor}" method="post"
+                                style="display: flex; gap: 10px; align-items: center;">
+                                <input type="hidden" name="brokerName" th:value="${entry.key}">
+                                <input type="number" name="factor" th:value="${entry.value}" step="0.1" min="0.1" max="10"
+                                    style="width: 80px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; text-align: center;">
+                                <button type="submit"
+                                    style="background-color: #1f6feb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">💾</button>
+                            </form>
+                        </td>
+                        <td style="padding: 10px;">
+                            <form th:action="@{/admin/broker-comm-factor/delete}" method="post"
+                                onsubmit="return confirm('Commission Faktor wirklich löschen?');" style="display: inline;">
+                                <input type="hidden" name="brokerName" th:value="${entry.key}">
+                                <button type="submit"
+                                    style="background-color: #da3633; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${#maps.isEmpty(brokerCommFactors)}" style="border-bottom: 1px solid #2a2e39;">
+                        <td colspan="3" style="padding: 15px; color: #6b7280; text-align: center; font-style: italic;">
+                            Keine Broker-Faktoren konfiguriert. Alle Commissions werden 1:1 übernommen.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="border-top: 1px solid #30363d; padding-top: 15px;">
+                <h3 style="color: #c9d1d9; font-size: 1rem; margin-top: 0;">➕ Neuen Broker hinzufügen</h3>
+                <form th:action="@{/admin/broker-comm-factor}" method="post"
+                    style="display: flex; gap: 15px; align-items: end;">
+                    <div>
+                        <label style="color: #8b949e; display: block; margin-bottom: 5px; font-size: 0.85rem;">Broker Name</label>
+                        <input type="text" name="brokerName" placeholder="z.B. Tickmill-Live" required
+                            style="width: 250px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="color: #8b949e; display: block; margin-bottom: 5px; font-size: 0.85rem;">Commission Faktor</label>
+                        <input type="number" name="factor" value="2.0" step="0.1" min="0.1" max="10" required
+                            style="width: 100px; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; text-align: center;">
+                    </div>
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 9px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">➕ Hinzufügen</button>
+                </form>
+            </div>
+        </div>
+
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
             <details style="cursor: pointer;">

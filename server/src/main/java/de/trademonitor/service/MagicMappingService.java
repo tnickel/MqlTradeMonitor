@@ -22,7 +22,8 @@ public class MagicMappingService {
      */
     public Map<Long, String> getAllMappings() {
         return repository.findAll().stream()
-                .collect(Collectors.toMap(MagicMappingEntity::getMagicNumber, MagicMappingEntity::getCustomComment));
+                .collect(Collectors.toMap(MagicMappingEntity::getMagicNumber, MagicMappingEntity::getCustomComment,
+                        (existing, replacement) -> existing));
     }
 
     /**
@@ -44,7 +45,7 @@ public class MagicMappingService {
         Map<Long, String> existing = getAllMappings();
 
         for (Long magic : magicNumbers) {
-            if (!existing.containsKey(magic)) {
+            if (!existing.containsKey(magic) && !repository.existsById(magic)) {
                 String defaultComment = defaultCommentProvider.apply(magic);
                 saveMapping(magic, defaultComment != null ? defaultComment : "");
             }

@@ -136,7 +136,37 @@
             </div>
         </div>
 
-        <!-- ======= ZENTRALER AUSWAHLFILTER ======= -->
+        <!-- ======= STICKY TIME FILTER BAR ======= -->
+        <div id="sticky-time-filter" style="
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(13, 17, 23, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 2rem;
+            margin: 0 -2rem 1rem -2rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        ">
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">Zeitraum:</span>
+            <div class="filter-bar" id="history-filter-bar" style="margin: 0; padding: 0; background: transparent; border: none; display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="filter-btn" data-range="today">Heute</button>
+                <button class="filter-btn" data-range="1week">1 Woche</button>
+                <button class="filter-btn" data-range="1month">1 Monat</button>
+                <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
+                <button class="filter-btn" data-range="6months">6 Monate</button>
+                <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
+                <button class="filter-btn" data-range="1year">1 Jahr</button>
+                <button class="filter-btn" data-range="all">Alles</button>
+            </div>
+            <span id="sticky-date-range" style="font-size: 0.8rem; color: var(--accent-primary, #6366f1); font-weight: 600; white-space: nowrap; padding: 4px 12px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px;"></span>
+        </div>
+
+        <!-- ======= ZENTRALER AUSWAHLFILTER (Thresholds) ======= -->
         <section class="trades-section central-filter-section"
             style="border: 1px solid var(--accent-primary); padding: 2rem; border-radius: 20px; margin-bottom: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); box-shadow: var(--shadow);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
@@ -148,58 +178,38 @@
                 </span>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                <!-- Row 1: Time Range -->
+            <div style="display: flex; gap: 2.5rem; align-items: flex-end; flex-wrap: wrap;">
                 <div>
                     <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">1. Zeitraum wählen:</span>
-                    <div class="filter-bar" id="history-filter-bar"
-                        style="margin: 0; padding: 0; background: transparent; border: none;">
-                        <button class="filter-btn" data-range="today">Heute</button>
-                        <button class="filter-btn" data-range="1week">1 Woche</button>
-                        <button class="filter-btn" data-range="1month">1 Monat</button>
-                        <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
-                        <button class="filter-btn" data-range="6months">6 Monate</button>
-                        <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
-                        <button class="filter-btn" data-range="1year">1 Jahr</button>
-                        <button class="filter-btn" data-range="all">Alles</button>
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                        1. Mindest-Trades im Zeitraum
+                        <span
+                            title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
+                            style="cursor: help;">ℹ️</span>
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
+                            max="9999"
+                            style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
+                        <span id="minTradesFeedback"
+                            style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
                     </div>
                 </div>
 
-                <!-- Row 2: Performance Thresholds -->
-                <div style="display: flex; gap: 2.5rem; align-items: flex-end; flex-wrap: wrap;">
-                    <div>
+                <div>
+                    <span
+                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                        2. Max. Alter (Tage, ohne offene Trades)
                         <span
-                            style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
-                            2. Mindest-Trades im Zeitraum
-                            <span
-                                title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
-                                style="cursor: help;">ℹ️</span>
-                        </span>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
-                                max="9999"
-                                style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
-                            <span id="minTradesFeedback"
-                                style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <span
-                            style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
-                            3. Max. Alter (Tage, ohne offene Trades)
-                            <span
-                                title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
-                                style="cursor: help;">ℹ️</span>
-                        </span>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
-                                max="9999"
-                                style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
-                            <span id="maxAgeFeedback"
-                                style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
-                        </div>
+                            title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
+                            style="cursor: help;">ℹ️</span>
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
+                            max="9999"
+                            style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
+                        <span id="maxAgeFeedback"
+                            style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
                     </div>
                 </div>
             </div>
@@ -400,7 +410,7 @@
                                 <th>Real. P/L</th>
                                 <th>Swap</th>
                                 <th>Komm.</th>
-                                <th>Gesamt</th>
+                                <th style="background: rgba(99,102,241,0.15); border-bottom: 2px solid rgba(99,102,241,0.4);">Gesamt</th>
                                 <th>Max Real. DD (€)</th>
                                 <th>Max Eq. DD (€)</th>
                                 <th>Max Eq. DD (%)</th>
@@ -409,6 +419,10 @@
                         </thead>
                         <tbody>
                             <tr th:each="mp : ${magicProfits}"
+                                th:data-magic="${mp.magicNumber}"
+                                th:data-open-count="${mp.openTradeCount}"
+                                th:data-open-profit="${mp.openProfit}"
+                                th:data-open-swap="${mp.openSwap}"
                                 th:data-symbols="${mp.tradedSymbols != null ? #strings.listJoin(mp.tradedSymbols.keySet(), ', ') : ''}">
                                 <td>
                                     <strong>
@@ -431,15 +445,21 @@
                                 <td th:text="${mp.openTradeCount}">3</td>
                                 <td th:class="${mp.openProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
                                     th:text="${#numbers.formatDecimal(mp.openProfit, 1, 2)}">+100.00</td>
-                                <td th:text="${mp.closedTradeCount}">10</td>
-                                <td th:class="${mp.closedProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                <td class="mc-closed-count" th:text="${mp.closedTradeCount}">10</td>
+                                <td class="mc-real-pl" th:class="${mp.closedProfit >= 0 ? 'mc-real-pl profit-positive' : 'mc-real-pl profit-negative'}"
                                     th:text="${#numbers.formatDecimal(mp.closedProfit, 1, 2)}">+500.00</td>
-                                <td th:style="${mp.totalSwap < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                <td class="mc-swap" th:style="${mp.totalSwap < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
                                     th:text="${#numbers.formatDecimal(mp.totalSwap, 1, 2)}">-10.00</td>
-                                <td th:style="${mp.totalCommission < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
+                                <td class="mc-comm" th:style="${mp.totalCommission < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
                                     th:text="${#numbers.formatDecimal(mp.totalCommission, 1, 2)}">-5.00</td>
-                                <td th:class="${mp.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                    th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</td>
+                                <td class="mc-gesamt-cell" style="background: rgba(99,102,241,0.08); font-weight: 800; font-size: 1.05rem;">
+                                    <div class="mc-gesamt-val" th:class="${mp.totalProfit >= 0 ? 'mc-gesamt-val profit-positive' : 'mc-gesamt-val profit-negative'}"
+                                        th:text="${#numbers.formatDecimal(mp.totalProfit, 1, 2)}">+600.00</div>
+                                    <div class="mc-netto-line" th:style="'font-size: 0.78rem; margin-top: 4px; font-weight: 700; letter-spacing: 0.01em; color: ' + (${mp.netClosedProfit >= 0} ? '#10b981' : '#ef4444')">
+                                        <span style="opacity: 0.7;">Netto:</span>
+                                        <span class="mc-netto-val" th:text="${#numbers.formatDecimal(mp.netClosedProfit, 1, 2)}">+500.00</span>
+                                    </div>
+                                </td>
                                 <td style="color: #ef4444;"
                                     th:text="'-' + ${#numbers.formatDecimal(mp.maxDrawdownEur, 1, 2)}">-150.00</td>
                                 <td style="color: #ef4444; font-weight: bold;"
@@ -461,6 +481,34 @@
                                 </td>
                             </tr>
                         </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid rgba(99,102,241,0.5); background: rgba(99,102,241,0.06);">
+                                <td style="font-weight: 800; font-size: 1rem; color: #fff;">SUMME</td>
+                                <td th:text="${#aggregates.sum(magicProfits.![openTradeCount])}" style="font-weight: 700;">0</td>
+                                <td th:style="'font-weight: 700; color: ' + (${#aggregates.sum(magicProfits.![openProfit]) >= 0} ? '#10b981' : '#ef4444')"
+                                    th:text="${#numbers.formatDecimal(#aggregates.sum(magicProfits.![openProfit]), 1, 2)}">0.00</td>
+                                <td th:text="${#aggregates.sum(magicProfits.![closedTradeCount])}" style="font-weight: 700;">0</td>
+                                <td th:style="'font-weight: 700; color: ' + (${#aggregates.sum(magicProfits.![closedProfit]) >= 0} ? '#10b981' : '#ef4444')"
+                                    th:text="${#numbers.formatDecimal(#aggregates.sum(magicProfits.![closedProfit]), 1, 2)}">0.00</td>
+                                <td style="font-weight: 700; color: #ef4444;"
+                                    th:text="${#numbers.formatDecimal(#aggregates.sum(magicProfits.![totalSwap]), 1, 2)}">0.00</td>
+                                <td style="font-weight: 700; color: #ef4444;"
+                                    th:text="${#numbers.formatDecimal(#aggregates.sum(magicProfits.![totalCommission]), 1, 2)}">0.00</td>
+                                <td style="background: rgba(99,102,241,0.15); text-align: center; padding: 12px 8px; cursor: help;">
+                                    <div th:with="totalSum=${#aggregates.sum(magicProfits.![totalProfit])},floatSum=${#aggregates.sum(magicProfits.![openProfit])},realSum=${#aggregates.sum(magicProfits.![closedProfit])},swapSum=${#aggregates.sum(magicProfits.![totalSwap])},commSum=${#aggregates.sum(magicProfits.![totalCommission])}"
+                                        th:style="'font-weight: 900; font-size: 1.3rem; color: ' + (${totalSum >= 0} ? '#10b981' : '#ef4444')"
+                                        th:title="'Gesamt = Float P/L + Real P/L + Swap + Komm' + '&#10;' + '= ' + ${#numbers.formatDecimal(floatSum, 1, 2)} + ' + ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(totalSum, 1, 2)}"
+                                        th:text="${#numbers.formatDecimal(totalSum, 1, 2)}">0.00</div>
+                                    <div th:with="netSum=${#aggregates.sum(magicProfits.![netClosedProfit])},realSum=${#aggregates.sum(magicProfits.![closedProfit])},swapSum=${#aggregates.sum(magicProfits.![totalSwap])},commSum=${#aggregates.sum(magicProfits.![totalCommission])}"
+                                        th:style="'font-size: 0.82rem; margin-top: 4px; font-weight: 700; color: ' + (${netSum >= 0} ? '#10b981' : '#ef4444')"
+                                        th:title="'Netto = Real P/L + Swap + Komm (ohne Float)' + '&#10;' + '= ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(netSum, 1, 2)}">
+                                        <span style="opacity: 0.7;">Netto:</span>
+                                        <span th:text="${#numbers.formatDecimal(netSum, 1, 2)}">0.00</span>
+                                    </div>
+                                </td>
+                                <td colspan="4"></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
                 <!-- Global Pie Chart Container -->
@@ -546,6 +594,7 @@
                         <!-- Loop all closed trades, rows will be filtered by JS -->
                         <tr th:each="trade : ${account.closedTrades}" th:data-close-time="${trade.closeTime}"
                             th:data-magic="${trade.magicNumber}"
+                            th:data-swap="${trade.swap}" th:data-commission="${trade.commission}"
                             th:classappend="${trade.closeTime != null && trade.closeTime.startsWith(todayDate)} ? 'trade-today'">
                             <td th:text="${trade.ticket}">123456789</td>
                             <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
@@ -668,6 +717,9 @@
         }
 
         // ============ HISTORY CHART MANAGER ============
+        // Minimum sane date: ignore trades with timestamps before 2000 (corrupt MT4 history data)
+        var MIN_SANE_DATE = new Date(2000, 0, 1).getTime();
+
         function HistoryChartManager(canvasId, currentBalance, allRows) {
             this.canvas = document.getElementById(canvasId);
             this.currentBalance = currentBalance;
@@ -690,6 +742,8 @@
                 if (timeStr) {
                     var t = timeStr.split(/[- :.]/);
                     var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
+                    // Skip trades with corrupt/unrealistic timestamps (before year 2000)
+                    if (date.getTime() < MIN_SANE_DATE) return;
                     data.push({
                         time: date.getTime(),
                         profit: profit,
@@ -753,7 +807,10 @@
                     if (timeStr) {
                         var t = timeStr.split(/[- :.]/);
                         var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
-                        visibleTrades.push({ time: date.getTime(), profit: profit });
+                        // Skip trades with corrupt/unrealistic timestamps (before year 2000)
+                        if (date.getTime() >= MIN_SANE_DATE) {
+                            visibleTrades.push({ time: date.getTime(), profit: profit });
+                        }
                     }
                 });
             }
@@ -785,8 +842,12 @@
             // 4. Filter balance points for display time range
             var displayData = fullBalanceHistory.filter(function (p) { return p.x >= minTime; });
 
-            if (displayData.length === 0 || displayData[0].x > minTime) {
-                var startPoint = { x: minTime, y: this.currentBalance };
+            // Only add a synthetic start point if we have a real time boundary (not "all" view)
+            // When minTime=0, the fullBalanceHistory already contains the natural start point.
+            if (minTime > 0 && (displayData.length === 0 || displayData[0].x > minTime)) {
+                // Default to the earliest known balance (before any trades), not current balance
+                var defaultY = fullBalanceHistory.length > 0 ? fullBalanceHistory[0].y : this.currentBalance;
+                var startPoint = { x: minTime, y: defaultY };
                 for (var j = 0; j < fullBalanceHistory.length; j++) {
                     if (fullBalanceHistory[j].x <= minTime) {
                         startPoint = { x: minTime, y: fullBalanceHistory[j].y };
@@ -1092,6 +1153,7 @@
         var currentBalance = /*[[${account.balance}]]*/ 0.0;
         var currentEquity = /*[[${account.equity}]]*/ 0.0;
         var accountCurrency = /*[[${account.currency}]]*/ 'EUR';
+        var commissionFactor = /*[[${account.commissionFactor}]]*/ 1.0;
 
         var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
 
@@ -1545,6 +1607,12 @@
             if (periodLabelCharts) periodLabelCharts.textContent = labelText;
             if (periodLabelTable) periodLabelTable.textContent = labelText;
             if (periodLabelHistory) periodLabelHistory.textContent = labelText;
+
+            // Update sticky date range label
+            var stickyDateLabel = document.getElementById('sticky-date-range');
+            if (stickyDateLabel) {
+                stickyDateLabel.textContent = dateStr || '';
+            }
         }
 
         /**
@@ -1601,7 +1669,10 @@
 
             var trades = historyMgr.filteredRows.map(row => {
                 var profitCell = row.querySelector('.profit-cell');
-                return parseFloat(profitCell ? profitCell.dataset.profit : 0);
+                var profit = parseFloat(profitCell ? profitCell.dataset.profit : 0);
+                var swap = parseFloat(row.dataset.swap || 0);
+                var commission = parseFloat(row.dataset.commission || 0) * commissionFactor;
+                return { profit: profit, netProfit: profit + swap + commission };
             });
 
             var totalProfit = 0;
@@ -1611,14 +1682,14 @@
             var losses = 0;
             var totalTrades = trades.length;
 
-            trades.forEach(p => {
-                totalProfit += p;
-                if (p > 0) {
-                    grossProfit += p;
+            trades.forEach(t => {
+                totalProfit += t.netProfit;
+                if (t.netProfit > 0) {
+                    grossProfit += t.netProfit;
                     wins++;
                 } else {
-                    grossLoss += Math.abs(p);
-                    if (p < 0) losses++;
+                    grossLoss += Math.abs(t.netProfit);
+                    if (t.netProfit < 0) losses++;
                 }
             });
 
@@ -1630,7 +1701,12 @@
             // Update Stats Grid
             var elProfit = document.getElementById('stat-total-profit');
             if (elProfit) {
-                elProfit.textContent = totalProfit.toFixed(2);
+                // Calculate percentage: profit relative to starting balance
+                var startBalance = currentBalance - totalProfit;
+                var profitPct = startBalance > 0 ? (totalProfit / startBalance * 100) : 0;
+                var pctSign = profitPct >= 0 ? '+' : '';
+                elProfit.innerHTML = totalProfit.toFixed(2) +
+                    ' <span style="font-size: 0.85rem; opacity: 0.8; margin-left: 6px;">(' + pctSign + profitPct.toFixed(1) + '%)</span>';
                 elProfit.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
                 elProfit.style.fontSize = "1.25rem";
                 elProfit.style.fontWeight = "bold";
@@ -1718,73 +1794,149 @@
         }
 
         function updateMagicStats(range) {
-            // Re-calculate statistics for the Magic Table based on historyMgr.filteredRows
-            // 1. Reset counters map
-            var magicStats = {}; // { magic: { closedCount: 0, closedProfit: 0.0 } }
+            // Re-calculate the Magic Table values based on historyMgr.filteredRows
+            var magicStats = {}; // { magic: { closedCount, closedProfit, closedSwap, closedCommission } }
             var currentMagics = getActiveMagics();
 
-            // 2. Aggregate from filtered history
+            // 1. Aggregate from filtered closed trades
             if (historyMgr && historyMgr.filteredRows) {
                 historyMgr.filteredRows.forEach(row => {
                     var magic = row.dataset.magic;
                     if (magic) {
                         var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
+                        var swap = parseFloat(row.dataset.swap || 0);
+                        var commission = parseFloat(row.dataset.commission || 0) * commissionFactor;
 
                         if (!magicStats[magic]) {
-                            magicStats[magic] = { closedCount: 0, closedProfit: 0.0 };
+                            magicStats[magic] = { closedCount: 0, closedProfit: 0, closedSwap: 0, closedCommission: 0 };
                         }
                         magicStats[magic].closedCount++;
                         magicStats[magic].closedProfit += profit;
+                        magicStats[magic].closedSwap += swap;
+                        magicStats[magic].closedCommission += commission;
                     }
                 });
             }
 
-            // 3. Update the Magic Table DOM
-            var magicRows = document.querySelectorAll('.magic-breakdown tbody tr');
+            // 2. Update each Magic Table row
+            var magicRows = document.querySelectorAll('.magic-breakdown tbody tr[data-magic]');
+            // Track sums for footer
+            var sumOpenCount = 0, sumOpenProfit = 0;
+            var sumClosedCount = 0, sumClosedProfit = 0, sumSwap = 0, sumComm = 0, sumGesamt = 0, sumNetto = 0;
+            var visibleRows = 0;
+
             magicRows.forEach(row => {
-                var magicCell = row.querySelector('td:nth-child(1) strong');
-                if (!magicCell) return;
-                var magic = magicCell.textContent.trim();
+                var magic = row.dataset.magic;
 
                 if (!currentMagics.has(magic)) {
                     row.style.display = 'none';
-                    return; // Skip calculating stats for hidden magics
-                } else {
-                    row.style.display = 'table-row';
+                    return;
                 }
 
-                var stats = magicStats[magic] || { closedCount: 0, closedProfit: 0.0 };
+                var stats = magicStats[magic] || { closedCount: 0, closedProfit: 0, closedSwap: 0, closedCommission: 0 };
+                var openCount = parseInt(row.dataset.openCount || 0);
+                var openProfit = parseFloat(row.dataset.openProfit || 0);
+                var openSwap = parseFloat(row.dataset.openSwap || 0);
 
-                // Open Profit (Static, from DOM as it was originally rendered)
-                var openProfitCell = row.querySelector('td:nth-child(3)');
-                var openProfit = parseFloat(openProfitCell ? openProfitCell.textContent : 0);
+                // Show/hide row based on whether it has any data
+                if (openCount === 0 && stats.closedCount === 0) {
+                    row.style.display = 'none';
+                    return;
+                }
+                row.style.display = 'table-row';
+                visibleRows++;
 
                 // Update Closed Count
-                var closedCountCell = row.querySelector('td:nth-child(4)');
-                if (closedCountCell) closedCountCell.textContent = stats.closedCount;
+                var el = row.querySelector('.mc-closed-count');
+                if (el) el.textContent = stats.closedCount;
 
-                // Update Closed Profit
-                var closedProfitCell = row.querySelector('td:nth-child(5)');
-                if (closedProfitCell) {
-                    closedProfitCell.textContent = stats.closedProfit.toFixed(2);
-                    closedProfitCell.className = stats.closedProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                // Update Real P/L (closed profit only)
+                el = row.querySelector('.mc-real-pl');
+                if (el) {
+                    el.textContent = stats.closedProfit.toFixed(2);
+                    el.className = 'mc-real-pl ' + (stats.closedProfit >= 0 ? 'profit-positive' : 'profit-negative');
                 }
 
-                // Update Total Profit (Closed + Open)
-                // We also need to add the static Swap and Commission that are currently displayed
-                var swapCell = row.querySelector('td:nth-child(6)');
-                var swapVal = parseFloat((swapCell ? swapCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
-
-                var commCell = row.querySelector('td:nth-child(7)');
-                var commVal = parseFloat((commCell ? commCell.textContent : '0').replace(/[^\d.-]/g, '') || 0);
-
-                var totalProfit = openProfit + stats.closedProfit + swapVal + commVal;
-                var totalProfitCell = row.querySelector('td:nth-child(8)');
-                if (totalProfitCell) {
-                    totalProfitCell.textContent = totalProfit.toFixed(2);
-                    totalProfitCell.className = totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                // Update Swap (open + closed)
+                var totalSwap = openSwap + stats.closedSwap;
+                el = row.querySelector('.mc-swap');
+                if (el) {
+                    el.textContent = totalSwap.toFixed(2);
+                    el.style.color = totalSwap < 0 ? '#ef4444' : '#a0a0c0';
                 }
+
+                // Update Commission
+                var totalComm = stats.closedCommission;
+                el = row.querySelector('.mc-comm');
+                if (el) {
+                    el.textContent = totalComm.toFixed(2);
+                    el.style.color = totalComm < 0 ? '#ef4444' : '#a0a0c0';
+                }
+
+                // Update Gesamt (open + closed + swap + commission)
+                var gesamt = openProfit + stats.closedProfit + totalSwap + totalComm;
+                el = row.querySelector('.mc-gesamt-val');
+                if (el) {
+                    el.textContent = gesamt.toFixed(2);
+                    el.className = 'mc-gesamt-val ' + (gesamt >= 0 ? 'profit-positive' : 'profit-negative');
+                }
+
+                // Update Netto (closed profit + swap + commission, without float)
+                var netto = stats.closedProfit + totalSwap + totalComm;
+                el = row.querySelector('.mc-netto-val');
+                if (el) {
+                    el.textContent = netto.toFixed(2);
+                }
+                var nettoLine = row.querySelector('.mc-netto-line');
+                if (nettoLine) {
+                    nettoLine.style.color = netto >= 0 ? '#10b981' : '#ef4444';
+                }
+
+                // Accumulate footer sums
+                sumOpenCount += openCount;
+                sumOpenProfit += openProfit;
+                sumClosedCount += stats.closedCount;
+                sumClosedProfit += stats.closedProfit;
+                sumSwap += totalSwap;
+                sumComm += totalComm;
+                sumGesamt += gesamt;
+                sumNetto += netto;
             });
+
+            // 3. Update SUMME footer row
+            var footerRow = document.querySelector('.magic-breakdown tfoot tr');
+            if (footerRow) {
+                var cells = footerRow.querySelectorAll('td');
+                if (cells.length >= 8) {
+                    // cells[0] = SUMME label
+                    cells[1].textContent = sumOpenCount; // Open Count
+                    cells[2].textContent = sumOpenProfit.toFixed(2); // Float P/L
+                    cells[2].style.color = sumOpenProfit >= 0 ? '#10b981' : '#ef4444';
+                    cells[2].style.fontWeight = '700';
+                    cells[3].textContent = sumClosedCount; // Closed Count
+                    cells[4].textContent = sumClosedProfit.toFixed(2); // Real P/L
+                    cells[4].style.color = sumClosedProfit >= 0 ? '#10b981' : '#ef4444';
+                    cells[4].style.fontWeight = '700';
+                    cells[5].textContent = sumSwap.toFixed(2); // Swap
+                    cells[6].textContent = sumComm.toFixed(2); // Commission
+
+                    // Update Gesamt cell
+                    var gesamtDiv = cells[7].querySelector('div:first-child');
+                    if (gesamtDiv) {
+                        gesamtDiv.textContent = sumGesamt.toFixed(2);
+                        gesamtDiv.style.color = sumGesamt >= 0 ? '#10b981' : '#ef4444';
+                        gesamtDiv.title = 'Gesamt = Float P/L + Real P/L + Swap + Komm\n= ' + sumOpenProfit.toFixed(2) + ' + ' + sumClosedProfit.toFixed(2) + ' + (' + sumSwap.toFixed(2) + ') + (' + sumComm.toFixed(2) + ')\n= ' + sumGesamt.toFixed(2);
+                    }
+                    // Update Netto
+                    var nettoDiv = cells[7].querySelector('div:nth-child(2)');
+                    if (nettoDiv) {
+                        nettoDiv.style.color = sumNetto >= 0 ? '#10b981' : '#ef4444';
+                        nettoDiv.title = 'Netto = Real P/L + Swap + Komm (ohne Float)\n= ' + sumClosedProfit.toFixed(2) + ' + (' + sumSwap.toFixed(2) + ') + (' + sumComm.toFixed(2) + ')\n= ' + sumNetto.toFixed(2);
+                        var nettoSpan = nettoDiv.querySelector('.mc-netto-val, span:last-child');
+                        if (nettoSpan) nettoSpan.textContent = sumNetto.toFixed(2);
+                    }
+                }
+            }
         }
 
 

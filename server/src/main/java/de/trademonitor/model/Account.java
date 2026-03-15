@@ -26,6 +26,7 @@ public class Account {
     private int displayOrder = 0;
     private int magicNumberMaxAge = 30; // Default 30 days
     private int magicMinTrades = 5; // Default 5 trades
+    private double commissionFactor = 1.0; // Broker-specific commission correction factor
 
     // Transient field for sync warning
     private boolean syncWarning;
@@ -118,6 +119,14 @@ public class Account {
         this.balance = balance;
         this.registeredAt = LocalDateTime.now();
         this.lastSeen = LocalDateTime.now();
+    }
+
+    public double getCommissionFactor() {
+        return commissionFactor;
+    }
+
+    public void setCommissionFactor(double commissionFactor) {
+        this.commissionFactor = commissionFactor;
     }
 
     // Status check
@@ -301,7 +310,7 @@ public class Account {
     }
 
     public double getTotalHistoryProfit() {
-        return closedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission()).sum();
+        return closedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
     }
 
     /**
@@ -368,7 +377,7 @@ public class Account {
             double closedCommission = closedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(ClosedTrade::getCommission)
-                    .sum();
+                    .sum() * commissionFactor;
             int closedCount = (int) closedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
@@ -427,7 +436,7 @@ public class Account {
             magicClosedTrades.sort(Comparator.comparing(t -> t.getCloseTime() == null ? "" : t.getCloseTime()));
 
             for (ClosedTrade ct : magicClosedTrades) {
-                double netTradeProfit = ct.getProfit() + ct.getSwap() + ct.getCommission();
+                double netTradeProfit = ct.getProfit() + ct.getSwap() + ct.getCommission() * commissionFactor;
                 cumulativeProfit += netTradeProfit;
                 if (cumulativeProfit > highWaterMark) {
                     highWaterMark = cumulativeProfit;
@@ -475,7 +484,7 @@ public class Account {
             }
 
             entries.add(
-                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, totalSwap, totalCommission,
+                    new MagicProfitEntry(magic, magicName, openProfit, closedProfit, totalSwap, totalCommission, openSwap,
                             openCount, closedCount,
                             tradedSymbols, maxDrawdownEur, maxDrawdownPercent, estimatedMaxEquityDrawdownEur,
                             maxEquityDrawdownPercent));
