@@ -1052,17 +1052,41 @@ public class DashboardController {
 
             List<String> timestamps = new ArrayList<>();
             List<Double> scaledEquity = new ArrayList<>();
+            List<Double> rawEquity = new ArrayList<>();
             double scaleFactor = 1.0;
             boolean scaleFactorSet = false;
 
+            // Downsampling: keep every N-th minute to reduce data volume
+            // daily = all points, weekly = every 15min, monthly = every 60min
+            int sampleIntervalMinutes = "weekly".equalsIgnoreCase(period) ? 15
+                    : "monthly".equalsIgnoreCase(period) ? 60 : 0;
+            long lastIncludedMillis = 0;
+
             for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
                 if (snapshotFilter.test(snap)) {
-                    if (!scaleFactorSet && snap.getBalance() > 0) {
-                        scaleFactor = 10000.0 / snap.getBalance();
+                    // Apply downsampling for weekly/monthly
+                    if (sampleIntervalMinutes > 0 && snap.getTimestamp() != null) {
+                        try {
+                            long snapMillis = java.time.LocalDateTime
+                                    .parse(snap.getTimestamp(),
+                                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                            if (lastIncludedMillis > 0
+                                    && (snapMillis - lastIncludedMillis) < sampleIntervalMinutes * 60000L) {
+                                continue; // Skip this snapshot (too close to the last included one)
+                            }
+                            lastIncludedMillis = snapMillis;
+                        } catch (Exception e) {
+                            // If parsing fails, include the snapshot
+                        }
+                    }
+                    if (!scaleFactorSet && snap.getEquity() > 0) {
+                        scaleFactor = 10000.0 / snap.getEquity();
                         scaleFactorSet = true;
                     }
                     timestamps.add(snap.getTimestamp());
                     scaledEquity.add(Math.round(snap.getEquity() * scaleFactor * 100.0) / 100.0);
+                    rawEquity.add(Math.round(snap.getEquity() * 100.0) / 100.0);
                 }
             }
 
@@ -1075,6 +1099,7 @@ public class DashboardController {
                 entry.put("scaleFactor", Math.round(scaleFactor * 10000.0) / 10000.0);
                 entry.put("timestamps", timestamps);
                 entry.put("scaledEquity", scaledEquity);
+                entry.put("rawEquity", rawEquity);
                 result.add(entry);
             }
         }

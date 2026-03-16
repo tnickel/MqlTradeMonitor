@@ -229,11 +229,32 @@
         </div>
     </header>
 
+    <!-- ======= STICKY NAV BAR ======= -->
+    <div id="sticky-filter-bar"
+        style="position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 8px 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+        <div style="max-width: 1300px; margin: 0 auto; display: flex; align-items: center; gap: 12px;">
+            <span style="font-weight: 800; color: #fff; font-size: 1rem;" th:text="${periodTitle}">Report</span>
+            <div style="padding: 2px 10px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.2); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--accent); font-weight: 600;">
+                <span th:text="${startDate}">01.01.2026</span> - <span th:text="${endDate}">31.01.2026</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <a th:href="@{/report/daily}" th:classappend="${period == 'daily' ? 'active' : ''}" class="period-btn">Daily</a>
+                <a th:href="@{/report/weekly}" th:classappend="${period == 'weekly' ? 'active' : ''}" class="period-btn">Weekly</a>
+                <a th:href="@{/report/monthly}" th:classappend="${period == 'monthly' ? 'active' : ''}" class="period-btn">Monthly</a>
+            </div>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.82rem; color: var(--text-secondary); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); user-select: none; white-space: nowrap; margin-left: auto;">
+                <input type="checkbox" id="scale-toggle" checked
+                    style="cursor: pointer; accent-color: var(--accent);">
+                <span style="font-weight: 600;">Skaliert auf 10K €</span>
+            </label>
+        </div>
+    </div>
+
     <!-- ======= SCALED PERFORMANCE COMPARISON CHART ======= -->
     <div class="report-container" style="margin-bottom: 20px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: var(--accent);">
-                📊 Performance Vergleich <span
+            <h2 id="scaled-chart-title" style="margin: 0; font-size: 1.2rem; color: var(--accent);">
+                📊 Performance Vergleich <span id="scaled-chart-subtitle"
                     style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(skaliert auf 10.000
                     €)</span>
             </h2>
@@ -490,6 +511,7 @@
         // ============ SCALED PERFORMANCE CHART ============
         var scaledChart = null;
         var scaledChartData = [];
+        var isScaled = true;
 
         // Professional color palette - distinct, vibrant colors
         var CHART_COLORS = [
@@ -514,6 +536,44 @@
             '#7c3aed', // Dark Violet
             '#db2777'  // Dark Pink
         ];
+
+        // Chart.js plugin: vertical line at 08:00
+        var verticalLinePlugin = {
+            id: 'verticalLine8AM',
+            afterDraw: function(chart) {
+                // Only show 08:00 line on daily view
+                if (currentPeriod !== 'daily') return;
+                var xScale = chart.scales.x;
+                if (!xScale || !xScale.min) return;
+
+                // Build 08:00 today
+                var today = new Date();
+                var line8AM = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8, 0, 0);
+                var xPixel = xScale.getPixelForValue(line8AM.getTime());
+
+                // Only draw if within visible range
+                if (xPixel < xScale.left || xPixel > xScale.right) return;
+
+                var ctx = chart.ctx;
+                var yScale = chart.scales.y;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([6, 4]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#f59e0b';
+                ctx.moveTo(xPixel, yScale.top);
+                ctx.lineTo(xPixel, yScale.bottom);
+                ctx.stroke();
+
+                // Label
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#f59e0b';
+                ctx.font = 'bold 10px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('08:00', xPixel, yScale.top - 4);
+                ctx.restore();
+            }
+        };
 
         function loadScaledChart() {
             var loadingEl = document.getElementById('scaled-chart-loading');
@@ -601,15 +661,26 @@
             if (!canvas) return;
             var ctx = canvas.getContext('2d');
 
+            // Remember which datasets were hidden before rebuild
+            var hiddenIndices = {};
+            if (scaledChart) {
+                data.forEach(function(_, idx) {
+                    if (!scaledChart.isDatasetVisible(idx)) {
+                        hiddenIndices[idx] = true;
+                    }
+                });
+            }
+
             var datasets = data.map(function (acc, idx) {
                 var color = CHART_COLORS[idx % CHART_COLORS.length];
                 var isReal = acc.type === 'REAL';
+                var equityArr = isScaled ? acc.scaledEquity : acc.rawEquity;
 
                 // Convert timestamps to Date objects for time axis
                 var points = acc.timestamps.map(function (ts, i) {
                     return {
                         x: new Date(ts),
-                        y: acc.scaledEquity[i]
+                        y: equityArr[i]
                     };
                 });
 
@@ -625,7 +696,8 @@
                     fill: false,
                     tension: 0.2,
                     borderDash: isReal ? [] : [4, 2],
-                    order: isReal ? 1 : 2
+                    order: isReal ? 1 : 2,
+                    hidden: hiddenIndices[idx] || false
                 };
             });
 
@@ -636,9 +708,11 @@
             scaledChart = new Chart(ctx, {
                 type: 'line',
                 data: { datasets: datasets },
+                plugins: [verticalLinePlugin],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: false,
                     interaction: {
                         mode: 'nearest',
                         intersect: false,
@@ -673,9 +747,10 @@
                             type: 'time',
                             time: {
                                 tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                unit: currentPeriod === 'daily' ? 'hour' : 'day',
                                 displayFormats: {
                                     hour: 'HH:mm',
-                                    day: 'dd.MM',
+                                    day: 'EEE dd.MM',
                                     week: 'dd.MM',
                                     month: 'MMM yyyy'
                                 }
@@ -712,7 +787,7 @@
         function toggleScaledDataset(index, visible) {
             if (!scaledChart) return;
             scaledChart.setDatasetVisibility(index, visible);
-            scaledChart.update();
+            scaledChart.update('none');
         }
 
         function toggleAllScaledAccounts(selectAll) {
@@ -736,8 +811,39 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Dynamic body padding for fixed filter bar
+            function adjustBodyPadding() {
+                var bar = document.getElementById('sticky-filter-bar');
+                if (bar) {
+                    document.body.style.paddingTop = bar.offsetHeight + 'px';
+                }
+            }
+            adjustBodyPadding();
+            window.addEventListener('resize', adjustBodyPadding);
+            // Re-adjust after chart data loads (checkboxes render and may change bar height)
+            var origLoadScaled = loadScaledChart;
+            loadScaledChart = function() {
+                origLoadScaled();
+                setTimeout(adjustBodyPadding, 100);
+            };
+
             // Load scaled performance chart
             loadScaledChart();
+
+            // Scale toggle checkbox
+            var scaleToggle = document.getElementById('scale-toggle');
+            if (scaleToggle) {
+                scaleToggle.addEventListener('change', function () {
+                    isScaled = this.checked;
+                    var subtitle = document.getElementById('scaled-chart-subtitle');
+                    if (subtitle) {
+                        subtitle.textContent = isScaled ? '(skaliert auf 10.000 €)' : '(echte Kontowerte)';
+                    }
+                    if (scaledChartData.length > 0) {
+                        renderScaledChart(scaledChartData);
+                    }
+                });
+            }
 
             // Existing mini-chart logic
             const canvases = document.querySelectorAll('.mini-chart');
