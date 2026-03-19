@@ -2378,6 +2378,7 @@
         <div style="display: flex; justify-content: center; gap: 2rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;">
             <a href="/impressum" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Impressum</a>
             <a href="/privacy" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Datenschutz</a>
+            <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin/health" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Server Health</a>
             <a href="/" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Dashboard</a>
             <a href="/open-trades" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Open Trades</a>
         </div>

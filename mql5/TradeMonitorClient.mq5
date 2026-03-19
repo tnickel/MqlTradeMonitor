@@ -10,7 +10,7 @@
 //--- Input parameters (defaults, overridden by config file if present)
 input string   ServerURL = "https://DEINE-DOMAIN.DE:8080";   // Server URL (use HTTPS!)
 input string   InpUserKey = "";                        // User API-Key (from Admin Dashboard)
-input int      UpdateIntervalSeconds = 5;              // Update interval (seconds)
+input int      UpdateIntervalSeconds = 15;             // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
 input int      MaxReconnectAttempts = 10;               // Max reconnect attempts (0=unlimited)
@@ -156,7 +156,7 @@ void InitConfig()
       
       if(ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080" && ServerURL != cfg_ServerURL) uiChanged = true;
       if(InpUserKey != "" && InpUserKey != cfg_UserKey) uiChanged = true;
-      if(UpdateIntervalSeconds != 5 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
+      if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
       if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
@@ -166,7 +166,7 @@ void InitConfig()
          Print("UI inputs differ from config file. Updating config file with new UI values.");
          cfg_ServerURL = (ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080") ? ServerURL : cfg_ServerURL;
          cfg_UserKey = (InpUserKey != "") ? InpUserKey : cfg_UserKey;
-         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 5) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
+         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
          cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
@@ -187,6 +187,23 @@ void InitConfig()
       
       // Generate the default configuration file so the user has something to edit
       SaveConfig();
+   }
+   
+   // Enforce minimum intervals
+   if(cfg_UpdateIntervalSeconds < 15)
+   {
+      Print("Warning: UpdateIntervalSeconds cannot be less than 15. Enforcing 15s.");
+      cfg_UpdateIntervalSeconds = 15;
+   }
+   if(cfg_HeartbeatIntervalSeconds < 30)
+   {
+      Print("Warning: HeartbeatIntervalSeconds cannot be less than 30. Enforcing 30s.");
+      cfg_HeartbeatIntervalSeconds = 30;
+   }
+   if(cfg_ReconnectIntervalSeconds < 30)
+   {
+      Print("Warning: ReconnectIntervalSeconds cannot be less than 30. Enforcing 30s.");
+      cfg_ReconnectIntervalSeconds = 30;
    }
    
    Print("Active config: ServerURL=", cfg_ServerURL,

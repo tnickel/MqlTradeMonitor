@@ -355,4 +355,100 @@ public class AdminController {
         }
         return "admin-client-logs";
     }
+
+    @GetMapping("/health")
+    public String serverHealth(Model model) {
+        de.trademonitor.dto.ServerHealthDto health = new de.trademonitor.dto.ServerHealthDto();
+        
+        // OS info
+        health.setOsName(System.getProperty("os.name"));
+        
+        // Memory JVM
+        long totalMem = Runtime.getRuntime().totalMemory();
+        long freeMem = Runtime.getRuntime().freeMemory();
+        long usedMem = totalMem - freeMem;
+        health.setTotalMemory(formatSize(totalMem));
+        health.setFreeMemory(formatSize(freeMem));
+        health.setUsedMemory(formatSize(usedMem));
+        
+        // Memory System
+        try {
+            javax.management.MBeanServer mbs = java.lang.management.ManagementFactory.getPlatformMBeanServer();
+            javax.management.ObjectName name = javax.management.ObjectName.getInstance("java.lang:type=OperatingSystem");
+            long sysTotal = (Long) mbs.getAttribute(name, "TotalPhysicalMemorySize");
+            long sysFree = (Long) mbs.getAttribute(name, "FreePhysicalMemorySize");
+            long sysUsed = sysTotal - sysFree;
+            health.setSystemTotalMemory(formatSize(sysTotal));
+            health.setSystemFreeMemory(formatSize(sysFree));
+            health.setSystemUsedMemory(formatSize(sysUsed));
+            model.addAttribute("sysFreeRaw", sysFree);
+            model.addAttribute("sysUsedRaw", sysUsed);
+        } catch (Throwable t) {
+            health.setSystemTotalMemory("N/A");
+            health.setSystemFreeMemory("N/A");
+            health.setSystemUsedMemory("N/A");
+            model.addAttribute("sysFreeRaw", 0);
+            model.addAttribute("sysUsedRaw", 0);
+        }
+        
+        // Disk (working dir)
+        java.io.File root = new java.io.File(".");
+        long totalSpace = root.getTotalSpace();
+        long freeSpace = root.getUsableSpace();
+        long usedSpace = totalSpace - freeSpace;
+        health.setDiskTotal(formatSize(totalSpace));
+        health.setDiskFree(formatSize(freeSpace));
+        health.setDiskUsed(formatSize(usedSpace));
+        
+        // CPU Load
+        try {
+            javax.management.MBeanServer mbs = java.lang.management.ManagementFactory.getPlatformMBeanServer();
+            javax.management.ObjectName name = javax.management.ObjectName.getInstance("java.lang:type=OperatingSystem");
+            double load = -1.0;
+            try {
+                load = (Double) mbs.getAttribute(name, "CpuLoad");
+            } catch (Exception e) {
+                try {
+                    load = (Double) mbs.getAttribute(name, "SystemCpuLoad");
+                } catch (Exception ex) {
+                    load = (Double) mbs.getAttribute(name, "ProcessCpuLoad");
+                }
+            }
+            if (load < 0) {
+                load = (Double) mbs.getAttribute(name, "ProcessCpuLoad");
+            }
+            health.setCpuLoad(load >= 0 ? String.format("%.1f %%", load * 100) : "N/A");
+        } catch (Throwable t) {
+            health.setCpuLoad("N/A");
+        }
+
+        // File sizes
+        java.io.File dbFile = new java.io.File(System.getProperty("user.home") + "/trademonitor_data/trademonitor.mv.db");
+        health.setDbFileSize(dbFile.exists() ? formatSize(dbFile.length()) : "Not Found");
+
+        java.io.File aiWar = new java.io.File("/opt/wildfly/standalone/deployments/ai-task-manager.war");
+        health.setAiTaskManagerWarSize(aiWar.exists() ? formatSize(aiWar.length()) : "Not Found");
+        
+        java.io.File rootWar = new java.io.File("/opt/wildfly/standalone/deployments/ROOT.war");
+        health.setRootWarSize(rootWar.exists() ? formatSize(rootWar.length()) : "Not Found");
+        
+        java.io.File logFile = new java.io.File("/opt/wildfly/standalone/log/server.log");
+        if (!logFile.exists()) {
+            java.io.File sysLog = new java.io.File("/var/log/syslog");
+            if(sysLog.exists()) logFile = sysLog;
+        }
+        health.setLogFileSize(logFile.exists() ? formatSize(logFile.length()) : "Not Found");
+
+        model.addAttribute("diskFreeRaw", freeSpace);
+        model.addAttribute("diskUsedRaw", usedSpace);
+        model.addAttribute("health", health);
+        
+        return "admin-health";
+    }
+
+    private String formatSize(long v) {
+        if (v < 1024) return v + " B";
+        int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
+        return String.format(java.util.Locale.US, "%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
+    }
 }
