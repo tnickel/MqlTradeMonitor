@@ -130,12 +130,72 @@
             <a href="/admin/requests" class="view-details-btn" style="background-color: #8f9026;">📡 Connection Logs</a>
             <a href="/admin/client-logs" class="view-details-btn" style="background-color: #1f6feb;">👤 Client Logs</a>
             <a href="/admin/health" class="view-details-btn" style="background-color: #9b59b6;">🩺 Server Health</a>
+            <a href="/admin/security-audit" class="view-details-btn" style="background-color: #e74c3c;">🛡️ Security Audit</a>
             <a href="/" class="view-details-btn">← Zum Dashboard</a>
 
             <form th:action="@{/logout}" method="post" style="display: inline; margin-left: auto;">
                 <button type="submit" class="view-details-btn"
                     style="background-color: #da3633; border: none; cursor: pointer;">Ausloggen</button>
             </form>
+        </div>
+
+        <!-- Flash Messages -->
+        <div th:if="${successMessage}" style="background-color: rgba(63, 185, 80, 0.15); border: 1px solid #3fb950; color: #3fb950; padding: 12px 18px; border-radius: 8px; margin-bottom: 15px; font-weight: 500;">
+            ✅ <span th:text="${successMessage}">Erfolg</span>
+        </div>
+        <div th:if="${errorMessage}" style="background-color: rgba(248, 81, 73, 0.15); border: 1px solid #f85149; color: #f85149; padding: 12px 18px; border-radius: 8px; margin-bottom: 15px; font-weight: 500;">
+            ❌ <span th:text="${errorMessage}">Fehler</span>
+        </div>
+
+        <!-- Admin Notification Banner -->
+        <div th:if="${notificationCount != null and notificationCount > 0}"
+             style="background: linear-gradient(135deg, rgba(248,81,73,0.12) 0%, rgba(227,179,65,0.12) 100%);
+                    border: 1px solid #f85149; border-radius: 10px; padding: 0; margin-bottom: 20px;
+                    box-shadow: 0 4px 16px rgba(248,81,73,0.15); overflow: hidden;">
+            
+            <!-- Header -->
+            <div style="background-color: rgba(248,81,73,0.15); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(248,81,73,0.2);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.4rem;">🔔</span>
+                    <span style="font-weight: 700; color: #f85149; font-size: 1rem;">
+                        <span th:text="${notificationCount}">2</span> unbestätigte Warnung(en)
+                    </span>
+                </div>
+                <form th:action="@{/admin/notifications/acknowledge}" method="post" style="margin: 0;">
+                    <button type="submit"
+                        style="background-color: #30363d; color: #c9d1d9; border: 1px solid #484f58;
+                               padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+                               font-weight: 500; transition: all 0.2s;"
+                        onmouseover="this.style.backgroundColor='#484f58'"
+                        onmouseout="this.style.backgroundColor='#30363d'">
+                        ✓ Alle bestätigen
+                    </button>
+                </form>
+            </div>
+
+            <!-- Notification Items -->
+            <div style="padding: 10px 20px;">
+                <div th:each="notif : ${adminNotifications}"
+                     style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0;
+                            border-bottom: 1px solid rgba(139,148,158,0.1);">
+                    <!-- Severity Indicator -->
+                    <div th:style="'width: 4px; min-height: 40px; border-radius: 4px; flex-shrink: 0; background-color: ' + ${notif.severityColor}">
+                    </div>
+                    <!-- Icon -->
+                    <span style="font-size: 1.3rem; flex-shrink: 0; padding-top: 2px;"
+                          th:text="${notif.categoryIcon}">🛡️</span>
+                    <!-- Content -->
+                    <div style="flex-grow: 1; min-width: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+                            <span style="font-weight: 600; color: #e1e1e1;" th:text="${notif.title}">Security Alert</span>
+                            <span style="font-size: 0.75rem; color: #6e7681; white-space: nowrap;"
+                                  th:text="${#temporals.format(notif.timestamp, 'dd.MM.yyyy HH:mm')}">20.03.2026 03:00</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #8b949e; margin-top: 3px; word-break: break-word;"
+                             th:text="${notif.message}">Details...</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="config-section"

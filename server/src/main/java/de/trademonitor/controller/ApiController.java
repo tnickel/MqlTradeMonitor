@@ -29,7 +29,10 @@ public class ApiController {
     private UserRepository userRepository;
 
     @Autowired
-    private de.trademonitor.repository.ClientLogRepository clientLogRepository;
+    private de.trademonitor.repository.ClientActionCounterRepository clientActionCounterRepository;
+
+    @Autowired
+    private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
     @Autowired
     private de.trademonitor.service.EmailService emailService;
@@ -37,9 +40,26 @@ public class ApiController {
     private void logClientAction(Long accountId, String action, String message,
             jakarta.servlet.http.HttpServletRequest request) {
         try {
-            String ip = request.getRemoteAddr();
-            de.trademonitor.entity.ClientLog log = new de.trademonitor.entity.ClientLog(accountId, action, ip, message);
-            clientLogRepository.save(log);
+            // Always increment the daily counter
+            java.time.LocalDate today = java.time.LocalDate.now();
+            de.trademonitor.entity.ClientActionCounter counter = clientActionCounterRepository
+                    .findByAccountIdAndActionAndDate(accountId, action, today)
+                    .orElse(null);
+            if (counter != null) {
+                counter.increment();
+                clientActionCounterRepository.save(counter);
+            } else {
+                clientActionCounterRepository.save(
+                        new de.trademonitor.entity.ClientActionCounter(accountId, action, today));
+            }
+
+            // For error actions, also save the full error message
+            boolean isError = action.contains("ERROR") || action.equals("AUTH_FAILED");
+            if (isError) {
+                String ip = request.getRemoteAddr();
+                clientErrorLogRepository.save(
+                        new de.trademonitor.entity.ClientErrorLog(accountId, action, ip, message));
+            }
         } catch (Exception e) {
             System.err.println("Failed to save client log: " + e.getMessage());
         }

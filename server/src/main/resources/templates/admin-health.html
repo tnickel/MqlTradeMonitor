@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Server Health - Trade Monitor</title>
+    <!-- include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { border-bottom: 1px solid #30363d; padding-bottom: 10px; margin-bottom: 20px; }
+        .action-bar { margin-bottom: 20px; display: flex; gap: 15px; background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; }
+        .view-details-btn { background-color: #1f6feb; color: white; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 0.9rem; }
+        .view-details-btn:hover { background-color: #388bfd; }
+        
+        .config-section { background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39; }
+        .config-section h2 { margin-top: 0; font-size: 1.2rem; color: #e1e1e1; margin-bottom: 15px; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .metric-card { background-color: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; }
+        .metric-label { font-size: 0.85rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; margin-bottom: 5px; }
+        .metric-value { font-size: 1.5rem; color: #58a6ff; font-weight: bold; }
+        
+        .chart-container { width: 100%; max-width: 400px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Server Health Dashboard</h1>
+        
+        <div class="action-bar">
+            <a href="/admin" class="view-details-btn">← Zurück zum Admin</a>
+            <a href="/" class="view-details-btn" style="background-color: #238636;">🏠 Dashboard</a>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <div class="config-section">
+                    <h2>🖥️ System Metriken</h2>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">OS</div>
+                            <div class="metric-value" th:text="${health.osName}">Linux</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">CPU Auslastung</div>
+                            <div class="metric-value" th:text="${health.cpuLoad}">10.5 %</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Total RAM (System)</div>
+                            <div class="metric-value" th:text="${health.systemTotalMemory}">8 GB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">JVM: <span th:text="${health.totalMemory}"></span></div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Used RAM (System)</div>
+                            <div class="metric-value" th:text="${health.systemUsedMemory}">4 GB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">JVM: <span th:text="${health.usedMemory}"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h2>📁 Datei & Datenbank Größen</h2>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">H2 Database Size</div>
+                            <div class="metric-value" th:text="${health.dbFileSize}">50 MB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">trademonitor.mv.db</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">App WAR Size</div>
+                            <div class="metric-value" th:text="${health.rootWarSize}">50 MB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">ROOT.war</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Admin UI WAR Size</div>
+                            <div class="metric-value" th:text="${health.aiTaskManagerWarSize}">50 MB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">ai-task-manager.war</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Server Log Size</div>
+                            <div class="metric-value" th:text="${health.logFileSize}">12 MB</div>
+                            <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">server.log</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="config-section">
+                    <h2>📊 System RAM Auslastung</h2>
+                    <div class="chart-container" style="max-width: 250px;">
+                        <canvas id="ramChart"></canvas>
+                    </div>
+                    <div class="metric-grid" style="margin-top: 20px;">
+                        <div class="metric-card">
+                            <div class="metric-label">Total RAM (System)</div>
+                            <div class="metric-value" th:text="${health.systemTotalMemory}" style="color: #e1e1e1;">16 GB</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Free RAM (System)</div>
+                            <div class="metric-value" th:text="${health.systemFreeMemory}" style="color: #2ea043;">8 GB</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h2>💾 Speicherplatz (Disk)</h2>
+                    <div class="chart-container" style="max-width: 250px;">
+                        <canvas id="diskChart"></canvas>
+                    </div>
+                    <div class="metric-grid" style="margin-top: 20px;">
+                        <div class="metric-card">
+                            <div class="metric-label">Total Space</div>
+                            <div class="metric-value" th:text="${health.diskTotal}" style="color: #e1e1e1;">100 GB</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Free Space</div>
+                            <div class="metric-value" th:text="${health.diskFree}" style="color: #2ea043;">50 GB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Inject raw data for Chart JS -->
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const freeRaw = /*[[${diskFreeRaw}]]*/ 0;
+        const usedRaw = /*[[${diskUsedRaw}]]*/ 0;
+        const sysFreeRaw = /*[[${sysFreeRaw}]]*/ 0;
+        const sysUsedRaw = /*[[${sysUsedRaw}]]*/ 0;
+        /*]]>*/
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('diskChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Frei', 'Belegt'],
+                    datasets: [{
+                        data: [freeRaw, usedRaw],
+                        backgroundColor: [
+                            '#2ea043', /* Green for free */
+                            '#da3633'  /* Red for used */
+                        ],
+                        borderColor: '#0d1117',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#c9d1d9' }
+                        }
+                    }
+                }
+            });
+
+            const ramCtx = document.getElementById('ramChart').getContext('2d');
+            new Chart(ramCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Frei', 'Belegt'],
+                    datasets: [{
+                        data: [sysFreeRaw, sysUsedRaw],
+                        backgroundColor: [
+                            '#2ea043', /* Green for free */
+                            '#da3633'  /* Red for used */
+                        ],
+                        borderColor: '#0d1117',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#c9d1d9' }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -17,7 +17,10 @@ public class AdminController {
     private LoginLogRepository loginLogRepository;
 
     @Autowired
-    private de.trademonitor.repository.ClientLogRepository clientLogRepository;
+    private de.trademonitor.repository.ClientActionCounterRepository clientActionCounterRepository;
+
+    @Autowired
+    private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
     @Autowired
     private de.trademonitor.repository.AccountRepository accountRepository;
@@ -36,6 +39,12 @@ public class AdminController {
 
     @Autowired
     private de.trademonitor.service.UserService userService;
+
+    @Autowired
+    private de.trademonitor.service.SecurityAuditService securityAuditService;
+
+    @Autowired
+    private de.trademonitor.service.AdminNotificationService adminNotificationService;
 
     @GetMapping("")
     public String adminDashboard(Model model) {
@@ -151,6 +160,10 @@ public class AdminController {
 
         // --- 6. Broker Commission Factors ---
         model.addAttribute("brokerCommFactors", globalConfigService.getAllBrokerCommFactors());
+
+        // --- 7. Admin Notifications ---
+        model.addAttribute("adminNotifications", adminNotificationService.getUnacknowledgedNotifications());
+        model.addAttribute("notificationCount", adminNotificationService.getUnacknowledgedCount());
 
         return "admin";
     }
@@ -345,15 +358,124 @@ public class AdminController {
     }
 
     @GetMapping("/client-logs")
-    public String viewClientLogs(@org.springframework.web.bind.annotation.RequestParam(required = false) Long accountId,
+    public String viewClientLogs(@RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) String date,
             Model model) {
-        if (accountId != null) {
-            model.addAttribute("logs", clientLogRepository.findByAccountIdOrderByTimestampDesc(accountId));
-            model.addAttribute("filterAccountId", accountId);
+
+        java.time.LocalDate selectedDate;
+        if (date != null && !date.isEmpty()) {
+            selectedDate = java.time.LocalDate.parse(date);
         } else {
-            model.addAttribute("logs", clientLogRepository.findAllByOrderByTimestampDesc());
+            selectedDate = java.time.LocalDate.now();
         }
+
+        // Today's counters
+        java.util.List<de.trademonitor.entity.ClientActionCounter> todayCounters;
+        if (accountId != null) {
+            todayCounters = clientActionCounterRepository
+                    .findByDateOrderByAccountIdAsc(selectedDate).stream()
+                    .filter(c -> c.getAccountId().equals(accountId))
+                    .collect(java.util.stream.Collectors.toList());
+        } else {
+            todayCounters = clientActionCounterRepository.findByDateOrderByAccountIdAsc(selectedDate);
+        }
+
+        // Monthly totals: aggregate from 1st of that month to selected date
+        java.time.LocalDate monthStart = selectedDate.withDayOfMonth(1);
+        java.util.List<de.trademonitor.entity.ClientActionCounter> monthRaw;
+        if (accountId != null) {
+            monthRaw = clientActionCounterRepository
+                    .findByAccountIdAndDateBetweenOrderByDateAsc(accountId, monthStart, selectedDate);
+        } else {
+            monthRaw = clientActionCounterRepository
+                    .findByDateBetweenOrderByAccountIdAscDateAsc(monthStart, selectedDate);
+        }
+        // Aggregate monthly by accountId+action
+        java.util.Map<String, Long> monthlyTotals = new java.util.LinkedHashMap<>();
+        for (de.trademonitor.entity.ClientActionCounter c : monthRaw) {
+            String key = c.getAccountId() + "|" + c.getAction();
+            monthlyTotals.merge(key, c.getCount(), Long::sum);
+        }
+
+        // Available accounts
+        java.util.List<Long> allAccountIds = clientActionCounterRepository.findDistinctAccountIds();
+
+        // Recent errors
+        java.util.List<de.trademonitor.entity.ClientErrorLog> errors;
+        if (accountId != null) {
+            errors = clientErrorLogRepository.findTop100ByAccountIdOrderByTimestampDesc(accountId);
+        } else {
+            errors = clientErrorLogRepository.findTop100ByOrderByTimestampDesc();
+        }
+
+        // Calculate total day count
+        long totalDayCount = 0;
+        for (de.trademonitor.entity.ClientActionCounter c : todayCounters) {
+            totalDayCount += c.getCount();
+        }
+
+        model.addAttribute("todayCounters", todayCounters);
+        model.addAttribute("monthlyTotals", monthlyTotals);
+        model.addAttribute("allAccountIds", allAccountIds);
+        model.addAttribute("errors", errors);
+        model.addAttribute("filterAccountId", accountId);
+        model.addAttribute("selectedDate", selectedDate.toString());
+        model.addAttribute("selectedDateFormatted",
+                selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+        model.addAttribute("totalDayCount", totalDayCount);
+
         return "admin-client-logs";
+    }
+
+    @GetMapping("/client-logs/chart-data")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> clientLogsChartData(
+            @RequestParam Long accountId,
+            @RequestParam(defaultValue = "7") int days) {
+
+        java.time.LocalDate end = java.time.LocalDate.now();
+        java.time.LocalDate start = end.minusDays(days - 1);
+
+        java.util.List<de.trademonitor.entity.ClientActionCounter> data =
+                clientActionCounterRepository.findByAccountIdAndDateBetweenOrderByDateAsc(accountId, start, end);
+
+        // Collect all unique actions and dates
+        java.util.Set<String> actions = new java.util.LinkedHashSet<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        for (int i = 0; i < days; i++) {
+            java.time.LocalDate d = start.plusDays(i);
+            labels.add(d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")));
+        }
+        for (de.trademonitor.entity.ClientActionCounter c : data) {
+            actions.add(c.getAction());
+        }
+
+        // Build datasets: one per action
+        java.util.List<java.util.Map<String, Object>> datasets = new java.util.ArrayList<>();
+        String[] colors = {"#3fb950", "#58a6ff", "#f0883e", "#f85149", "#a371f7", "#3dc9b0", "#d2a8ff", "#8b949e"};
+        int colorIdx = 0;
+        for (String action : actions) {
+            java.util.Map<String, Object> ds = new java.util.LinkedHashMap<>();
+            ds.put("label", action);
+            ds.put("backgroundColor", colors[colorIdx % colors.length]);
+            long[] counts = new long[days];
+            for (de.trademonitor.entity.ClientActionCounter c : data) {
+                if (c.getAction().equals(action)) {
+                    int idx = (int) java.time.temporal.ChronoUnit.DAYS.between(start, c.getDate());
+                    if (idx >= 0 && idx < days) {
+                        counts[idx] = c.getCount();
+                    }
+                }
+            }
+            ds.put("data", counts);
+            datasets.add(ds);
+            colorIdx++;
+        }
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("labels", labels);
+        result.put("datasets", datasets);
+        return result;
     }
 
     @GetMapping("/health")
@@ -444,6 +566,31 @@ public class AdminController {
         model.addAttribute("health", health);
         
         return "admin-health";
+    }
+
+    @GetMapping("/security-audit")
+    public String securityAudit(Model model) {
+        de.trademonitor.dto.SecurityAuditDto audit = securityAuditService.getLatestAudit();
+        model.addAttribute("audit", audit);
+        return "admin-security";
+    }
+
+    @PostMapping("/notifications/acknowledge")
+    public String acknowledgeNotifications(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        adminNotificationService.acknowledgeAll();
+        redirectAttrs.addFlashAttribute("successMessage", "Alle Benachrichtigungen bestätigt.");
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/security-audit/run")
+    public String runSecurityAudit(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            securityAuditService.runManualAudit();
+            redirectAttrs.addFlashAttribute("successMessage", "Security Audit erfolgreich durchgeführt.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Audit: " + e.getMessage());
+        }
+        return "redirect:/admin/security-audit";
     }
 
     private String formatSize(long v) {

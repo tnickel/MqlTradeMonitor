@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Client Activity Logs - Trade Monitor</title>
+    <title>Client Activity Monitor - Trade Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -24,60 +25,196 @@
             margin-bottom: 20px;
         }
 
+        h2 {
+            font-size: 1.2rem;
+            color: #e1e1e1;
+            margin-top: 0;
+        }
+
+        .section {
+            background-color: #161b22;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            margin-bottom: 20px;
+        }
+
         .filter-bar {
             background-color: #161b22;
             padding: 15px;
-            border-radius: 6px;
+            border-radius: 8px;
             border: 1px solid #30363d;
             margin-bottom: 20px;
             display: flex;
             gap: 15px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
-        .log-table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: #161b22;
-            border-radius: 6px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        .filter-bar label {
+            color: #8b949e;
             font-size: 0.9rem;
         }
 
-        .log-table th,
-        .log-table td {
-            text-align: left;
-            padding: 10px 12px;
-            border-bottom: 1px solid #30363d;
+        .filter-bar select,
+        .filter-bar input[type="date"] {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
         }
 
-        .log-table th {
-            background-color: #21262d;
+        .counter-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .counter-table th,
+        .counter-table td {
+            text-align: left;
+            padding: 10px 14px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .counter-table th {
+            background-color: #0d1117;
             color: #8b949e;
             font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s, background-color 0.2s;
+            position: relative;
         }
 
-        .log-table tr:hover {
-            background-color: #1c2128;
+        .counter-table th:hover {
+            color: #e1e1e1;
+            background-color: #161b22;
         }
 
-        .action-register {
-            color: #3fb950;
-            font-weight: bold;
+        .counter-table th .sort-indicator {
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+            margin-left: 4px;
+            font-size: 0.65rem;
+            opacity: 0.4;
+            transition: opacity 0.2s;
         }
 
-        .action-heartbeat {
-            color: #8b949e;
-        }
-
-        .action-update {
+        .counter-table th.sort-active .sort-indicator {
+            opacity: 1;
             color: #58a6ff;
         }
 
-        .action-error {
+        .counter-table tr:hover {
+            background-color: #1c2128;
+        }
+
+        .counter-value {
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #58a6ff;
+        }
+
+        .counter-value.high {
+            color: #3fb950;
+        }
+
+        .action-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge-heartbeat {
+            background-color: rgba(139, 148, 158, 0.15);
+            color: #8b949e;
+        }
+
+        .badge-register {
+            background-color: rgba(63, 185, 80, 0.15);
+            color: #3fb950;
+        }
+
+        .badge-update {
+            background-color: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
+        }
+
+        .badge-error {
+            background-color: rgba(248, 81, 73, 0.15);
             color: #f85149;
-            font-weight: bold;
+        }
+
+        .badge-init {
+            background-color: rgba(163, 113, 247, 0.15);
+            color: #a371f7;
+        }
+
+        .badge-history {
+            background-color: rgba(240, 136, 62, 0.15);
+            color: #f0883e;
+        }
+
+        .badge-auth {
+            background-color: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+        }
+
+        .badge-default {
+            background-color: rgba(139, 148, 158, 0.15);
+            color: #8b949e;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-top: 15px;
+        }
+
+        .error-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .error-table th,
+        .error-table td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .error-table th {
+            background-color: #0d1117;
+            color: #8b949e;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+        }
+
+        .error-table tr:hover {
+            background-color: #1c2128;
+        }
+
+        .error-msg {
+            color: #f85149;
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .back-btn {
@@ -89,75 +226,460 @@
             font-size: 0.9rem;
             display: inline-block;
             margin-bottom: 20px;
+            transition: background-color 0.2s;
         }
 
         .back-btn:hover {
             background-color: #388bfd;
         }
 
-        input[type="number"] {
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 6px 10px;
-            border-radius: 4px;
-        }
-
-        button {
+        .btn {
             background-color: #238636;
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #2ea043;
+        }
+
+        .btn-secondary {
+            background-color: #30363d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #484f58;
+        }
+
+        .date-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .date-nav button {
+            background: #30363d;
+            border: 1px solid #484f58;
+            color: #c9d1d9;
+            padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .date-nav button:hover {
+            background: #484f58;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #58a6ff;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.75rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #484f58;
+            font-size: 0.95rem;
+        }
+
+        .empty-state .icon {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+
+        .scrollable-errors {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .account-id {
+            color: #58a6ff;
+            font-weight: 600;
+        }
+
+        .timestamp {
+            color: #8b949e;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <a href="/admin" class="back-btn">← Back to Admin</a>
-        <h1>Client Activity Logs</h1>
+        <a href="/admin" class="back-btn">← Zurück zum Admin</a>
+        <h1>📊 Client Activity Monitor</h1>
 
+        <!-- Filter Bar -->
         <div class="filter-bar">
-            <form action="/admin/client-logs" method="get"
-                style="display: flex; gap: 10px; align-items: center; width: 100%;">
-                <label for="accountId">Filter by Account ID:</label>
-                <input type="number" id="accountId" name="accountId" th:value="${filterAccountId}"
-                    placeholder="e.g. 6199827">
-                <button type="submit">Filter</button>
-                <a href="/admin/client-logs" style="color: #8b949e; text-decoration: none; margin-left: 10px;"
-                    th:if="${filterAccountId != null}">Clear Filter</a>
-            </form>
+            <label>Account:</label>
+            <select id="accountFilter" onchange="applyFilter()">
+                <option value="">Alle Accounts</option>
+                <option th:each="aid : ${allAccountIds}" th:value="${aid}" th:text="${aid}"
+                    th:selected="${filterAccountId != null && filterAccountId == aid}">123</option>
+            </select>
+
+            <div class="date-nav">
+                <label>Datum:</label>
+                <button onclick="navigateDate(-1)" title="Vorheriger Tag">◀</button>
+                <input type="date" id="dateFilter" th:value="${selectedDate}" onchange="applyFilter()">
+                <button onclick="navigateDate(1)" title="Nächster Tag">▶</button>
+                <button onclick="setToday()" class="btn btn-secondary"
+                    style="font-size: 0.8rem; padding: 6px 10px;">Heute</button>
+            </div>
+
+            <span th:if="${filterAccountId != null}" style="margin-left: auto;">
+                <a th:href="@{/admin/client-logs(date=${selectedDate})}"
+                    style="color: #8b949e; text-decoration: none;">✕ Filter zurücksetzen</a>
+            </span>
         </div>
 
-        <table class="log-table">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Account ID</th>
-                    <th>Action</th>
-                    <th>IP Address</th>
-                    <th>Message</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="log : ${logs}">
-                    <td th:text="${#temporals.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2023-01-01 12:00:00</td>
-                    <td>
-                        <a th:href="@{/admin/client-logs(accountId=${log.accountId})}" th:text="${log.accountId}"
-                            style="color: #58a6ff; text-decoration: none;">12345</a>
-                    </td>
-                    <td th:text="${log.action}" th:classappend="${log.action == 'REGISTER' ? 'action-register' : 
-                                         (log.action.contains('ERROR') ? 'action-error' : 
-                                         (log.action == 'HEARTBEAT' ? 'action-heartbeat' : 'action-update'))}">UPDATE
-                    </td>
-                    <td th:text="${log.ipAddress}">127.0.0.1</td>
-                    <td th:text="${log.message}">Details...</td>
-                </tr>
-            </tbody>
-        </table>
+        <!-- Summary Stats -->
+        <div class="stats-grid" th:if="${!todayCounters.isEmpty()}">
+            <div class="stat-card">
+                <div class="stat-value" th:text="${#numbers.formatInteger(totalDayCount, 1, 'POINT')}">0</div>
+                <div class="stat-label">Aktionen am <span th:text="${selectedDateFormatted}">20.03.2026</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${todayCounters.size()}">0</div>
+                <div class="stat-label">Aktive Zähler</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #f85149;" th:text="${errors.size()}">0</div>
+                <div class="stat-label">Letzte Fehler</div>
+            </div>
+        </div>
+
+        <!-- Day Counters Table -->
+        <div class="section">
+            <h2>📋 Tagesübersicht — <span th:text="${selectedDateFormatted}">20.03.2026</span></h2>
+
+            <div th:if="${todayCounters.isEmpty()}" class="empty-state">
+                <div class="icon">📭</div>
+                <p>Keine Aktivitäten für diesen Tag aufgezeichnet.</p>
+            </div>
+
+            <table class="counter-table" th:if="${!todayCounters.isEmpty()}">
+                <thead>
+                    <tr>
+                        <th data-sort-key="accountId" data-sort-type="number" onclick="sortTable(this)">Account ID <span class="sort-indicator">⇅</span></th>
+                        <th data-sort-key="action" data-sort-type="string" onclick="sortTable(this)">Aktion <span class="sort-indicator">⇅</span></th>
+                        <th data-sort-key="dayCount" data-sort-type="number" style="text-align: right;" onclick="sortTable(this)">Tages-Zähler <span class="sort-indicator">⇅</span></th>
+                        <th data-sort-key="monthCount" data-sort-type="number" style="text-align: right;" onclick="sortTable(this)">Monats-Zähler <span class="sort-indicator">⇅</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="counter : ${todayCounters}">
+                        <td>
+                            <a th:href="@{/admin/client-logs(accountId=${counter.accountId}, date=${selectedDate})}"
+                                class="account-id" style="text-decoration: none;"
+                                th:text="${counter.accountId}">6199827</a>
+                        </td>
+                        <td>
+                            <span class="action-badge"
+                                th:classappend="${counter.action == 'HEARTBEAT'} ? 'badge-heartbeat' : 
+                                               (${counter.action == 'REGISTER'} ? 'badge-register' : 
+                                               (${counter.action.contains('UPDATE')} ? 'badge-update' : 
+                                               (${counter.action.contains('ERROR') || counter.action == 'AUTH_FAILED'} ? 'badge-error' : 
+                                               (${counter.action.contains('INIT')} ? 'badge-init' : 
+                                               (${counter.action.contains('HISTORY')} ? 'badge-history' : 'badge-default')))))"
+                                th:text="${counter.action}">HEARTBEAT</span>
+                        </td>
+                        <td style="text-align: right;">
+                            <span class="counter-value" th:classappend="${counter.count > 100} ? 'high' : ''"
+                                th:text="${#numbers.formatInteger(counter.count, 1, 'POINT')}">500</span>
+                        </td>
+                        <td style="text-align: right;">
+                            <span class="counter-value" style="color: #a371f7;"
+                                th:text="${monthlyTotals.containsKey(counter.accountId + '|' + counter.action)} ? ${#numbers.formatInteger(monthlyTotals.get(counter.accountId + '|' + counter.action), 1, 'POINT')} : '0'">5000</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2>📈 Aktivitäts-Verlauf (Letzte 7 Tage)</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="chartAccount" style="color: #8b949e; font-size: 0.85rem;">Account:</label>
+                    <select id="chartAccount"
+                        style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; font-size: 0.85rem;">
+                        <option value="">Account wählen...</option>
+                        <option th:each="aid : ${allAccountIds}" th:value="${aid}" th:text="${aid}"
+                            th:selected="${filterAccountId != null && filterAccountId == aid}">123</option>
+                    </select>
+                    <select id="chartDays"
+                        style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 4px; font-size: 0.85rem;">
+                        <option value="7" selected>7 Tage</option>
+                        <option value="14">14 Tage</option>
+                        <option value="30">30 Tage</option>
+                    </select>
+                    <button onclick="loadChart()" class="btn" style="font-size: 0.8rem; padding: 6px 14px;">Laden</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+            <div id="chartEmpty" class="empty-state" style="display: none;">
+                <div class="icon">📊</div>
+                <p>Wähle einen Account und klicke "Laden" um den Aktivitäts-Verlauf zu sehen.</p>
+            </div>
+        </div>
+
+        <!-- Error Log -->
+        <div class="section">
+            <h2>🚨 Fehler-Log (letzte 100)</h2>
+            <div th:if="${errors.isEmpty()}" class="empty-state">
+                <div class="icon">✅</div>
+                <p>Keine Fehler aufgezeichnet — alles läuft rund!</p>
+            </div>
+            <div class="scrollable-errors" th:if="${!errors.isEmpty()}">
+                <table class="error-table">
+                    <thead>
+                        <tr>
+                            <th>Zeitpunkt</th>
+                            <th>Account</th>
+                            <th>Aktion</th>
+                            <th>IP</th>
+                            <th>Fehlermeldung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="err : ${errors}">
+                            <td class="timestamp"
+                                th:text="${#temporals.format(err.timestamp, 'dd.MM.yyyy HH:mm:ss')}">20.03.2026
+                                12:00:00</td>
+                            <td>
+                                <a th:href="@{/admin/client-logs(accountId=${err.accountId})}" class="account-id"
+                                    style="text-decoration: none;" th:text="${err.accountId}">6199827</a>
+                            </td>
+                            <td>
+                                <span class="action-badge badge-error" th:text="${err.action}">UPDATE_ERROR</span>
+                            </td>
+                            <td style="color: #8b949e;" th:text="${err.ipAddress}">127.0.0.1</td>
+                            <td class="error-msg" th:text="${err.message}" th:title="${err.message}">Error
+                                details...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+
+    <script th:inline="javascript">
+        let chartInstance = null;
+        let currentSortKey = null;
+        let currentSortDir = 'asc';
+
+        function sortTable(headerEl) {
+            const table = headerEl.closest('table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const sortKey = headerEl.dataset.sortKey;
+            const sortType = headerEl.dataset.sortType;
+
+            // Determine column index from header position
+            const allHeaders = Array.from(headerEl.parentElement.children);
+            const colIndex = allHeaders.indexOf(headerEl);
+
+            // Toggle direction
+            if (currentSortKey === sortKey) {
+                currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortKey = sortKey;
+                currentSortDir = 'asc';
+            }
+
+            // Update header visual indicators
+            allHeaders.forEach(th => {
+                th.classList.remove('sort-active');
+                const ind = th.querySelector('.sort-indicator');
+                if (ind) ind.textContent = '⇅';
+            });
+            headerEl.classList.add('sort-active');
+            const indicator = headerEl.querySelector('.sort-indicator');
+            if (indicator) {
+                indicator.textContent = currentSortDir === 'asc' ? '▲' : '▼';
+            }
+
+            // Extract cell value
+            function getCellValue(row) {
+                const cell = row.children[colIndex];
+                const text = (cell.innerText || cell.textContent).trim();
+                if (sortType === 'number') {
+                    // Remove thousands separators (dots) and parse
+                    return parseFloat(text.replace(/\./g, '').replace(/,/g, '.')) || 0;
+                }
+                return text.toLowerCase();
+            }
+
+            rows.sort((a, b) => {
+                const valA = getCellValue(a);
+                const valB = getCellValue(b);
+                let cmp = 0;
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    cmp = valA - valB;
+                } else {
+                    cmp = String(valA).localeCompare(String(valB));
+                }
+                return currentSortDir === 'asc' ? cmp : -cmp;
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+
+        function applyFilter() {
+            const accountId = document.getElementById('accountFilter').value;
+            const date = document.getElementById('dateFilter').value;
+            let url = '/admin/client-logs?';
+            if (accountId) url += 'accountId=' + accountId + '&';
+            if (date) url += 'date=' + date;
+            window.location.href = url;
+        }
+
+        function navigateDate(offset) {
+            const dateInput = document.getElementById('dateFilter');
+            const current = new Date(dateInput.value);
+            current.setDate(current.getDate() + offset);
+            dateInput.value = current.toISOString().split('T')[0];
+            applyFilter();
+        }
+
+        function setToday() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            document.getElementById('dateFilter').value = `${y}-${m}-${d}`;
+            applyFilter();
+        }
+
+        function loadChart() {
+            const accountId = document.getElementById('chartAccount').value;
+            const days = document.getElementById('chartDays').value;
+            const emptyMsg = document.getElementById('chartEmpty');
+            const canvas = document.getElementById('activityChart');
+
+            if (!accountId) {
+                emptyMsg.style.display = 'block';
+                canvas.style.display = 'none';
+                return;
+            }
+
+            fetch(`/admin/client-logs/chart-data?accountId=${accountId}&days=${days}`)
+                .then(r => r.json())
+                .then(data => {
+                    emptyMsg.style.display = 'none';
+                    canvas.style.display = 'block';
+
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+
+                    if (!data.datasets || data.datasets.length === 0) {
+                        emptyMsg.innerHTML = '<div class="icon">📭</div><p>Keine Daten für diesen Account im gewählten Zeitraum.</p>';
+                        emptyMsg.style.display = 'block';
+                        canvas.style.display = 'none';
+                        return;
+                    }
+
+                    chartInstance = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: data.datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        color: '#c9d1d9',
+                                        padding: 15,
+                                        usePointStyle: true,
+                                        pointStyle: 'rectRounded'
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: '#1c2128',
+                                    titleColor: '#e1e1e1',
+                                    bodyColor: '#c9d1d9',
+                                    borderColor: '#30363d',
+                                    borderWidth: 1,
+                                    padding: 12,
+                                    cornerRadius: 8
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    grid: { color: '#21262d' },
+                                    ticks: { color: '#8b949e' }
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    grid: { color: '#21262d' },
+                                    ticks: { color: '#8b949e' }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error('Chart load failed:', err);
+                    emptyMsg.innerHTML = '<div class="icon">⚠️</div><p>Fehler beim Laden der Chartdaten.</p>';
+                    emptyMsg.style.display = 'block';
+                    canvas.style.display = 'none';
+                });
+        }
+
+        // Auto-load chart if account is pre-selected
+        document.addEventListener('DOMContentLoaded', function () {
+            const chartAccount = document.getElementById('chartAccount');
+            if (chartAccount.value) {
+                loadChart();
+            } else {
+                document.getElementById('chartEmpty').style.display = 'block';
+                document.getElementById('activityChart').style.display = 'none';
+            }
+        });
+    </script>
 </body>
 
 </html>

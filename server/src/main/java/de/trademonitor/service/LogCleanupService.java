@@ -19,7 +19,10 @@ public class LogCleanupService {
     private de.trademonitor.repository.RequestLogRepository requestLogRepository;
 
     @Autowired
-    private de.trademonitor.repository.ClientLogRepository clientLogRepository;
+    private de.trademonitor.repository.ClientActionCounterRepository clientActionCounterRepository;
+
+    @Autowired
+    private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
     /**
      * Runs every day at 2:00 AM server time to clean up old logs.
@@ -46,9 +49,13 @@ public class LogCleanupService {
 
             int clientDays = configService.getLogClientDays();
             if (clientDays > 0) {
-                LocalDateTime cutoff = LocalDateTime.now().minusDays(clientDays);
-                clientLogRepository.deleteByTimestampBefore(cutoff);
-                System.out.println("Deleted Client Logs older than " + clientDays + " days.");
+                java.time.LocalDate dateCutoff = java.time.LocalDate.now().minusDays(clientDays);
+                clientActionCounterRepository.deleteByDateBefore(dateCutoff);
+                System.out.println("Deleted Client Action Counters older than " + clientDays + " days.");
+
+                LocalDateTime timeCutoff = LocalDateTime.now().minusDays(clientDays);
+                clientErrorLogRepository.deleteByTimestampBefore(timeCutoff);
+                System.out.println("Deleted Client Error Logs older than " + clientDays + " days.");
             }
 
         } catch (Exception e) {
