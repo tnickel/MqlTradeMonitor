@@ -45,7 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
                                 "/api/heartbeat", "/api/history", "/css/**", "/js/**",
                                 "/img/**", "/login", "/demo-login", "/impressum", "/privacy",
-                                "/mobile/**")
+                                "/mobile/**", "/api/login", "/api/demo-login", "/api/logout")
                         .permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

@@ -427,10 +427,22 @@
             </table>
         </div>
 
-        <!-- Chart Section -->
+        <!-- Top 10 Bar Chart -->
+        <div class="section">
+            <h2>📈 Top 10 Aktivitäten (Letzte 7 Tage)</h2>
+            <div th:if="${top10Labels.isEmpty()}" class="empty-state">
+                <div class="icon">📭</div>
+                <p>Keine Aktivitätsdaten in den letzten 7 Tagen vorhanden.</p>
+            </div>
+            <div th:if="${!top10Labels.isEmpty()}" class="chart-container" style="height: 420px;">
+                <canvas id="top10Chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Per-Account Chart Section -->
         <div class="section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2>📈 Aktivitäts-Verlauf (Letzte 7 Tage)</h2>
+                <h2>📊 Account-Verlauf (Detail)</h2>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <label for="chartAccount" style="color: #8b949e; font-size: 0.85rem;">Account:</label>
                     <select id="chartAccount"
@@ -453,7 +465,7 @@
             </div>
             <div id="chartEmpty" class="empty-state" style="display: none;">
                 <div class="icon">📊</div>
-                <p>Wähle einen Account und klicke "Laden" um den Aktivitäts-Verlauf zu sehen.</p>
+                <p>Wähle einen Account und klicke "Laden" um den Account-Verlauf zu sehen.</p>
             </div>
         </div>
 
@@ -669,8 +681,75 @@
                 });
         }
 
-        // Auto-load chart if account is pre-selected
+        // --- Top 10 Chart (server-rendered data) ---
         document.addEventListener('DOMContentLoaded', function () {
+            const top10Labels = /*[[${top10Labels}]]*/ [];
+            const top10Values = /*[[${top10Values}]]*/ [];
+
+            if (top10Labels.length > 0) {
+                const top10Canvas = document.getElementById('top10Chart');
+                const barColors = [
+                    '#58a6ff', '#3fb950', '#f0883e', '#a371f7', '#f85149',
+                    '#3dc9b0', '#d2a8ff', '#d29922', '#8b949e', '#79c0ff'
+                ];
+
+                new Chart(top10Canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: top10Labels,
+                        datasets: [{
+                            label: 'Anzahl (7 Tage)',
+                            data: top10Values,
+                            backgroundColor: top10Labels.map((_, i) => barColors[i % barColors.length]),
+                            borderColor: top10Labels.map((_, i) => barColors[i % barColors.length]),
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.7
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1c2128',
+                                titleColor: '#e1e1e1',
+                                bodyColor: '#c9d1d9',
+                                borderColor: '#30363d',
+                                borderWidth: 1,
+                                padding: 12,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: function(ctx) {
+                                        return ctx.parsed.x.toLocaleString('de-DE') + ' Aktionen';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { color: '#21262d' },
+                                ticks: {
+                                    color: '#8b949e',
+                                    callback: function(v) { return v.toLocaleString('de-DE'); }
+                                }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: '#c9d1d9',
+                                    font: { size: 12, family: "'SF Mono', 'Cascadia Code', 'Consolas', monospace" }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Per-account chart
             const chartAccount = document.getElementById('chartAccount');
             if (chartAccount.value) {
                 loadChart();

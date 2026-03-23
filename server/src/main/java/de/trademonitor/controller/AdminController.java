@@ -424,6 +424,32 @@ public class AdminController {
                 selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")));
         model.addAttribute("totalDayCount", totalDayCount);
 
+        // --- Top 10 bar chart data (last 7 days, all accounts) ---
+        java.time.LocalDate chartEnd = java.time.LocalDate.now();
+        java.time.LocalDate chartStart = chartEnd.minusDays(6);
+        java.util.List<de.trademonitor.entity.ClientActionCounter> last7DaysData =
+                clientActionCounterRepository.findByDateBetweenOrderByAccountIdAscDateAsc(chartStart, chartEnd);
+
+        // Aggregate by accountId + action
+        java.util.Map<String, Long> aggregated = new java.util.LinkedHashMap<>();
+        for (de.trademonitor.entity.ClientActionCounter c : last7DaysData) {
+            String key = c.getAccountId() + " / " + c.getAction();
+            aggregated.merge(key, c.getCount(), Long::sum);
+        }
+
+        // Sort by count desc and take top 10
+        java.util.List<java.util.Map.Entry<String, Long>> sorted = new java.util.ArrayList<>(aggregated.entrySet());
+        sorted.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        java.util.List<String> top10Labels = new java.util.ArrayList<>();
+        java.util.List<Long> top10Values = new java.util.ArrayList<>();
+        for (int i = 0; i < Math.min(10, sorted.size()); i++) {
+            top10Labels.add(sorted.get(i).getKey());
+            top10Values.add(sorted.get(i).getValue());
+        }
+
+        model.addAttribute("top10Labels", top10Labels);
+        model.addAttribute("top10Values", top10Values);
+
         return "admin-client-logs";
     }
 
