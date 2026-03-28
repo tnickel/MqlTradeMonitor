@@ -467,17 +467,35 @@
                 </div>
 
                 <div class="form-group"
-                    style="grid-column: span 2; display: flex; gap: 20px; padding: 10px; background-color: #0d1117; border-radius: 4px; border: 1px solid #30363d;">
-                    <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" name="triggerSync" th:checked="${homeyTriggerSync}"
-                            style="margin-right: 8px;">
-                        Bei Sync-Fehler (Real vs Demo)
-                    </label>
-                    <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" name="triggerApi" th:checked="${homeyTriggerApi}"
-                            style="margin-right: 8px;">
-                        Bei API-Fehler
-                    </label>
+                    style="grid-column: span 2; padding: 15px; background-color: #0d1117; border-radius: 4px; border: 1px solid #30363d;">
+                    <div style="color: #8b949e; font-size: 0.85rem; margin-bottom: 10px; font-weight: 600;">🔔 Sirene auslösen bei:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+                        <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="triggerSync" th:checked="${homeyTriggerSync}"
+                                style="margin-right: 8px; accent-color: #6366f1;">
+                            🔄 Sync-Fehler (Real vs Demo)
+                        </label>
+                        <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="triggerApi" th:checked="${homeyTriggerApi}"
+                                style="margin-right: 8px; accent-color: #6366f1;">
+                            ⛔ API-Fehler
+                        </label>
+                        <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="triggerHealth" th:checked="${homeyTriggerHealth}"
+                                style="margin-right: 8px; accent-color: #6366f1;">
+                            🩺 Server Health (CPU/RAM/Disk)
+                        </label>
+                        <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="triggerSecurity" th:checked="${homeyTriggerSecurity}"
+                                style="margin-right: 8px; accent-color: #6366f1;">
+                            🛡️ Security Angriff
+                        </label>
+                        <label style="color: #c9d1d9; display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="triggerOffline" th:checked="${homeyTriggerOffline}"
+                                style="margin-right: 8px; accent-color: #6366f1;">
+                            📡 Account Offline (REAL)
+                        </label>
+                    </div>
                 </div>
 
                 <div class="form-group" style="grid-column: span 2;">

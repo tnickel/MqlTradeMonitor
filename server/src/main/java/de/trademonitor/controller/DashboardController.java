@@ -55,6 +55,12 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.TradeComparisonService tradeComparisonService;
 
+    @Autowired
+    private de.trademonitor.service.SecurityAuditService securityAuditService;
+
+    @Autowired
+    private de.trademonitor.service.ServerHealthMonitorService serverHealthMonitorService;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -711,11 +717,14 @@ public class DashboardController {
             @RequestParam String homeyEvent,
             @RequestParam(required = false) boolean triggerSync,
             @RequestParam(required = false) boolean triggerApi,
+            @RequestParam(required = false) boolean triggerHealth,
+            @RequestParam(required = false) boolean triggerSecurity,
+            @RequestParam(required = false) boolean triggerOffline,
             @RequestParam int repeatCount,
             @RequestParam(defaultValue = "5") int syncAlarmDelayMins) {
 
-        globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi, repeatCount,
-                syncAlarmDelayMins);
+        globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi,
+                triggerHealth, triggerSecurity, triggerOffline, repeatCount, syncAlarmDelayMins);
         return "redirect:/admin";
     }
 
@@ -1154,6 +1163,101 @@ public class DashboardController {
         model.addAttribute("selectedPeriod", period);
 
         return "trade-comparison";
+    }
+
+    @GetMapping("/api/stats/system-status")
+    @ResponseBody
+    public Map<String, Object> getSystemStatus(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        result.put("isAdmin", isAdmin);
+        
+        List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        if (!isAdmin && userDetails != null) {
+            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            accounts = accounts.stream()
+                    .filter(acc -> {
+                        Long id = (Long) acc.get("accountId");
+                        return id != null && allowed.contains(id);
+                    })
+                    .collect(Collectors.toList());
+        }
+        
+        String todayStr = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+
+        List<Map<String, Object>> realAccounts = new ArrayList<>();
+        boolean accountsOk = true;
+        for (Map<String, Object> acc : accounts) {
+            if ("REAL".equals(acc.get("type"))) {
+                Map<String, Object> rAcc = new LinkedHashMap<>();
+                Long accountId = (Long) acc.get("accountId");
+                rAcc.put("accountId", accountId);
+                rAcc.put("name", acc.get("name"));
+                
+                boolean isOnline = Boolean.TRUE.equals(acc.get("online"));
+                boolean hasError = Boolean.TRUE.equals(acc.get("errorState"));
+                boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("syncWarning"));
+                boolean hasAlarm = Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered"));
+                
+                boolean statusOk = isOnline && !hasError && !hasSyncWarning && !hasAlarm;
+                if (!statusOk) accountsOk = false;
+                
+                rAcc.put("statusOk", statusOk);
+                rAcc.put("online", isOnline);
+                rAcc.put("error", hasError);
+                rAcc.put("syncWarning", hasSyncWarning);
+                rAcc.put("alarm", hasAlarm);
+                rAcc.put("openTrades", acc.get("trades"));
+                rAcc.put("profit", acc.get("profit"));
+                rAcc.put("currency", acc.get("currency"));
+                
+                // Calculate today's closed profit
+                double dailyProfit = 0.0;
+                de.trademonitor.model.Account realAccObj = accountManager.getAccount(accountId);
+                if (realAccObj != null && realAccObj.getClosedTrades() != null) {
+                    for (de.trademonitor.model.ClosedTrade ct : realAccObj.getClosedTrades()) {
+                        if (ct.getCloseTime() != null && ct.getCloseTime().startsWith(todayStr)) {
+                            dailyProfit += ct.getProfit() + ct.getSwap() + (ct.getCommission() * realAccObj.getCommissionFactor());
+                        }
+                    }
+                }
+                rAcc.put("dailyProfit", dailyProfit);
+                
+                realAccounts.add(rAcc);
+            }
+        }
+        
+        boolean overallOk = accountsOk;
+        
+        if (isAdmin) {
+            de.trademonitor.dto.SecurityAuditDto audit = securityAuditService.getLatestAudit();
+            boolean attackOk = (audit == null || audit.getOverallStatus() == de.trademonitor.dto.SecurityAuditDto.Status.GREEN);
+            
+            String healthStatus = serverHealthMonitorService.getLastStatus();
+            boolean healthOk = "OK".equals(healthStatus);
+            
+            Map<String, Object> syncMetrics = tradeSyncService.getMetrics();
+            boolean syncOk = "OK".equals(syncMetrics.get("status"));
+            
+            overallOk = accountsOk && attackOk && healthOk && syncOk;
+            
+            Map<String, Object> serverDetails = new LinkedHashMap<>();
+            serverDetails.put("attackOk", attackOk);
+            serverDetails.put("healthOk", healthOk);
+            serverDetails.put("syncOk", syncOk);
+            if (audit != null) {
+                serverDetails.put("attackMessage", audit.getStatusMessage());
+            }
+            serverDetails.put("healthProblems", serverHealthMonitorService.getLastProblems());
+            serverDetails.put("syncStatus", syncMetrics.get("status"));
+            
+            result.put("server", serverDetails);
+        }
+        
+        result.put("overallOk", overallOk);
+        result.put("realAccounts", realAccounts);
+        
+        return result;
     }
 
     private static class ResultComparator {

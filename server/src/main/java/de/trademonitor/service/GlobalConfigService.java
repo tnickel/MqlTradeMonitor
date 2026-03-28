@@ -311,6 +311,9 @@ public class GlobalConfigService {
     public static final String KEY_HOMEY_EVENT = "HOMEY_EVENT";
     public static final String KEY_HOMEY_TRIGGER_SYNC = "HOMEY_TRIGGER_SYNC";
     public static final String KEY_HOMEY_TRIGGER_API = "HOMEY_TRIGGER_API";
+    public static final String KEY_HOMEY_TRIGGER_HEALTH = "HOMEY_TRIGGER_HEALTH";
+    public static final String KEY_HOMEY_TRIGGER_SECURITY = "HOMEY_TRIGGER_SECURITY";
+    public static final String KEY_HOMEY_TRIGGER_OFFLINE = "HOMEY_TRIGGER_OFFLINE";
     public static final String KEY_HOMEY_REPEAT_COUNT = "HOMEY_REPEAT_COUNT";
     public static final String KEY_SYNC_ALARM_DELAY_MINS = "SYNC_ALARM_DELAY_MINS";
 
@@ -343,12 +346,31 @@ public class GlobalConfigService {
                 .orElse(false);
     }
 
+    public boolean isHomeyTriggerHealth() {
+        return repository.findById(KEY_HOMEY_TRIGGER_HEALTH).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(false);
+    }
+
+    public boolean isHomeyTriggerSecurity() {
+        return repository.findById(KEY_HOMEY_TRIGGER_SECURITY).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(false);
+    }
+
+    public boolean isHomeyTriggerOffline() {
+        return repository.findById(KEY_HOMEY_TRIGGER_OFFLINE).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(false);
+    }
+
     public void saveHomeyConfig(String homeyId, String eventName, boolean triggerSync, boolean triggerApi,
+            boolean triggerHealth, boolean triggerSecurity, boolean triggerOffline,
             int repeatCount, int syncAlarmDelayMins) {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_ID, homeyId));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_EVENT, eventName));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_API, String.valueOf(triggerApi)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_HEALTH, String.valueOf(triggerHealth)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SECURITY, String.valueOf(triggerSecurity)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_OFFLINE, String.valueOf(triggerOffline)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
         repository.save(new GlobalConfigEntity(KEY_SYNC_ALARM_DELAY_MINS, String.valueOf(syncAlarmDelayMins)));
         this.cachedSyncAlarmDelayMins = syncAlarmDelayMins;

@@ -29,6 +29,12 @@ public class ServerHealthMonitorService {
     @Autowired
     private AdminNotificationService notificationService;
 
+    @Autowired
+    private HomeyService homeyService;
+
+    @Autowired
+    private GlobalConfigService globalConfigService;
+
     private LocalDateTime lastCheckTime;
     private String lastStatus = "OK";
     private List<String> lastProblems = new ArrayList<>();
@@ -169,6 +175,12 @@ public class ServerHealthMonitorService {
             emailService.sendSyncWarningEmail("⚠️ Server Health Alert", body.toString());
         } catch (Exception e) {
             System.err.println("[HealthMonitor] Failed to send health alert email: " + e.getMessage());
+        }
+
+        // Trigger Homey Siren if enabled for health alerts
+        if (globalConfigService.isHomeyTriggerHealth()) {
+            System.out.println("[HealthMonitor] Triggering Homey siren for health alert.");
+            homeyService.triggerSiren();
         }
     }
 

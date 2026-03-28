@@ -6,6 +6,7 @@ import de.trademonitor.model.ClosedTrade;
 import de.trademonitor.model.Trade;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -21,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AccountManager {
 
     private final Map<Long, Account> accounts = new ConcurrentHashMap<>();
+    /** Tracks which REAL accounts have already triggered an offline siren (to avoid repeated alerts). */
+    private final Set<Long> offlineSirenLatch = ConcurrentHashMap.newKeySet();
 
     @Value("${account.timeout.seconds:60}")
     private int timeoutSeconds;
@@ -435,6 +438,39 @@ public class AccountManager {
      */
     public int getTimeoutSeconds() {
         return timeoutSeconds;
+    }
+
+    /**
+     * Scheduled check (every 2 minutes) for REAL accounts going offline.
+     * Triggers Homey siren if HOMEY_TRIGGER_OFFLINE is enabled.
+     * Uses a latch to prevent repeated alerts for the same account.
+     */
+    @Scheduled(fixedRate = 120000, initialDelay = 120000) // 2 min
+    public void checkAccountsOffline() {
+        if (!globalConfigService.isHomeyTriggerOffline()) {
+            return;
+        }
+
+        for (Account account : accounts.values()) {
+            if (!"REAL".equalsIgnoreCase(account.getType())) {
+                continue; // Only monitor REAL accounts
+            }
+
+            boolean isOnline = account.isOnline(timeoutSeconds);
+
+            if (!isOnline && account.getLastSeen() != null) {
+                // Account is offline — trigger siren if not already latched
+                if (offlineSirenLatch.add(account.getAccountId())) {
+                    System.out.println("[AccountManager] REAL account " + account.getAccountId()
+                            + " (" + (account.getName() != null ? account.getName() : "unnamed")
+                            + ") went OFFLINE — triggering Homey siren.");
+                    homeyService.triggerSiren();
+                }
+            } else if (isOnline) {
+                // Account is back online — reset the latch
+                offlineSirenLatch.remove(account.getAccountId());
+            }
+        }
     }
 
     /**

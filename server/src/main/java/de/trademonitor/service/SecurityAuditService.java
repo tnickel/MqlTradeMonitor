@@ -30,6 +30,12 @@ public class SecurityAuditService {
     @Autowired
     private AdminNotificationService notificationService;
 
+    @Autowired
+    private HomeyService homeyService;
+
+    @Autowired
+    private GlobalConfigService globalConfigService;
+
     public SecurityAuditService() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
@@ -281,6 +287,7 @@ public class SecurityAuditService {
             443,   // HTTPS (Nginx)
             53,    // DNS (systemd-resolved) — localhost only
             631,   // CUPS (print service) — localhost only
+            3002,  // Kursplaner App (Node.js)
             8080,  // WildFly HTTP
             8443,  // WildFly HTTPS
             9990,  // WildFly Management
@@ -451,6 +458,12 @@ public class SecurityAuditService {
                     body.toString());
         } catch (Exception e) {
             System.err.println("[SecurityAudit] Failed to send alert email: " + e.getMessage());
+        }
+
+        // Trigger Homey Siren if enabled for security alerts
+        if (globalConfigService.isHomeyTriggerSecurity()) {
+            System.out.println("[SecurityAudit] Triggering Homey siren for security alert.");
+            homeyService.triggerSiren();
         }
     }
 }
