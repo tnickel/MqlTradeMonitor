@@ -27,6 +27,42 @@
         .metric-value { font-size: 1.5rem; color: #58a6ff; font-weight: bold; }
         
         .chart-container { width: 100%; max-width: 400px; margin: 0 auto; }
+
+        /* Modal styles */
+        .db-modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .db-modal-overlay.active { display: flex; }
+        .db-modal {
+            background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+            width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto;
+            padding: 25px; position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .db-modal h2 { margin-top: 0; color: #e1e1e1; font-size: 1.3rem; border-bottom: 1px solid #30363d; padding-bottom: 12px; }
+        .db-modal-close {
+            position: absolute; top: 12px; right: 16px; background: none; border: none;
+            color: #8b949e; font-size: 1.5rem; cursor: pointer; padding: 5px;
+        }
+        .db-modal-close:hover { color: #f85149; }
+        .db-modal table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .db-modal th { text-align: left; color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid #30363d; }
+        .db-modal td { padding: 8px 10px; border-bottom: 1px solid #21262d; font-size: 0.9rem; }
+        .db-modal tr:hover td { background: rgba(88,166,255,0.05); }
+        .db-modal .bar-cell { width: 30%; }
+        .db-modal .bar-bg { background: #21262d; border-radius: 4px; height: 8px; overflow: hidden; }
+        .db-modal .bar-fill { background: linear-gradient(90deg, #58a6ff, #3fb950); height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+        .db-modal .summary-row { display: flex; gap: 20px; margin-top: 15px; flex-wrap: wrap; }
+        .db-modal .summary-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px 18px; flex: 1; min-width: 150px; }
+        .db-modal .summary-card .label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; }
+        .db-modal .summary-card .val { font-size: 1.2rem; color: #58a6ff; font-weight: bold; margin-top: 4px; }
+        .details-btn {
+            background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3);
+            padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+            margin-top: 8px; transition: all 0.2s;
+        }
+        .details-btn:hover { background: rgba(88,166,255,0.25); }
+        .db-chart-wrap { max-width: 220px; margin: 15px auto 0; }
     </style>
 </head>
 <body>
@@ -65,12 +101,13 @@
                 </div>
 
                 <div class="config-section">
-                    <h2>📁 Datei & Datenbank Größen</h2>
+                    <h2>📁 Datei &amp; Datenbank Größen</h2>
                     <div class="metric-grid">
                         <div class="metric-card">
                             <div class="metric-label">H2 Database Size</div>
                             <div class="metric-value" th:text="${health.dbFileSize}">50 MB</div>
                             <div style="font-size: 0.75rem; color: #8b949e; margin-top: 5px;">trademonitor.mv.db</div>
+                            <button class="details-btn" onclick="openDbDetails()">🔍 Details anzeigen</button>
                         </div>
                         <div class="metric-card">
                             <div class="metric-label">App WAR Size</div>
@@ -128,6 +165,34 @@
             </div>
         </div>
         
+    </div>
+
+    <!-- DB Details Modal -->
+    <div class="db-modal-overlay" id="dbModal">
+        <div class="db-modal">
+            <button class="db-modal-close" onclick="closeDbDetails()">&times;</button>
+            <h2>🗄️ H2 Datenbank — Tabellenübersicht</h2>
+            <div id="dbModalLoading" style="text-align:center; padding: 30px; color: #8b949e;">
+                ⏳ Lade Datenbank-Details...
+            </div>
+            <div id="dbModalContent" style="display:none;">
+                <div class="summary-row" id="dbSummaryRow"></div>
+                <div class="db-chart-wrap">
+                    <canvas id="dbPieChart"></canvas>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tabelle</th>
+                            <th>Zeilen</th>
+                            <th>Geschätzte Größe</th>
+                            <th class="bar-cell">Anteil</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dbTableBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Inject raw data for Chart JS -->
@@ -191,6 +256,94 @@
                     }
                 }
             });
+        });
+
+        // --- DB Details Modal ---
+        let dbPieChartInstance = null;
+
+        function openDbDetails() {
+            document.getElementById('dbModal').classList.add('active');
+            document.getElementById('dbModalLoading').style.display = 'block';
+            document.getElementById('dbModalContent').style.display = 'none';
+
+            fetch('/admin/api/db-details')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('dbModalLoading').style.display = 'none';
+                    document.getElementById('dbModalContent').style.display = 'block';
+
+                    // Summary cards
+                    const summaryEl = document.getElementById('dbSummaryRow');
+                    summaryEl.innerHTML = `
+                        <div class="summary-card">
+                            <div class="label">DB-Datei (Disk)</div>
+                            <div class="val">${data.dbFileFormatted}</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="label">Tabellen gesamt</div>
+                            <div class="val">${data.tables.length}</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="label">Geschätzte Gesamtgröße</div>
+                            <div class="val">${data.totalInternalFormatted}</div>
+                        </div>
+                    `;
+
+                    // Table rows
+                    const tbody = document.getElementById('dbTableBody');
+                    tbody.innerHTML = '';
+                    const maxBytes = data.tables.length > 0 ? Math.max(...data.tables.map(t => t.diskUsedBytes), 1) : 1;
+
+                    data.tables.forEach(t => {
+                        const pct = maxBytes > 0 ? (t.diskUsedBytes / maxBytes * 100) : 0;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-weight: 600; color: #e1e1e1;">${t.tableName}</td>
+                            <td style="color: #8b949e;">${Number(t.rowCount).toLocaleString('de-DE')}</td>
+                            <td style="color: #58a6ff; font-weight: 600;">${t.diskUsedFormatted}</td>
+                            <td class="bar-cell">
+                                <div class="bar-bg"><div class="bar-fill" style="width: ${pct}%"></div></div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    // Pie chart — top 6 tables + Others
+                    if (dbPieChartInstance) { dbPieChartInstance.destroy(); }
+                    const chartColors = ['#58a6ff','#3fb950','#f0883e','#f85149','#a371f7','#3dc9b0','#8b949e'];
+                    const top = data.tables.slice(0, 6);
+                    const othersBytes = data.tables.slice(6).reduce((s, t) => s + t.diskUsedBytes, 0);
+                    const labels = top.map(t => t.tableName);
+                    const values = top.map(t => t.diskUsedBytes);
+                    if (othersBytes > 0) { labels.push('Sonstige'); values.push(othersBytes); }
+                    
+                    const pieCtx = document.getElementById('dbPieChart').getContext('2d');
+                    dbPieChartInstance = new Chart(pieCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{ data: values, backgroundColor: chartColors.slice(0, labels.length), borderColor: '#161b22', borderWidth: 2 }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { color: '#c9d1d9', font: { size: 11 } } }
+                            }
+                        }
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('dbModalLoading').innerHTML = '❌ Fehler beim Laden: ' + err.message;
+                });
+        }
+
+        function closeDbDetails() {
+            document.getElementById('dbModal').classList.remove('active');
+        }
+
+        // Close on backdrop click
+        document.getElementById('dbModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDbDetails();
         });
     </script>
 </body>

@@ -99,6 +99,16 @@ public class AccountManager {
                 }
             }
 
+            // Load eaLogAcceptedAt if available
+            if (ae.getEaLogAcceptedAt() != null && !ae.getEaLogAcceptedAt().isEmpty()) {
+                try {
+                    account.setEaLogAcceptedAt(LocalDateTime.parse(ae.getEaLogAcceptedAt()));
+                } catch (Exception e) {
+                    System.err.println(
+                            "Could not parse eaLogAcceptedAt for account " + ae.getAccountId() + ": " + ae.getEaLogAcceptedAt());
+                }
+            }
+
             // MIGRATION CHECK: If sectionID is null but we have legacy string
             if (account.getSectionId() == null) {
                 Long targetSectionId = sections.get(0).getId(); // Default to top
@@ -339,6 +349,7 @@ public class AccountManager {
             info.put("trades", account.getOpenTrades().size());
             info.put("online", account.isOnline(timeoutSeconds));
             info.put("lastSeen", account.getLastSeen());
+            info.put("eaLogAcceptedAt", account.getEaLogAcceptedAt());
 
             long lastSeenMins = -1;
             if (account.getLastSeen() != null) {
@@ -713,5 +724,14 @@ public class AccountManager {
         });
 
         return result;
+    }
+
+    public void acceptEaLogs(long accountId) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            LocalDateTime now = LocalDateTime.now();
+            account.setEaLogAcceptedAt(now);
+            tradeStorage.updateAccountEaLogAcceptedAt(accountId, now);
+        }
     }
 }

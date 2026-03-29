@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
@@ -46,6 +48,9 @@
                 </button>
                 <button id="view-btn-real" class="view-toggle-btn" onclick="setViewMode('real')">
                     <span>🛡️</span> Real Focus
+                </button>
+                <button th:if="${isAdmin}" title="Alle Protokollwarnungen quittieren" id="accept-all-logs-btn" class="view-toggle-btn" onclick="acceptAllEaLogs()" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);">
+                    <span>✅</span> Accept All
                 </button>
             </div>
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
@@ -529,6 +534,12 @@
                                 class="view-details-btn"
                                 style="flex: 1; background: rgba(122, 162, 247, 0.15); border-color: rgba(122, 162, 247, 0.4); color: var(--accent);">
                                 Trade Compare →
+                            </a>
+                            <a th:href="@{/account/{id}/ea-logs(id=${acc.accountId})}"
+                                class="view-details-btn"
+                                th:style="${acc.eaLogSeverity == 2 ? 'flex: 1; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #ef4444;' : (acc.eaLogSeverity == 1 ? 'flex: 1; background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.4); color: #f97316;' : 'flex: 1; background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #10b981;')}"
+                                title="EA Logs anzeigen">
+                                <i class="fa-solid fa-file-code"></i> EA Logs
                             </a>
                         </div>
                     </div>
@@ -1574,6 +1585,31 @@
 
             fetch('/api/section/delete?id=' + sectionId, { method: 'POST' })
                 .then(r => location.reload());
+        }
+
+        async function acceptAllEaLogs() {
+            if (!confirm("Alle aktuellen Warnungen und Fehler für ALLE Accounts als 'Zur Kenntnis genommen' markieren?")) {
+                return;
+            }
+            try {
+                const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                
+                const response = await fetch(`/admin/api/accounts/accept-all-ea-logs`, {
+                    method: 'POST',
+                    headers: {
+                        [header]: token
+                    }
+                });
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Fehler beim Bestätigen der Logs.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Netzwerkfehler');
+            }
         }
 
     </script>

@@ -1,6 +1,25 @@
 *.class
 *.jar
 
+# Build-Artefakte
+server/target/
+
+# Datenbank-Dateien (H2)
+server/data/*.db
+server/data/*.db.old
+
+# Server-Logs
+server/server_log*.txt
+
+# IDE-Dateien
+server/.classpath
+server/.project
+server/.settings/
+
 # Sensible Infrastruktur-Dokumentation (Server-spezifisch)
 Doku/sicherheits_log.md
 Doku/tips.md
+
+# Claude/Antigravity
+.claude/
+.gemini/

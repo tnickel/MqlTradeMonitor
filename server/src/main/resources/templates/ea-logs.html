@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'EA Logs - ' + ${accountName} + ' | MqlTradeMonitor'">EA Logs</title>
+    <!-- CSRF Token -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+        .glass-button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+        }
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .log-table-container {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+        /* Custom Scrollbar */
+        .log-table-container::-webkit-scrollbar { width: 8px; }
+        .log-table-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .log-table-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .log-table-container::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        
+        /* Log Row Colors */
+        .row-error {
+            background-color: rgba(220, 38, 38, 0.1) !important;
+            color: #fca5a5;
+        }
+        .row-error:hover {
+            background-color: rgba(220, 38, 38, 0.2) !important;
+        }
+        .row-warning {
+            background-color: rgba(217, 119, 6, 0.1) !important;
+            color: #fcd34d;
+        }
+        .row-warning:hover {
+            background-color: rgba(217, 119, 6, 0.2) !important;
+        }
+        .row-normal {
+            color: #e2e8f0;
+        }
+        .row-normal:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        
+        /* Tabs */
+        .tab-btn {
+            padding: 8px 16px;
+            border-bottom: 2px solid transparent;
+            color: #94a3b8;
+            transition: all 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .tab-btn:hover {
+            color: #e2e8f0;
+            background: rgba(255,255,255,0.05);
+        }
+        .tab-btn.active {
+            color: #38bdf8;
+            border-bottom-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                <i class="fa-solid fa-file-code mr-2"></i> EA Logs
+            </h1>
+            <a href="/" class="glass-button text-slate-200 hover:text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Zurück
+            </a>
+        </div>
+
+        <div class="glass-panel overflow-hidden shadow-2xl">
+            <!-- Header section -->
+            <div class="p-6 pb-0 border-b border-white/10 bg-black/20">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                            <span th:text="${accountName}">Account Name</span>
+                        </h2>
+                        <div class="flex items-center gap-4 text-slate-400 text-sm mt-2">
+                            <span class="bg-black/30 px-3 py-1 rounded-full"><i class="fa-solid fa-hashtag mr-1"></i> <span th:text="${accountId}">123</span></span>
+                            <span class="bg-black/30 px-3 py-1 rounded-full"><i class="fa-solid fa-list mr-1"></i> <span id="logCount">0</span> Einträge</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div id="dayStats" class="flex items-center gap-2 mr-2" style="display: none;">
+                            <span class="bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner" title="Infos">
+                                <i class="fa-solid fa-info-circle text-blue-400"></i> <span id="statInfo" class="font-bold">0</span>
+                            </span>
+                            <span class="bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner" title="Warnungen">
+                                <i class="fa-solid fa-triangle-exclamation text-orange-400"></i> <span id="statWarn" class="font-bold">0</span>
+                            </span>
+                            <span class="bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded-md text-sm text-red-200 flex items-center gap-2 shadow-inner" title="Fehler">
+                                <i class="fa-solid fa-circle-xmark text-red-500"></i> <span id="statErr" class="font-bold">0</span>
+                            </span>
+                        </div>
+                        
+                        <div class="flex flex-col items-end mr-2" th:if="${isAdmin}">
+                            <button onclick="acceptEaLogs()" class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(5,150,105,0.3)] shadow-emerald-500/20 font-medium flex items-center gap-2 text-sm shrink-0 mb-1">
+                                <i class="fa-solid fa-check-double"></i> Accept Warnings/Errors
+                            </button>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold" th:if="${eaLogAcceptedAtFormatted != null}">Zuletzt: <span th:text="${eaLogAcceptedAtFormatted}"></span></span>
+                        </div>
+
+                        <button onclick="refreshLogs()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.3)] shadow-blue-500/20 font-medium flex items-center gap-2 shrink-0">
+                            <i class="fa-solid fa-rotate-right" id="refreshIcon"></i> Aktualisieren
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Tabs Container -->
+                <div class="flex overflow-x-auto gap-1 mt-4" id="tabsContainer">
+                    <!-- Tabs injected here -->
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="bg-black/40 log-table-container">
+                <table class="w-full text-left border-collapse">
+                    <thead class="sticky top-0 bg-slate-800/90 backdrop-blur border-b border-white/10 text-slate-300 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold w-48">Server Empfang</th>
+                            <th class="px-6 py-4 font-semibold">MetaTrader Log Meldung</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTableBody" class="text-sm font-mono divide-y divide-white/5">
+                        <!-- Initialization text -->
+                        <tr>
+                            <td colspan="2" class="px-6 py-12 text-center text-slate-500 italic">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Lade Logs...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const accountId = /*[[${accountId}]]*/ 0;
+        let allLogsByDate = {}; // Format: { "28.03.2026": [logs...], "27.03.2026": [logs...] }
+        let activeTabDate = null;
+
+        // Initialize on load
+        document.addEventListener("DOMContentLoaded", () => {
+            refreshLogs();
+        });
+
+        function refreshLogs() {
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('fa-spin');
+            
+            fetch('/api/ea-logs/' + accountId)
+                .then(response => response.json())
+                .then(data => {
+                    processLogData(data);
+                })
+                .catch(error => {
+                    console.error("Error refreshing logs:", error);
+                    document.getElementById('logTableBody').innerHTML = `
+                        <tr><td colspan="2" class="px-6 py-12 text-center text-red-400"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Fehler beim Laden der Logs.</td></tr>
+                    `;
+                })
+                .finally(() => {
+                    setTimeout(() => icon.classList.remove('fa-spin'), 500);
+                });
+        }
+
+        function processLogData(logs) {
+            allLogsByDate = {};
+            document.getElementById('logCount').textContent = logs ? logs.length : 0;
+            
+            if (!logs || logs.length === 0) {
+                renderEmptyState();
+                return;
+            }
+
+            // Group by date
+            logs.forEach(log => {
+                let dateStr = "Unbekannt";
+                let timeStr = "";
+                
+                try {
+                    let dt = null;
+                    if (!log.timestamp) {
+                        // null or undefined
+                    } else if (Array.isArray(log.timestamp)) {
+                        // Spring Jackson returns [YYYY, MM, DD, HH, mm, ss, ns]
+                        dt = new Date(
+                            log.timestamp[0], 
+                            log.timestamp[1] - 1, 
+                            log.timestamp[2], 
+                            log.timestamp[3] || 0, 
+                            log.timestamp[4] || 0, 
+                            log.timestamp[5] || 0
+                        );
+                    } else if (typeof log.timestamp === 'object' && log.timestamp.year) {
+                        // Spring Jackson serializing LocalDateTime as raw POJO
+                        dt = new Date(
+                            log.timestamp.year,
+                            (log.timestamp.monthValue || 1) - 1,
+                            log.timestamp.dayOfMonth || 1,
+                            log.timestamp.hour || 0,
+                            log.timestamp.minute || 0,
+                            log.timestamp.second || 0
+                        );
+                    } else if (typeof log.timestamp === 'string') {
+                        // Handle "dd.MM.yyyy HH:mm:ss" from DashboardController string formatting
+                        const match = log.timestamp.match(/^(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2}):(\d{2})$/);
+                        if (match) {
+                            dt = new Date(
+                                parseInt(match[3], 10),
+                                parseInt(match[2], 10) - 1,
+                                parseInt(match[1], 10),
+                                parseInt(match[4], 10),
+                                parseInt(match[5], 10),
+                                parseInt(match[6], 10)
+                            );
+                        } else {
+                            // Fallback for standard ISO strings
+                            dt = new Date(log.timestamp);
+                        }
+                    } else {
+                        dt = new Date(log.timestamp);
+                    }
+
+                    if (dt && !isNaN(dt.getTime())) {
+                        const dd = String(dt.getDate()).padStart(2, '0');
+                        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                        const yyyy = dt.getFullYear();
+                        dateStr = `${dd}.${mm}.${yyyy}`;
+                        
+                        const hh = String(dt.getHours()).padStart(2, '0');
+                        const mins = String(dt.getMinutes()).padStart(2, '0');
+                        const ss = String(dt.getSeconds()).padStart(2, '0');
+                        timeStr = `${hh}:${mins}:${ss}`;
+                    }
+                } catch(e) {
+                    console.error("Date parsing error:", e);
+                }
+                
+                if (!allLogsByDate[dateStr]) {
+                    allLogsByDate[dateStr] = [];
+                }
+                
+                allLogsByDate[dateStr].push({
+                    timeStr: timeStr,
+                    rawTime: log.timestamp,
+                    message: log.logLine
+                });
+            });
+
+            // Get sorted dates (newest first)
+            const sortedDates = Object.keys(allLogsByDate).sort((a, b) => {
+                // Simple sort logic: convert DD.MM.YYYY to YYYYMMDD for comparison
+                const partsA = a.split('.');
+                const partsB = b.split('.');
+                if(partsA.length === 3 && partsB.length === 3) {
+                    const numA = parseInt(partsA[2] + partsA[1] + partsA[0]);
+                    const numB = parseInt(partsB[2] + partsB[1] + partsB[0]);
+                    return numB - numA; // Descending
+                }
+                return 0;
+            });
+
+            // Set active tab
+            if (!activeTabDate || !allLogsByDate[activeTabDate]) {
+                activeTabDate = sortedDates[0];
+            }
+
+            renderTabs(sortedDates);
+            renderTable(activeTabDate);
+        }
+
+        function renderTabs(dates) {
+            const container = document.getElementById('tabsContainer');
+            container.innerHTML = '';
+            
+            dates.forEach(date => {
+                const count = allLogsByDate[date].length;
+                const btn = document.createElement('button');
+                btn.className = `tab-btn font-medium ${date === activeTabDate ? 'active' : ''}`;
+                btn.innerHTML = `<i class="fa-regular fa-calendar mr-2"></i>${date} <span class="ml-1 text-xs px-2 py-0.5 rounded-full ${date === activeTabDate ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10'}">${count}</span>`;
+                btn.onclick = () => {
+                    activeTabDate = date;
+                    renderTabs(dates); // re-render tabs to update active state
+                    renderTable(date);
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function renderTable(date) {
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+            
+            const logs = allLogsByDate[date];
+            if (!logs || logs.length === 0) {
+                renderEmptyState();
+                return;
+            }
+
+            let infoCount = 0;
+            let warnCount = 0;
+            let errCount = 0;
+
+            logs.forEach(log => {
+                const tr = document.createElement('tr');
+                const msgLower = log.message.toLowerCase();
+                
+                // Color Logic
+                let iconHtml = '';
+                if (msgLower.includes('error') || msgLower.includes('failed') || msgLower.includes('exception')) {
+                    errCount++;
+                    tr.className = 'row-error transition-colors';
+                    iconHtml = '<i class="fa-solid fa-circle-xmark mr-2 text-red-500"></i>';
+                } else if (msgLower.includes('warning') || msgLower.includes('warn ')) {
+                    warnCount++;
+                    tr.className = 'row-warning transition-colors';
+                    iconHtml = '<i class="fa-solid fa-triangle-exclamation mr-2 text-orange-400"></i>';
+                } else {
+                    infoCount++;
+                    tr.className = 'row-normal';
+                    iconHtml = '<i class="fa-solid fa-info-circle mr-2 opacity-30"></i>';
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-3 whitespace-nowrap border-r border-white/5 opacity-80">
+                        ${log.timeStr}
+                    </td>
+                    <td class="px-6 py-3 break-all flex items-start">
+                        <span class="mt-0.5">${iconHtml}</span>
+                        <span class="flex-1">${escapeHtml(log.message)}</span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            // Update the stats overview
+            document.getElementById('statInfo').textContent = infoCount;
+            document.getElementById('statWarn').textContent = warnCount;
+            document.getElementById('statErr').textContent = errCount;
+            document.getElementById('dayStats').style.display = 'flex';
+        }
+
+        function renderEmptyState() {
+            document.getElementById('tabsContainer').innerHTML = '';
+            document.getElementById('dayStats').style.display = 'none';
+            document.getElementById('logTableBody').innerHTML = `
+                <tr>
+                    <td colspan="2" class="px-6 py-16 text-center text-slate-500 italic">
+                        <i class="fa-regular fa-folder-open text-4xl mb-4 block opacity-50"></i>
+                        Keine Logs für diesen Account gefunden.
+                    </td>
+                </tr>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function acceptEaLogs() {
+            if (!confirm("Alle aktuellen Warnungen und Fehler für diesen Account als 'Zur Kenntnis genommen' markieren? (Die Kachel auf dem Dashboard wird wieder grün)")) {
+                return;
+            }
+            try {
+                const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                
+                const response = await fetch(`/admin/api/accounts/${accountId}/accept-ea-logs`, {
+                    method: 'POST',
+                    headers: {
+                        [header]: token
+                    }
+                });
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Fehler beim Bestätigen der Logs.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Netzwerkfehler');
+            }
+        }
+    </script>
+</body>
+</html>

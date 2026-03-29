@@ -24,6 +24,9 @@ public class LogCleanupService {
     @Autowired
     private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
+    @Autowired
+    private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
+
     /**
      * Runs every day at 2:00 AM server time to clean up old logs.
      * Cron expression: Second Minute Hour Day Month Weekday
@@ -56,6 +59,13 @@ public class LogCleanupService {
                 LocalDateTime timeCutoff = LocalDateTime.now().minusDays(clientDays);
                 clientErrorLogRepository.deleteByTimestampBefore(timeCutoff);
                 System.out.println("Deleted Client Error Logs older than " + clientDays + " days.");
+            }
+
+            int eaLogDays = configService.getLogEaDays();
+            if (eaLogDays > 0) {
+                LocalDateTime cutoff = LocalDateTime.now().minusDays(eaLogDays);
+                eaLogEntryRepository.deleteByTimestampBefore(cutoff);
+                System.out.println("Deleted EA Log Entries older than " + eaLogDays + " days.");
             }
 
         } catch (Exception e) {

@@ -20,6 +20,7 @@ public class AccountEntity {
     private String type; // "DEMO" or "REAL"
     private String registeredAt;
     private String lastSeen;
+    private String eaLogAcceptedAt; // ISO timestamp string
 
     private String section; // "TOP" or "BOTTOM" (Deprecated, use sectionId)
 
@@ -108,6 +109,14 @@ public class AccountEntity {
 
     public void setLastSeen(String lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+    public String getEaLogAcceptedAt() {
+        return eaLogAcceptedAt;
+    }
+
+    public void setEaLogAcceptedAt(String eaLogAcceptedAt) {
+        this.eaLogAcceptedAt = eaLogAcceptedAt;
     }
 
     public String getName() {

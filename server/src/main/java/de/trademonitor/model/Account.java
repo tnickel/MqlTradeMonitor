@@ -20,6 +20,7 @@ public class Account {
     private String type; // "DEMO" or "REAL"
     private LocalDateTime lastSeen; // DO NOT DEFAULT TO NOW!
     private LocalDateTime registeredAt;
+    private LocalDateTime eaLogAcceptedAt;
 
     private String section = "TOP"; // Default to TOP (Deprecated)
     private Long sectionId;
@@ -205,6 +206,14 @@ public class Account {
 
     public void setRegisteredAt(LocalDateTime registeredAt) {
         this.registeredAt = registeredAt;
+    }
+
+    public LocalDateTime getEaLogAcceptedAt() {
+        return eaLogAcceptedAt;
+    }
+
+    public void setEaLogAcceptedAt(LocalDateTime eaLogAcceptedAt) {
+        this.eaLogAcceptedAt = eaLogAcceptedAt;
     }
 
     public List<Trade> getOpenTrades() {

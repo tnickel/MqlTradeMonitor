@@ -35,6 +35,9 @@ public class ApiController {
     private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
     @Autowired
+    private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
+
+    @Autowired
     private de.trademonitor.service.EmailService emailService;
 
     private void logClientAction(Long accountId, String action, String message,
@@ -284,6 +287,54 @@ public class ApiController {
         } catch (Exception e) {
             logClientAction(request.getAccountId(), "HISTORY_ERROR", e.getMessage(), httpRequest);
             accountManager.reportError(request.getAccountId(), "History Error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Receive EA log entries from MetaTrader.
+     * The EA sends new log lines incrementally.
+     */
+    @PostMapping("/ea-logs")
+    public ResponseEntity<?> receiveEaLogs(@RequestBody Map<String, Object> request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        Long accountId = null;
+        try {
+            Object idObj = request.get("accountId");
+            if (idObj instanceof Number) {
+                accountId = ((Number) idObj).longValue();
+            }
+            if (accountId == null) {
+                return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Missing accountId"));
+            }
+
+            @SuppressWarnings("unchecked")
+            java.util.List<String> logEntries = (java.util.List<String>) request.get("logEntries");
+            if (logEntries == null || logEntries.isEmpty()) {
+                return ResponseEntity.ok(Map.of("status", "ok", "stored", 0));
+            }
+
+            int stored = 0;
+            java.util.List<de.trademonitor.entity.EaLogEntry> entities = new java.util.ArrayList<>();
+            for (String line : logEntries) {
+                if (line != null && !line.trim().isEmpty()) {
+                    entities.add(new de.trademonitor.entity.EaLogEntry(accountId, line));
+                    stored++;
+                }
+            }
+            if (!entities.isEmpty()) {
+                eaLogEntryRepository.saveAll(entities);
+            }
+
+            logClientAction(accountId, "EA_LOG_UPLOAD", "Lines: " + stored, httpRequest);
+
+            return ResponseEntity.ok(Map.of("status", "ok", "stored", stored));
+        } catch (Exception e) {
+            if (accountId != null) {
+                logClientAction(accountId, "EA_LOG_ERROR", e.getMessage(), httpRequest);
+            }
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));

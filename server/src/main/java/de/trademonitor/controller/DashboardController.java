@@ -61,6 +61,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.ServerHealthMonitorService serverHealthMonitorService;
 
+    @Autowired
+    private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -101,8 +104,11 @@ public class DashboardController {
                            Model model) {
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
 
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        model.addAttribute("isAdmin", isAdmin);
+
         // Filter by user permissions
-        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+        if (userDetails != null && !isAdmin) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
             allAccounts = allAccounts.stream()
                     .filter(acc -> {
@@ -123,7 +129,15 @@ public class DashboardController {
         }
 
         int totalTradesCount = 0;
+        java.time.LocalDateTime logCutoff = java.time.LocalDateTime.now().minusHours(24);
         for (java.util.Map<String, Object> acc : allAccounts) {
+            Long accId = (Long) acc.get("accountId");
+            if (accId != null) {
+                java.time.LocalDateTime acceptedAt = (java.time.LocalDateTime) acc.get("eaLogAcceptedAt");
+                Integer severity = eaLogEntryRepository.getLogSeverityForAccountSince(accId, logCutoff, acceptedAt);
+                acc.put("eaLogSeverity", severity != null ? severity : 0);
+            }
+
             Long sectionId = (Long) acc.get("sectionId");
             // Fallback if null (should handled by migration, but safety check)
             if (sectionId == null && !sections.isEmpty()) {
@@ -1257,6 +1271,57 @@ public class DashboardController {
         result.put("overallOk", overallOk);
         result.put("realAccounts", realAccounts);
         
+        return result;
+    }
+
+    /**
+     * EA Logs page for a specific account.
+     */
+    @GetMapping("/account/{accountId}/ea-logs")
+    public String eaLogs(@PathVariable Long accountId, Model model) {
+        model.addAttribute("accountId", accountId);
+        
+        // Get account name for display
+        var acc = accountManager.getAllAccounts().stream()
+                .filter(a -> a.getAccountId() == accountId)
+                .findFirst().orElse(null);
+        model.addAttribute("accountName", acc != null && acc.getName() != null && !acc.getName().isEmpty() ? acc.getName() : String.valueOf(accountId));
+        
+        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop500ByAccountIdOrderByTimestampDesc(accountId);
+        model.addAttribute("logs", logs);
+        model.addAttribute("logCount", eaLogEntryRepository.countByAccountId(accountId));
+
+        java.time.LocalDateTime acceptedAt = acc != null ? acc.getEaLogAcceptedAt() : null;
+        if (acceptedAt != null) {
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+            model.addAttribute("eaLogAcceptedAtFormatted", acceptedAt.format(formatter));
+        } else {
+            model.addAttribute("eaLogAcceptedAtFormatted", null);
+        }
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        model.addAttribute("isAdmin", isAdmin);
+        
+        return "ea-logs";
+    }
+
+    /**
+     * REST API to fetch EA logs for AJAX refreshing.
+     */
+    @GetMapping("/api/ea-logs/{accountId}")
+    @ResponseBody
+    public java.util.List<java.util.Map<String, Object>> getEaLogsApi(@PathVariable Long accountId) {
+        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop500ByAccountIdOrderByTimestampDesc(accountId);
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        for (de.trademonitor.entity.EaLogEntry log : logs) {
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", log.getId());
+            item.put("timestamp", log.getTimestamp() != null ? log.getTimestamp().format(fmt) : "");
+            item.put("logLine", log.getLogLine());
+            result.add(item);
+        }
         return result;
     }
 

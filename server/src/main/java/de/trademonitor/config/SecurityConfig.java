@@ -48,7 +48,7 @@ public class SecurityConfig {
                 .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
-                                "/api/heartbeat", "/api/history", "/css/**", "/js/**",
+                                "/api/heartbeat", "/api/history", "/api/ea-logs", "/css/**", "/js/**",
                                 "/img/**", "/login", "/demo-login", "/impressum", "/privacy",
                                 "/mobile/**", "/api/login", "/api/demo-login", "/api/logout")
                         .permitAll()

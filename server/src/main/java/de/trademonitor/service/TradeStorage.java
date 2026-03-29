@@ -85,6 +85,17 @@ public class TradeStorage {
     }
 
     /**
+     * Update the eaLogAcceptedAt timestamp for a specific account.
+     */
+    public void updateAccountEaLogAcceptedAt(long accountId, LocalDateTime timestamp) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setEaLogAcceptedAt(timestamp != null ? timestamp.toString() : null);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Update magic number max age for a specific account.
      */
     public void updateAccountMagicMaxAge(long accountId, int days) {

@@ -46,6 +46,12 @@ public class AdminController {
     @Autowired
     private de.trademonitor.service.AdminNotificationService adminNotificationService;
 
+    @Autowired
+    private de.trademonitor.service.AccountManager accountManager;
+
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
     @GetMapping("")
     public String adminDashboard(Model model) {
         // --- 1. Admin Stats (migrated from DashboardController) ---
@@ -113,6 +119,7 @@ public class AdminController {
         model.addAttribute("logLoginDays", globalConfigService.getLogLoginDays());
         model.addAttribute("logConnDays", globalConfigService.getLogConnDays());
         model.addAttribute("logClientDays", globalConfigService.getLogClientDays());
+        model.addAttribute("logEaDays", globalConfigService.getLogEaDays());
 
         // Homey Config
         model.addAttribute("homeyId", globalConfigService.getHomeyId());
@@ -279,8 +286,9 @@ public class AdminController {
     public String saveLogRetention(
             @RequestParam int logLoginDays,
             @RequestParam int logConnDays,
-            @RequestParam int logClientDays) {
-        globalConfigService.saveLogRetentionConfig(logLoginDays, logConnDays, logClientDays);
+            @RequestParam int logClientDays,
+            @RequestParam(defaultValue = "30") int logEaDays) {
+        globalConfigService.saveLogRetentionConfig(logLoginDays, logConnDays, logClientDays, logEaDays);
         return "redirect:/admin";
     }
 
@@ -626,5 +634,125 @@ public class AdminController {
         if (v < 1024) return v + " B";
         int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
         return String.format(java.util.Locale.US, "%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/accounts/{id}/accept-ea-logs")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> acceptEaLogs(@org.springframework.web.bind.annotation.PathVariable("id") long accountId) {
+        accountManager.acceptEaLogs(accountId);
+        return java.util.Map.of("status", "ok");
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/accounts/accept-all-ea-logs")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> acceptAllEaLogs() {
+        for (de.trademonitor.entity.AccountEntity acc : accountRepository.findAll()) {
+            accountManager.acceptEaLogs(acc.getAccountId());
+        }
+        return java.util.Map.of("status", "ok");
+    }
+
+    @GetMapping("/api/db-details")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> dbDetails() {
+        java.util.List<java.util.Map<String, Object>> tables = new java.util.ArrayList<>();
+        long totalBytes = 0;
+
+        try (java.sql.Connection conn = dataSource.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+
+            // Step 1: Get all table names and row counts
+            java.util.Map<String, Long> rowCounts = new java.util.LinkedHashMap<>();
+            java.sql.ResultSet rs = stmt.executeQuery(
+                "SELECT TABLE_NAME, COALESCE(ROW_COUNT_ESTIMATE, 0) AS ROW_EST " +
+                "FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'PUBLIC' ORDER BY TABLE_NAME"
+            );
+            while (rs.next()) {
+                rowCounts.put(rs.getString("TABLE_NAME"), rs.getLong("ROW_EST"));
+            }
+            rs.close();
+
+            // Step 2: For each table, estimate row size from column metadata
+            for (java.util.Map.Entry<String, Long> entry : rowCounts.entrySet()) {
+                String tableName = entry.getKey();
+                long rowCount = entry.getValue();
+                long estRowSize = 0;
+
+                java.sql.ResultSet colRs = stmt.executeQuery(
+                    "SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) AS MAX_LEN, " +
+                    "COALESCE(NUMERIC_PRECISION, 0) AS NUM_PREC " +
+                    "FROM INFORMATION_SCHEMA.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = '" + tableName + "'"
+                );
+                while (colRs.next()) {
+                    String dataType = colRs.getString("DATA_TYPE").toUpperCase();
+                    long maxLen = colRs.getLong("MAX_LEN");
+
+                    // Estimate bytes per column per row
+                    long colSize;
+                    switch (dataType) {
+                        case "BIGINT":
+                        case "TIMESTAMP":
+                        case "TIMESTAMP WITH TIME ZONE":
+                        case "DOUBLE":
+                        case "DOUBLE PRECISION":
+                            colSize = 8; break;
+                        case "INTEGER":
+                        case "INT":
+                        case "REAL":
+                        case "FLOAT":
+                            colSize = 4; break;
+                        case "SMALLINT":
+                        case "TINYINT":
+                            colSize = 2; break;
+                        case "BOOLEAN":
+                        case "BIT":
+                            colSize = 1; break;
+                        case "CHARACTER VARYING":
+                        case "VARCHAR":
+                        case "CLOB":
+                        case "CHARACTER LARGE OBJECT":
+                            // Estimate average fill as 40% of max length, min 20 bytes
+                            colSize = Math.max(20, maxLen * 2 / 5);
+                            break;
+                        default:
+                            colSize = 16; // general fallback
+                    }
+                    estRowSize += colSize;
+                }
+                colRs.close();
+
+                // Add ~16 bytes overhead per row for H2 internal bookkeeping
+                estRowSize += 16;
+
+                long estTableSize = rowCount * estRowSize;
+                java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("tableName", tableName);
+                row.put("diskUsedBytes", estTableSize);
+                row.put("diskUsedFormatted", formatSize(estTableSize));
+                row.put("rowCount", rowCount);
+                tables.add(row);
+                totalBytes += estTableSize;
+            }
+
+            // Sort by estimated size descending
+            tables.sort((a, b) -> Long.compare((Long)b.get("diskUsedBytes"), (Long)a.get("diskUsedBytes")));
+
+        } catch (Exception e) {
+            System.err.println("[AdminController] DB details error: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        // Also report the .mv.db file size
+        java.io.File dbFile = new java.io.File(System.getProperty("user.home") + "/trademonitor_data/trademonitor.mv.db");
+        long fileSize = dbFile.exists() ? dbFile.length() : 0;
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("tables", tables);
+        result.put("totalInternalBytes", totalBytes);
+        result.put("totalInternalFormatted", formatSize(totalBytes));
+        result.put("dbFileBytes", fileSize);
+        result.put("dbFileFormatted", formatSize(fileSize));
+        return result;
     }
 }

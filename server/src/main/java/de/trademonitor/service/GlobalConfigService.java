@@ -45,6 +45,7 @@ public class GlobalConfigService {
     public static final String KEY_LOG_LOGIN_DAYS = "LOG_LOGIN_DAYS";
     public static final String KEY_LOG_CONN_DAYS = "LOG_CONN_DAYS";
     public static final String KEY_LOG_CLIENT_DAYS = "LOG_CLIENT_DAYS";
+    public static final String KEY_LOG_EA_DAYS = "LOG_EA_DAYS";
 
     // Cache the value to avoid hitting DB on every request
     // cachedMaxAgeDays removed — now stored per-account in AccountEntity
@@ -61,6 +62,7 @@ public class GlobalConfigService {
     private int cachedLogLoginDays = 360;
     private int cachedLogConnDays = 3;
     private int cachedLogClientDays = 3;
+    private int cachedLogEaDays = 30;
 
     // Security Config Keys
     public static final String KEY_SEC_RATE_LIMIT_ENABLED = "SEC_RATE_LIMIT_ENABLED";
@@ -140,6 +142,12 @@ public class GlobalConfigService {
         repository.findById(KEY_LOG_CLIENT_DAYS).ifPresent(entity -> {
             try {
                 cachedLogClientDays = Integer.parseInt(entity.getConfValue());
+            } catch (NumberFormatException e) {
+            }
+        });
+        repository.findById(KEY_LOG_EA_DAYS).ifPresent(entity -> {
+            try {
+                cachedLogEaDays = Integer.parseInt(entity.getConfValue());
             } catch (NumberFormatException e) {
             }
         });
@@ -416,13 +424,23 @@ public class GlobalConfigService {
         return cachedLogClientDays;
     }
 
+    public int getLogEaDays() {
+        return cachedLogEaDays;
+    }
+
     public void saveLogRetentionConfig(int loginDays, int connDays, int clientDays) {
+        saveLogRetentionConfig(loginDays, connDays, clientDays, cachedLogEaDays);
+    }
+
+    public void saveLogRetentionConfig(int loginDays, int connDays, int clientDays, int eaDays) {
         this.cachedLogLoginDays = loginDays;
         this.cachedLogConnDays = connDays;
         this.cachedLogClientDays = clientDays;
+        this.cachedLogEaDays = eaDays;
         repository.save(new GlobalConfigEntity(KEY_LOG_LOGIN_DAYS, String.valueOf(loginDays)));
         repository.save(new GlobalConfigEntity(KEY_LOG_CONN_DAYS, String.valueOf(connDays)));
         repository.save(new GlobalConfigEntity(KEY_LOG_CLIENT_DAYS, String.valueOf(clientDays)));
+        repository.save(new GlobalConfigEntity(KEY_LOG_EA_DAYS, String.valueOf(eaDays)));
     }
 
     public void setSyncExemptMagicNumbers(Set<Long> magicNumbers) {
