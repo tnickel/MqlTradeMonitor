@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics – Trade Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-primary: #020617;
+            --bg-secondary: rgba(15, 23, 42, 0.6);
+            --bg-card: rgba(30, 41, 59, 0.5);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #8b5cf6;
+            --accent2: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass-blur: blur(12px);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-primary);
+            background-image: radial-gradient(at 10% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+                              radial-gradient(at 80% 80%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ===== HEADER ===== */
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+        .page-header h1 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #a78bfa, #818cf8, #7dd3fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: #fff; }
+
+        /* ===== TABS ===== */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 2rem;
+            background: rgba(255,255,255,0.03);
+            padding: 6px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 14px 24px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: -0.01em;
+        }
+        .tab-btn:hover {
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--text-secondary);
+        }
+        .tab-btn.active {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(99, 102, 241, 0.2));
+            color: #fff;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== GLASS PANELS ===== */
+        .glass-panel {
+            background: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+        .panel-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ===== HEATMAP ===== */
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(24, 1fr);
+            gap: 2px;
+            overflow-x: auto;
+        }
+        .heatmap-header {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 4px 0;
+            font-weight: 700;
+        }
+        .heatmap-day-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            padding-right: 8px;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.6);
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.3);
+            z-index: 10;
+            box-shadow: 0 0 12px rgba(0,0,0,0.5);
+        }
+
+        /* ===== HEATMAP TOOLTIP ===== */
+        .heatmap-tooltip {
+            display: none;
+            position: fixed;
+            background: #1a1b26ee;
+            border: 1px solid #414868;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.82rem;
+            color: #c0caf5;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            min-width: 180px;
+        }
+        .heatmap-tooltip .tt-title {
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        .heatmap-tooltip .tt-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 2px 0;
+        }
+        .heatmap-tooltip .tt-label { color: var(--text-muted); }
+        .heatmap-tooltip .tt-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+
+        /* ===== LEADERBOARD TABLE ===== */
+        .lb-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 4px;
+        }
+        .lb-table th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+            white-space: nowrap;
+        }
+        .lb-table th:hover { color: var(--accent); }
+        .lb-table th.sorted { color: var(--accent); }
+        .lb-table td {
+            padding: 12px;
+            background: rgba(255,255,255,0.02);
+            border-top: 1px solid transparent;
+            border-bottom: 1px solid transparent;
+            font-size: 0.88rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .lb-table tr:hover td { background: rgba(139, 92, 246, 0.06); }
+        .lb-table td:first-child { border-radius: 8px 0 0 8px; }
+        .lb-table td:last-child { border-radius: 0 8px 8px 0; }
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            font-weight: 900;
+            font-size: 0.8rem;
+        }
+        .rank-1 { background: linear-gradient(135deg, #ffd700, #ffb800); color: #000; }
+        .rank-2 { background: linear-gradient(135deg, #c0c0c0, #a0a0a0); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #cd7f32, #b06c28); color: #fff; }
+        .rank-default { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .kpi-good { color: var(--success); }
+        .kpi-bad { color: var(--danger); }
+        .kpi-neutral { color: var(--text-secondary); }
+        .sparkline-canvas { width: 80px; height: 28px; }
+
+        /* ===== CORRELATION MATRIX ===== */
+        .corr-matrix {
+            display: inline-grid;
+            gap: 3px;
+            margin: 1rem auto;
+        }
+        .corr-cell {
+            width: 52px;
+            height: 52px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            transition: transform 0.15s;
+            cursor: default;
+        }
+        .corr-cell:hover { transform: scale(1.1); z-index: 5; }
+        .corr-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 4px 2px;
+            max-width: 52px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        /* ===== FILTER BAR ===== */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .filter-pill {
+            padding: 6px 16px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-pill:hover { background: rgba(139, 92, 246, 0.1); color: #fff; }
+        .filter-pill.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+        }
+
+        /* ===== LOADING ===== */
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .positive { color: var(--success); }
+        .negative { color: var(--danger); }
+        .text-right { text-align: right; }
+
+        /* ===== CHART CONTAINERS ===== */
+        .chart-wrap {
+            position: relative;
+            height: 400px;
+            background: rgba(0,0,0,0.15);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        /* ===== INFO BOXES ===== */
+        .info-box {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(99, 102, 241, 0.04));
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+        .info-box strong {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+        .info-box .info-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #c4b5fd;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .info-box ul {
+            margin: 0.5rem 0 0 1rem;
+            padding: 0;
+        }
+        .info-box li {
+            margin-bottom: 4px;
+        }
+        .info-box code {
+            background: rgba(139, 92, 246, 0.15);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #a78bfa;
+        }
+        .kpi-explain-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            margin-top: 0.75rem;
+        }
+        .kpi-explain-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+        }
+        .kpi-explain-card .kpi-name {
+            font-weight: 800;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+        .kpi-explain-card .kpi-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .kpi-explain-card .kpi-formula {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: #a78bfa;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h1>📈 Analytics</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Strategy Performance • Portfolio Korrelation • Risk Analytics</p>
+            </div>
+            <a href="/" class="back-link">← Dashboard</a>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('heatmap')">🔥 Heatmap</button>
+            <button class="tab-btn" onclick="switchTab('leaderboard')">🏆 Strategy Leaderboard</button>
+            <button class="tab-btn" onclick="switchTab('portfolio')">📊 Portfolio Analytics</button>
+        </div>
+
+        <!-- ==================== TAB 1: HEATMAP ==================== -->
+        <div id="tab-heatmap" class="tab-panel active">
+            <div class="info-box">
+                <div class="info-title">ℹ️ Was zeigt die Heatmap?</div>
+                Diese Heatmap visualisiert die <strong>Profitabilität aller abgeschlossenen Trades</strong>, aufgeschlüsselt nach <strong>Wochentag</strong> (Zeilen) und <strong>Stunde</strong> (Spalten).
+                Jede Zelle zeigt die Summe aller Gewinne/Verluste für diesen Zeitslot.
+                <ul>
+                    <li><strong>Grüne Zellen</strong> = profitabler Zeitraum (je intensiver, desto mehr Gewinn)</li>
+                    <li><strong>Rote Zellen</strong> = Verlustzeitraum (je intensiver, desto höhere Verluste)</li>
+                    <li><strong>Zahl in der Zelle</strong> = Anzahl der Trades in diesem Zeitfenster</li>
+                    <li><strong>Hover</strong> über eine Zelle zeigt Profit, Trade-Anzahl und Win Rate</li>
+                </ul>
+                So erkennst du auf einen Blick, <strong>wann deine Strategien am besten performen</strong> – und wann du besser pausieren solltest.
+            </div>
+
+            <div class="glass-panel">
+                <div class="panel-title">🔥 Performance Heatmap <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 10px;">Wochentag × Stunde</span></div>
+
+                <div class="filter-bar">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">FILTER:</span>
+                    <button class="filter-pill active" onclick="loadHeatmap('', this)">Alle Accounts</button>
+                    <button class="filter-pill" onclick="loadHeatmap('REAL', this)">🛡️ Nur Real</button>
+                    <button class="filter-pill" onclick="loadHeatmap('DEMO', this)">📉 Nur Demo</button>
+                </div>
+
+                <div id="heatmap-container" class="loading-spinner">⏳ Lade Heatmap-Daten...</div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: LEADERBOARD ==================== -->
+        <div id="tab-leaderboard" class="tab-panel">
+            <div class="info-box">
+                <div class="info-title">ℹ️ Was zeigt das Strategy Leaderboard?</div>
+                Das Leaderboard rankt <strong>alle aktiven Trading-Strategien</strong> (identifiziert über ihre Magic Number) <strong>über alle Accounts hinweg</strong>.
+                Jede Strategie wird anhand professioneller quantitativer Kennzahlen bewertet, wie sie auch in institutionellen Hedgefonds verwendet werden.
+                Die Tabelle ist <strong>sortierbar</strong> – klicke auf eine Spaltenüberschrift um das Ranking zu ändern.
+
+                <div class="kpi-explain-grid">
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">📊 Profit Factor</div>
+                        <div class="kpi-desc">Verhältnis von Bruttogewinnen zu Bruttoverlusten. Werte &gt; 1.5 gelten als gut, &gt; 2.0 als exzellent.</div>
+                        <div class="kpi-formula">= Σ Gewinne / |Σ Verluste|</div>
+                    </div>
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">📈 Sharpe Ratio</div>
+                        <div class="kpi-desc">Risikobereinigte Rendite (annualisiert). Misst, wie viel Rendite pro Einheit Risiko erzielt wird. Werte &gt; 1.0 sind gut, &gt; 2.0 exzellent.</div>
+                        <div class="kpi-formula">= (Ø Daily Return / σ) × √252</div>
+                    </div>
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">🎯 Win Rate</div>
+                        <div class="kpi-desc">Prozentsatz der gewonnenen Trades. Eine hohe Win Rate allein sagt noch nichts – sie muss im Kontext des Profit Factors gesehen werden.</div>
+                        <div class="kpi-formula">= Gewinn-Trades / Gesamt × 100</div>
+                    </div>
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">🔄 Recovery Factor</div>
+                        <div class="kpi-desc">Wie oft hat die Strategie ihren maximalen Drawdown wieder aufgeholt? Werte &gt; 2.0 zeigen starke Erholung.</div>
+                        <div class="kpi-formula">= Net Profit / Max Drawdown</div>
+                    </div>
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">📉 Max Drawdown</div>
+                        <div class="kpi-desc">Der größte Rückgang vom Höchststand der kumulierten Gewinnkurve. Ein Maß für das maximale Verlustrisiko der Strategie.</div>
+                        <div class="kpi-formula">= max(Peak − Trough)</div>
+                    </div>
+                    <div class="kpi-explain-card">
+                        <div class="kpi-name">🔥 Win/Loss Streaks</div>
+                        <div class="kpi-desc">Längste Serien aufeinanderfolgender Gewinne (W) bzw. Verluste (L). Gibt einen Eindruck von der Konsistenz und dem Drawdown-Verhalten.</div>
+                        <div class="kpi-formula">W5 / L3 = 5er Gewinnserie, 3er Verlustserie</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div class="panel-title">🏆 Strategy Leaderboard <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 10px;">Ranking aller Magic Numbers</span></div>
+
+                <div class="filter-bar">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">FILTER:</span>
+                    <button class="filter-pill active" onclick="loadLeaderboard('', this)">Alle</button>
+                    <button class="filter-pill" onclick="loadLeaderboard('REAL', this)">🛡️ Real</button>
+                    <button class="filter-pill" onclick="loadLeaderboard('DEMO', this)">📉 Demo</button>
+                </div>
+
+                <div id="leaderboard-container" class="loading-spinner">⏳ Lade Leaderboard...</div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 3: PORTFOLIO ==================== -->
+        <div id="tab-portfolio" class="tab-panel">
+            <div class="info-box">
+                <div class="info-title">ℹ️ Was zeigt die Portfolio-Analyse?</div>
+                Diese Seite bietet eine <strong>ganzheitliche Sicht auf alle Handelskonten</strong> und deren Zusammenspiel.
+                Die drei Visualisierungen beantworten jeweils eine zentrale Frage des Portfolio-Managements:
+                <ul>
+                    <li><strong>Equity Overlay:</strong> Wie hat sich jedes Konto im Vergleich zu den anderen entwickelt? Die Kurven werden auf 10.000 € normalisiert, sodass Konten mit unterschiedlichem Kapital direkt vergleichbar sind. Real-Accounts sind mit durchgezogener Linie dargestellt, Demo-Accounts gestrichelt.</li>
+                    <li><strong>Drawdown-Überlagerung:</strong> Wie tief war der maximale Rückgang vom Hoch bei jedem Konto? Dies zeigt das <strong>konkrete Verlustrisiko</strong> über die Zeit.</li>
+                    <li><strong>Korrelationsmatrix:</strong> Wie stark bewegen sich die Konten gleichzeitig? Werte nahe <code>+1.0</code> bedeuten, dass zwei Konten fast identisch reagieren (hohes Klumpenrisiko). Werte nahe <code>0.0</code> zeigen Unabhängigkeit (gute Diversifikation). Werte nahe <code>-1.0</code> bedeuten gegenläufige Bewegungen (perfektes Hedging).</li>
+                </ul>
+            </div>
+
+            <!-- Equity Overlay -->
+            <div class="glass-panel">
+                <div class="panel-title">📈 Multi-Account Equity Overlay <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 10px;">Normalisiert auf 10.000 €</span></div>
+                <div class="info-box" style="background: rgba(16,185,129,0.05); border-color: rgba(16,185,129,0.15); margin-top: 0;">
+                    Alle Equity-Kurven starten bei <strong>10.000 € normalisiert</strong>, unabhängig vom tatsächlichen Kontosaldo.
+                    So wird die <strong>prozentuale Performance</strong> vergleichbar. Durchgezogene Linien = Real-Accounts, gestrichelte = Demo.
+                    Nutze die Checkboxen um einzelne Accounts ein-/auszublenden.
+                </div>
+                <div id="equity-toggles" class="filter-bar" style="display: none;"></div>
+                <div class="chart-wrap">
+                    <canvas id="equity-overlay-chart"></canvas>
+                </div>
+                <div id="equity-loading" class="loading-spinner">⏳ Lade Equity-Daten...</div>
+            </div>
+
+            <!-- Drawdown -->
+            <div class="glass-panel">
+                <div class="panel-title">📉 Drawdown-Überlagerung</div>
+                <div class="info-box" style="background: rgba(239,68,68,0.05); border-color: rgba(239,68,68,0.15); margin-top: 0;">
+                    Zeigt den <strong>prozentualen Rückgang vom jeweiligen Equity-Höchststand</strong> für jedes Konto.
+                    Ein Drawdown von <code>-5%</code> bedeutet, dass das Konto 5% unter seinem bisherigen Maximum liegt.
+                    Je tiefer die Kurve, desto höher das Verlustrisiko. Ideale Konten haben flache, wenig volatile Drawdown-Kurven.
+                </div>
+                <div id="dd-toggles" class="filter-bar" style="display: none;"></div>
+                <div class="chart-wrap">
+                    <canvas id="drawdown-overlay-chart"></canvas>
+                </div>
+                <div id="dd-loading" class="loading-spinner">⏳ Lade Drawdown-Daten...</div>
+            </div>
+
+            <!-- Correlation Matrix -->
+            <div class="glass-panel">
+                <div class="panel-title">🔗 Korrelationsmatrix <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 10px;">Pearson-Korrelation täglicher Returns</span></div>
+                <div class="info-box" style="background: rgba(99,102,241,0.05); border-color: rgba(99,102,241,0.15); margin-top: 0;">
+                    Die Matrix zeigt die <strong>Pearson-Korrelation</strong> zwischen den täglichen Renditen aller Accounts.
+                    Berechnet wird: an jedem Tag die Equity-Veränderung in Prozent – und dann wie stark diese Veränderungen zwischen je zwei Accounts zusammenhängen.
+                    <ul>
+                        <li><strong style="color: #ef4444;">Rot (+0.7 bis +1.0):</strong> Starke positive Korrelation → Konten bewegen sich gleichzeitig. Klumpenrisiko!</li>
+                        <li><strong style="color: #94a3b8;">Grau (−0.3 bis +0.3):</strong> Kaum Korrelation → gute Diversifikation</li>
+                        <li><strong style="color: #6366f1;">Blau (−1.0 bis −0.3):</strong> Negative Korrelation → Konten bewegen sich gegenläufig (Hedging-Effekt)</li>
+                    </ul>
+                </div>
+                <div id="correlation-container" class="loading-spinner">⏳ Lade Korrelationsdaten...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Heatmap Tooltip -->
+    <div id="heatmap-tooltip" class="heatmap-tooltip"></div>
+
+    <script>
+        // ===== TAB SWITCHING =====
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Lazy-load data
+            if (tabName === 'heatmap' && !window._heatmapLoaded) { loadHeatmap(''); window._heatmapLoaded = true; }
+            if (tabName === 'leaderboard' && !window._leaderboardLoaded) { loadLeaderboard(''); window._leaderboardLoaded = true; }
+            if (tabName === 'portfolio' && !window._portfolioLoaded) { loadPortfolioData(); window._portfolioLoaded = true; }
+        }
+
+        // ===== COLOR CONSTANTS =====
+        const CHART_COLORS = [
+            '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1',
+            '#ec4899', '#0ea5e9', '#14b8a6', '#f97316', '#84cc16',
+            '#a855f7', '#06b6d4', '#d946ef', '#22d3ee', '#e11d48'
+        ];
+
+        const DAY_NAMES = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        const DAY_NAMES_FULL = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+        // ===== HEATMAP =====
+        function loadHeatmap(type, btn) {
+            if (btn) {
+                btn.closest('.filter-bar').querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            var container = document.getElementById('heatmap-container');
+            container.innerHTML = '<div class="loading-spinner">⏳ Lade Heatmap-Daten...</div>';
+
+            var url = '/api/stats/heatmap' + (type ? '?type=' + type : '');
+            fetch(url)
+                .then(r => r.json())
+                .then(data => renderHeatmap(data, container))
+                .catch(err => { container.innerHTML = '<div class="loading-spinner" style="color: var(--danger);">Fehler beim Laden.</div>'; });
+        }
+
+        function renderHeatmap(data, container) {
+            var profit = data.profit;
+            var tradeCount = data.tradeCount;
+            var winRate = data.winRate;
+
+            // Find min/max profit for color scaling
+            var maxVal = 0;
+            for (var d = 0; d < 7; d++) {
+                for (var h = 0; h < 24; h++) {
+                    maxVal = Math.max(maxVal, Math.abs(profit[d][h]));
+                }
+            }
+            if (maxVal === 0) maxVal = 1;
+
+            var html = '<div class="heatmap-grid" style="grid-template-columns: 60px repeat(24, 1fr);">';
+
+            // Header row (hours)
+            html += '<div></div>';
+            for (var h = 0; h < 24; h++) {
+                html += '<div class="heatmap-header">' + String(h).padStart(2, '0') + '</div>';
+            }
+
+            // Data rows
+            for (var d = 0; d < 7; d++) {
+                html += '<div class="heatmap-day-label">' + DAY_NAMES[d] + '</div>';
+                for (var h = 0; h < 24; h++) {
+                    var p = profit[d][h];
+                    var tc = tradeCount[d][h];
+                    var wr = winRate[d][h];
+                    var bg = getHeatmapColor(p, maxVal);
+                    var label = tc > 0 ? tc : '';
+                    html += '<div class="heatmap-cell" style="background: ' + bg + ';" '
+                          + 'data-day="' + d + '" data-hour="' + h + '" '
+                          + 'data-profit="' + p + '" data-trades="' + tc + '" data-winrate="' + wr + '" '
+                          + 'onmousemove="showHeatmapTooltip(event, this)" '
+                          + 'onmouseleave="hideHeatmapTooltip()">'
+                          + label + '</div>';
+                }
+            }
+            html += '</div>';
+            html += '<div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-muted);">';
+            html += '<span>Verlust</span>';
+            html += '<div style="width: 200px; height: 14px; border-radius: 4px; background: linear-gradient(to right, hsl(0,70%,35%), hsl(0,0%,20%), hsl(142,70%,35%));"></div>';
+            html += '<span>Gewinn</span>';
+            html += '<span style="margin-left: 20px; font-weight: 700;">Gesamt: ' + data.totalTrades + ' Trades</span>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function getHeatmapColor(value, maxVal) {
+            if (value === 0) return 'rgba(255,255,255,0.03)';
+            var intensity = Math.min(Math.abs(value) / maxVal, 1);
+            intensity = Math.pow(intensity, 0.5); // sqrt for better visual spread
+            if (value > 0) {
+                var l = 20 + intensity * 25;
+                var s = 30 + intensity * 40;
+                return 'hsl(142, ' + s + '%, ' + l + '%)';
+            } else {
+                var l = 20 + intensity * 25;
+                var s = 30 + intensity * 40;
+                return 'hsl(0, ' + s + '%, ' + l + '%)';
+            }
+        }
+
+        function showHeatmapTooltip(e, el) {
+            var tt = document.getElementById('heatmap-tooltip');
+            var day = DAY_NAMES_FULL[parseInt(el.dataset.day)];
+            var hour = String(parseInt(el.dataset.hour)).padStart(2, '0') + ':00';
+            var profit = parseFloat(el.dataset.profit);
+            var trades = parseInt(el.dataset.trades);
+            var wr = parseFloat(el.dataset.winrate);
+            var profitClass = profit >= 0 ? 'positive' : 'negative';
+            var profitSign = profit > 0 ? '+' : '';
+
+            tt.innerHTML = '<div class="tt-title">' + day + ' ' + hour + '</div>'
+                + '<div class="tt-row"><span class="tt-label">Profit:</span><span class="tt-value ' + profitClass + '">' + profitSign + profit.toFixed(2) + ' €</span></div>'
+                + '<div class="tt-row"><span class="tt-label">Trades:</span><span class="tt-value">' + trades + '</span></div>'
+                + '<div class="tt-row"><span class="tt-label">Win Rate:</span><span class="tt-value">' + wr.toFixed(1) + '%</span></div>';
+
+            tt.style.display = 'block';
+            tt.style.left = (e.clientX + 16) + 'px';
+            tt.style.top = (e.clientY - 10) + 'px';
+        }
+
+        function hideHeatmapTooltip() {
+            document.getElementById('heatmap-tooltip').style.display = 'none';
+        }
+
+        // ===== LEADERBOARD =====
+        var leaderboardData = [];
+        var currentSort = { col: 'profitFactor', dir: 'desc' };
+
+        function loadLeaderboard(type, btn) {
+            if (btn) {
+                btn.closest('.filter-bar').querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            var container = document.getElementById('leaderboard-container');
+            container.innerHTML = '<div class="loading-spinner">⏳ Lade Leaderboard...</div>';
+
+            var url = '/api/stats/strategy-leaderboard' + (type ? '?type=' + type : '');
+            fetch(url)
+                .then(r => r.json())
+                .then(data => { leaderboardData = data; renderLeaderboard(container); })
+                .catch(err => { container.innerHTML = '<div class="loading-spinner" style="color: var(--danger);">Fehler beim Laden.</div>'; });
+        }
+
+        function renderLeaderboard(container) {
+            if (leaderboardData.length === 0) {
+                container.innerHTML = '<div class="loading-spinner">Keine Strategien mit ≥3 Trades gefunden.</div>';
+                return;
+            }
+
+            var html = '<div style="overflow-x: auto;"><table class="lb-table">';
+            html += '<thead><tr>'
+                + thSortable('#', 'rank')
+                + thSortable('Strategie', 'name')
+                + thSortable('Account', 'accountName')
+                + thSortable('Profit Factor', 'profitFactor')
+                + thSortable('Sharpe', 'sharpeRatio')
+                + thSortable('Win Rate', 'winRate')
+                + thSortable('Ø Trade', 'avgTrade')
+                + thSortable('Total Profit', 'totalProfit')
+                + thSortable('Max DD', 'maxDrawdown')
+                + thSortable('Recovery', 'recoveryFactor')
+                + thSortable('Trades', 'totalTrades')
+                + '<th>Equity-Kurve</th>'
+                + thSortable('Streaks', 'maxWinStreak')
+                + '</tr></thead><tbody>';
+
+            leaderboardData.forEach(function(row, idx) {
+                var rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-default';
+                var pfClass = row.profitFactor >= 1.5 ? 'kpi-good' : row.profitFactor < 1.0 ? 'kpi-bad' : 'kpi-neutral';
+                var srClass = row.sharpeRatio >= 1.0 ? 'kpi-good' : row.sharpeRatio < 0 ? 'kpi-bad' : 'kpi-neutral';
+                var wrClass = row.winRate >= 60 ? 'kpi-good' : row.winRate < 40 ? 'kpi-bad' : 'kpi-neutral';
+                var profClass = row.totalProfit >= 0 ? 'positive' : 'negative';
+                var typeBadge = row.accountType === 'REAL' ? '<span style="font-size:0.65rem; background:rgba(16,185,129,0.15); color:#34d399; padding:2px 6px; border-radius:4px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">REAL</span>'
+                    : '<span style="font-size:0.65rem; background:rgba(245,158,11,0.15); color:#fbbf24; padding:2px 6px; border-radius:4px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">DEMO</span>';
+
+                html += '<tr>'
+                    + '<td><span class="rank-badge ' + rankClass + '">' + (idx + 1) + '</span></td>'
+                    + '<td style="font-family:Inter; font-weight:700; color:#fff;">' + (row.name || 'Magic ' + row.magicNumber) + '<div style="font-size:0.7rem; color:var(--text-muted); font-weight:400;">Magic: ' + row.magicNumber + '</div></td>'
+                    + '<td style="font-family:Inter;">' + row.accountName + ' ' + typeBadge + '</td>'
+                    + '<td class="' + pfClass + '" style="font-weight:800;">' + row.profitFactor.toFixed(2) + '</td>'
+                    + '<td class="' + srClass + '">' + row.sharpeRatio.toFixed(2) + '</td>'
+                    + '<td class="' + wrClass + '">' + row.winRate.toFixed(1) + '%</td>'
+                    + '<td class="' + (row.avgTrade >= 0 ? 'positive' : 'negative') + '">' + row.avgTrade.toFixed(2) + '</td>'
+                    + '<td class="' + profClass + '" style="font-weight:800;">' + row.totalProfit.toFixed(2) + '</td>'
+                    + '<td class="negative">-' + row.maxDrawdown.toFixed(2) + '</td>'
+                    + '<td class="' + (row.recoveryFactor >= 2 ? 'kpi-good' : 'kpi-neutral') + '">' + row.recoveryFactor.toFixed(2) + '</td>'
+                    + '<td>' + row.totalTrades + '</td>'
+                    + '<td><canvas class="sparkline-canvas" id="spark-' + idx + '"></canvas></td>'
+                    + '<td style="font-family:Inter; font-size:0.78rem;"><span class="positive">W' + row.maxWinStreak + '</span> / <span class="negative">L' + row.maxLossStreak + '</span></td>'
+                    + '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+
+            // Render sparklines
+            leaderboardData.forEach(function(row, idx) {
+                renderSparkline('spark-' + idx, row.sparkline);
+            });
+        }
+
+        function thSortable(label, col) {
+            var cls = currentSort.col === col ? ' sorted' : '';
+            var arrow = currentSort.col === col ? (currentSort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+            return '<th class="' + cls + '" onclick="sortLeaderboard(\'' + col + '\')">' + label + arrow + '</th>';
+        }
+
+        function sortLeaderboard(col) {
+            if (currentSort.col === col) {
+                currentSort.dir = currentSort.dir === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSort.col = col;
+                currentSort.dir = 'desc';
+            }
+
+            leaderboardData.sort(function(a, b) {
+                var va = a[col], vb = b[col];
+                if (typeof va === 'string') {
+                    return currentSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return currentSort.dir === 'asc' ? va - vb : vb - va;
+            });
+
+            renderLeaderboard(document.getElementById('leaderboard-container'));
+        }
+
+        function renderSparkline(canvasId, data) {
+            var canvas = document.getElementById(canvasId);
+            if (!canvas || !data || data.length < 2) return;
+            var ctx = canvas.getContext('2d');
+            var w = canvas.width = 80;
+            var h = canvas.height = 28;
+
+            var min = Math.min.apply(null, data);
+            var max = Math.max.apply(null, data);
+            var range = max - min || 1;
+
+            var lastVal = data[data.length - 1];
+            var color = lastVal >= 0 ? '#10b981' : '#ef4444';
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = 'round';
+
+            data.forEach(function(val, i) {
+                var x = (i / (data.length - 1)) * w;
+                var y = h - ((val - min) / range) * (h - 4) - 2;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Fill gradient
+            var lastX = w, lastY = h - ((data[data.length - 1] - min) / range) * (h - 4) - 2;
+            ctx.lineTo(lastX, h);
+            ctx.lineTo(0, h);
+            ctx.closePath();
+            var grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, color + '30');
+            grad.addColorStop(1, color + '05');
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        // ===== PORTFOLIO ANALYTICS =====
+        var equityChart = null;
+        var drawdownChart = null;
+
+        function loadPortfolioData() {
+            loadEquityOverlay();
+            loadDrawdownCurves();
+            loadCorrelationMatrix();
+        }
+
+        function loadEquityOverlay() {
+            fetch('/api/stats/equity-overlay')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('equity-loading').style.display = 'none';
+                    renderEquityOverlay(data);
+                })
+                .catch(err => {
+                    document.getElementById('equity-loading').innerHTML = '<span style="color: var(--danger);">Fehler beim Laden.</span>';
+                });
+        }
+
+        function renderEquityOverlay(data) {
+            if (data.length === 0) {
+                document.getElementById('equity-loading').style.display = 'block';
+                document.getElementById('equity-loading').textContent = 'Keine Equity-Daten verfügbar (min. 2 Tage benötigt).';
+                return;
+            }
+
+            var allTimestamps = new Set();
+            data.forEach(function(acc) { acc.timestamps.forEach(function(ts) { allTimestamps.add(ts); }); });
+            var sortedLabels = Array.from(allTimestamps).sort();
+
+            // Build toggle buttons
+            var toggleHtml = '<span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">ACCOUNTS:</span>';
+            data.forEach(function(acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+                toggleHtml += '<label style="display:flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.78rem; border:1px solid ' + color + '40; background:' + color + '15; transition:all 0.15s; user-select:none;">'
+                    + '<input type="checkbox" checked class="eq-toggle" data-idx="' + idx + '" style="accent-color:' + color + '; cursor:pointer;" onchange="toggleEquityDataset(' + idx + ', this.checked)">'
+                    + '<span style="width:10px; height:10px; border-radius:50%; background:' + color + '; display:inline-block;' + (isReal ? ' box-shadow:0 0 6px ' + color + ';' : '') + '"></span>'
+                    + '<span style="font-weight:' + (isReal ? '700' : '400') + ';">' + (isReal ? '🛡️ ' : '') + acc.name + '</span>'
+                    + '</label>';
+            });
+            document.getElementById('equity-toggles').innerHTML = toggleHtml;
+            document.getElementById('equity-toggles').style.display = 'flex';
+
+            var datasets = data.map(function(acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+                return {
+                    label: acc.name + (isReal ? ' [REAL]' : ' [DEMO]'),
+                    data: acc.timestamps.map(function(ts, i) { return { x: ts, y: acc.normalized[i] }; }),
+                    borderColor: color,
+                    borderWidth: isReal ? 3 : 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: false,
+                    tension: 0.3,
+                    borderDash: isReal ? [] : [5, 3]
+                };
+            });
+
+            var ctx = document.getElementById('equity-overlay-chart').getContext('2d');
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: sortedLabels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1b26ee', titleColor: '#c0caf5', bodyColor: '#a0a0c0',
+                            borderColor: '#414868', borderWidth: 1,
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                            callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + c.parsed.y.toFixed(2) + ' €'; } }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { 
+                                color: '#565f89', 
+                                maxTicksLimit: 12, 
+                                maxRotation: 0, 
+                                font: { size: 11 },
+                                callback: function(val) {
+                                    var label = this.getLabelForValue(val);
+                                    return label ? label.substring(0, 10) : '';
+                                }
+                            }, 
+                            grid: { color: 'rgba(65,72,104,0.2)' } 
+                        },
+                        y: { ticks: { color: '#565f89', font: { size: 11, family: "'JetBrains Mono'" }, callback: v => v.toLocaleString('de-DE') + ' €' }, grid: { color: 'rgba(65,72,104,0.2)' } }
+                    }
+                }
+            });
+        }
+
+        function toggleEquityDataset(idx, visible) {
+            if (equityChart) { equityChart.setDatasetVisibility(idx, visible); equityChart.update('none'); }
+        }
+
+        function loadDrawdownCurves() {
+            fetch('/api/stats/drawdown-curves')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('dd-loading').style.display = 'none';
+                    renderDrawdownChart(data);
+                })
+                .catch(err => { document.getElementById('dd-loading').innerHTML = '<span style="color: var(--danger);">Fehler.</span>'; });
+        }
+
+        function renderDrawdownChart(data) {
+            if (data.length === 0) {
+                document.getElementById('dd-loading').style.display = 'block';
+                document.getElementById('dd-loading').textContent = 'Keine Drawdown-Daten verfügbar.';
+                return;
+            }
+
+            var allTimestamps = new Set();
+            data.forEach(function(acc) { acc.timestamps.forEach(function(ts) { allTimestamps.add(ts); }); });
+            var sortedLabels = Array.from(allTimestamps).sort();
+
+            // Build toggle buttons
+            var toggleHtml = '<span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">ACCOUNTS:</span>';
+            data.forEach(function(acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+                toggleHtml += '<label style="display:flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.78rem; border:1px solid ' + color + '40; background:' + color + '15; transition:all 0.15s; user-select:none;">'
+                    + '<input type="checkbox" checked class="dd-toggle" data-idx="' + idx + '" style="accent-color:' + color + '; cursor:pointer;" onchange="toggleDrawdownDataset(' + idx + ', this.checked)">'
+                    + '<span style="width:10px; height:10px; border-radius:50%; background:' + color + '; display:inline-block;' + (isReal ? ' box-shadow:0 0 6px ' + color + ';' : '') + '"></span>'
+                    + '<span style="font-weight:' + (isReal ? '700' : '400') + ';">' + (isReal ? '🛡️ ' : '') + acc.name + '</span>'
+                    + '</label>';
+            });
+            document.getElementById('dd-toggles').innerHTML = toggleHtml;
+            document.getElementById('dd-toggles').style.display = 'flex';
+
+            var datasets = data.map(function(acc, idx) {
+                var color = CHART_COLORS[idx % CHART_COLORS.length];
+                var isReal = acc.type === 'REAL';
+                // Downsample for performance
+                var step = Math.max(1, Math.floor(acc.timestamps.length / 500));
+                var points = [];
+                for (var i = 0; i < acc.timestamps.length; i += step) {
+                    points.push({ x: acc.timestamps[i], y: acc.drawdown[i] });
+                }
+                return {
+                    label: acc.name,
+                    data: points,
+                    borderColor: color,
+                    borderWidth: isReal ? 2 : 1,
+                    pointRadius: 0,
+                    fill: true,
+                    backgroundColor: color + '10',
+                    tension: 0.2,
+                    borderDash: isReal ? [] : [4, 2]
+                };
+            });
+
+            var ctx = document.getElementById('drawdown-overlay-chart').getContext('2d');
+            drawdownChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: sortedLabels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1b26ee', titleColor: '#c0caf5', bodyColor: '#a0a0c0',
+                            borderColor: '#414868', borderWidth: 1,
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                            callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + c.parsed.y.toFixed(2) + '%'; } }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { 
+                                color: '#565f89', 
+                                maxTicksLimit: 12, 
+                                maxRotation: 0, 
+                                font: { size: 11 },
+                                callback: function(val) {
+                                    var label = this.getLabelForValue(val);
+                                    return label ? label.substring(0, 10) : '';
+                                }
+                            }, 
+                            grid: { color: 'rgba(65,72,104,0.2)' } 
+                        },
+                        y: {
+                            reverse: false,
+                            ticks: { color: '#ef4444', font: { size: 11, family: "'JetBrains Mono'" }, callback: v => v.toFixed(1) + '%' },
+                            grid: { color: 'rgba(239,68,68,0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleDrawdownDataset(idx, visible) {
+            if (drawdownChart) { drawdownChart.setDatasetVisibility(idx, visible); drawdownChart.update('none'); }
+        }
+
+        function loadCorrelationMatrix() {
+            fetch('/api/stats/correlation-matrix')
+                .then(r => r.json())
+                .then(data => renderCorrelationMatrix(data))
+                .catch(err => { document.getElementById('correlation-container').innerHTML = '<span style="color: var(--danger);">Fehler.</span>'; });
+        }
+
+        function renderCorrelationMatrix(data) {
+            var container = document.getElementById('correlation-container');
+            var accounts = data.accounts;
+            var matrix = data.matrix;
+            var n = accounts.length;
+
+            if (n < 2) {
+                container.innerHTML = '<div class="loading-spinner">Mindestens 2 Accounts mit ≥5 Tagen Equity-Daten benötigt.</div>';
+                return;
+            }
+
+            var cols = n + 1;
+            var html = '<div style="overflow-x: auto; display: flex; justify-content: center;">'
+                + '<div class="corr-matrix" style="grid-template-columns: 70px repeat(' + n + ', 52px);">';
+
+            // Header row
+            html += '<div></div>';
+            for (var j = 0; j < n; j++) {
+                html += '<div class="corr-label" title="' + accounts[j] + '">' + accounts[j].substring(0, 7) + '</div>';
+            }
+
+            // Data rows
+            for (var i = 0; i < n; i++) {
+                html += '<div class="corr-label" style="text-align:right; display:flex; align-items:center; justify-content:flex-end;" title="' + accounts[i] + '">' + accounts[i].substring(0, 8) + '</div>';
+                for (var j = 0; j < n; j++) {
+                    var val = matrix[i][j];
+                    var bg = getCorrColor(val);
+                    var textColor = Math.abs(val) > 0.6 ? '#fff' : 'var(--text-secondary)';
+                    html += '<div class="corr-cell" style="background:' + bg + '; color:' + textColor + ';" title="' + accounts[i] + ' ↔ ' + accounts[j] + ': ' + val.toFixed(2) + '">' + val.toFixed(2) + '</div>';
+                }
+            }
+
+            html += '</div></div>';
+
+            // Legend
+            html += '<div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:1.5rem; font-size:0.75rem; color:var(--text-muted);">';
+            html += '<span>-1.0 (invers)</span>';
+            html += '<div style="width:200px; height:14px; border-radius:4px; background:linear-gradient(to right, hsl(220,80%,40%), hsl(220,10%,20%), hsl(0,80%,45%));"></div>';
+            html += '<span>+1.0 (korreliert)</span>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function getCorrColor(val) {
+            if (val >= 0) {
+                var intensity = Math.pow(val, 0.7);
+                var h = 0;
+                var s = 20 + intensity * 60;
+                var l = 15 + intensity * 30;
+                return 'hsl(' + h + ', ' + s + '%, ' + l + '%)';
+            } else {
+                var intensity = Math.pow(Math.abs(val), 0.7);
+                var h = 220;
+                var s = 20 + intensity * 60;
+                var l = 15 + intensity * 30;
+                return 'hsl(' + h + ', ' + s + '%, ' + l + '%)';
+            }
+        }
+
+        // ===== INIT =====
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check URL hash for deep-linking from dashboard
+            var hash = window.location.hash.replace('#', '');
+            if (hash === 'leaderboard' || hash === 'portfolio') {
+                // Activate correct tab
+                document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+                document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+                document.getElementById('tab-' + hash).classList.add('active');
+                // Find and activate the matching button
+                var btns = document.querySelectorAll('.tab-btn');
+                btns.forEach(function(b) {
+                    if (b.textContent.toLowerCase().indexOf(hash) !== -1) b.classList.add('active');
+                });
+
+                if (hash === 'leaderboard') { loadLeaderboard(''); window._leaderboardLoaded = true; }
+                else if (hash === 'portfolio') { loadPortfolioData(); window._portfolioLoaded = true; }
+            } else {
+                loadHeatmap('');
+                window._heatmapLoaded = true;
+            }
+        });
+    </script>
+</body>
+</html>

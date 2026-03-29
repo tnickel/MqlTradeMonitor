@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.06"
+#property version   "1.07"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -14,10 +14,17 @@ input int      UpdateIntervalSeconds = 15;             // Update interval (secon
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
 input int      MaxReconnectAttempts = 10;               // Max reconnect attempts (0=unlimited)
+input int      LogUploadIntervalSeconds = 300;         // EA Log upload interval (seconds, 0=disabled)
+input int      DebugMode = 0;                          // Debug Logging (0=Off, 1=On)
+
+//--- DLL imports
+#import "kernel32.dll"
+bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
+#import
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.06"
+#define EA_VERSION "1.07"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -26,11 +33,14 @@ int      cfg_UpdateIntervalSeconds = 0;
 int      cfg_HeartbeatIntervalSeconds = 0;
 int      cfg_ReconnectIntervalSeconds = 0;
 int      cfg_MaxReconnectAttempts = 0;
+int      cfg_LogUploadIntervalSeconds = 0;
+int      cfg_DebugMode = 0;
 
 //--- Global variables
 uint lastUpdateTick = 0;
 uint lastHeartbeatTick = 0;
 uint lastReconnectAttemptTick = 0;
+uint lastLogUploadTick = 0;
 bool isRegistered = false;
 int httpTimeout = 5000;          // 5 seconds timeout for normal requests
 int httpTimeoutInit = 300000;    // 300 seconds (5 min) timeout for initial trade list (large payload)
@@ -44,6 +54,10 @@ int g_initRetryCount = 0;                // Number of init trade list retry atte
 
 //--- History sync tracking
 string g_lastSyncedCloseTime = "";       // Last close time successfully synced to server
+
+//--- EA Log tracking
+int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
+string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
 
 //--- Reconnect tracking
 int g_reconnectAttempts = 0;             // Number of reconnect attempts
@@ -105,6 +119,8 @@ bool LoadConfig()
       else if(key == "HeartbeatIntervalSeconds")  cfg_HeartbeatIntervalSeconds = (int)StringToInteger(value);
       else if(key == "ReconnectIntervalSeconds")  cfg_ReconnectIntervalSeconds = (int)StringToInteger(value);
       else if(key == "MaxReconnectAttempts")       cfg_MaxReconnectAttempts = (int)StringToInteger(value);
+      else if(key == "LogUploadIntervalSeconds")  cfg_LogUploadIntervalSeconds = (int)StringToInteger(value);
+      else if(key == "DebugMode")                 cfg_DebugMode = (int)StringToInteger(value);
    }
    
    FileClose(handle);
@@ -130,9 +146,11 @@ void SaveConfig()
    FileWriteString(handle, "ServerURL=" + cfg_ServerURL + "\r\n");
    FileWriteString(handle, "UserKey=" + cfg_UserKey + "\r\n");
    FileWriteString(handle, "UpdateIntervalSeconds=" + IntegerToString(cfg_UpdateIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "HeartbeatIntervalSeconds=" + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "ReconnectIntervalSeconds=" + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "MaxReconnectAttempts=" + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
+   FileWriteString(handle, "HeartbeatIntervalSeconds = " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "ReconnectIntervalSeconds = " + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "MaxReconnectAttempts = " + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
+   FileWriteString(handle, "LogUploadIntervalSeconds = " + IntegerToString(cfg_LogUploadIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "DebugMode = " + IntegerToString(cfg_DebugMode) + "\r\n");
    
    FileClose(handle);
    Print("Default configuration saved to ", CONFIG_FILE);
@@ -160,6 +178,14 @@ void InitConfig()
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
       if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
+      if(LogUploadIntervalSeconds != 300 && LogUploadIntervalSeconds != cfg_LogUploadIntervalSeconds) uiChanged = true;
+      if(DebugMode != 0 && DebugMode != cfg_DebugMode) uiChanged = true;
+      
+      if(cfg_LogUploadIntervalSeconds == 0 && LogUploadIntervalSeconds == 300)
+      {
+         cfg_LogUploadIntervalSeconds = 300;
+         uiChanged = true;
+      }
       
       if(uiChanged)
       {
@@ -170,6 +196,8 @@ void InitConfig()
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
          cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
+         cfg_LogUploadIntervalSeconds = (LogUploadIntervalSeconds != 300) ? LogUploadIntervalSeconds : cfg_LogUploadIntervalSeconds;
+         cfg_DebugMode = (DebugMode != 0) ? DebugMode : cfg_DebugMode;
          
          SaveConfig();
       }
@@ -183,6 +211,8 @@ void InitConfig()
       cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds;
       cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds;
       cfg_MaxReconnectAttempts = MaxReconnectAttempts;
+      cfg_LogUploadIntervalSeconds = LogUploadIntervalSeconds;
+      cfg_DebugMode = DebugMode;
       Print("Config file not found. Using UI inputs and generating a default config file.");
       
       // Generate the default configuration file so the user has something to edit
@@ -210,7 +240,9 @@ void InitConfig()
          " UpdateInterval=", cfg_UpdateIntervalSeconds,
          " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
          " ReconnectInterval=", cfg_ReconnectIntervalSeconds,
-         " MaxReconnectAttempts=", cfg_MaxReconnectAttempts);
+         " LogUploadInterval=", cfg_LogUploadIntervalSeconds,
+         " MaxReconnectAttempts=", cfg_MaxReconnectAttempts,
+         " DebugMode=", cfg_DebugMode);
 }
 
 //+------------------------------------------------------------------+
@@ -227,6 +259,15 @@ int OnInit()
    string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    GV_TRADELIST_SENT = "TM_TradeListSent_" + accStr;
    GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
+   GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
+    
+   // Load last log position
+   if(GlobalVariableCheck(GV_LAST_LOG_LINES))
+   {
+      g_lastLogLinesSent = (int)GlobalVariableGet(GV_LAST_LOG_LINES);
+      if(g_lastLogLinesSent > 0 && cfg_DebugMode > 0)
+         Print("Loaded last log position: line ", g_lastLogLinesSent);
+   }
    
    // Check if trade list was already sent in a previous session
    if(GlobalVariableCheck(GV_TRADELIST_SENT))
@@ -307,6 +348,15 @@ void OnTimer()
    if(!TerminalInfoInteger(TERMINAL_CONNECTED))
    {
       UpdateStatusLabel("Disconnected from Broker", clrRed);
+      return;
+   }
+   
+   // Check if trading is allowed in the terminal
+   // If trading is disabled, stop ALL communication including heartbeat
+   // This will cause the server tile to go red (timeout)
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+   {
+      UpdateStatusLabel("Trading DISABLED\nHeartbeat stopped", clrRed);
       return;
    }
 
@@ -433,6 +483,13 @@ void OnTimer()
          SendHeartbeat();
          lastHeartbeatTick = currentTick;
       }
+       
+      // Send EA logs (if enabled)
+      if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
+      {
+         SendEaLogs();
+         lastLogUploadTick = currentTick;
+      }
    }
    else
    {
@@ -498,10 +555,7 @@ void CreateStatusLabel()
 //+------------------------------------------------------------------+
 void UpdateStatusLabel(string text, color col)
 {
-   string configInfo = "Cfg: " + cfg_ServerURL + "\n" + 
-                       "Upd: " + IntegerToString(cfg_UpdateIntervalSeconds) + "s | HB: " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "s\n" + 
-                       "ReConn: " + IntegerToString(cfg_ReconnectIntervalSeconds) + "s (Max: " + IntegerToString(cfg_MaxReconnectAttempts) + ")";
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text + "\n" + configInfo);
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "v" + EA_VERSION + " | " + text + " | URL: " + cfg_ServerURL);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, col);
    ChartRedraw(0);
 }
@@ -535,6 +589,7 @@ void OnChartEvent(const int id,
          g_lastSyncedCloseTime = "";
          isRegistered = false;
          lastReconnectAttemptTick = 0;
+         lastLogUploadTick = 0; // Force immediate log upload on reconnect
          GlobalVariableSet(GV_TRADELIST_SENT, 0);  // Clear persisted status
          SaveLastSyncTime("");                     // Clear sync bookmark
          
@@ -620,11 +675,11 @@ bool SendInitialTradeList()
    Print("Sending initial trade list to server...");
    
    // Build open trades array
-   Print("Building open trades JSON...");
+   if(cfg_DebugMode > 0) Print("Building open trades JSON...");
    string tradesJson = BuildOpenTradesJson();
    
    // Build closed trades array (full history)
-   Print("Building closed trades JSON (full history)...");
+   if(cfg_DebugMode > 0) Print("Building closed trades JSON (full history)...");
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson("", latestCloseTime);
    
@@ -719,7 +774,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    outLatestCloseTime = "";
    
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
-   if(!isIncremental)
+   if(!isIncremental && cfg_DebugMode > 0)
       Print("Processing full history: ", totalDeals, " deals found...");
    
    for(int i = 0; i < totalDeals; i++)
@@ -808,7 +863,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "}";
             
             // Progress logging every 100 closed trades
-            if(!isIncremental && closedCount % 100 == 0)
+            if(!isIncremental && closedCount % 100 == 0 && cfg_DebugMode > 0)
             {
                int pct = (int)((double)i / (double)totalDeals * 100.0);
                Print("History progress: ", closedCount, " closed trades processed (", pct, "% of deals scanned)");
@@ -819,10 +874,10 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    historyJson += "]";
    if(isIncremental)
    {
-      if(closedCount > 0)
+      if(closedCount > 0 && cfg_DebugMode > 0)
          Print("Incremental sync: ", closedCount, " new trades (skipped ", skippedCount, " already synced)");
    }
-   else
+   else if(cfg_DebugMode > 0)
       Print("History complete: ", closedCount, " closed trades from ", totalDeals, " total deals");
    return historyJson;
 }
@@ -904,7 +959,8 @@ void SendHistoryUpdate()
       {
          g_lastSyncedCloseTime = latestCloseTime;
          SaveLastSyncTime(latestCloseTime);
-         Print("History sync updated, latest close time: ", latestCloseTime);
+         if(cfg_DebugMode > 0)
+            Print("History sync updated, latest close time: ", latestCloseTime);
       }
    }
 }
@@ -970,22 +1026,23 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
       return false;
    }
    
-   if(res != 200)
+   string responseBody = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   if(res == 200 || res == 201)
    {
-      // Read server error response body for debugging
-      string responseBody = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
-      Print("HTTP request returned status: ", res, " URL: ", url);
-      if(StringLen(responseBody) > 0)
+      if(cfg_DebugMode > 0)
+         Print("HTTP request returned status: ", res, " URL: ", url);
+      return true;
+   }
+   else
+   {
+      if(res != -1)
       {
-         // Truncate very long responses
-         if(StringLen(responseBody) > 500)
-            responseBody = StringSubstr(responseBody, 0, 500) + "...";
-         Print("Server response: ", responseBody);
+         Print("HTTP request returned status: ", res, " URL: ", url);
+         if(cfg_DebugMode > 0)
+            Print("Server response: ", responseBody);
       }
       return false;
    }
-   
-   return true;
 }
 
 //+------------------------------------------------------------------+
@@ -1033,6 +1090,80 @@ string EscapeJson(string text)
    StringReplace(result, "\r", "\\r");
    StringReplace(result, "\t", "\\t");
    return result;
+}
+
+//+------------------------------------------------------------------+
+//| Send EA log entries to server (incremental)                        |
+//+------------------------------------------------------------------+
+void SendEaLogs()
+{
+   string logDate = TimeToString(TimeLocal(), TIME_DATE);
+   StringReplace(logDate, ".", "");
+   
+   string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\" + logDate + ".log";
+   string destFile = "ea_log_copy.txt";
+   string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + destFile;
+   
+   if(!CopyFileW(srcPath, destPath, false))
+   {
+      Print("EA Logs Sync: Failed to copy log file. Ensure 'Allow DLL imports' is enabled.");
+      return;
+   }
+   
+   int handle = FileOpen(destFile, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
+   if(handle == INVALID_HANDLE)
+   {
+      return;
+   }
+   
+   string lines[];
+   int lineCount = 0;
+   
+   while(!FileIsEnding(handle))
+   {
+      string line = FileReadString(handle);
+      if(StringLen(line) > 0)
+      {
+         lineCount++;
+         if(lineCount > g_lastLogLinesSent)
+         {
+            int newIdx = ArraySize(lines);
+            ArrayResize(lines, newIdx + 1);
+            lines[newIdx] = line;
+         }
+      }
+   }
+   FileClose(handle);
+   
+   int newLines = ArraySize(lines);
+   if(newLines == 0)
+      return;
+   
+   int maxLines = MathMin(newLines, 500);
+   
+   string logsJson = "[";
+   for(int i = 0; i < maxLines; i++)
+   {
+      if(i > 0) logsJson += ",";
+      logsJson += "\"" + EscapeJson(lines[i]) + "\"";
+   }
+   logsJson += "]";
+   
+   string json = "{";
+   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"logEntries\":" + logsJson + ",";
+   json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
+   json += "}";
+   
+   string url = cfg_ServerURL + "/api/ea-logs";
+   
+   if(SendHttpPost(url, json))
+   {
+      g_lastLogLinesSent += maxLines;
+      GlobalVariableSet(GV_LAST_LOG_LINES, (double)g_lastLogLinesSent);
+      if(cfg_DebugMode > 0)
+         Print("EA logs sent: ", maxLines, " new lines (total tracked: ", g_lastLogLinesSent, ")");
+   }
 }
 
 //+------------------------------------------------------------------+

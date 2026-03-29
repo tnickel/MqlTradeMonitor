@@ -307,34 +307,37 @@ public class StrategyAnalyticsService {
         java.util.function.Predicate<String> dateFilter = getSnapshotPeriodFilter(period);
         List<Map<String, Object>> result = new ArrayList<>();
 
-        int sampleInterval = "monthly".equalsIgnoreCase(period) ? 60 : ("weekly".equalsIgnoreCase(period) ? 15 : 0);
-
         for (Account acc : accounts) {
             List<EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(acc.getAccountId());
 
-            List<String> timestamps = new ArrayList<>();
-            List<Double> drawdowns = new ArrayList<>();
             double peak = 0;
-            long lastMillis = 0;
+            Map<String, Double> hourlyDrawdown = new LinkedHashMap<>();
+            Map<String, String> hourToTs = new LinkedHashMap<>();
 
             for (EquitySnapshotEntity snap : snapshots) {
                 if (snap.getTimestamp() == null || !dateFilter.test(snap.getTimestamp())) continue;
 
-                // Downsample for larger periods
-                if (sampleInterval > 0) {
-                    try {
-                        long millis = LocalDateTime.parse(snap.getTimestamp(), ISO_FMT)
-                                .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-                        if (lastMillis > 0 && (millis - lastMillis) < sampleInterval * 60000L) continue;
-                        lastMillis = millis;
-                    } catch (Exception ignored) {}
-                }
-
                 double eq = snap.getEquity();
                 if (eq > peak) peak = eq;
+
                 double ddPct = peak > 0 ? ((eq - peak) / peak) * 100.0 : 0.0;
-                timestamps.add(snap.getTimestamp());
-                drawdowns.add(Math.round(ddPct * 100.0) / 100.0);
+                
+                // Downsample to max 1 point per hour
+                String hourStr = snap.getTimestamp().length() >= 13 ? snap.getTimestamp().substring(0, 13) : snap.getTimestamp();
+                
+                // Keep the lowest (most severe) drawdown per hour to preserve max DD visually
+                Double currentMin = hourlyDrawdown.get(hourStr);
+                if (currentMin == null || ddPct < currentMin) {
+                    hourlyDrawdown.put(hourStr, ddPct);
+                    hourToTs.put(hourStr, snap.getTimestamp());
+                }
+            }
+
+            List<String> timestamps = new ArrayList<>(hourToTs.values());
+            List<Double> drawdowns = new ArrayList<>();
+            for (String ts : timestamps) {
+                String hourStr = ts.length() >= 13 ? ts.substring(0, 13) : ts;
+                drawdowns.add(Math.round(hourlyDrawdown.get(hourStr) * 100.0) / 100.0);
             }
 
             if (!timestamps.isEmpty()) {

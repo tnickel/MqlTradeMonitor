@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -14,10 +14,17 @@ input int      UpdateIntervalSeconds = 5;              // Update interval (secon
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
 input int      MaxReconnectAttempts = 10;               // Max reconnect attempts (0=unlimited)
+input int      LogUploadIntervalSeconds = 300;         // EA Log upload interval (seconds, 0=disabled)
+input int      DebugMode = 0;                          // Debug Logging (0=Off, 1=On)
+
+//--- DLL imports
+#import "kernel32.dll"
+bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
+#import
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.02"
+#define EA_VERSION "1.03"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -26,14 +33,21 @@ int      cfg_UpdateIntervalSeconds = 0;
 int      cfg_HeartbeatIntervalSeconds = 0;
 int      cfg_ReconnectIntervalSeconds = 0;
 int      cfg_MaxReconnectAttempts = 0;
+int      cfg_LogUploadIntervalSeconds = 0;
+int      cfg_DebugMode = 0;
 
 //--- Global variables
 uint lastUpdateTick = 0;
 uint lastHeartbeatTick = 0;
 uint lastReconnectAttemptTick = 0;
+uint lastLogUploadTick = 0;
 bool isRegistered = false;
 int httpTimeout = 5000;          // 5 seconds timeout for normal requests
 int httpTimeoutInit = 180000;    // 180 seconds (3 min) timeout for initial trade list (large payload)
+
+//--- EA Log tracking
+int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
+string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
 
 //--- Trade list tracking
 bool g_tradeListSent = false;            // Whether full trade list was successfully sent
@@ -125,6 +139,8 @@ bool LoadConfig()
       else if(key == "HeartbeatIntervalSeconds")  cfg_HeartbeatIntervalSeconds = (int)StringToInteger(value);
       else if(key == "ReconnectIntervalSeconds")  cfg_ReconnectIntervalSeconds = (int)StringToInteger(value);
       else if(key == "MaxReconnectAttempts")       cfg_MaxReconnectAttempts = (int)StringToInteger(value);
+      else if(key == "LogUploadIntervalSeconds")  cfg_LogUploadIntervalSeconds = (int)StringToInteger(value);
+      else if(key == "DebugMode")                 cfg_DebugMode = (int)StringToInteger(value);
    }
    
    FileClose(handle);
@@ -150,9 +166,11 @@ void SaveConfig()
    FileWriteString(handle, "ServerURL=" + cfg_ServerURL + "\r\n");
    FileWriteString(handle, "UserKey=" + cfg_UserKey + "\r\n");
    FileWriteString(handle, "UpdateIntervalSeconds=" + IntegerToString(cfg_UpdateIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "HeartbeatIntervalSeconds=" + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "ReconnectIntervalSeconds=" + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "MaxReconnectAttempts=" + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
+   FileWriteString(handle, "HeartbeatIntervalSeconds = " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "ReconnectIntervalSeconds = " + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "MaxReconnectAttempts = " + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
+   FileWriteString(handle, "LogUploadIntervalSeconds = " + IntegerToString(cfg_LogUploadIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "DebugMode = " + IntegerToString(cfg_DebugMode) + "\r\n");
    
    FileClose(handle);
    Print("Default configuration saved to ", CONFIG_FILE);
@@ -167,11 +185,6 @@ void InitConfig()
    {
       Print("Loaded configuration from ", CONFIG_FILE);
       
-      // Check if UI inputs have been changed by the user
-      // We assume they changed if they differ from what we just loaded from the file.
-      // (This requires that the user actually enters values in the UI dialog that differ
-      // from the current file state. If they just open and close it without changes, 
-      // these will match, or they might match the default inputs).
       bool uiChanged = false;
       
       if(ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080" && ServerURL != cfg_ServerURL) uiChanged = true;
@@ -180,47 +193,52 @@ void InitConfig()
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
       if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
+      if(LogUploadIntervalSeconds != 300 && LogUploadIntervalSeconds != cfg_LogUploadIntervalSeconds) uiChanged = true;
+      if(DebugMode != 0 && DebugMode != cfg_DebugMode) uiChanged = true;
+      
+      if(cfg_LogUploadIntervalSeconds == 0 && LogUploadIntervalSeconds == 300)
+      {
+         cfg_LogUploadIntervalSeconds = 300;
+         uiChanged = true;
+      }
       
       if(uiChanged)
       {
          Print("UI inputs differ from config file. Updating config file with new UI values.");
          cfg_ServerURL = (ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080") ? ServerURL : cfg_ServerURL;
          cfg_UserKey = (InpUserKey != "") ? InpUserKey : cfg_UserKey;
-         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 5) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
+         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
          cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
+         cfg_LogUploadIntervalSeconds = (LogUploadIntervalSeconds != 300) ? LogUploadIntervalSeconds : cfg_LogUploadIntervalSeconds;
+         cfg_DebugMode = (DebugMode != 0) ? DebugMode : cfg_DebugMode;
          
          SaveConfig();
       }
    }
    else
    {
-      // No config file, use current UI input defaults
       cfg_ServerURL = ServerURL;
       cfg_UserKey = InpUserKey;
       cfg_UpdateIntervalSeconds = UpdateIntervalSeconds;
       cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds;
       cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds;
       cfg_MaxReconnectAttempts = MaxReconnectAttempts;
+      cfg_LogUploadIntervalSeconds = LogUploadIntervalSeconds;
+      cfg_DebugMode = DebugMode;
       Print("Config file not found. Using UI inputs and generating a default config file.");
       
-      // Generate the default configuration file so the user has something to edit
       SaveConfig();
    }
    
-   // --- Robust URL cleanup ---
-   // Remove trailing slash, carriage return, newline, and spaces
-   // (can sneak in from config file reads on Windows)
    StringTrimRight(cfg_ServerURL);
    StringTrimLeft(cfg_ServerURL);
-   // Remove any trailing slash
    int urlLen = StringLen(cfg_ServerURL);
    if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == '/')
       cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
-   // Remove carriage return if present at end
    urlLen = StringLen(cfg_ServerURL);
-   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)  // CR = 13
+   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)
       cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
    
    Print("Active config: ServerURL=", cfg_ServerURL,
@@ -228,7 +246,8 @@ void InitConfig()
          " UpdateInterval=", cfg_UpdateIntervalSeconds,
          " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
          " ReconnectInterval=", cfg_ReconnectIntervalSeconds,
-         " MaxReconnectAttempts=", cfg_MaxReconnectAttempts);
+         " MaxReconnectAttempts=", cfg_MaxReconnectAttempts,
+         " LogUploadInterval=", cfg_LogUploadIntervalSeconds);
    Print(">>> MT4 Allowed URL must be EXACTLY: ", cfg_ServerURL, " (copy this!)");
 }
 
@@ -239,20 +258,22 @@ int OnInit()
 {
    Print("TradeMonitorClient EA v" + EA_VERSION + " initialized");
    
-   // === DIAGNOSTIC: Test WebRequest with a public URL ===
-   // This tells us if WebRequest works at ALL in this MT4 build.
-   // Requires 'http://worldtimeapi.org' in Tools -> Options -> Expert Advisors -> WebRequest URLs
    DiagnosticWebRequestTest();
    
-   // Load or initialize configuration
    InitConfig();
    
-   // Build unique GlobalVariable names per account
    string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    GV_TRADELIST_SENT = "TM_TradeListSent_" + accStr;
    GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
+   GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
    
-   // Check if trade list was already sent in a previous session
+   if(GlobalVariableCheck(GV_LAST_LOG_LINES))
+   {
+      g_lastLogLinesSent = (int)GlobalVariableGet(GV_LAST_LOG_LINES);
+      if(g_lastLogLinesSent > 0)
+         Print("Loaded last log position: line ", g_lastLogLinesSent);
+   }
+   
    if(GlobalVariableCheck(GV_TRADELIST_SENT))
    {
       double gvValue = GlobalVariableGet(GV_TRADELIST_SENT);
@@ -264,24 +285,20 @@ int OnInit()
       }
    }
    
-   // Load last synced close time from config file
    LoadLastSyncTime();
    
    Print("Server URL: ", cfg_ServerURL);
    Print("Account ID: ", AccountInfoInteger(ACCOUNT_LOGIN));
    
-   // Create reconnect button on chart
    CreateReconnectButton();
    CreateStatusLabel();
    
-   // Register with server on startup
    if(RegisterWithServer())
    {
       isRegistered = true;
       g_lastError = 0;
       Print("Successfully registered with server");
       
-      // Send full trade list on first connect (only if not already sent)
       if(!g_tradeListSent)
       {
          if(SendInitialTradeList())
@@ -305,7 +322,6 @@ int OnInit()
       g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
    }
    
-   // Set timer for periodic updates
    EventSetTimer(1);
    
    return(INIT_SUCCEEDED);
@@ -330,7 +346,12 @@ void OnTimer()
    uint currentTick = GetTickCount();
    datetime now = TimeCurrent();
    
-   // Check if we need to register / reconnect
+   if(!IsTradeAllowed())
+   {
+      UpdateStatusLabel("Trading DISABLED\nHeartbeat stopped", clrRed);
+      return;
+   }
+   
    if(!isRegistered)
    {
       int secondsRemaining = (int)(g_nextRetryTime - now);
@@ -359,11 +380,9 @@ void OnTimer()
       
       UpdateStatusLabel(statusText, statusColor);
       
-      // Wait for next retry time
       if(now < g_nextRetryTime)
          return;
       
-      // Perform Retry
       g_reconnectAttempts++;
       
       if(g_extendedRetryMode)
@@ -373,9 +392,8 @@ void OnTimer()
       
       if(RegisterWithServer())
       {
-         // SUCCESS
          isRegistered = true;
-         g_extendedRetryMode = false; // Exit extended mode
+         g_extendedRetryMode = false;
          g_reconnectAttempts = 0;
          g_lastError = 0;
          
@@ -384,7 +402,6 @@ void OnTimer()
          
          Print("Successfully registered with server");
          
-         // Send full trade list on reconnect (if not already sent)
          if(!g_tradeListSent)
          {
             if(SendInitialTradeList())
@@ -398,32 +415,24 @@ void OnTimer()
       }
       else
       {
-         // FAILURE
          g_lastError = GetLastError();
          
-         // Check if we should switch to extended retry mode
          if(!g_extendedRetryMode && cfg_MaxReconnectAttempts > 0 && g_reconnectAttempts >= cfg_MaxReconnectAttempts)
          {
             g_extendedRetryMode = true;
-            g_reconnectAttempts = 0; // Reset counter for extended phase logic if needed
+            g_reconnectAttempts = 0;
             Print("Max normal reconnect attempts reached. Switching to 15-minute extended retry mode.");
-            
-            // Set next retry time to LONG interval
             g_nextRetryTime = now + LONG_RETRY_INTERVAL;
          }
          else
          {
-            // Determine next retry interval based on mode
             int interval = g_extendedRetryMode ? LONG_RETRY_INTERVAL : cfg_ReconnectIntervalSeconds;
             g_nextRetryTime = now + interval;
-            
             Print("Reconnect failed. Next attempt in ", interval, " seconds.");
          }
       }
       return;
    }
-   
-   // --- CONNECTED STATE ---
    
    string statusText = "Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    if(g_tradeListSent)
@@ -433,10 +442,8 @@ void OnTimer()
       
    UpdateStatusLabel(statusText, clrGreen);
    
-   // Normal update cycle (only if registered and trade list was sent)
    if(g_tradeListSent)
    {
-      // Send trade updates
       if(currentTick - lastUpdateTick >= (uint)cfg_UpdateIntervalSeconds * 1000)
       {
          SendTradeUpdate();
@@ -444,17 +451,20 @@ void OnTimer()
          lastUpdateTick = currentTick;
       }
       
-      // Send heartbeat
       if(currentTick - lastHeartbeatTick >= (uint)cfg_HeartbeatIntervalSeconds * 1000)
       {
          SendHeartbeat();
          lastHeartbeatTick = currentTick;
       }
+      
+      if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
+      {
+         SendEaLogs();
+         lastLogUploadTick = currentTick;
+      }
    }
    else
    {
-      // Registered but trade list not yet sent - retry with cooldown
-      // Give up after MAX_INIT_RETRIES to avoid infinite loop
       if(g_initRetryCount >= MAX_INIT_RETRIES)
       {
          UpdateStatusLabel("Connected\nSync Failed (Max Retries)", clrRed);
@@ -515,10 +525,7 @@ void CreateStatusLabel()
 //+------------------------------------------------------------------+
 void UpdateStatusLabel(string text, color col)
 {
-   string configInfo = "Cfg: " + cfg_ServerURL + "\n" + 
-                       "Upd: " + IntegerToString(cfg_UpdateIntervalSeconds) + "s | HB: " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "s\n" + 
-                       "ReConn: " + IntegerToString(cfg_ReconnectIntervalSeconds) + "s (Max: " + IntegerToString(cfg_MaxReconnectAttempts) + ")";
-   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "Ver: " + EA_VERSION + "\n" + text + "\n" + configInfo);
+   ObjectSetString(0, LBL_STATUS, OBJPROP_TEXT, "v" + EA_VERSION + " | " + text + " | URL: " + cfg_ServerURL);
    ObjectSetInteger(0, LBL_STATUS, OBJPROP_COLOR, col);
    ChartRedraw(0);
 }
@@ -552,6 +559,7 @@ void OnChartEvent(const int id,
          g_lastSyncedCloseTime = "";
          isRegistered = false;
          lastReconnectAttemptTick = 0;
+         lastLogUploadTick = 0; // Force immediate log upload on reconnect
          GlobalVariableSet(GV_TRADELIST_SENT, 0);  // Clear persisted status
          SaveLastSyncTime("");                     // Clear sync bookmark
          
@@ -729,7 +737,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    outLatestCloseTime = "";
    
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
-   if(!isIncremental)
+   if(!isIncremental && cfg_DebugMode > 0)
       Print("Processing full history: ", totalOrders, " orders found...");
    
    for(int i = 0; i < totalOrders; i++)
@@ -782,7 +790,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                  historyJson += "}";
                  
                  // Progress logging every 100 closed trades
-                 if(!isIncremental && closedCount % 100 == 0)
+                 if(!isIncremental && closedCount % 100 == 0 && cfg_DebugMode > 0)
                  {
                     int pct = (int)((double)i / (double)totalOrders * 100.0);
                     Print("History progress: ", closedCount, " closed trades processed (", pct, "% scanned)");
@@ -794,10 +802,10 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    historyJson += "]";
    if(isIncremental)
    {
-      if(closedCount > 0)
+      if(closedCount > 0 && cfg_DebugMode > 0)
          Print("Incremental sync: ", closedCount, " new trades (skipped ", skippedCount, " already synced)");
    }
-   else
+   else if(cfg_DebugMode > 0)
       Print("History complete: ", closedCount, " closed trades from ", totalOrders, " total history orders");
    return historyJson;
 }
@@ -909,7 +917,8 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
    ResetLastError();
    
    // Debug: print exact URL before sending
-   Print("[WebRequest] POST to: ", url, " (urlLen=", StringLen(url), " dataLen=", ArraySize(postData), " timeout=", timeout, "ms)");
+   if(cfg_DebugMode > 0)
+      Print("[WebRequest] POST to: ", url, " (urlLen=", StringLen(url), " dataLen=", ArraySize(postData), " timeout=", timeout, "ms)");
    
    // MQL4 WebRequest signature is same as MQL5
    int res = WebRequest("POST", url, headers, timeout, postData, result, resultHeaders);
@@ -934,21 +943,6 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
       else
       {
          Print("HTTP request failed, error: ", error, " (timeout was ", timeout, "ms) URL: ", url);
-      }
-      return false;
-   }
-   
-   if(res != 200)
-   {
-      // Read server error response body for debugging
-      string responseBody = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
-      Print("HTTP request returned status: ", res, " URL: ", url);
-      if(StringLen(responseBody) > 0)
-      {
-         // Truncate very long responses
-         if(StringLen(responseBody) > 500)
-            responseBody = StringSubstr(responseBody, 0, 500) + "...";
-         Print("Server response: ", responseBody);
       }
       return false;
    }
@@ -1001,6 +995,80 @@ string EscapeJson(string text)
    StringReplace(result, "\r", "\\r");
    StringReplace(result, "\t", "\\t");
    return result;
+}
+
+//+------------------------------------------------------------------+
+//| Send EA log entries to server (incremental)                        |
+//+------------------------------------------------------------------+
+void SendEaLogs()
+{
+   string logDate = TimeToString(TimeLocal(), TIME_DATE);
+   StringReplace(logDate, ".", "");
+   
+   string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL4\\Logs\\" + logDate + ".log";
+   string destFile = "ea_log_copy.txt";
+   string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL4\\Files\\" + destFile;
+   
+   if(!CopyFileW(srcPath, destPath, false))
+   {
+      Print("EA Logs Sync: Failed to copy log file. Ensure 'Allow DLL imports' is enabled.");
+      return;
+   }
+   
+   int handle = FileOpen(destFile, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
+   if(handle == INVALID_HANDLE)
+   {
+      return;
+   }
+   
+   string lines[];
+   int lineCount = 0;
+   
+   while(!FileIsEnding(handle))
+   {
+      string line = FileReadString(handle);
+      if(StringLen(line) > 0)
+      {
+         lineCount++;
+         if(lineCount > g_lastLogLinesSent)
+         {
+            int newIdx = ArraySize(lines);
+            ArrayResize(lines, newIdx + 1);
+            lines[newIdx] = line;
+         }
+      }
+   }
+   FileClose(handle);
+   
+   int newLines = ArraySize(lines);
+   if(newLines == 0)
+      return;
+   
+   int maxLines = MathMin(newLines, 500);
+   
+   string logsJson = "[";
+   for(int i = 0; i < maxLines; i++)
+   {
+      if(i > 0) logsJson += ",";
+      logsJson += "\"" + EscapeJson(lines[i]) + "\"";
+   }
+   logsJson += "]";
+   
+   string json = "{";
+   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"logEntries\":" + logsJson + ",";
+   json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
+   json += "}";
+   
+   string url = cfg_ServerURL + "/api/ea-logs";
+   
+   if(SendHttpPost(url, json))
+   {
+      g_lastLogLinesSent += maxLines;
+      GlobalVariableSet(GV_LAST_LOG_LINES, (double)g_lastLogLinesSent);
+      if(cfg_DebugMode > 0)
+         Print("EA logs sent: ", maxLines, " new lines (total tracked: ", g_lastLogLinesSent, ")");
+   }
 }
 
 //+------------------------------------------------------------------+

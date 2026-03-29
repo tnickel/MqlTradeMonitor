@@ -80,6 +80,7 @@ public class AccountManager {
             account.setType(ae.getType());
             account.setSection(ae.getSection()); // Legacy loading
             account.setSectionId(ae.getSectionId()); // New loading
+            account.setMetaTraderInfo(ae.getMetaTraderInfo());
             account.setMagicNumberMaxAge(ae.getMagicNumberMaxAge() != null ? ae.getMagicNumberMaxAge() : 30);
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
@@ -232,6 +233,17 @@ public class AccountManager {
             account.setOpenProfitAlarmPct(alarmPct);
             // Persist
             tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
+        }
+    }
+
+    /**
+     * Update MetaTrader Info (2 lines text area) for an account.
+     */
+    public void updateMetaTraderInfo(long accountId, String metaTraderInfo) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setMetaTraderInfo(metaTraderInfo);
+            tradeStorage.updateMetaTraderInfo(accountId, metaTraderInfo);
         }
     }
 

@@ -98,6 +98,23 @@
                         th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
                     </span>
                 </div>
+
+                <div style="margin-top: 15px; padding: 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <div id="meta-info-display-mode">
+                        <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; font-weight: 700; letter-spacing: 0.05em;">MetaTrader Info</div>
+                        <div style="white-space: pre-wrap; font-size: 0.85rem; color: #d1d5db; line-height: 1.5;" th:text="${account.metaTraderInfo != null && !account.metaTraderInfo.isEmpty() ? account.metaTraderInfo : 'Keine Info...'}">Info...</div>
+                        <button type="button" onclick="document.getElementById('meta-info-display-mode').style.display='none'; document.getElementById('meta-info-edit-mode').style.display='block';" style="margin-top: 8px; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='rgba(255,255,255,0.3)';" onmouseout="this.style.color='#9ca3af'; this.style.borderColor='rgba(255,255,255,0.1)';">✏️ Info bearbeiten</button>
+                    </div>
+                    <div id="meta-info-edit-mode" style="display: none;">
+                        <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; font-weight: 700; letter-spacing: 0.05em;">MetaTrader Info eingeben</div>
+                        <textarea id="meta-trader-info-input" rows="2" style="width: 100%; max-width: 400px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--accent-primary); color: #fff; padding: 8px; border-radius: 6px; resize: vertical; margin-bottom: 8px; font-family: 'Inter', sans-serif; font-size: 0.85rem;" th:text="${account.metaTraderInfo}" placeholder="Informationen über diesen MT in ca 2 Zeilen eingeben..."></textarea>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button type="button" onclick="saveMetaTraderInfo()" style="background: var(--accent-primary); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">Speichern</button>
+                            <button type="button" onclick="document.getElementById('meta-info-edit-mode').style.display='none'; document.getElementById('meta-info-display-mode').style.display='block';" style="background: transparent; color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">Abbrechen</button>
+                            <span id="metaInfoFeedback" style="font-size: 0.8rem; font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div th:if="${currentUser != null}" style="text-align: right; margin-top: 10px;">
                 <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Eingeloggt als</div>
@@ -642,6 +659,35 @@
 
         // ============ PER-ACCOUNT MAGIC MAX AGE SAVE ============
         var currentAccountId = /*[[${accountId}]]*/ 0;
+
+        function saveMetaTraderInfo() {
+            var inputInfo = document.getElementById('meta-trader-info-input').value;
+            var feedback = document.getElementById('metaInfoFeedback');
+            
+            feedback.style.display = 'inline';
+            feedback.style.color = '#9ca3af';
+            feedback.textContent = '⏳ ...';
+            
+            fetch('/api/account/meta-trader-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId + '&metaTraderInfo=' + encodeURIComponent(inputInfo)
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    feedback.style.color = '#10b981'; // Green
+                    feedback.textContent = '✓ Gespeichert';
+                    setTimeout(function() { location.reload(); }, 600);
+                } else {
+                    feedback.style.color = '#ef4444'; // Red
+                    feedback.textContent = '✗ Fehler';
+                }
+            })
+            .catch(function() {
+                feedback.style.color = '#ef4444';
+                feedback.textContent = '✗ Netzwerkfehler';
+            });
+        }
 
         function saveMagicMaxAge() {
             var days = document.getElementById('magicMaxAgeInput').value;

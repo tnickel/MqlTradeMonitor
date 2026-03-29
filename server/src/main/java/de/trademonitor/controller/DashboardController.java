@@ -64,6 +64,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
 
+    @Autowired
+    private de.trademonitor.service.StrategyAnalyticsService strategyAnalyticsService;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -352,6 +355,15 @@ public class DashboardController {
             @RequestParam(value = "alarmAbs", required = false) Double alarmAbs,
             @RequestParam(value = "alarmPct", required = false) Double alarmPct) {
         accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
+        return ResponseEntity.ok("Saved");
+    }
+
+    @PostMapping("/api/account/meta-trader-info")
+    @ResponseBody
+    public ResponseEntity<String> updateMetaTraderInfo(
+            @RequestParam("accountId") Long accountId,
+            @RequestParam("metaTraderInfo") String metaTraderInfo) {
+        accountManager.updateMetaTraderInfo(accountId, metaTraderInfo);
         return ResponseEntity.ok("Saved");
     }
 
@@ -1322,6 +1334,130 @@ public class DashboardController {
             item.put("logLine", log.getLogLine());
             result.add(item);
         }
+        return result;
+    }
+
+    // ==================== ANALYTICS PAGE ====================
+
+    @GetMapping("/analytics")
+    public String analyticsPage(Model model) {
+        return "analytics";
+    }
+
+    // ==================== ANALYTICS API ENDPOINTS ====================
+
+    /**
+     * Heatmap: Profit aggregated by Weekday x Hour.
+     */
+    @GetMapping("/api/stats/heatmap")
+    @ResponseBody
+    public Map<String, Object> getHeatmapGlobal(@RequestParam(required = false) String type) {
+        return strategyAnalyticsService.buildHeatmap(null, type);
+    }
+
+    @GetMapping("/api/stats/heatmap/{accountId}")
+    @ResponseBody
+    public Map<String, Object> getHeatmap(@PathVariable long accountId) {
+        return strategyAnalyticsService.buildHeatmap(accountId, null);
+    }
+
+    /**
+     * Strategy KPIs per magic number for a single account.
+     */
+    @GetMapping("/api/stats/strategy-kpis/{accountId}")
+    @ResponseBody
+    public List<Map<String, Object>> getStrategyKpis(@PathVariable long accountId) {
+        return strategyAnalyticsService.getStrategyKpis(accountId);
+    }
+
+    /**
+     * Global strategy leaderboard across all accounts.
+     */
+    @GetMapping("/api/stats/strategy-leaderboard")
+    @ResponseBody
+    public List<Map<String, Object>> getStrategyLeaderboard(@RequestParam(required = false) String type) {
+        return strategyAnalyticsService.getGlobalLeaderboard(type);
+    }
+
+    /**
+     * Correlation matrix between account daily returns.
+     */
+    @GetMapping("/api/stats/correlation-matrix")
+    @ResponseBody
+    public Map<String, Object> getCorrelationMatrix(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String period) {
+        return strategyAnalyticsService.getCorrelationMatrix(type, period);
+    }
+
+    /**
+     * Drawdown curves for all accounts.
+     */
+    @GetMapping("/api/stats/drawdown-curves")
+    @ResponseBody
+    public List<Map<String, Object>> getDrawdownCurves(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String period) {
+        return strategyAnalyticsService.getDrawdownCurves(type, period);
+    }
+
+    /**
+     * Equity overlay curves for portfolio analytics.
+     */
+    @GetMapping("/api/stats/equity-overlay")
+    @ResponseBody
+    public List<Map<String, Object>> getEquityOverlay(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String period) {
+        List<Account> accounts = accountManager.getAccountsSortedByPrivilege().stream()
+                .filter(a -> type == null || type.isEmpty() || type.equalsIgnoreCase(a.getType()))
+                .collect(Collectors.toList());
+
+        java.util.function.Predicate<String> dateFilter = s -> true;
+        if ("monthly".equalsIgnoreCase(period)) {
+            String monthStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+            dateFilter = s -> s.startsWith(monthStr);
+        } else if ("weekly".equalsIgnoreCase(period)) {
+            String weekStr = java.time.LocalDate.now().with(java.time.DayOfWeek.MONDAY).toString();
+            dateFilter = s -> s.compareTo(weekStr) >= 0;
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Account acc : accounts) {
+            var snapshots = tradeStorage.loadEquitySnapshots(acc.getAccountId());
+            if (snapshots.isEmpty()) continue;
+
+            // Downsample to daily for normalization
+            Map<String, Double> dailyEquity = new java.util.LinkedHashMap<>();
+            final java.util.function.Predicate<String> filter = dateFilter;
+            for (var snap : snapshots) {
+                if (snap.getTimestamp() == null || !filter.test(snap.getTimestamp())) continue;
+                String day = snap.getTimestamp().substring(0, 10);
+                dailyEquity.put(day, snap.getEquity());
+            }
+
+            if (dailyEquity.size() < 2) continue;
+
+            // Normalize to 10000 start
+            double firstVal = dailyEquity.values().iterator().next();
+            List<String> timestamps = new ArrayList<>(dailyEquity.keySet());
+            List<Double> normalized = new ArrayList<>();
+            List<Double> raw = new ArrayList<>();
+            for (double eq : dailyEquity.values()) {
+                normalized.add(Math.round(eq / firstVal * 10000.0 * 100.0) / 100.0);
+                raw.add(Math.round(eq * 100.0) / 100.0);
+            }
+
+            Map<String, Object> entry = new java.util.LinkedHashMap<>();
+            entry.put("accountId", acc.getAccountId());
+            entry.put("name", acc.getName() != null ? acc.getName() : "Account " + acc.getAccountId());
+            entry.put("type", acc.getType());
+            entry.put("timestamps", timestamps);
+            entry.put("normalized", normalized);
+            entry.put("raw", raw);
+            result.add(entry);
+        }
+
         return result;
     }
 

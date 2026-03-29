@@ -85,6 +85,17 @@ public class TradeStorage {
     }
 
     /**
+     * Update MetaTrader Info text.
+     */
+    public void updateMetaTraderInfo(long accountId, String metaTraderInfo) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setMetaTraderInfo(metaTraderInfo);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Update the eaLogAcceptedAt timestamp for a specific account.
      */
     public void updateAccountEaLogAcceptedAt(long accountId, LocalDateTime timestamp) {

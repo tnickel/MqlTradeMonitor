@@ -44,6 +44,9 @@ public class AccountEntity {
     @Column(name = "open_profit_alarm_pct")
     private Double openProfitAlarmPct; // e.g. 10.0 (max drawdown % of balance)
 
+    @Column(name = "meta_trader_info", length = 1000)
+    private String metaTraderInfo;
+
     public AccountEntity() {
     }
 
@@ -197,5 +200,13 @@ public class AccountEntity {
 
     public void setOpenProfitAlarmPct(Double openProfitAlarmPct) {
         this.openProfitAlarmPct = openProfitAlarmPct;
+    }
+
+    public String getMetaTraderInfo() {
+        return metaTraderInfo;
+    }
+
+    public void setMetaTraderInfo(String metaTraderInfo) {
+        this.metaTraderInfo = metaTraderInfo;
     }
 }

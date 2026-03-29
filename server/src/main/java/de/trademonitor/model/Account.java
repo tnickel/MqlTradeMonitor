@@ -44,6 +44,8 @@ public class Account {
     private String lastErrorMsg;
     private LocalDateTime lastErrorTime;
 
+    private String metaTraderInfo;
+
     public boolean isSyncWarning() {
         return syncWarning;
     }
@@ -105,6 +107,14 @@ public class Account {
         if (lastErrorTime == null)
             return false;
         return LocalDateTime.now().minusMinutes(5).isBefore(lastErrorTime);
+    }
+
+    public String getMetaTraderInfo() {
+        return metaTraderInfo;
+    }
+
+    public void setMetaTraderInfo(String metaTraderInfo) {
+        this.metaTraderInfo = metaTraderInfo;
     }
 
     private List<Trade> openTrades = new ArrayList<>();

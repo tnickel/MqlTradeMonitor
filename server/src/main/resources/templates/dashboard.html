@@ -267,6 +267,26 @@
                     <canvas id="chart-combined-report"></canvas>
                 </div>
             </div>
+
+            <!-- Analytics Card -->
+            <div class="account-card" onclick="location.href='/analytics'"
+                style="cursor: pointer; border: 1px solid #8b5cf6; background: linear-gradient(to bottom right, var(--bg-card), rgba(139, 92, 246, 0.1)); flex: 0 1 auto; min-width: 300px; position: relative; overflow: hidden;">
+                <div class="account-header" style="position: relative; z-index: 2;">
+                    <span class="account-id" style="font-size: 1.2rem;">📈 Analytics</span>
+                    <div style="font-size: 0.8rem; color: #a0a0c0;">Heatmap • Leaderboard • Portfolio</div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px; position: relative; z-index: 2;">
+                    <div style="display: flex; gap: 8px;">
+                        <a href="/analytics" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0; background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3); color: #a78bfa;" onclick="event.stopPropagation();">🔥 Heatmap</a>
+                        <a href="/analytics#leaderboard" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0; background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3); color: #a78bfa;" onclick="event.stopPropagation();">🏆 Ranking</a>
+                        <a href="/analytics#portfolio" class="view-details-btn" style="flex: 1; text-align: center; padding: 10px 0; background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3); color: #a78bfa;" onclick="event.stopPropagation();">📊 Portfolio</a>
+                    </div>
+                </div>
+
+                <!-- Decorative gradient -->
+                <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.15; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #0ea5e9 100%);"></div>
+            </div>
         </div>
 
         <script>
@@ -660,6 +680,7 @@
             <a href="/admin" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Admin Area</a>
             <a href="/open-trades" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Open Trades</a>
             <a href="/trade-comparison" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Vergleich</a>
+            <a href="/analytics" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;">Analytics</a>
         </div>
     </footer>
 
