@@ -67,6 +67,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.StrategyAnalyticsService strategyAnalyticsService;
 
+    @Autowired
+    private de.trademonitor.repository.TimelineRepository timelineRepository;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -171,6 +174,15 @@ public class DashboardController {
         for (List<java.util.Map<String, Object>> list : accountsBySection.values()) {
             list.sort(orderComparator);
         }
+
+        java.time.YearMonth currentMonth = java.time.YearMonth.now();
+        java.time.YearMonth prevMonth = currentMonth.minusMonths(1);
+        java.time.YearMonth prevPrevMonth = prevMonth.minusMonths(1);
+        
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MMM", java.util.Locale.GERMAN);
+        model.addAttribute("month1Name", prevPrevMonth.format(formatter));
+        model.addAttribute("month2Name", prevMonth.format(formatter));
+        model.addAttribute("month3Name", currentMonth.format(formatter));
 
         model.addAttribute("sections", sections);
         model.addAttribute("accountsBySection", accountsBySection);
@@ -366,6 +378,38 @@ public class DashboardController {
         accountManager.updateMetaTraderInfo(accountId, metaTraderInfo);
         return ResponseEntity.ok("Saved");
     }
+
+    @PostMapping("/api/account/timelines")
+    @ResponseBody
+    public ResponseEntity<String> addTimeline(
+            @RequestParam("accountId") Long accountId,
+            @RequestParam("timelineDate") String timelineDate) {
+        
+        de.trademonitor.entity.TimelineEntity timeline = new de.trademonitor.entity.TimelineEntity(accountId, timelineDate);
+        timelineRepository.save(timeline);
+        
+        Account account = accountManager.getAccount(accountId);
+        if (account != null) {
+            String currentInfo = account.getMetaTraderInfo();
+            if (currentInfo == null) {
+                currentInfo = "";
+            } else if (!currentInfo.trim().isEmpty()) {
+                currentInfo += "\n";
+            }
+            currentInfo += "[Timeline hinzugefügt: " + timelineDate + "]";
+            accountManager.updateMetaTraderInfo(accountId, currentInfo);
+        }
+        
+        return ResponseEntity.ok("Saved");
+    }
+
+    @DeleteMapping("/api/account/timelines/{id}")
+    @ResponseBody
+    public ResponseEntity<String> deleteTimeline(@PathVariable("id") Long id) {
+        timelineRepository.deleteById(id);
+        return ResponseEntity.ok("Deleted");
+    }
+
 
     /**
      * AJAX Endpoint to update magic number max age for a specific account.
@@ -640,6 +684,9 @@ public class DashboardController {
         if (userDetails != null) {
             model.addAttribute("currentUser", userDetails.getUserEntity());
         }
+
+        List<de.trademonitor.entity.TimelineEntity> timelines = timelineRepository.findByAccountIdOrderByTimelineDateAsc(accountId);
+        model.addAttribute("timelines", timelines);
 
         return "account-detail";
     }
@@ -1299,7 +1346,7 @@ public class DashboardController {
                 .findFirst().orElse(null);
         model.addAttribute("accountName", acc != null && acc.getName() != null && !acc.getName().isEmpty() ? acc.getName() : String.valueOf(accountId));
         
-        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop500ByAccountIdOrderByTimestampDesc(accountId);
+        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop5000ByAccountIdOrderByTimestampDesc(accountId);
         model.addAttribute("logs", logs);
         model.addAttribute("logCount", eaLogEntryRepository.countByAccountId(accountId));
 
@@ -1324,7 +1371,7 @@ public class DashboardController {
     @GetMapping("/api/ea-logs/{accountId}")
     @ResponseBody
     public java.util.List<java.util.Map<String, Object>> getEaLogsApi(@PathVariable Long accountId) {
-        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop500ByAccountIdOrderByTimestampDesc(accountId);
+        java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop5000ByAccountIdOrderByTimestampDesc(accountId);
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
         for (de.trademonitor.entity.EaLogEntry log : logs) {
@@ -1472,4 +1519,5 @@ public class DashboardController {
             return s1.compareToIgnoreCase(s2);
         }
     }
+
 }

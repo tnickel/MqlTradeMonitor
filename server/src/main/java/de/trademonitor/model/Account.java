@@ -547,4 +547,248 @@ public class Account {
                 .distinct()
                 .collect(java.util.stream.Collectors.joining(", "));
     }
+
+    /**
+     * Calculates performance metrics: Profit %, Monthly Profit %, M-PDD (3-Months).
+     * @return Map containing the calculated metrics.
+     */
+    public Map<String, Object> getPerformanceMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        double totalHistoryProfit = getTotalHistoryProfit();
+        double initialBalance = balance - totalHistoryProfit;
+        if (initialBalance <= 0) {
+            initialBalance = balance > 0 ? balance : 1.0; // Fallback
+        }
+
+        // 1. Profit %
+        double profitPct = (totalHistoryProfit / initialBalance) * 100.0;
+        metrics.put("profitPct", profitPct);
+
+        // 2. Account Age & Monthly Profit %
+        double accountAgeMonths = 1.0;
+        if (closedTrades != null && !closedTrades.isEmpty()) {
+            Optional<String> oldestTimeStr = closedTrades.stream()
+                    .map(ClosedTrade::getCloseTime)
+                    .filter(Objects::nonNull)
+                    .min(String::compareTo);
+            
+            if (oldestTimeStr.isPresent()) {
+                try {
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+                    LocalDateTime oldestTime = LocalDateTime.parse(oldestTimeStr.get(), formatter);
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(oldestTime, LocalDateTime.now());
+                    accountAgeMonths = Math.max(1.0, days / 30.44); // Average days in month
+                } catch (Exception e) {
+                    // Ignore parsing error, default to 1
+                }
+            }
+        }
+        double monthlyProfitPct = profitPct / accountAgeMonths;
+        metrics.put("monthlyProfitPct", monthlyProfitPct);
+
+        // 3. M-PDD (3-Months)
+        double mpdd3 = 0.0;
+        if (closedTrades != null && !closedTrades.isEmpty()) {
+            LocalDateTime threeMonthsAgo = LocalDateTime.now().minusDays(90);
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+            
+            List<ClosedTrade> recentTrades = new ArrayList<>();
+            for (ClosedTrade t : closedTrades) {
+                if (t.getCloseTime() != null) {
+                    try {
+                        LocalDateTime ctTime = LocalDateTime.parse(t.getCloseTime(), formatter);
+                        if (ctTime.isAfter(threeMonthsAgo)) {
+                            recentTrades.add(t);
+                        }
+                    } catch (Exception e) {
+                        // ignore unparseable
+                    }
+                }
+            }
+            
+            if (!recentTrades.isEmpty()) {
+                // Sort by time ascending
+                recentTrades.sort(Comparator.comparing(ClosedTrade::getCloseTime));
+                
+                double recentProfit = recentTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
+                double startBalance3M = balance - recentProfit - getTotalProfit(); // Approximate starting balance 3M ago
+                if (startBalance3M <= 0) startBalance3M = balance > 0 ? balance : 1.0;
+                
+                double threeMonthProfitPct = (recentProfit / startBalance3M) * 100.0;
+                double avgMonthly3M = threeMonthProfitPct / 3.0;
+                
+                double maxDrawdownPct3M = 0;
+                double hwm = startBalance3M;
+                double runningBalance = startBalance3M;
+                
+                for (ClosedTrade t : recentTrades) {
+                    runningBalance += (t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor);
+                    if (runningBalance > hwm) {
+                        hwm = runningBalance;
+                    }
+                    double ddVal = hwm - runningBalance;
+                    if (ddVal > 0) {
+                        double ddPct = (ddVal / hwm) * 100.0;
+                        if (ddPct > maxDrawdownPct3M) {
+                            maxDrawdownPct3M = ddPct;
+                        }
+                    }
+                }
+                
+                // Include current open profit in the 3M drawdown calculus
+                runningBalance += getTotalProfit();
+                if (runningBalance > hwm) {
+                    hwm = runningBalance;
+                }
+                double currentDdVal = hwm - runningBalance;
+                if (currentDdVal > 0) {
+                    double currentDdPct = (currentDdVal / hwm) * 100.0;
+                    if (currentDdPct > maxDrawdownPct3M) {
+                        maxDrawdownPct3M = currentDdPct;
+                    }
+                }
+                
+                if (maxDrawdownPct3M > 0) {
+                    mpdd3 = avgMonthly3M / maxDrawdownPct3M;
+                } else if (avgMonthly3M > 0) {
+                    mpdd3 = avgMonthly3M; // If no DD, mpdd3 is essentially the profit, though dividing by 0 is undefined. Using value as fallback.
+                }
+            }
+        }
+        // 4. Monthly Breakdowns (Last 3 Calendar Months)
+        java.time.YearMonth currentMonth = java.time.YearMonth.now();
+        java.time.YearMonth prevMonth = currentMonth.minusMonths(1);
+        java.time.YearMonth prevPrevMonth = prevMonth.minusMonths(1);
+
+        double m3Profit = 0.0; // Current Month
+        double m2Profit = 0.0; // Prev Month
+        double m1Profit = 0.0; // P-Prev Month
+
+        double startBalanceM3 = balance - getTotalProfit(); 
+        double startBalanceM2 = startBalanceM3;
+        double startBalanceM1 = startBalanceM3;
+
+        if (closedTrades != null && !closedTrades.isEmpty()) {
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+            for (ClosedTrade t : closedTrades) {
+                if (t.getCloseTime() != null) {
+                    try {
+                        LocalDateTime ctTime = LocalDateTime.parse(t.getCloseTime(), formatter);
+                        java.time.YearMonth tradeMonth = java.time.YearMonth.from(ctTime);
+                        double netProfit = t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor;
+                        
+                        if (tradeMonth.equals(currentMonth)) {
+                            m3Profit += netProfit;
+                        } else if (tradeMonth.equals(prevMonth)) {
+                            m2Profit += netProfit;
+                        } else if (tradeMonth.equals(prevPrevMonth)) {
+                            m1Profit += netProfit;
+                        }
+
+                        if (!tradeMonth.isBefore(currentMonth)) {
+                            startBalanceM3 -= netProfit;
+                            startBalanceM2 -= netProfit;
+                            startBalanceM1 -= netProfit;
+                        } else if (!tradeMonth.isBefore(prevMonth)) {
+                            startBalanceM2 -= netProfit;
+                            startBalanceM1 -= netProfit;
+                        } else if (!tradeMonth.isBefore(prevPrevMonth)) {
+                            startBalanceM1 -= netProfit;
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+        if (startBalanceM1 <= 0) startBalanceM1 = balance > 0 ? balance : 1.0;
+        if (startBalanceM2 <= 0) startBalanceM2 = balance > 0 ? balance : 1.0;
+        if (startBalanceM3 <= 0) startBalanceM3 = balance > 0 ? balance : 1.0;
+
+        // 5. All-Time Closed DD % (High Water Mark) 
+        // Instead of trying to calculate startBalance (which is wrong because getTotalHistoryProfit includes deposits),
+        // we walk through ALL trades chronologically and reconstruct the balance curve.
+        // Trades with type BUY/SELL are real trades. Everything else (BALANCE, etc.) is a deposit/withdrawal.
+        double maxDrawdownPctAllTime = 0.0;
+        
+        if (closedTrades != null && !closedTrades.isEmpty()) {
+            List<ClosedTrade> sortedAllTrades = new ArrayList<>(closedTrades);
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+            
+            sortedAllTrades.sort((a, b) -> {
+                LocalDateTime timeA = null;
+                LocalDateTime timeB = null;
+                try { if (a.getCloseTime() != null) timeA = LocalDateTime.parse(a.getCloseTime(), formatter); } catch (Exception e) {}
+                try { if (b.getCloseTime() != null) timeB = LocalDateTime.parse(b.getCloseTime(), formatter); } catch (Exception e) {}
+                if (timeA == null && timeB == null) return 0;
+                if (timeA == null) return -1;
+                if (timeB == null) return 1;
+                return timeA.compareTo(timeB);
+            });
+            
+            // Reconstruct balance from the very first trade.
+            // The first entry is typically a deposit. We start at 0 and build up.
+            double runBal = 0.0;
+            double hwm = 0.0;
+            
+            for (ClosedTrade t : sortedAllTrades) {
+                double netTrade = t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor;
+                String tType = t.getType();
+                
+                // Determine if this is a real trade (BUY/SELL) or a balance operation (deposit/withdrawal)
+                boolean isRealTrade = tType != null && (tType.equalsIgnoreCase("BUY") || tType.equalsIgnoreCase("SELL"));
+                
+                runBal += netTrade;
+                
+                if (isRealTrade) {
+                    // Real trade: update HWM, then check drawdown
+                    if (runBal > hwm) {
+                        hwm = runBal;
+                    }
+                    if (hwm > 0) {
+                        double ddVal = hwm - runBal;
+                        if (ddVal > 0) {
+                            double ddPct = (ddVal / hwm) * 100.0;
+                            if (ddPct > maxDrawdownPctAllTime) {
+                                maxDrawdownPctAllTime = ddPct;
+                            }
+                        }
+                    }
+                } else {
+                    // Balance operation (deposit/withdrawal): adjust HWM equally
+                    // so it doesn't count as trading drawdown
+                    hwm += netTrade;
+                    if (hwm < 0) hwm = 0;
+                    // After a deposit, if balance exceeds hwm, update hwm
+                    if (runBal > hwm) {
+                        hwm = runBal;
+                    }
+                }
+            }
+            
+            // Include current open profit in the drawdown check
+            runBal += getTotalProfit();
+            if (runBal > hwm) {
+                hwm = runBal;
+            }
+            if (hwm > 0) {
+                double ddValCurrent = hwm - runBal;
+                if (ddValCurrent > 0) {
+                    double ddPct = (ddValCurrent / hwm) * 100.0;
+                    if (ddPct > maxDrawdownPctAllTime) {
+                        maxDrawdownPctAllTime = ddPct;
+                    }
+                }
+            }
+        }
+
+        metrics.put("m1Pct", (m1Profit / startBalanceM1) * 100.0);
+        metrics.put("m2Pct", (m2Profit / startBalanceM2) * 100.0);
+        metrics.put("m3Pct", (m3Profit / startBalanceM3) * 100.0);
+        metrics.put("mpdd3", mpdd3);
+        metrics.put("maxDrawdownPct", maxDrawdownPctAllTime);
+        metrics.put("openTradesCount", openTrades != null ? openTrades.size() : 0);
+        metrics.put("closedTradesCount", closedTrades != null ? closedTrades.size() : 0);
+
+        return metrics;
+    }
 }

@@ -107,11 +107,29 @@
                     </div>
                     <div id="meta-info-edit-mode" style="display: none;">
                         <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; font-weight: 700; letter-spacing: 0.05em;">MetaTrader Info eingeben</div>
-                        <textarea id="meta-trader-info-input" rows="2" style="width: 100%; max-width: 400px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--accent-primary); color: #fff; padding: 8px; border-radius: 6px; resize: vertical; margin-bottom: 8px; font-family: 'Inter', sans-serif; font-size: 0.85rem;" th:text="${account.metaTraderInfo}" placeholder="Informationen über diesen MT in ca 2 Zeilen eingeben..."></textarea>
+                        <textarea id="meta-trader-info-input" rows="5" style="width: 100%; max-width: 400px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--accent-primary); color: #fff; padding: 8px; border-radius: 6px; resize: vertical; margin-bottom: 8px; font-family: 'Inter', sans-serif; font-size: 0.85rem;" th:text="${account.metaTraderInfo}" placeholder="Informationen über diesen MT eingeben..."></textarea>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <button type="button" onclick="saveMetaTraderInfo()" style="background: var(--accent-primary); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">Speichern</button>
                             <button type="button" onclick="document.getElementById('meta-info-edit-mode').style.display='none'; document.getElementById('meta-info-display-mode').style.display='block';" style="background: transparent; color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">Abbrechen</button>
                             <span id="metaInfoFeedback" style="font-size: 0.8rem; font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- ======= TIMELINES ======== -->
+                    <div style="margin-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Timelines</span>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <input type="date" id="new-timeline-date" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">
+                                <button type="button" onclick="addTimeline()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-primary)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">+ Add</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            <span th:if="${#lists.isEmpty(timelines)}" style="font-size: 0.75rem; color: #6b7280; font-style: italic;">Keine Zeitschwellen gesetzt...</span>
+                            <div th:each="timeline : ${timelines}" style="display: inline-flex; align-items: center; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; color: #a5b4fc;">
+                                <span style="margin-right: 6px;">📅 <span th:text="${timeline.timelineDate}">2026-01-01</span></span>
+                                <button type="button" th:attr="onclick=|deleteTimeline(${timeline.id})|" style="background: transparent; border: none; color: #ef4444; font-size: 0.75rem; cursor: pointer; padding: 0; line-height: 1; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Timeline löschen">✖</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -659,6 +677,36 @@
 
         // ============ PER-ACCOUNT MAGIC MAX AGE SAVE ============
         var currentAccountId = /*[[${accountId}]]*/ 0;
+        
+        var timelineList = /*[[${timelines}]]*/ [];
+        var timelineDates = [];
+        if (timelineList && timelineList.length > 0) {
+            timelineDates = timelineList.map(function(t) { return t.timelineDate; });
+            timelineDates.sort(); // sort ascending
+        }
+
+        function addTimeline() {
+            var dateVal = document.getElementById('new-timeline-date').value;
+            if (!dateVal) return;
+            var feedback = document.getElementById('metaInfoFeedback');
+            fetch('/api/account/timelines', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'accountId=' + currentAccountId + '&timelineDate=' + encodeURIComponent(dateVal)
+            })
+            .then(function(res) {
+                if(res.ok) setTimeout(function() { location.reload(); }, 300);
+                else { feedback.style.display='inline'; feedback.style.color='#ef4444'; feedback.textContent='Fehler'; }
+            });
+        }
+
+        function deleteTimeline(id) {
+            if(!confirm('Timeline wirklich löschen?')) return;
+            fetch('/api/account/timelines/' + id, { method: 'DELETE' })
+            .then(function(res) {
+                if(res.ok) location.reload();
+            });
+        }
 
         function saveMetaTraderInfo() {
             var inputInfo = document.getElementById('meta-trader-info-input').value;
@@ -1001,9 +1049,50 @@
                 });
             }
 
+            var timelinePlugin = {
+                id: 'timelineVerticalLines',
+                afterDraw: function(chart) {
+                    if (!timelineDates || timelineDates.length === 0) return;
+                    var ctx = chart.ctx;
+                    var xAxis = chart.scales.x;
+                    var yAxis = chart.scales.y;
+                    
+                    ctx.save();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'; // Red with some transparency
+                    ctx.setLineDash([5, 5]);
+                    
+                    timelineDates.forEach(function(dateStr) {
+                        var dateObj = new Date(dateStr + "T00:00:00");
+                        var ts = dateObj.getTime();
+                        
+                        if (ts >= xAxis.min && ts <= xAxis.max) {
+                            var pixelX = xAxis.getPixelForValue(ts);
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(pixelX, yAxis.top);
+                            ctx.lineTo(pixelX, yAxis.bottom);
+                            ctx.stroke();
+                            
+                            // Draw badge / text
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                            var textW = 60;
+                            var textH = 16;
+                            ctx.fillRect(pixelX - textW/2, yAxis.top - textH, textW, textH);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = '9px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(dateStr, pixelX, yAxis.top - 4);
+                        }
+                    });
+                    ctx.restore();
+                }
+            };
+
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: { datasets: datasets },
+                plugins: [timelinePlugin],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -1146,7 +1235,39 @@
             var end = start + this.pageSize;
 
             for (var i = start; i < end && i < this.filteredRows.length; i++) {
-                this.filteredRows[i].style.display = '';
+                var row = this.filteredRows[i];
+                row.style.display = '';
+
+                // Add Timeline Border Logic (row sorts Descending by default)
+                row.style.borderBottom = '';
+                if (typeof timelineDates !== 'undefined' && timelineDates.length > 0) {
+                    var currentDateStr = row.dataset.closeTime;
+                    if (currentDateStr) {
+                        var currentDate = currentDateStr.substring(0, 10).replace(/\./g, '-');
+                        // Check if previous row (which is a newer date) crossed a timeline
+                        if (i > 0) { // i=0 is the newest, no timeline divider before the newest (unless we needed it, but mostly between trades)
+                            var prevRow = this.filteredRows[i-1];
+                            var prevDateStr = prevRow.dataset.closeTime;
+                            if (prevDateStr) {
+                                var prevDate = prevDateStr.substring(0, 10).replace(/\./g, '-');
+                                // if prevDate (newer) >= tlDate && currentDate (older) < tlDate -> crossed boundary!
+                                for(var t = 0; t < timelineDates.length; t++) {
+                                     var tlDate = timelineDates[t];
+                                     if (prevDate >= tlDate && currentDate < tlDate) {
+                                          // Add thick border above this row (since this row is the first one *before* the timeline event)
+                                          // Or actually, border-bottom on the previous row (the newer one) might be better, or border-top on this row.
+                                          // Let's do border-bottom on the previous row if it's visible, but actually border-top on this row is easier.
+                                          row.style.borderTop = '3px solid #ef4444';
+                                          // Maybe add a pseudo-element or just the thick line. 
+                                          break;
+                                     } else {
+                                        row.style.borderTop = '';
+                                     }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             this.renderPagination(totalPages);

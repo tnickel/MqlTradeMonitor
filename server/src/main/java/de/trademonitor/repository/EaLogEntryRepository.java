@@ -13,8 +13,8 @@ public interface EaLogEntryRepository extends JpaRepository<EaLogEntry, Long> {
 
     List<EaLogEntry> findByAccountIdOrderByTimestampDesc(Long accountId);
 
-    @Query("SELECT e FROM EaLogEntry e WHERE e.accountId = :accountId ORDER BY e.timestamp DESC LIMIT 500")
-    List<EaLogEntry> findTop500ByAccountIdOrderByTimestampDesc(Long accountId);
+    @Query("SELECT e FROM EaLogEntry e WHERE e.accountId = :accountId ORDER BY e.timestamp DESC LIMIT 5000")
+    List<EaLogEntry> findTop5000ByAccountIdOrderByTimestampDesc(Long accountId);
 
     @Transactional
     @Modifying

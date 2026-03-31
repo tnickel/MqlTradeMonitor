@@ -52,6 +52,9 @@
                 <button th:if="${isAdmin}" title="Alle Protokollwarnungen quittieren" id="accept-all-logs-btn" class="view-toggle-btn" onclick="acceptAllEaLogs()" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);">
                     <span>✅</span> Accept All
                 </button>
+                <button id="view-btn-metrics-info" class="view-toggle-btn" onclick="openMetricsInfoModal()" style="color: #6366f1; border-color: rgba(99, 102, 241, 0.3);">
+                    <span>ℹ️</span> Infos
+                </button>
             </div>
             <button id="edit-layout-btn" class="edit-layout-btn" onclick="toggleEditMode()">Layout bearbeiten</button>
             <button id="save-layout-btn" class="save-layout-btn" onclick="saveLayout()"
@@ -287,6 +290,8 @@
                 <!-- Decorative gradient -->
                 <div style="height: 60px; width: 100%; position: absolute; bottom: 0; left: 0; opacity: 0.15; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #0ea5e9 100%);"></div>
             </div>
+
+
         </div>
 
         <script>
@@ -516,6 +521,13 @@
                                     USD</span>
                             </div>
                             <div class="metric">
+                                <span class="metric-label" title="Gesamter Profit inkl. % zur Start-Balance">Profit <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
+                                <span th:class="${acc.totalHistoryProfit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                                    th:text="(${acc.totalHistoryProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.totalHistoryProfit, 1, 2)} + ' ' + ${acc.currency} + ' (' + (${acc.profitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profitPct, 1, 1)} + '%)'">
+                                    +120 EUR (+12%)
+                                </span>
+                            </div>
+                            <div class="metric">
                                 <span class="metric-label">Alarm</span>
                                 <span th:if="${!acc.openProfitAlarmEnabled}" class="metric-value"
                                     style="color: #555;">–</span>
@@ -529,15 +541,29 @@
                                     ALARM</span>
                             </div>
                             <div class="metric">
-                                <span class="metric-label">Open Profit</span>
-                                <span
-                                    th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
-                                    th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+50
-                                    USD</span>
+                                <span class="metric-label" th:title="'Rendite in ' + ${month1Name} + ', ' + ${month2Name} + ', ' + ${month3Name}" th:text="${month1Name} + ' | ' + ${month2Name} + ' | ' + ${month3Name}">Jan | Feb | Mär</span>
+                                <span class="metric-value" style="font-size: 0.85rem;">
+                                    <span th:class="${acc.m1Pct >= 0 ? 'profit-positive' : 'profit-negative'}" th:text="${#numbers.formatDecimal(acc.m1Pct, 1, 1)} + '%'"></span> |
+                                    <span th:class="${acc.m2Pct >= 0 ? 'profit-positive' : 'profit-negative'}" th:text="${#numbers.formatDecimal(acc.m2Pct, 1, 1)} + '%'"></span> |
+                                    <span th:class="${acc.m3Pct >= 0 ? 'profit-positive' : 'profit-negative'}" th:text="${#numbers.formatDecimal(acc.m3Pct, 1, 1)} + '%'"></span>
+                                </span>
                             </div>
                             <div class="metric">
-                                <span class="metric-label">Open Trades</span>
-                                <span class="metric-value" th:text="${acc.trades}">5</span>
+                                <span class="metric-label">Open Profit</span>
+                                <span th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
+                                      th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}"></span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Trades (Offen/Hist)</span>
+                                <span class="metric-value" th:text="${acc.openTradesCount} + ' / ' + ${acc.closedTradesCount}"></span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label" title="All-Time Max Drawdown % (Close-to-Close)">Closed DD <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
+                                <span class="metric-value profit-negative" th:text="'-' + ${#numbers.formatDecimal(acc.maxDrawdownPct, 1, 2)} + '%'">-12.40%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label" title="M-PDD3 = (Ø 3M-Rendite) / (3M Max Drawdown)">M-PDD <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
+                                <span class="metric-value" th:text="${acc.mpdd3 > 0 ? #numbers.formatDecimal(acc.mpdd3, 1, 2) : '-'}">2.4</span>
                             </div>
                         </div>
                         <div th:if="${acc.errorState}"
@@ -573,16 +599,22 @@
                 <h3 th:text="${section.name}" class="section-title"
                     style="margin-bottom:10px; border-bottom:1px solid #3f3f5f; padding-bottom:5px;">Section
                 </h3>
-                <table class="compact-table">
+                <table class="compact-table" style="table-layout: fixed; width: 100%;">
                     <thead>
                         <tr>
-                            <th>Account</th>
-                            <th>Name</th>
-                            <th>Balance</th>
-                            <th>Alarm</th>
-                            <th>Open Profit</th>
-                            <th>Trades</th>
-                            <th style="text-align:center;">Sync</th>
+                            <th style="width: 8%;">Account</th>
+                            <th style="width: 15%;">Name</th>
+                            <th style="width: 10%; text-align: right;">Balance</th>
+                            <th style="width: 13%; text-align: right;" title="Gesamter Profit inkl. %">Profit <span style="cursor:help; color:var(--accent-primary); font-size: 0.8em;">ⓘ</span></th>
+                            <th style="width: 6%; text-align: right;" th:text="${month1Name}">Jan</th>
+                            <th style="width: 6%; text-align: right;" th:text="${month2Name}">Feb</th>
+                            <th style="width: 6%; text-align: right;" th:text="${month3Name}">Mär</th>
+                            <th style="width: 6%; text-align: right;" title="All-Time Max Drawdown % (Close-to-Close)">Closed DD <span style="cursor:help; color:var(--accent-primary); font-size: 0.8em;">ⓘ</span></th>
+                            <th style="width: 5%; text-align: right;" title="M-PDD3 = (Ø 3M-Rendite) / (3M Max Drawdown)">M-PDD <span style="cursor:help; color:var(--accent-primary); font-size: 0.8em;">ⓘ</span></th>
+                            <th style="width: 4%; text-align: center;">Alarm</th>
+                            <th style="width: 13%; text-align: right;" title="Laufender Profit / Anzahl offener Positionen">Open P/L / O.T. <span style="cursor:help; color:var(--accent-primary); font-size: 0.8em;">ⓘ</span></th>
+                            <th style="width: 6%; text-align: right;" title="Historisch abgeschlossene Trades">Hist. T. <span style="cursor:help; color:var(--accent-primary); font-size: 0.8em;">ⓘ</span></th>
+                            <th style="width: 2%; text-align: center;">Sync</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -602,18 +634,27 @@
                                     </span>
                                 </div>
                             </td>
-                            <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}">1000.00</td>
-                            <td>
-                                <span th:if="${!acc.openProfitAlarmEnabled}"
-                                    th:text="${#numbers.formatDecimal(acc.equity, 1, 2)}">1000.00</span>
+                            <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}" style="text-align: right;">1000.00</td>
+                            <td style="text-align: right;" th:classappend="${acc.totalHistoryProfit >= 0 ? ' profit-positive' : ' profit-negative'}"
+                                th:text="(${acc.totalHistoryProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.totalHistoryProfit, 1, 2)} + ' (' + (${acc.profitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profitPct, 1, 1)} + '%)'">+120 (+12%)</td>
+                            <td style="text-align: right;" th:classappend="${acc.m1Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m1Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m1Pct, 1, 1)} + '%'"></td>
+                            <td style="text-align: right;" th:classappend="${acc.m2Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m2Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m2Pct, 1, 1)} + '%'"></td>
+                            <td style="text-align: right;" th:classappend="${acc.m3Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m3Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m3Pct, 1, 1)} + '%'"></td>
+                            <td style="text-align: right;" class="profit-negative" th:text="'-' + ${#numbers.formatDecimal(acc.maxDrawdownPct, 1, 2)} + '%'">-5.00%</td>
+                            <td style="text-align: right;" th:text="${acc.mpdd3 > 0.009 ? #numbers.formatDecimal(acc.mpdd3, 1, 2) : '-'}">2.4</td>
+                            <td style="text-align: center;">
+                                <span th:if="${!acc.openProfitAlarmEnabled}" style="color: #555;">–</span>
                                 <span th:if="${acc.openProfitAlarmEnabled && !acc.openProfitAlarmTriggered}"
                                     style="color: #10b981; font-size: 0.85rem;">⚡</span>
                                 <span th:if="${acc.openProfitAlarmEnabled && acc.openProfitAlarmTriggered}"
                                     style="color: #ef4444; font-weight: bold;">🔴</span>
                             </td>
-                            <td th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}">+50</td>
-                            <td th:text="${acc.trades}">5</td>
+                            <td style="text-align: right;">
+                                <span th:class="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                      th:text="${#numbers.formatDecimal(acc.profit, 1, 2)}"></span>
+                                <span th:text="' / ' + ${acc.openTradesCount}" style="color: #a0a0c0; font-size: 0.85rem;"></span>
+                            </td>
+                            <td style="text-align: right; color: #a0a0c0;" th:text="${acc.closedTradesCount}">123</td>
                             <td style="text-align:center;">
                                 <span th:if="${acc.syncWarning}" title="Sync Error!"
                                     style="color: #ef4444; font-size:1.2em;">⚠️</span>
@@ -730,6 +771,44 @@
                 .then(data => alert(data))
                 .catch(error => alert('Netzwerkfehler: ' + error));
         }
+    </script>
+
+    <!-- Edit Account Modal -->
+    <div id="metricsInfoModal" class="modal">
+        <div class="modal-content" style="max-width: 600px; width: 90%;">
+            <span class="close-modal" onclick="closeMetricsInfoModal()">&times;</span>
+            <h2>📊 Performance Metriken Erklärt</h2>
+            <div style="margin-top: 20px; line-height: 1.6; color: #c9d1d9; font-size: 0.95rem;">
+                <p><strong>Profit %</strong><br>
+                Berechnet sich aus dem gesamten realisierten Gewinn im Verhältnis zur angenommenen Initial Balance.<br>
+                <em style="color: var(--accent-primary);">Start-Balance = Aktuelle Balance - All-time Profit</em></p>
+                <hr style="border-color: #3f3f5f; margin: 15px 0;">
+                
+                <p><strong>3 Monats-Ansicht (<span th:text="${month1Name} + ', ' + ${month2Name} + ', ' + ${month3Name}"></span>)</strong><br>
+                Die reine prozentuale Netto-Rendite, isoliert auf die geschlossenen Trades in den jeweiligen Kalendermonaten, berechnet als Gewinn im Verhältnis zur ermittelten Monats-Start-Balance.</p>
+                <hr style="border-color: #3f3f5f; margin: 15px 0;">
+                
+                <p><strong>M-PDD3 (Performance Drawdown)</strong><br>
+                Kennzahl (Ratio), welches das <strong>Verhältnis von Rendite zu Risiko im aktuellen Quartal</strong> darstellt.<br>
+                <em style="color: var(--accent-primary);">Formel = (Monatliche 3M-Rendite) / (Max Drawdown der letzten 3M)</em><br>
+                <span style="font-size: 0.85rem; color: #8b949e;">Höher ist besser. Zeigt die Stabilität der Rendite in Bezug auf historische Verluste an.</span></p>
+                <hr style="border-color: #3f3f5f; margin: 15px 0;">
+                
+                <p><strong>Closed DD (Drawdown Close-to-Close)</strong><br>
+                Berechnet den gemessenen Kontoeinbruch basierend auf geschlossenen Trades plus aktuellem Open Profit. Schwebende historische Floating-Verluste (wie bei Myfxbook) können hier nicht erfasst werden, da der MetaTrader nur Snapshots sendet.</p>
+                <hr style="border-color: #3f3f5f; margin: 15px 0;">
+                
+                <p><strong>Open P/L / O.T. & Hist. T.</strong><br>
+                Zeigt den nicht realisierten Gewinn (Open P/L) in Währung und in einer separaten Spalte die Menge der offenen Trades (O.T.) sowie der historisch geschlossenen Trades (Hist. T.).</p>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="save-btn" onclick="closeMetricsInfoModal()">Schließen</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function openMetricsInfoModal() { document.getElementById('metricsInfoModal').style.display = 'block'; }
+        function closeMetricsInfoModal() { document.getElementById('metricsInfoModal').style.display = 'none'; }
     </script>
 
     <!-- Edit Account Modal -->

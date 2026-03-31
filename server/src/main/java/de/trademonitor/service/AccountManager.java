@@ -383,6 +383,20 @@ public class AccountManager {
             info.put("openProfitAlarmAbs", account.getOpenProfitAlarmAbs());
             info.put("openProfitAlarmPct", account.getOpenProfitAlarmPct());
             info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
+
+            // Add new performance metrics
+            Map<String, Object> perfMetrics = account.getPerformanceMetrics();
+            info.put("profitPct", perfMetrics.get("profitPct"));
+            info.put("monthlyProfitPct", perfMetrics.get("monthlyProfitPct"));
+            info.put("m1Pct", perfMetrics.get("m1Pct"));
+            info.put("m2Pct", perfMetrics.get("m2Pct"));
+            info.put("m3Pct", perfMetrics.get("m3Pct"));
+            info.put("mpdd3", perfMetrics.get("mpdd3"));
+            info.put("maxDrawdownPct", perfMetrics.get("maxDrawdownPct"));
+            info.put("openTradesCount", perfMetrics.get("openTradesCount"));
+            info.put("closedTradesCount", perfMetrics.get("closedTradesCount"));
+            info.put("totalHistoryProfit", account.getTotalHistoryProfit());
+
             result.add(info);
         }
         // Sort by online status then by account ID

@@ -77,6 +77,24 @@
             border-bottom-color: #38bdf8;
             background: rgba(56, 189, 248, 0.1);
         }
+        
+        /* Filter Buttons */
+        .filter-btn {
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .filter-btn.filter-active {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .filter-btn.filter-inactive {
+            opacity: 0.35;
+            transform: scale(0.95);
+            text-decoration: line-through;
+        }
+        .filter-btn.filter-inactive:hover {
+            opacity: 0.6;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -106,15 +124,15 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <div id="dayStats" class="flex items-center gap-2 mr-2" style="display: none;">
-                            <span class="bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner" title="Infos">
+                            <button id="filterInfo" onclick="toggleFilter('info')" class="filter-btn filter-active bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner cursor-pointer hover:bg-slate-700/80 transition-all" title="Info-Meldungen ein/ausblenden">
                                 <i class="fa-solid fa-info-circle text-blue-400"></i> <span id="statInfo" class="font-bold">0</span>
-                            </span>
-                            <span class="bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner" title="Warnungen">
+                            </button>
+                            <button id="filterWarn" onclick="toggleFilter('warn')" class="filter-btn filter-active bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md text-sm text-slate-300 flex items-center gap-2 shadow-inner cursor-pointer hover:bg-slate-700/80 transition-all" title="Warnungen ein/ausblenden">
                                 <i class="fa-solid fa-triangle-exclamation text-orange-400"></i> <span id="statWarn" class="font-bold">0</span>
-                            </span>
-                            <span class="bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded-md text-sm text-red-200 flex items-center gap-2 shadow-inner" title="Fehler">
+                            </button>
+                            <button id="filterErr" onclick="toggleFilter('error')" class="filter-btn filter-active bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded-md text-sm text-red-200 flex items-center gap-2 shadow-inner cursor-pointer hover:bg-red-900/40 transition-all" title="Fehler ein/ausblenden">
                                 <i class="fa-solid fa-circle-xmark text-red-500"></i> <span id="statErr" class="font-bold">0</span>
-                            </span>
+                            </button>
                         </div>
                         
                         <div class="flex flex-col items-end mr-2" th:if="${isAdmin}">
@@ -162,11 +180,36 @@
         const accountId = /*[[${accountId}]]*/ 0;
         let allLogsByDate = {}; // Format: { "28.03.2026": [logs...], "27.03.2026": [logs...] }
         let activeTabDate = null;
+        
+        // Filter state: all active by default
+        let activeFilters = { info: true, warn: true, error: true };
 
         // Initialize on load
         document.addEventListener("DOMContentLoaded", () => {
             refreshLogs();
         });
+
+        function toggleFilter(type) {
+            activeFilters[type] = !activeFilters[type];
+            
+            // Update button visual state
+            const btnMap = { info: 'filterInfo', warn: 'filterWarn', error: 'filterErr' };
+            const btn = document.getElementById(btnMap[type]);
+            if (btn) {
+                if (activeFilters[type]) {
+                    btn.classList.add('filter-active');
+                    btn.classList.remove('filter-inactive');
+                } else {
+                    btn.classList.remove('filter-active');
+                    btn.classList.add('filter-inactive');
+                }
+            }
+            
+            // Re-render table with current filters
+            if (activeTabDate) {
+                renderTable(activeTabDate);
+            }
+        }
 
         function refreshLogs() {
             const icon = document.getElementById('refreshIcon');
@@ -188,6 +231,16 @@
                 });
         }
 
+        function classifyLog(message) {
+            const msgLower = message.toLowerCase();
+            if (msgLower.includes('error') || msgLower.includes('failed') || msgLower.includes('exception')) {
+                return 'error';
+            } else if (msgLower.includes('warning') || msgLower.includes('warn ')) {
+                return 'warn';
+            }
+            return 'info';
+        }
+
         function processLogData(logs) {
             allLogsByDate = {};
             document.getElementById('logCount').textContent = logs ? logs.length : 0;
@@ -207,7 +260,6 @@
                     if (!log.timestamp) {
                         // null or undefined
                     } else if (Array.isArray(log.timestamp)) {
-                        // Spring Jackson returns [YYYY, MM, DD, HH, mm, ss, ns]
                         dt = new Date(
                             log.timestamp[0], 
                             log.timestamp[1] - 1, 
@@ -217,7 +269,6 @@
                             log.timestamp[5] || 0
                         );
                     } else if (typeof log.timestamp === 'object' && log.timestamp.year) {
-                        // Spring Jackson serializing LocalDateTime as raw POJO
                         dt = new Date(
                             log.timestamp.year,
                             (log.timestamp.monthValue || 1) - 1,
@@ -227,7 +278,6 @@
                             log.timestamp.second || 0
                         );
                     } else if (typeof log.timestamp === 'string') {
-                        // Handle "dd.MM.yyyy HH:mm:ss" from DashboardController string formatting
                         const match = log.timestamp.match(/^(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2}):(\d{2})$/);
                         if (match) {
                             dt = new Date(
@@ -239,7 +289,6 @@
                                 parseInt(match[6], 10)
                             );
                         } else {
-                            // Fallback for standard ISO strings
                             dt = new Date(log.timestamp);
                         }
                     } else {
@@ -255,7 +304,7 @@
                         const hh = String(dt.getHours()).padStart(2, '0');
                         const mins = String(dt.getMinutes()).padStart(2, '0');
                         const ss = String(dt.getSeconds()).padStart(2, '0');
-                        timeStr = `${hh}:${mins}:${ss}`;
+                        timeStr = `${dd}.${mm}. ${hh}:${mins}:${ss}`;
                     }
                 } catch(e) {
                     console.error("Date parsing error:", e);
@@ -268,19 +317,19 @@
                 allLogsByDate[dateStr].push({
                     timeStr: timeStr,
                     rawTime: log.timestamp,
-                    message: log.logLine
+                    message: log.logLine,
+                    level: classifyLog(log.logLine || '')
                 });
             });
 
             // Get sorted dates (newest first)
             const sortedDates = Object.keys(allLogsByDate).sort((a, b) => {
-                // Simple sort logic: convert DD.MM.YYYY to YYYYMMDD for comparison
                 const partsA = a.split('.');
                 const partsB = b.split('.');
                 if(partsA.length === 3 && partsB.length === 3) {
                     const numA = parseInt(partsA[2] + partsA[1] + partsA[0]);
                     const numB = parseInt(partsB[2] + partsB[1] + partsB[0]);
-                    return numB - numA; // Descending
+                    return numB - numA;
                 }
                 return 0;
             });
@@ -305,7 +354,7 @@
                 btn.innerHTML = `<i class="fa-regular fa-calendar mr-2"></i>${date} <span class="ml-1 text-xs px-2 py-0.5 rounded-full ${date === activeTabDate ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10'}">${count}</span>`;
                 btn.onclick = () => {
                     activeTabDate = date;
-                    renderTabs(dates); // re-render tabs to update active state
+                    renderTabs(dates);
                     renderTable(date);
                 };
                 container.appendChild(btn);
@@ -325,23 +374,32 @@
             let infoCount = 0;
             let warnCount = 0;
             let errCount = 0;
+            let visibleCount = 0;
 
             logs.forEach(log => {
-                const tr = document.createElement('tr');
-                const msgLower = log.message.toLowerCase();
+                const level = log.level;
                 
-                // Color Logic
+                // Count totals regardless of filter
+                if (level === 'error') errCount++;
+                else if (level === 'warn') warnCount++;
+                else infoCount++;
+                
+                // Apply filter
+                if (level === 'error' && !activeFilters.error) return;
+                if (level === 'warn' && !activeFilters.warn) return;
+                if (level === 'info' && !activeFilters.info) return;
+
+                visibleCount++;
+                const tr = document.createElement('tr');
+                
                 let iconHtml = '';
-                if (msgLower.includes('error') || msgLower.includes('failed') || msgLower.includes('exception')) {
-                    errCount++;
+                if (level === 'error') {
                     tr.className = 'row-error transition-colors';
                     iconHtml = '<i class="fa-solid fa-circle-xmark mr-2 text-red-500"></i>';
-                } else if (msgLower.includes('warning') || msgLower.includes('warn ')) {
-                    warnCount++;
+                } else if (level === 'warn') {
                     tr.className = 'row-warning transition-colors';
                     iconHtml = '<i class="fa-solid fa-triangle-exclamation mr-2 text-orange-400"></i>';
                 } else {
-                    infoCount++;
                     tr.className = 'row-normal';
                     iconHtml = '<i class="fa-solid fa-info-circle mr-2 opacity-30"></i>';
                 }
@@ -357,6 +415,17 @@
                 `;
                 tbody.appendChild(tr);
             });
+            
+            // Show "no results" if all filtered out
+            if (visibleCount === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="2" class="px-6 py-12 text-center text-slate-500 italic">
+                            <i class="fa-solid fa-filter mr-2"></i> Keine Einträge für die aktiven Filter.
+                        </td>
+                    </tr>
+                `;
+            }
             
             // Update the stats overview
             document.getElementById('statInfo').textContent = infoCount;
