@@ -24,7 +24,7 @@ bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExis
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.03"
+#define EA_VERSION "1.04"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -47,7 +47,9 @@ int httpTimeoutInit = 180000;    // 180 seconds (3 min) timeout for initial trad
 
 //--- EA Log tracking
 int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
+string GV_TRADELIST_SENT = "";           // GlobalVariable name for persisting trade list sync status
 string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
+string GV_LAST_LOG_DATE = "";            // GlobalVariable name for persisting the log date format YYYYMMDD
 
 //--- Trade list tracking
 bool g_tradeListSent = false;            // Whether full trade list was successfully sent
@@ -73,7 +75,6 @@ int g_lastError = 0;                     // Last web request error
 #define LBL_STATUS "lblStatus"
 
 //--- MetaTrader GlobalVariable names for persisting state
-string GV_TRADELIST_SENT = "";
 string GV_LAST_SYNC_TIME = "";          // Stores last synced close time as string hash
 
 //+------------------------------------------------------------------+
@@ -95,6 +96,7 @@ void UpdateStatusLabel(string text, color col);
 void LoadLastSyncTime();
 void SaveLastSyncTime(string closeTime);
 void DiagnosticWebRequestTest();
+void SendEaLogs();
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -262,10 +264,23 @@ int OnInit()
    
    InitConfig();
    
-   string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   GV_TRADELIST_SENT = "TM_TradeListSent_" + accStr;
-   GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
+   // Build unique GlobalVariable names per account
+   string accStr = IntegerToString(AccountNumber());
+   GV_TRADELIST_SENT = "TM_Trade_Sent_" + accStr;
    GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
+   GV_LAST_LOG_DATE  = "TM_LastLogDate_" + accStr;
+   GV_LAST_SYNC_TIME  = "TM_LastSync_" + accStr;
+   
+   // Load persisted states
+   if(GlobalVariableCheck(GV_TRADELIST_SENT))
+   {
+      double val = GlobalVariableGet(GV_TRADELIST_SENT);
+      if(val > 0)
+      {
+         g_tradeListSent = true;
+         g_tradeListSentTime = (datetime)val;
+      }
+   }
    
    if(GlobalVariableCheck(GV_LAST_LOG_LINES))
    {
@@ -274,39 +289,33 @@ int OnInit()
          Print("Loaded last log position: line ", g_lastLogLinesSent);
    }
    
-   if(GlobalVariableCheck(GV_TRADELIST_SENT))
-   {
-      double gvValue = GlobalVariableGet(GV_TRADELIST_SENT);
-      if(gvValue > 0)
-      {
-         g_tradeListSent = true;
-         g_tradeListSentTime = (datetime)(long)gvValue;
-         Print("Trade list was already sent at ", TimeToString(g_tradeListSentTime), " (from GlobalVariable)");
-      }
-   }
-   
    LoadLastSyncTime();
    
    Print("Server URL: ", cfg_ServerURL);
    Print("Account ID: ", AccountInfoInteger(ACCOUNT_LOGIN));
-   
+      // Create reconnect button on chart
    CreateReconnectButton();
    CreateStatusLabel();
    
+   // Register with server on startup
+   UpdateStatusLabel("Connecting to Server...", clrWhite);
    if(RegisterWithServer())
    {
       isRegistered = true;
       g_lastError = 0;
       Print("Successfully registered with server");
       
+      // Send full trade list on first connect (only if not already sent)
       if(!g_tradeListSent)
       {
+         UpdateStatusLabel("Syncing Trade Data...", clrWhite);
          if(SendInitialTradeList())
          {
             g_tradeListSent = true;
             g_tradeListSentTime = TimeCurrent();
             GlobalVariableSet(GV_TRADELIST_SENT, (double)g_tradeListSentTime);
             Print("Initial trade list sent successfully at ", TimeToString(g_tradeListSentTime));
+            UpdateStatusLabel("Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)), clrGreen);
          }
          else
          {
@@ -456,12 +465,6 @@ void OnTimer()
          SendHeartbeat();
          lastHeartbeatTick = currentTick;
       }
-      
-      if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
-      {
-         SendEaLogs();
-         lastLogUploadTick = currentTick;
-      }
    }
    else
    {
@@ -498,6 +501,13 @@ void OnTimer()
              }
          }
       }
+   }
+
+   // Send EA logs ALWAYS when connected (independent of trade sync status)
+   if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
+   {
+      SendEaLogs();
+      lastLogUploadTick = currentTick;
    }
 }
 
@@ -560,6 +570,8 @@ void OnChartEvent(const int id,
          isRegistered = false;
          lastReconnectAttemptTick = 0;
          lastLogUploadTick = 0; // Force immediate log upload on reconnect
+         g_lastLogLinesSent = 0; // Reset log line counter to re-send all lines
+         GlobalVariableSet(GV_LAST_LOG_LINES, 0); // Persist the reset
          GlobalVariableSet(GV_TRADELIST_SENT, 0);  // Clear persisted status
          SaveLastSyncTime("");                     // Clear sync bookmark
          
@@ -646,12 +658,16 @@ bool SendInitialTradeList()
    
    // Build open trades array
    Print("Building open trades JSON...");
+   UpdateStatusLabel("Syncing Open Trades...", clrWhite);
    string tradesJson = BuildOpenTradesJson();
    
    // Build closed trades array (full history)
    Print("Building closed trades JSON (full history)...");
+   UpdateStatusLabel("Syncing Trade History...", clrWhite);
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson("", latestCloseTime);
+   
+   UpdateStatusLabel("Uploading Data to Server...", clrWhite);
    
    // Build main JSON payload
    string json = "{";
@@ -790,10 +806,12 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                  historyJson += "}";
                  
                  // Progress logging every 100 closed trades
-                 if(!isIncremental && closedCount % 100 == 0 && cfg_DebugMode > 0)
+                 if(!isIncremental && closedCount % 100 == 0)
                  {
                     int pct = (int)((double)i / (double)totalOrders * 100.0);
-                    Print("History progress: ", closedCount, " closed trades processed (", pct, "% scanned)");
+                    if(cfg_DebugMode > 0)
+                       Print("History progress: ", closedCount, " closed trades processed (", pct, "% scanned)");
+                    UpdateStatusLabel("Reading History: " + IntegerToString(closedCount) + " trades (" + IntegerToString(pct) + "%)", clrWhite);
                  }
              }
          }
@@ -1004,8 +1022,27 @@ void SendEaLogs()
 {
    string logDate = TimeToString(TimeLocal(), TIME_DATE);
    StringReplace(logDate, ".", "");
+   double currentDateNumeric = StringToDouble(logDate);
    
-   string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL4\\Logs\\" + logDate + ".log";
+   // Check if the day rolled over. If so, reset the line counter.
+   if(GlobalVariableCheck(GV_LAST_LOG_DATE))
+   {
+      double lastDate = GlobalVariableGet(GV_LAST_LOG_DATE);
+      if(lastDate > 0 && lastDate != currentDateNumeric)
+      {
+         // Day has changed! Reset line count.
+         g_lastLogLinesSent = 0;
+         GlobalVariableSet(GV_LAST_LOG_LINES, 0);
+         GlobalVariableSet(GV_LAST_LOG_DATE, currentDateNumeric);
+         Print("EA Logs Sync: New day detected (", logDate, "), resetting log line counter to 0");
+      }
+   }
+   else
+   {
+      GlobalVariableSet(GV_LAST_LOG_DATE, currentDateNumeric);
+   }
+   
+   string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\logs\\" + logDate + ".log";
    string destFile = "ea_log_copy.txt";
    string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL4\\Files\\" + destFile;
    

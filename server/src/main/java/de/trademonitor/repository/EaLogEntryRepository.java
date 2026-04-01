@@ -32,4 +32,16 @@ public interface EaLogEntryRepository extends JpaRepository<EaLogEntry, Long> {
     Integer getLogSeverityForAccountSince(@org.springframework.data.repository.query.Param("accountId") Long accountId, 
                                           @org.springframework.data.repository.query.Param("since") LocalDateTime since,
                                           @org.springframework.data.repository.query.Param("logAcceptedAt") LocalDateTime logAcceptedAt);
+
+    /**
+     * Batch version: Get log severity for ALL accounts in one query.
+     * Returns rows of [accountId, severity].
+     */
+    @Query(value = "SELECT e.account_id, CASE " +
+                   "WHEN SUM(CASE WHEN LOWER(e.log_line) LIKE '%error%' OR LOWER(e.log_line) LIKE '%failed%' OR LOWER(e.log_line) LIKE '%exception%' THEN 1 ELSE 0 END) > 0 THEN 2 " +
+                   "WHEN SUM(CASE WHEN LOWER(e.log_line) LIKE '%warn %' OR LOWER(e.log_line) LIKE '%warning%' THEN 1 ELSE 0 END) > 0 THEN 1 " +
+                   "ELSE 0 END " +
+                   "FROM ea_log_entry e WHERE e.timestamp > :since " +
+                   "GROUP BY e.account_id", nativeQuery = true)
+    List<Object[]> getLogSeverityForAllAccountsSince(@org.springframework.data.repository.query.Param("since") LocalDateTime since);
 }

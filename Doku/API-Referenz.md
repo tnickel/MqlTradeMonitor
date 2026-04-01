@@ -196,6 +196,13 @@ Sendet eine Test-E-Mail mit der aktuellen SMTP-Konfiguration.
 
 ---
 
+### REST API Auth Endpunkte (`/api/login`, `/api/demo-login`, `/api/logout`)
+
+Diese Endpunkte dienen explizit externen Headless-Clients (wie der Replit App), um sich per REST/JSON anzumelden, ohne HTML-Seiten für CSRF-Tokens parsen zu müssen. Sie geben das `JSESSIONID` Cookie im Set-Cookie Header zurück.
+Weitere Details hierzu befinden sich in der Dokumentation unter `replit/Replit_Erweiterung.md`.
+
+---
+
 ## 2. Dashboard-Endpunkte
 
 ### GET `/`

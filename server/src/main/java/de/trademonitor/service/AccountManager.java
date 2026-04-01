@@ -13,6 +13,7 @@ import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 /**
  * Manages registered MetaTrader accounts and their status.
@@ -21,9 +22,20 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class AccountManager {
 
+    private static final Logger LOG = Logger.getLogger(AccountManager.class.getName());
     private final Map<Long, Account> accounts = new ConcurrentHashMap<>();
     /** Tracks which REAL accounts have already triggered an offline siren (to avoid repeated alerts). */
     private final Set<Long> offlineSirenLatch = ConcurrentHashMap.newKeySet();
+
+    // === PERFORMANCE CACHES ===
+    /** Cached max drawdown % per account (computed from equity snapshots). */
+    private final Map<Long, Double> cachedMaxDrawdownPct = new ConcurrentHashMap<>();
+    /** Cached performance metrics per account (profitPct, monthlyProfitPct, m1/m2/m3, mpdd3 etc.). */
+    private final Map<Long, Map<String, Object>> cachedPerformanceMetrics = new ConcurrentHashMap<>();
+    /** Cached today's closed profit per account. */
+    private final Map<Long, Double> cachedDailyProfit = new ConcurrentHashMap<>();
+    /** Date string for which cachedDailyProfit is valid. */
+    private volatile String cachedDailyProfitDate = "";
 
     @Value("${account.timeout.seconds:60}")
     private int timeoutSeconds;
@@ -39,6 +51,9 @@ public class AccountManager {
 
     @Autowired
     private HomeyService homeyService;
+
+    @Autowired
+    private de.trademonitor.repository.EquitySnapshotRepository equitySnapshotRepository;
 
     private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
 
@@ -125,8 +140,11 @@ public class AccountManager {
             }
 
             accounts.put(ae.getAccountId(), account);
-            System.out.println("Loaded account " + ae.getAccountId() + " from DB");
+            LOG.info("Loaded account " + ae.getAccountId() + " from DB");
         }
+        // Cache initialization is done asynchronously via @Scheduled(initialDelay=5000)
+        // to avoid blocking server startup. The getAccountsWithStatus() fallback
+        // will calculate metrics on-demand if cache is empty.
     }
 
     public List<de.trademonitor.entity.DashboardSectionEntity> getAllSections() {
@@ -190,7 +208,7 @@ public class AccountManager {
             }
 
             accounts.put(accountId, account);
-            System.out.println("New account registered: " + accountId + " (" + broker + ")");
+            LOG.info("New account registered: " + accountId + " (" + broker + ")");
         } else {
             account.setBroker(broker);
             account.setCurrency(currency);
@@ -384,15 +402,23 @@ public class AccountManager {
             info.put("openProfitAlarmPct", account.getOpenProfitAlarmPct());
             info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
 
-            // Add new performance metrics
-            Map<String, Object> perfMetrics = account.getPerformanceMetrics();
+            // Use CACHED performance metrics instead of recalculating every time
+            Map<String, Object> perfMetrics = cachedPerformanceMetrics.get(account.getAccountId());
+            if (perfMetrics == null) {
+                // Fallback: calculate and cache on first access
+                perfMetrics = account.getPerformanceMetrics();
+                cachedPerformanceMetrics.put(account.getAccountId(), perfMetrics);
+            }
             info.put("profitPct", perfMetrics.get("profitPct"));
             info.put("monthlyProfitPct", perfMetrics.get("monthlyProfitPct"));
             info.put("m1Pct", perfMetrics.get("m1Pct"));
             info.put("m2Pct", perfMetrics.get("m2Pct"));
             info.put("m3Pct", perfMetrics.get("m3Pct"));
             info.put("mpdd3", perfMetrics.get("mpdd3"));
-            info.put("maxDrawdownPct", perfMetrics.get("maxDrawdownPct"));
+
+            // Use CACHED max drawdown % (computed from equity snapshots)
+            double equityDDPct = cachedMaxDrawdownPct.getOrDefault(account.getAccountId(), 0.0);
+            info.put("maxDrawdownPct", equityDDPct);
             info.put("openTradesCount", perfMetrics.get("openTradesCount"));
             info.put("closedTradesCount", perfMetrics.get("closedTradesCount"));
             info.put("totalHistoryProfit", account.getTotalHistoryProfit());
@@ -498,7 +524,7 @@ public class AccountManager {
             if (!isOnline && account.getLastSeen() != null) {
                 // Account is offline — trigger siren if not already latched
                 if (offlineSirenLatch.add(account.getAccountId())) {
-                    System.out.println("[AccountManager] REAL account " + account.getAccountId()
+                    LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
                             + ") went OFFLINE — triggering Homey siren.");
                     homeyService.triggerSiren();
@@ -523,6 +549,12 @@ public class AccountManager {
             // Reload from DB to keep in-memory cache consistent
             account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
             account.setLastSeen(LocalDateTime.now());
+
+            // Invalidate caches for this account since trades changed
+            if (inserted > 0) {
+                cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+                refreshDailyProfitForAccount(accountId);
+            }
             return inserted;
         }
         return 0;
@@ -759,5 +791,104 @@ public class AccountManager {
             account.setEaLogAcceptedAt(now);
             tradeStorage.updateAccountEaLogAcceptedAt(accountId, now);
         }
+    }
+
+    // === PERFORMANCE CACHE METHODS ===
+
+    /**
+     * Refresh ALL performance caches. Called on startup and periodically.
+     */
+    public void refreshAllCaches() {
+        long start = System.currentTimeMillis();
+        for (Account account : accounts.values()) {
+            long accId = account.getAccountId();
+            // Cache performance metrics
+            cachedPerformanceMetrics.put(accId, account.getPerformanceMetrics());
+            // Cache max drawdown from equity snapshots
+            refreshDrawdownCacheForAccount(accId);
+            // Cache daily profit
+            refreshDailyProfitForAccount(accId);
+        }
+        long elapsed = System.currentTimeMillis() - start;
+        LOG.info("[Performance] All caches refreshed in " + elapsed + "ms for " + accounts.size() + " accounts");
+    }
+
+    /**
+     * Refresh drawdown cache for a single account from equity snapshots.
+     */
+    private void refreshDrawdownCacheForAccount(long accountId) {
+        try {
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots =
+                equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
+            double equityDDPct = 0.0;
+            if (snapshots != null && snapshots.size() > 10) {
+                double hwm = 0.0;
+                for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
+                    double eq = snap.getEquity();
+                    if (eq > hwm) {
+                        hwm = eq;
+                    }
+                    if (hwm > 0) {
+                        double dd = (hwm - eq) / hwm * 100.0;
+                        if (dd > equityDDPct) {
+                            equityDDPct = dd;
+                        }
+                    }
+                }
+            }
+            cachedMaxDrawdownPct.put(accountId, equityDDPct);
+        } catch (Exception e) {
+            cachedMaxDrawdownPct.put(accountId, 0.0);
+        }
+    }
+
+    /**
+     * Refresh daily profit cache for a single account.
+     */
+    private void refreshDailyProfitForAccount(long accountId) {
+        String todayStr = java.time.LocalDateTime.now().format(
+            java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+
+        // Reset all caches if the date changed
+        if (!todayStr.equals(cachedDailyProfitDate)) {
+            cachedDailyProfit.clear();
+            cachedDailyProfitDate = todayStr;
+        }
+
+        Account account = accounts.get(accountId);
+        if (account != null && account.getClosedTrades() != null) {
+            double dailyProfit = 0.0;
+            for (ClosedTrade ct : account.getClosedTrades()) {
+                if (ct.getCloseTime() != null && ct.getCloseTime().startsWith(todayStr)) {
+                    dailyProfit += ct.getProfit() + ct.getSwap() + (ct.getCommission() * account.getCommissionFactor());
+                }
+            }
+            cachedDailyProfit.put(accountId, dailyProfit);
+        }
+    }
+
+    /**
+     * Get cached daily profit for an account.
+     */
+    public double getCachedDailyProfit(long accountId) {
+        String todayStr = java.time.LocalDateTime.now().format(
+            java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+        if (!todayStr.equals(cachedDailyProfitDate)) {
+            // Date changed, force refresh
+            cachedDailyProfit.clear();
+            cachedDailyProfitDate = todayStr;
+            refreshDailyProfitForAccount(accountId);
+        }
+        return cachedDailyProfit.getOrDefault(accountId, 0.0);
+    }
+
+    /**
+     * Scheduled: Refresh all caches every 5 minutes.
+     * Initial run 5 seconds after startup (non-blocking).
+     * This ensures caches stay in sync even if a trade update notification was missed.
+     */
+    @Scheduled(fixedRate = 300000, initialDelay = 5000) // 5 min, first run after 5s
+    public void scheduledCacheRefresh() {
+        refreshAllCaches();
     }
 }

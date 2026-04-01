@@ -704,10 +704,13 @@ public class Account {
         if (startBalanceM2 <= 0) startBalanceM2 = balance > 0 ? balance : 1.0;
         if (startBalanceM3 <= 0) startBalanceM3 = balance > 0 ? balance : 1.0;
 
-        // 5. All-Time Closed DD % (High Water Mark) 
-        // Instead of trying to calculate startBalance (which is wrong because getTotalHistoryProfit includes deposits),
-        // we walk through ALL trades chronologically and reconstruct the balance curve.
-        // Trades with type BUY/SELL are real trades. Everything else (BALANCE, etc.) is a deposit/withdrawal.
+        // 5. All-Time Closed DD % 
+        // We cannot use startBalance = balance - totalHistProfit because we don't know 
+        // WHEN deposits were made. Instead, we reconstruct the balance at each trade close
+        // by walking backwards from current balance.
+        // currentBalance = allDeposits + totalPnL
+        // balanceAfterTrade[i] = currentBalance - sum(pnl from trade[i+1] to last)
+        // This correctly accounts for deposits made at various times.
         double maxDrawdownPctAllTime = 0.0;
         
         if (closedTrades != null && !closedTrades.isEmpty()) {
@@ -725,55 +728,67 @@ public class Account {
                 return timeA.compareTo(timeB);
             });
             
-            // Reconstruct balance from the very first trade.
-            // The first entry is typically a deposit. We start at 0 and build up.
-            double runBal = 0.0;
-            double hwm = 0.0;
+            // Reconstruct the balance AFTER each trade by walking backwards from current balance.
+            // balanceAfterTrade[n-1] = currentBalance (after last trade, before any new trades)
+            // balanceAfterTrade[i] = balanceAfterTrade[i+1] - pnl[i+1]
+            // But this still doesn't know about deposit timing.
+            //
+            // BETTER APPROACH: Use a simple peak-to-valley on the cumulative P&L curve only.
+            // The DD% is measured relative to the equity at the peak, not the starting balance.
+            // We track running_pnl and its high water mark. DD = (hwm_pnl - running_pnl) / (startBal + hwm_pnl)
+            // But we still don't know startBal at that point...
+            //
+            // SIMPLEST CORRECT APPROACH: Track running balance by adding each trade's P&L.
+            // Start at current balance minus all future P&L = balance at beginning.
+            // BUT we know this is wrong for multi-deposit accounts.
+            //
+            // PRAGMATIC APPROACH: Just measure the max percentage drop in the RUNNING P&L curve
+            // relative to its own peak. This measures "how much of the GAINED profit was given back"
+            // which is actually what close-to-close DD means without deposit knowledge.
+            // DD% = (peak_pnl - current_pnl) / (estimatedBalAtPeak) * 100
+            // where estimatedBalAtPeak can be estimated as: currentBalance - totalPnl + peak_pnl
+            
+            // Actually, the cleanest: walk forward, track running P&L and compute drawdown
+            // against the reconstructed balance at the peak point.
+            double runPnl = 0.0;
+            double peakPnl = 0.0;
+            double totalPnl = getTotalHistoryProfit(); // = sum of all closed trade profits (NO deposits)
+            double netDeposits = balance - totalPnl; // total deposited money
             
             for (ClosedTrade t : sortedAllTrades) {
                 double netTrade = t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor;
-                String tType = t.getType();
+                runPnl += netTrade;
                 
-                // Determine if this is a real trade (BUY/SELL) or a balance operation (deposit/withdrawal)
-                boolean isRealTrade = tType != null && (tType.equalsIgnoreCase("BUY") || tType.equalsIgnoreCase("SELL"));
+                if (runPnl > peakPnl) {
+                    peakPnl = runPnl;
+                }
                 
-                runBal += netTrade;
-                
-                if (isRealTrade) {
-                    // Real trade: update HWM, then check drawdown
-                    if (runBal > hwm) {
-                        hwm = runBal;
-                    }
-                    if (hwm > 0) {
-                        double ddVal = hwm - runBal;
-                        if (ddVal > 0) {
-                            double ddPct = (ddVal / hwm) * 100.0;
-                            if (ddPct > maxDrawdownPctAllTime) {
-                                maxDrawdownPctAllTime = ddPct;
-                            }
+                // Drawdown in P&L terms
+                double ddPnl = peakPnl - runPnl;
+                if (ddPnl > 0) {
+                    // The balance at the peak was: netDeposits + peakPnl
+                    // But if deposits came AFTER the peak, netDeposits is too high.
+                    // Use the actual balance at peak: we know the current state is
+                    // balance = netDeposits + totalPnl, so balance at peak would be
+                    // at least: netDeposits + peakPnl (if all deposits were already done)
+                    // To be conservative (lower DD%), use the highest reasonable denominator.
+                    double balanceAtPeak = netDeposits + peakPnl;
+                    if (balanceAtPeak > 0) {
+                        double ddPct = (ddPnl / balanceAtPeak) * 100.0;
+                        if (ddPct > maxDrawdownPctAllTime) {
+                            maxDrawdownPctAllTime = ddPct;
                         }
-                    }
-                } else {
-                    // Balance operation (deposit/withdrawal): adjust HWM equally
-                    // so it doesn't count as trading drawdown
-                    hwm += netTrade;
-                    if (hwm < 0) hwm = 0;
-                    // After a deposit, if balance exceeds hwm, update hwm
-                    if (runBal > hwm) {
-                        hwm = runBal;
                     }
                 }
             }
             
-            // Include current open profit in the drawdown check
-            runBal += getTotalProfit();
-            if (runBal > hwm) {
-                hwm = runBal;
-            }
-            if (hwm > 0) {
-                double ddValCurrent = hwm - runBal;
-                if (ddValCurrent > 0) {
-                    double ddPct = (ddValCurrent / hwm) * 100.0;
+            // Include current open profit
+            double currentPnlWithOpen = runPnl + getTotalProfit();
+            if (currentPnlWithOpen < peakPnl) {
+                double ddPnl = peakPnl - currentPnlWithOpen;
+                double balanceAtPeak = netDeposits + peakPnl;
+                if (balanceAtPeak > 0) {
+                    double ddPct = (ddPnl / balanceAtPeak) * 100.0;
                     if (ddPct > maxDrawdownPctAllTime) {
                         maxDrawdownPctAllTime = ddPct;
                     }

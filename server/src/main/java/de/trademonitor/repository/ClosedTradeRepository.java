@@ -38,4 +38,24 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
     long countByAccountIds(java.util.Collection<Long> accountIds);
 
     java.util.Optional<ClosedTradeEntity> findFirstByMagicNumber(Long magicNumber);
+
+    /**
+     * Sum profit for a specific account where closeTime starts with the given prefix.
+     * Useful for daily (prefix="2026.04.01") or monthly (prefix="2026.04") aggregation.
+     */
+    @Query("SELECT COALESCE(SUM(c.profit), 0) FROM ClosedTradeEntity c WHERE c.accountId = ?1 AND c.closeTime LIKE CONCAT(?2, '%')")
+    double sumProfitByAccountIdAndCloseTimePrefix(long accountId, String prefix);
+
+    /**
+     * Count trades for a specific account where closeTime starts with the given prefix.
+     */
+    @Query("SELECT COUNT(c) FROM ClosedTradeEntity c WHERE c.accountId = ?1 AND c.closeTime LIKE CONCAT(?2, '%')")
+    long countByAccountIdAndCloseTimePrefix(long accountId, String prefix);
+
+    /**
+     * Batch: Get trade count and sum profit per account for trades matching a closeTime prefix.
+     * Returns rows of [accountId, count, sumProfit].
+     */
+    @Query("SELECT c.accountId, COUNT(c), COALESCE(SUM(c.profit), 0) FROM ClosedTradeEntity c WHERE c.accountId IN ?1 AND c.closeTime LIKE CONCAT(?2, '%') GROUP BY c.accountId")
+    java.util.List<Object[]> aggregateByAccountIdsAndPrefix(java.util.Collection<Long> accountIds, String prefix);
 }

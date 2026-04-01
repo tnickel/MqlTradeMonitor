@@ -10,6 +10,10 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "closed_trades", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "accountId", "ticket" })
+}, indexes = {
+        @Index(name = "idx_closed_trades_account", columnList = "accountId"),
+        @Index(name = "idx_closed_trades_account_close", columnList = "accountId, closeTime"),
+        @Index(name = "idx_closed_trades_magic", columnList = "magicNumber")
 })
 public class ClosedTradeEntity {
 

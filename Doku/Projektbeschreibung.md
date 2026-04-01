@@ -128,6 +128,15 @@ Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickel
 | **RequestLoggingFilter** | Audit-Log fuer neue IP-Adressen |
 | **AuthenticationEvents** | Event-Listener fuer Login-Erfolg/-Fehlschlag, speist LoginLog und BruteForce-Tracking |
 
+### 4.5 Externe API Clients (Replit App)
+
+Neben dem internen Thymeleaf SSR Frontend unterstützt der Server auch komplett entkoppelte Headless-Clients.
+Aktuell existiert eine experimentelle Web-App, die über Replit (Replit AI) entwickelt wird. 
+
+**Besonderheiten:**
+- Eigene REST-API-Auth-Endpunkte (`/api/login`, `/api/demo-login`, `/api/logout`) ohne CSRF-Zwang
+- Sämtliche Dokumentation, Prompts und Beschreibungen für die Replit App befinden sich im separaten Verzeichnis `replit/` (z.B. `Replit_Erweiterung.md`)
+
 ---
 
 ## 5. Datenbankschema (11 Tabellen)

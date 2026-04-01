@@ -4,12 +4,12 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.07"
+#property version   "1.09"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
-input string   ServerURL = "https://DEINE-DOMAIN.DE:8080";   // Server URL (use HTTPS!)
-input string   InpUserKey = "";                        // User API-Key (from Admin Dashboard)
+input string   ServerURL = "https://monitor.ki-software-schmiede.de"; // Server URL (use HTTPS!)
+input string   InpUserKey = "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4"; // User API-Key (from Admin Dashboard)
 input int      UpdateIntervalSeconds = 15;             // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
@@ -24,7 +24,7 @@ bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExis
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.07"
+#define EA_VERSION "1.09"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -57,7 +57,9 @@ string g_lastSyncedCloseTime = "";       // Last close time successfully synced 
 
 //--- EA Log tracking
 int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
+string GV_TRADELIST_SENT = "";           // GlobalVariable name for persisting trade list sync status
 string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
+string GV_LAST_LOG_DATE = "";            // GlobalVariable name for persisting the log date format YYYYMMDD
 
 //--- Reconnect tracking
 int g_reconnectAttempts = 0;             // Number of reconnect attempts
@@ -73,7 +75,6 @@ int g_lastError = 0;                     // Last web request error
 #define LBL_STATUS "lblStatus"
 
 //--- MetaTrader GlobalVariable names for persisting state
-string GV_TRADELIST_SENT = "";
 string GV_LAST_SYNC_TIME = "";          // Stores last synced close time as string hash
 
 //+------------------------------------------------------------------+
@@ -172,8 +173,8 @@ void InitConfig()
       // these will match, or they might match the default inputs).
       bool uiChanged = false;
       
-      if(ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080" && ServerURL != cfg_ServerURL) uiChanged = true;
-      if(InpUserKey != "" && InpUserKey != cfg_UserKey) uiChanged = true;
+      if(ServerURL != "" && ServerURL != "https://monitor.ki-software-schmiede.de" && ServerURL != cfg_ServerURL) uiChanged = true;
+      if(InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4" && InpUserKey != cfg_UserKey) uiChanged = true;
       if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
@@ -190,8 +191,8 @@ void InitConfig()
       if(uiChanged)
       {
          Print("UI inputs differ from config file. Updating config file with new UI values.");
-         cfg_ServerURL = (ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080") ? ServerURL : cfg_ServerURL;
-         cfg_UserKey = (InpUserKey != "") ? InpUserKey : cfg_UserKey;
+         cfg_ServerURL = (ServerURL != "" && ServerURL != "https://monitor.ki-software-schmiede.de") ? ServerURL : cfg_ServerURL;
+         cfg_UserKey = (InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4") ? InpUserKey : cfg_UserKey;
          cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
@@ -257,28 +258,27 @@ int OnInit()
    
    // Build unique GlobalVariable names per account
    string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   GV_TRADELIST_SENT = "TM_TradeListSent_" + accStr;
-   GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
+   GV_TRADELIST_SENT = "TM_Trade_Sent_" + accStr;
    GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
+   GV_LAST_LOG_DATE  = "TM_LastLogDate_" + accStr;
+   GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
     
-   // Load last log position
+   // Load persisted states
+   if(GlobalVariableCheck(GV_TRADELIST_SENT))
+   {
+      double val = GlobalVariableGet(GV_TRADELIST_SENT);
+      if(val > 0)
+      {
+         g_tradeListSent = true;
+         g_tradeListSentTime = (datetime)val;
+      }
+   }
+   
    if(GlobalVariableCheck(GV_LAST_LOG_LINES))
    {
       g_lastLogLinesSent = (int)GlobalVariableGet(GV_LAST_LOG_LINES);
       if(g_lastLogLinesSent > 0 && cfg_DebugMode > 0)
          Print("Loaded last log position: line ", g_lastLogLinesSent);
-   }
-   
-   // Check if trade list was already sent in a previous session
-   if(GlobalVariableCheck(GV_TRADELIST_SENT))
-   {
-      double gvValue = GlobalVariableGet(GV_TRADELIST_SENT);
-      if(gvValue > 0)
-      {
-         g_tradeListSent = true;
-         g_tradeListSentTime = (datetime)(long)gvValue;
-         Print("Trade list was already sent at ", TimeToString(g_tradeListSentTime), " (from GlobalVariable)");
-      }
    }
    
    // Load last synced close time from config file
@@ -292,6 +292,7 @@ int OnInit()
    CreateStatusLabel();
    
    // Register with server on startup
+   UpdateStatusLabel("Connecting to Server...", clrWhite);
    if(RegisterWithServer())
    {
       isRegistered = true;
@@ -301,12 +302,14 @@ int OnInit()
       // Send full trade list on first connect (only if not already sent)
       if(!g_tradeListSent)
       {
+         UpdateStatusLabel("Syncing Trade Data...", clrWhite);
          if(SendInitialTradeList())
          {
             g_tradeListSent = true;
             g_tradeListSentTime = TimeCurrent();
             GlobalVariableSet(GV_TRADELIST_SENT, (double)g_tradeListSentTime);
             Print("Initial trade list sent successfully at ", TimeToString(g_tradeListSentTime));
+            UpdateStatusLabel("Connected\nID: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)), clrLime);
          }
          else
          {
@@ -483,13 +486,6 @@ void OnTimer()
          SendHeartbeat();
          lastHeartbeatTick = currentTick;
       }
-       
-      // Send EA logs (if enabled)
-      if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
-      {
-         SendEaLogs();
-         lastLogUploadTick = currentTick;
-      }
    }
    else
    {
@@ -528,6 +524,13 @@ void OnTimer()
              }
          }
       }
+   }
+
+   // Send EA logs ALWAYS when connected (independent of trade sync status)
+   if(cfg_LogUploadIntervalSeconds > 0 && currentTick - lastLogUploadTick >= (uint)cfg_LogUploadIntervalSeconds * 1000)
+   {
+      SendEaLogs();
+      lastLogUploadTick = currentTick;
    }
 }
 
@@ -590,6 +593,8 @@ void OnChartEvent(const int id,
          isRegistered = false;
          lastReconnectAttemptTick = 0;
          lastLogUploadTick = 0; // Force immediate log upload on reconnect
+         g_lastLogLinesSent = 0; // Reset log line counter to re-send all lines
+         GlobalVariableSet(GV_LAST_LOG_LINES, 0); // Persist the reset
          GlobalVariableSet(GV_TRADELIST_SENT, 0);  // Clear persisted status
          SaveLastSyncTime("");                     // Clear sync bookmark
          
@@ -676,12 +681,16 @@ bool SendInitialTradeList()
    
    // Build open trades array
    if(cfg_DebugMode > 0) Print("Building open trades JSON...");
+   UpdateStatusLabel("Syncing Open Trades...", clrWhite);
    string tradesJson = BuildOpenTradesJson();
    
    // Build closed trades array (full history)
    if(cfg_DebugMode > 0) Print("Building closed trades JSON (full history)...");
+   UpdateStatusLabel("Syncing Trade History...", clrWhite);
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson("", latestCloseTime);
+   
+   UpdateStatusLabel("Uploading Data to Server...", clrWhite);
    
    // Build main JSON payload
    string json = "{";
@@ -863,10 +872,12 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "}";
             
             // Progress logging every 100 closed trades
-            if(!isIncremental && closedCount % 100 == 0 && cfg_DebugMode > 0)
+            if(!isIncremental && closedCount % 100 == 0)
             {
                int pct = (int)((double)i / (double)totalDeals * 100.0);
-               Print("History progress: ", closedCount, " closed trades processed (", pct, "% of deals scanned)");
+               if(cfg_DebugMode > 0)
+                  Print("History progress: ", closedCount, " closed trades processed (", pct, "% of deals scanned)");
+               UpdateStatusLabel("Reading History: " + IntegerToString(closedCount) + " trades (" + IntegerToString(pct) + "%)", clrWhite);
             }
          }
       }
@@ -1029,8 +1040,8 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
    string responseBody = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    if(res == 200 || res == 201)
    {
-      if(cfg_DebugMode > 0)
-         Print("HTTP request returned status: ", res, " URL: ", url);
+      // Chatty log removed: successful heartbeat/trade update requests flood the logs
+      // even in DebugMode.
       return true;
    }
    else
@@ -1099,6 +1110,25 @@ void SendEaLogs()
 {
    string logDate = TimeToString(TimeLocal(), TIME_DATE);
    StringReplace(logDate, ".", "");
+   double currentDateNumeric = StringToDouble(logDate);
+   
+   // Check if the day rolled over. If so, reset the line counter.
+   if(GlobalVariableCheck(GV_LAST_LOG_DATE))
+   {
+      double lastDate = GlobalVariableGet(GV_LAST_LOG_DATE);
+      if(lastDate > 0 && lastDate != currentDateNumeric)
+      {
+         // Day has changed! Reset line count.
+         g_lastLogLinesSent = 0;
+         GlobalVariableSet(GV_LAST_LOG_LINES, 0);
+         GlobalVariableSet(GV_LAST_LOG_DATE, currentDateNumeric);
+         Print("EA Logs Sync: New day detected (", logDate, "), resetting log line counter to 0");
+      }
+   }
+   else
+   {
+      GlobalVariableSet(GV_LAST_LOG_DATE, currentDateNumeric);
+   }
    
    string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\" + logDate + ".log";
    string destFile = "ea_log_copy.txt";
