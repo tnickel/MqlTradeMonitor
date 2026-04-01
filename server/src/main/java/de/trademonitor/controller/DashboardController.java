@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import de.trademonitor.security.CustomUserDetails;
 
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -22,6 +23,8 @@ import java.util.stream.Collectors;
  */
 @Controller
 public class DashboardController {
+
+    private static final Logger LOG = Logger.getLogger(DashboardController.class.getName());
 
     private boolean isAllowedAccess(CustomUserDetails userDetails, long accountId) {
         if (userDetails == null)
@@ -108,7 +111,9 @@ public class DashboardController {
     public String dashboard(@AuthenticationPrincipal CustomUserDetails userDetails, 
                            @RequestAttribute(value = "isMobile", required = false) Boolean isMobile,
                            Model model) {
+        long t0 = System.currentTimeMillis();
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
+        long t1 = System.currentTimeMillis();
 
         boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
         model.addAttribute("isAdmin", isAdmin);
@@ -136,12 +141,27 @@ public class DashboardController {
 
         int totalTradesCount = 0;
         java.time.LocalDateTime logCutoff = java.time.LocalDateTime.now().minusHours(24);
+        long t2 = System.currentTimeMillis();
+
+        // BATCH: Load EA log severities for ALL accounts in ONE query instead of N queries
+        Map<Long, Integer> severityMap = new HashMap<>();
+        try {
+            List<Object[]> severityRows = eaLogEntryRepository.getLogSeverityForAllAccountsSince(logCutoff);
+            for (Object[] row : severityRows) {
+                Long accIdRow = ((Number) row[0]).longValue();
+                Integer sev = ((Number) row[1]).intValue();
+                severityMap.put(accIdRow, sev);
+            }
+        } catch (Exception e) {
+            // Fallback: leave empty map, all severities will be 0
+        }
+
         for (java.util.Map<String, Object> acc : allAccounts) {
             Long accId = (Long) acc.get("accountId");
             if (accId != null) {
-                java.time.LocalDateTime acceptedAt = (java.time.LocalDateTime) acc.get("eaLogAcceptedAt");
-                Integer severity = eaLogEntryRepository.getLogSeverityForAccountSince(accId, logCutoff, acceptedAt);
-                acc.put("eaLogSeverity", severity != null ? severity : 0);
+                // Use batch result for severity
+                Integer severity = severityMap.getOrDefault(accId, 0);
+                acc.put("eaLogSeverity", severity);
             }
 
             Long sectionId = (Long) acc.get("sectionId");
@@ -229,8 +249,12 @@ public class DashboardController {
         }
 
         if (Boolean.TRUE.equals(isMobile)) {
+            long tEnd = System.currentTimeMillis();
+            LOG.info("[PERF] dashboard(mobile): total=" + (tEnd - t0) + "ms | getAccountsWithStatus=" + (t1 - t0) + "ms | eaLogBatch=" + (System.currentTimeMillis() - t2) + "ms");
             return "mobile-dashboard";
         }
+        long tEnd = System.currentTimeMillis();
+        LOG.info("[PERF] dashboard: total=" + (tEnd - t0) + "ms | getAccountsWithStatus=" + (t1 - t0) + "ms | eaLogBatch=" + (tEnd - t2) + "ms");
         return "dashboard";
     }
 
@@ -494,7 +518,7 @@ public class DashboardController {
     @PostMapping("/api/account/layout")
     @ResponseBody
     public ResponseEntity<String> saveLayout(@RequestBody Map<String, List<Object>> layoutData) {
-        System.out.println("=== SAVE LAYOUT called with " + layoutData.size() + " sections ===");
+        LOG.info("=== SAVE LAYOUT called with " + layoutData.size() + " sections ===");
         int totalSaved = 0;
         for (Map.Entry<String, List<Object>> entry : layoutData.entrySet()) {
             try {
@@ -513,12 +537,12 @@ public class DashboardController {
                             try {
                                 accountId = Long.parseLong((String) idObj);
                             } catch (NumberFormatException nfe) {
-                                System.out.println("    WARN: Could not parse accountId: " + idObj);
+                                LOG.info("    WARN: Could not parse accountId: " + idObj);
                             }
                         }
 
                         if (accountId != null) {
-                            System.out.println(
+                            LOG.info(
                                     "    Saving account " + accountId + " -> section=" + sectionId + ", order=" + i);
                             accountManager.saveAccountSection(accountId, sectionId, i);
                             totalSaved++;
@@ -526,10 +550,10 @@ public class DashboardController {
                     }
                 }
             } catch (NumberFormatException e) {
-                System.out.println("  WARN: Could not parse sectionId key: " + entry.getKey());
+                LOG.info("  WARN: Could not parse sectionId key: " + entry.getKey());
             }
         }
-        System.out.println("=== SAVE LAYOUT complete: " + totalSaved + " accounts saved ===");
+        LOG.info("=== SAVE LAYOUT complete: " + totalSaved + " accounts saved ===");
         return ResponseEntity.ok("Layout saved");
     }
 
@@ -581,14 +605,44 @@ public class DashboardController {
         }
         List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
         List<Map<String, Object>> result = new ArrayList<>();
-        for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("timestamp", snap.getTimestamp());
-            entry.put("equity", snap.getEquity());
-            entry.put("balance", snap.getBalance());
-            result.add(entry);
+        
+        // Downsampling if there are too many snapshots (>1500)
+        int step = 1;
+        if (snapshots.size() > 1500) {
+            step = snapshots.size() / 1500;
+        }
+        
+        for (int i = 0; i < snapshots.size(); i++) {
+            // Always include first, last, and every step-th item
+            if (i == 0 || i == snapshots.size() - 1 || i % step == 0) {
+                de.trademonitor.entity.EquitySnapshotEntity snap = snapshots.get(i);
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("timestamp", snap.getTimestamp());
+                entry.put("equity", snap.getEquity());
+                entry.put("balance", snap.getBalance());
+                result.add(entry);
+            }
         }
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * AJAX Endpoint to fetch all closed trades as compact JSON for the dashboard.
+     */
+    @GetMapping("/api/account/{accountId}/closed-trades")
+    @ResponseBody
+    public ResponseEntity<?> getClosedTrades(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body("Access Denied");
+        }
+        Account account = accountManager.getAccount(accountId);
+        if (account == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // Use the in-memory cache from Account to avoid DB load overhead where possible
+        // The frontend JS will handle sorting and filtering
+        return ResponseEntity.ok(account.getClosedTrades());
     }
 
     /**
@@ -607,6 +661,7 @@ public class DashboardController {
     @GetMapping("/account/{accountId}")
     public String accountDetail(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable long accountId,
             Model model) {
+        long t0 = System.currentTimeMillis();
         if (!isAllowedAccess(userDetails, accountId)) {
             return "redirect:/";
         }
@@ -652,13 +707,16 @@ public class DashboardController {
         model.addAttribute("groupSummaries", groupSummaries);
         model.addAttribute("magicMappings", mappings);
 
+        long t1 = System.currentTimeMillis();
         // Pass resolver to getMagicProfitEntries
         model.addAttribute("magicProfits", account.getMagicProfitEntries(maxAge, minTrades, mappings::get));
+        long t2 = System.currentTimeMillis();
         model.addAttribute("magicMaxAge", maxAge);
         model.addAttribute("magicMinTrades", minTrades);
 
         // Build magic curve data as JSON for Chart.js
         model.addAttribute("magicCurveJson", buildMagicCurveJson(account, maxAge, mappings));
+        long t3 = System.currentTimeMillis();
 
         // Provide accountId for AJAX save
         model.addAttribute("accountId", account.getAccountId());
@@ -688,6 +746,7 @@ public class DashboardController {
         List<de.trademonitor.entity.TimelineEntity> timelines = timelineRepository.findByAccountIdOrderByTimelineDateAsc(accountId);
         model.addAttribute("timelines", timelines);
 
+        LOG.info("[PERF] accountDetail(" + accountId + "): total=" + (System.currentTimeMillis() - t0) + "ms | magicProfits=" + (t2 - t1) + "ms | magicCurves=" + (t3 - t2) + "ms");
         return "account-detail";
     }
 
@@ -992,6 +1051,7 @@ public class DashboardController {
     @GetMapping("/report/{period}")
     public String getReport(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable String period,
             Model model, HttpServletRequest request) {
+        long t0 = System.currentTimeMillis();
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
@@ -1037,23 +1097,59 @@ public class DashboardController {
         model.addAttribute("startDate", startDt.format(dateFormatter));
         model.addAttribute("endDate", endDt.format(dateFormatter));
 
+        // Build the closeTime prefix for DB-level aggregation (daily/monthly only)
+        String closeTimePrefix = null;
+        java.time.format.DateTimeFormatter tradeDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        java.time.format.DateTimeFormatter tradeMonthFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM");
+        if ("daily".equalsIgnoreCase(period)) {
+            closeTimePrefix = today.format(tradeDateFormatter);
+        } else if ("monthly".equalsIgnoreCase(period)) {
+            closeTimePrefix = today.format(tradeMonthFormatter);
+        }
+
+        // Batch-aggregate closed trades for daily/monthly (much faster than loading all trades)
+        Map<Long, long[]> batchAggregation = null; // [count, sumProfit*100]
+        if (closeTimePrefix != null) {
+            List<Long> accIds = accounts.stream().map(acc -> (Long) acc.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
+            if (!accIds.isEmpty()) {
+                batchAggregation = new HashMap<>();
+                List<Object[]> rows = closedTradeRepository.aggregateByAccountIdsAndPrefix(accIds, closeTimePrefix);
+                for (Object[] row : rows) {
+                    Long accId = ((Number) row[0]).longValue();
+                    long count = ((Number) row[1]).longValue();
+                    double sum = ((Number) row[2]).doubleValue();
+                    batchAggregation.put(accId, new long[]{count, Math.round(sum * 100)});
+                }
+            }
+        }
+
         java.util.function.Predicate<String> dateFilter = getDateFilter(period);
 
         for (Map<String, Object> acc : accounts) {
             Long accountId = (Long) acc.get("accountId");
 
-            // Get closed trades
-            List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
-                    .findByAccountId(accountId);
+            long closedCount;
+            double closedProfit;
 
-            // Filter and sum
-            java.util.DoubleSummaryStatistics closedStats = closedTrades.stream()
-                    .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
-                    .collect(java.util.DoubleSummaryStatistics::new,
-                            (stats, t) -> stats.accept(t.getProfit()),
-                            java.util.DoubleSummaryStatistics::combine);
+            if (batchAggregation != null) {
+                // Use batch DB aggregation (daily/monthly)
+                long[] agg = batchAggregation.getOrDefault(accountId, new long[]{0, 0});
+                closedCount = agg[0];
+                closedProfit = agg[1] / 100.0;
+            } else {
+                // Fallback for weekly: load and filter in Java
+                List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
+                        .findByAccountId(accountId);
+                java.util.DoubleSummaryStatistics closedStats = closedTrades.stream()
+                        .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
+                        .collect(java.util.DoubleSummaryStatistics::new,
+                                (stats, t) -> stats.accept(t.getProfit()),
+                                java.util.DoubleSummaryStatistics::combine);
+                closedCount = closedStats.getCount();
+                closedProfit = closedStats.getSum();
+            }
 
-            // Get equity snapshots for the period
+            // Get equity snapshots for the period (still needed for sparkline)
             java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> snapshotFilter = getSnapshotDateFilter(
                     period);
             List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
@@ -1068,8 +1164,8 @@ public class DashboardController {
             }
 
             Map<String, Object> row = new HashMap<>(acc);
-            row.put("closedCount", closedStats.getCount());
-            row.put("closedProfit", closedStats.getSum());
+            row.put("closedCount", closedCount);
+            row.put("closedProfit", closedProfit);
             row.put("equityHistory", equityH);
             row.put("balanceHistory", balanceH);
             reportData.add(row);
@@ -1093,8 +1189,10 @@ public class DashboardController {
 
         Boolean isMobile = (Boolean) request.getAttribute("isMobile");
         if (isMobile != null && isMobile) {
+            LOG.info("[PERF] report(" + period + ",mobile): total=" + (System.currentTimeMillis() - t0) + "ms");
             return "mobile-report";
         }
+        LOG.info("[PERF] report(" + period + "): total=" + (System.currentTimeMillis() - t0) + "ms");
         return "report";
     }
 
@@ -1256,8 +1354,6 @@ public class DashboardController {
                     .collect(Collectors.toList());
         }
         
-        String todayStr = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
-
         List<Map<String, Object>> realAccounts = new ArrayList<>();
         boolean accountsOk = true;
         for (Map<String, Object> acc : accounts) {
@@ -1284,16 +1380,8 @@ public class DashboardController {
                 rAcc.put("profit", acc.get("profit"));
                 rAcc.put("currency", acc.get("currency"));
                 
-                // Calculate today's closed profit
-                double dailyProfit = 0.0;
-                de.trademonitor.model.Account realAccObj = accountManager.getAccount(accountId);
-                if (realAccObj != null && realAccObj.getClosedTrades() != null) {
-                    for (de.trademonitor.model.ClosedTrade ct : realAccObj.getClosedTrades()) {
-                        if (ct.getCloseTime() != null && ct.getCloseTime().startsWith(todayStr)) {
-                            dailyProfit += ct.getProfit() + ct.getSwap() + (ct.getCommission() * realAccObj.getCommissionFactor());
-                        }
-                    }
-                }
+                // Use CACHED daily profit instead of iterating all closed trades
+                double dailyProfit = accountManager.getCachedDailyProfit(accountId);
                 rAcc.put("dailyProfit", dailyProfit);
                 
                 realAccounts.add(rAcc);
@@ -1506,6 +1594,73 @@ public class DashboardController {
         }
 
         return result;
+    }
+
+    /**
+     * Performance test endpoint — measures key operations and returns timing as JSON.
+     */
+    @GetMapping("/api/perf-test")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> perfTest() {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // 1. getAccountsWithStatus (cache-based, should be fast)
+        long t0 = System.currentTimeMillis();
+        List<Map<String, Object>> accs = accountManager.getAccountsWithStatus();
+        long t1 = System.currentTimeMillis();
+        result.put("getAccountsWithStatus_ms", t1 - t0);
+        result.put("accountCount", accs.size());
+
+        // 2. EA Log Batch Query
+        long t2 = System.currentTimeMillis();
+        try {
+            java.time.LocalDateTime logCutoff = java.time.LocalDateTime.now().minusHours(24);
+            List<Object[]> severityRows = eaLogEntryRepository.getLogSeverityForAllAccountsSince(logCutoff);
+            result.put("eaLogBatchQuery_ms", System.currentTimeMillis() - t2);
+            result.put("eaLogBatchRows", severityRows != null ? severityRows.size() : 0);
+        } catch (Exception e) {
+            result.put("eaLogBatchQuery_ms", System.currentTimeMillis() - t2);
+            result.put("eaLogBatchError", e.getMessage());
+        }
+
+        // 3. Global Trade Count
+        long t3 = System.currentTimeMillis();
+        List<Long> ids = accs.stream().map(a -> (Long) a.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
+        if (!ids.isEmpty()) {
+            long tradeCount = closedTradeRepository.countByAccountIds(ids);
+            result.put("globalTradeCount_ms", System.currentTimeMillis() - t3);
+            result.put("globalTradeCount", tradeCount);
+        }
+
+        // 4. Report Aggregation (daily, batch)
+        long t4 = System.currentTimeMillis();
+        String todayPrefix = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+        if (!ids.isEmpty()) {
+            List<Object[]> agg = closedTradeRepository.aggregateByAccountIdsAndPrefix(ids, todayPrefix);
+            result.put("reportDailyAgg_ms", System.currentTimeMillis() - t4);
+            result.put("reportDailyAggRows", agg != null ? agg.size() : 0);
+        }
+
+        // 5. Cached daily profit (should be instant)
+        long t5 = System.currentTimeMillis();
+        double totalDailyProfit = 0;
+        for (Long accId : ids) {
+            totalDailyProfit += accountManager.getCachedDailyProfit(accId);
+        }
+        result.put("cachedDailyProfit_ms", System.currentTimeMillis() - t5);
+        result.put("totalDailyProfit", totalDailyProfit);
+
+        // 6. Single account equity snapshots (biggest previous bottleneck)
+        if (!ids.isEmpty()) {
+            long t6 = System.currentTimeMillis();
+            List<de.trademonitor.entity.EquitySnapshotEntity> snaps = tradeStorage.loadEquitySnapshots(ids.get(0));
+            result.put("equitySnapshotLoad_ms", System.currentTimeMillis() - t6);
+            result.put("equitySnapshotCount", snaps != null ? snaps.size() : 0);
+            result.put("equitySnapshotAccountId", ids.get(0));
+        }
+
+        result.put("totalEndpoint_ms", System.currentTimeMillis() - t0);
+        return ResponseEntity.ok(result);
     }
 
     private static class ResultComparator {
