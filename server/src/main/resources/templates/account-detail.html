@@ -2110,11 +2110,11 @@
             // 1. Group trades by Magic
             var magicData = {}; // { magic: [ { time, profit } ] }
 
-            rows.forEach(row => {
-                var magic = row.dataset.magic;
-                if (magic) {
-                    var profit = parseFloat(row.querySelector('.profit-cell').dataset.profit || 0);
-                    var timeStr = row.dataset.closeTime;
+            rows.forEach(trade => {
+                var magic = String(trade.magicNumber);
+                if (magic && magic !== 'undefined' && magic !== '0') {
+                    var profit = parseFloat(trade.profit || 0);
+                    var timeStr = trade.closeTime;
 
                     if (timeStr) {
                         var t = timeStr.split(/[- :.]/);
