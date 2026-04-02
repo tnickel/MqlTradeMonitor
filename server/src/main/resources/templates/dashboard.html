@@ -12,7 +12,46 @@
 </head>
 
 <body>
-    <div class="container">
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Trade Monitor</h2>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">v0.12.0</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item active">
+                    <span style="font-size: 1.2rem;">📊</span> Dashboard
+                </a>
+                <a href="/trade-comparison" class="nav-item">
+                    <span style="font-size: 1.2rem;">⚖️</span> Trade Compare
+                </a>
+                <a href="/copier-map" class="nav-item">
+                    <span style="font-size: 1.2rem;">🔗</span> Copier Map
+                </a>
+                <a href="/open-trades" class="nav-item">
+                    <span style="font-size: 1.2rem;">📈</span> Open Trades
+                </a>
+                
+                <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin" class="nav-item">
+                        <span style="font-size: 1.2rem;">⚙️</span> Admin
+                    </a>
+                    <a th:if="${currentUser != null}" href="/profile" class="nav-item">
+                        <span style="font-size: 1.2rem;">👤</span> Profil
+                    </a>
+                    <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0; padding: 0;">
+                        <button type="submit" class="nav-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                            <span style="font-size: 1.2rem;">🚪</span> Logout
+                        </button>
+                    </form>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
         <header style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
                 <h1>🔄 Trade Monitor <span
@@ -62,20 +101,6 @@
             <button class="view-toggle-btn" onclick="location.reload()" style="background: var(--bg-card); color: var(--text-secondary); border-color: var(--border-color); margin-right: 5px;">
                 <span>🔄</span> Refresh
             </button>
-            <div style="display:flex; gap:10px; align-items:center; margin-left: 10px;">
-                <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin"
-                    class="btn btn-secondary"
-                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">⚙️
-                    Admin</a>
-                <a th:if="${currentUser != null}" href="/profile" class="btn btn-secondary"
-                    style="background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s;">👤
-                    Profil</a>
-                <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0;">
-                    <button type="submit" class="btn btn-secondary"
-                        style="background-color: #161b22; color: #ff7b72; border: 1px solid rgba(218, 54, 51, 0.4); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s;">🚪
-                        Logout</button>
-                </form>
-            </div>
         </div>
 
         <!-- Global Warning Banner -->
@@ -459,7 +484,7 @@
                 <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
                     <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card"
                         th:data-online="${acc.online}"
-                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''} + ${acc.copierError ? ' copier-error-shadow' : ''}"
                         th:data-id="${acc.accountId}" th:data-type="${acc.type}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
@@ -494,6 +519,10 @@
                                 <span th:if="${acc.errorState}" class="status-badge offline"
                                     th:title="${acc.lastErrorMsg}"
                                     style="background-color: #ef4444; color: white; cursor: help;">ERROR</span>
+
+                                <span th:if="${acc.copierError}" class="status-badge offline"
+                                    th:title="${acc.copierErrorMessage}"
+                                    style="background-color: #ef4444; color: white; cursor: help;">COPIER ERR</span>
 
                                 <span th:if="${!acc.online}"
                                     style="font-size: 0.75rem; color: #6b6b8f; white-space: nowrap;"
@@ -1713,6 +1742,8 @@
         }
 
     </script>
+        </main>
+    </div>
 </body>
 
 </html>

@@ -148,6 +148,29 @@ public class TradeStorage {
     }
 
     /**
+     * Update server time offset.
+     */
+    public void updateServerTimeOffset(long accountId, long offsetSeconds) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setServerTimeOffsetSeconds(offsetSeconds);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
+     * Update copier error state.
+     */
+    public void updateCopierError(long accountId, boolean isError, String errorMessage) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setCopierError(isError);
+            entity.setCopierErrorMessage(errorMessage);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Save closed trades with duplicate check.
      * Only trades that don't already exist (by accountId + ticket) are inserted.
      * Returns the number of newly inserted trades.

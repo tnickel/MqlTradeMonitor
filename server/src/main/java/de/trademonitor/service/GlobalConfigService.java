@@ -207,6 +207,40 @@ public class GlobalConfigService {
         if (!cachedBrokerCommFactors.containsKey("Tickmill Ltd")) {
             saveBrokerCommFactor("Tickmill Ltd", 2.0);
         }
+
+        // Load Copier Verification Config
+        repository.findById(KEY_COPIER_TOLERANCE_SECONDS).ifPresent(e -> {
+            try {
+                cachedCopierToleranceSeconds = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {}
+        });
+        repository.findById(KEY_COPIER_INTERVAL_MINS).ifPresent(e -> {
+            try {
+                cachedCopierIntervalMins = Integer.parseInt(e.getConfValue());
+            } catch (NumberFormatException ex) {}
+        });
+    }
+
+    // --- Copier Verification Config ---
+    public static final String KEY_COPIER_TOLERANCE_SECONDS = "COPIER_TOLERANCE_SECONDS";
+    public static final String KEY_COPIER_INTERVAL_MINS = "COPIER_INTERVAL_MINS";
+
+    private int cachedCopierToleranceSeconds = 60; // default 60s
+    private int cachedCopierIntervalMins = 10; // default 10 mins
+
+    public int getCopierToleranceSeconds() {
+        return cachedCopierToleranceSeconds;
+    }
+
+    public int getCopierIntervalMins() {
+        return cachedCopierIntervalMins;
+    }
+
+    public void saveCopierConfig(int toleranceSeconds, int intervalMins) {
+        this.cachedCopierToleranceSeconds = toleranceSeconds;
+        this.cachedCopierIntervalMins = intervalMins;
+        repository.save(new GlobalConfigEntity(KEY_COPIER_TOLERANCE_SECONDS, String.valueOf(toleranceSeconds)));
+        repository.save(new GlobalConfigEntity(KEY_COPIER_INTERVAL_MINS, String.valueOf(intervalMins)));
     }
 
     // getMagicNumberMaxAge() and setMagicNumberMaxAge() removed — now per-account

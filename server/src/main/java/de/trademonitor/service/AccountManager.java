@@ -105,6 +105,11 @@ public class AccountManager {
             account.setOpenProfitAlarmAbs(ae.getOpenProfitAlarmAbs());
             account.setOpenProfitAlarmPct(ae.getOpenProfitAlarmPct());
 
+            // Load copier state & time offset to prevent false alarms on restart
+            account.setCopierError(ae.getCopierError() != null ? ae.getCopierError() : false);
+            account.setCopierErrorMessage(ae.getCopierErrorMessage());
+            account.setServerTimeOffsetSeconds(ae.getServerTimeOffsetSeconds() != null ? ae.getServerTimeOffsetSeconds() : 0L);
+
             // Load lastSeen if available
             if (ae.getLastSeen() != null && !ae.getLastSeen().isEmpty()) {
                 try {
@@ -350,6 +355,29 @@ public class AccountManager {
     }
 
     /**
+     * Update server time offset for an account.
+     */
+    public void updateServerTimeOffset(long accountId, long offsetSeconds) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setServerTimeOffsetSeconds(offsetSeconds);
+            tradeStorage.updateServerTimeOffset(accountId, offsetSeconds);
+        }
+    }
+
+    /**
+     * Update copier error state for an account.
+     */
+    public void updateCopierError(long accountId, boolean isError, String errorMessage) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setCopierError(isError);
+            account.setCopierErrorMessage(errorMessage);
+            tradeStorage.updateCopierError(accountId, isError, errorMessage);
+        }
+    }
+
+    /**
      * Get account by ID.
      */
     public Account getAccount(long accountId) {
@@ -401,6 +429,8 @@ public class AccountManager {
             info.put("openProfitAlarmAbs", account.getOpenProfitAlarmAbs());
             info.put("openProfitAlarmPct", account.getOpenProfitAlarmPct());
             info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
+            info.put("copierError", account.getCopierError());
+            info.put("copierErrorMessage", account.getCopierErrorMessage());
 
             // Use CACHED performance metrics instead of recalculating every time
             Map<String, Object> perfMetrics = cachedPerformanceMetrics.get(account.getAccountId());

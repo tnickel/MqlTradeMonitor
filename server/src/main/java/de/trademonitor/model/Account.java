@@ -46,6 +46,9 @@ public class Account {
 
     private String metaTraderInfo;
 
+    private Long serverTimeOffsetSeconds = 0L;
+    private Boolean copierError = false;
+    private String copierErrorMessage;
     public boolean isSyncWarning() {
         return syncWarning;
     }
@@ -130,6 +133,30 @@ public class Account {
         this.balance = balance;
         this.registeredAt = LocalDateTime.now();
         this.lastSeen = LocalDateTime.now();
+    }
+
+    public Long getServerTimeOffsetSeconds() {
+        return serverTimeOffsetSeconds;
+    }
+
+    public void setServerTimeOffsetSeconds(Long serverTimeOffsetSeconds) {
+        this.serverTimeOffsetSeconds = serverTimeOffsetSeconds;
+    }
+
+    public Boolean getCopierError() {
+        return copierError;
+    }
+
+    public void setCopierError(Boolean copierError) {
+        this.copierError = copierError;
+    }
+
+    public String getCopierErrorMessage() {
+        return copierErrorMessage;
+    }
+
+    public void setCopierErrorMessage(String copierErrorMessage) {
+        this.copierErrorMessage = copierErrorMessage;
     }
 
     public double getCommissionFactor() {

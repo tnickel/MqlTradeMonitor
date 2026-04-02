@@ -239,6 +239,20 @@ public class ApiController {
         try {
             logClientAction(request.getAccountId(), "HEARTBEAT", "Alive", httpRequest);
             accountManager.updateHeartbeat(request.getAccountId());
+            
+            // Calculate Server Time Offset from Broker Time
+            if (request.getTimestamp() != null && !request.getTimestamp().isEmpty()) {
+                try {
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+                    java.time.LocalDateTime brokerTime = java.time.LocalDateTime.parse(request.getTimestamp(), formatter);
+                    java.time.LocalDateTime serverTime = java.time.LocalDateTime.now();
+                    long offsetSeconds = java.time.temporal.ChronoUnit.SECONDS.between(brokerTime, serverTime);
+                    accountManager.updateServerTimeOffset(request.getAccountId(), offsetSeconds);
+                } catch (Exception e) {
+                    System.err.println("Could not parse heartbeat timestamp: " + request.getTimestamp() + " for account " + request.getAccountId());
+                }
+            }
+
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (Exception e) {
             logClientAction(request.getAccountId(), "HEARTBEAT_ERROR", e.getMessage(), httpRequest);

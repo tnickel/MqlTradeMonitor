@@ -47,6 +47,21 @@ public class AccountEntity {
     @Column(name = "meta_trader_info", length = 1000)
     private String metaTraderInfo;
 
+    @Column(name = "map_pos_x")
+    private Double mapPosX;
+
+    @Column(name = "map_pos_y")
+    private Double mapPosY;
+
+    @Column(name = "server_time_offset_seconds")
+    private Long serverTimeOffsetSeconds = 0L;
+
+    @Column(name = "copier_error")
+    private Boolean copierError = false;
+
+    @Column(name = "copier_error_message", length = 1000)
+    private String copierErrorMessage;
+
     public AccountEntity() {
     }
 
@@ -55,6 +70,30 @@ public class AccountEntity {
         this.broker = broker;
         this.currency = currency;
         this.balance = balance;
+    }
+
+    public Long getServerTimeOffsetSeconds() {
+        return serverTimeOffsetSeconds;
+    }
+
+    public void setServerTimeOffsetSeconds(Long serverTimeOffsetSeconds) {
+        this.serverTimeOffsetSeconds = serverTimeOffsetSeconds;
+    }
+
+    public Boolean getCopierError() {
+        return copierError;
+    }
+
+    public void setCopierError(Boolean copierError) {
+        this.copierError = copierError;
+    }
+
+    public String getCopierErrorMessage() {
+        return copierErrorMessage;
+    }
+
+    public void setCopierErrorMessage(String copierErrorMessage) {
+        this.copierErrorMessage = copierErrorMessage;
     }
 
     // Getters and Setters
@@ -208,5 +247,21 @@ public class AccountEntity {
 
     public void setMetaTraderInfo(String metaTraderInfo) {
         this.metaTraderInfo = metaTraderInfo;
+    }
+
+    public Double getMapPosX() {
+        return mapPosX;
+    }
+
+    public void setMapPosX(Double mapPosX) {
+        this.mapPosX = mapPosX;
+    }
+
+    public Double getMapPosY() {
+        return mapPosY;
+    }
+
+    public void setMapPosY(Double mapPosY) {
+        this.mapPosY = mapPosY;
     }
 }
