@@ -576,7 +576,7 @@
                                 style="flex: 1;">Details
                                 anzeigen
                                 →</a>
-                            <a th:if="${acc.type == 'REAL'}" th:href="@{/trade-comparison(accountId=${acc.accountId})}"
+                            <a th:href="@{/trade-comparison(accountA=${acc.accountId})}"
                                 class="view-details-btn"
                                 style="flex: 1; background: rgba(122, 162, 247, 0.15); border-color: rgba(122, 162, 247, 0.4); color: var(--accent);">
                                 Trade Compare →

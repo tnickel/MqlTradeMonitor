@@ -3,12 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Trade Vergleich (Slippage & Delay)</title>
+    <title>Trade Vergleich (A ↔ B)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #1a1b26;
             --bg-card: #24283b;
+            --bg-card-alt: #1f2335;
             --text-primary: #c0caf5;
             --text-muted: #565f89;
             --accent: #7aa2f7;
@@ -19,81 +21,337 @@
             --hover: #2f344f;
         }
 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             background-color: var(--bg-dark);
             color: var(--text-primary);
             font-family: 'Inter', sans-serif;
-            margin: 0;
             padding: 20px;
+            min-height: 100vh;
         }
 
         h1 {
             text-align: center;
             color: var(--accent);
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             font-size: 1.5rem;
+            font-weight: 700;
         }
 
-        .filter-container {
-            max-width: 1200px;
-            margin: 0 auto 20px auto;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-
-        .filter-container select,
-        .filter-container button {
-            padding: 8px 16px;
-            background-color: var(--bg-card);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.95rem;
-            outline: none;
-        }
-
-        .filter-container button {
-            background-color: var(--accent);
-            color: var(--bg-dark);
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-
-        .filter-container button:hover {
-            opacity: 0.9;
-        }
-
-        .comparison-container {
+        /* === Filter Panel === */
+        .filter-panel {
             max-width: 1400px;
-            /* very wide for the table */
-            margin: 0 auto;
-            background-color: var(--bg-card);
+            margin: 0 auto 20px auto;
+            background: var(--bg-card);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            overflow-x: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group select,
+        .filter-group input[type="range"] {
+            padding: 8px 12px;
+            background-color: var(--bg-card-alt);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 200px;
+        }
+
+        .filter-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .filter-group select option {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .tolerance-display {
+            font-size: 0.85rem;
+            color: var(--accent);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .tolerance-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            cursor: pointer;
+            min-width: 160px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-dark);
+            box-shadow: 0 0 6px rgba(122, 162, 247, 0.4);
+        }
+
+        .btn-compare {
+            padding: 9px 24px;
+            background: linear-gradient(135deg, var(--accent), #5a7ee0);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-compare:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(122, 162, 247, 0.4);
+        }
+
+        .swap-btn {
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            align-self: flex-end;
+        }
+
+        .swap-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* === Period Buttons === */
+        .period-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .period-btn {
+            background-color: var(--bg-card-alt);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .period-btn.active {
+            background: rgba(122, 162, 247, 0.15);
+            color: var(--accent);
+            border-color: rgba(122, 162, 247, 0.5);
+        }
+
+        /* === Date Range === */
+        .date-range-section {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            justify-content: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(65, 72, 104, 0.4);
+            flex-wrap: wrap;
+        }
+
+        .filter-group input[type="date"] {
+            padding: 7px 12px;
+            background-color: var(--bg-card-alt);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 150px;
+        }
+
+        .filter-group input[type="date"]:focus {
+            border-color: var(--accent);
+        }
+
+        /* Fix date input color scheme for dark mode */
+        .filter-group input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.7);
+            cursor: pointer;
+        }
+
+        .date-separator {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            align-self: flex-end;
+            padding-bottom: 8px;
+        }
+
+        .btn-clear-dates {
+            padding: 7px 14px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .btn-clear-dates:hover {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        /* === Summary === */
+        .summary-bar {
+            max-width: 1400px;
+            margin: 0 auto 16px auto;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 14px 24px;
+            text-align: center;
+            min-width: 140px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .summary-card .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .summary-card .label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .summary-card.matched .value { color: var(--success); }
+        .summary-card.only-a .value { color: var(--warning); }
+        .summary-card.only-b .value { color: var(--danger); }
+        .summary-card.total .value { color: var(--accent); }
+        .summary-card.pct .value { color: var(--success); }
+
+        /* === Comparison Table === */
+        .comparison-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
+        }
+
+        thead {
+            background: var(--bg-card-alt);
         }
 
         th {
             text-align: left;
             color: var(--text-muted);
             font-weight: 600;
-            padding: 10px 8px;
+            padding: 12px 10px;
             border-bottom: 2px solid var(--border);
             white-space: nowrap;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Column group headers */
+        .col-group-a {
+            background: rgba(122, 162, 247, 0.08);
+            border-top: 2px solid rgba(122, 162, 247, 0.3);
+        }
+
+        .col-group-b {
+            background: rgba(224, 175, 104, 0.08);
+            border-top: 2px solid rgba(224, 175, 104, 0.3);
+        }
+
+        .col-group-status {
+            background: rgba(158, 206, 106, 0.08);
+            border-top: 2px solid rgba(158, 206, 106, 0.3);
         }
 
         td {
-            padding: 10px 8px;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 10px;
+            border-bottom: 1px solid rgba(65, 72, 104, 0.4);
             vertical-align: middle;
         }
 
@@ -105,64 +363,80 @@
             background-color: var(--hover);
         }
 
+        /* Color-code entire rows by matched cells */
+        td.cell-a {
+            background: rgba(122, 162, 247, 0.03);
+        }
+        td.cell-b {
+            background: rgba(224, 175, 104, 0.03);
+        }
+        td.cell-status {
+            background: rgba(158, 206, 106, 0.03);
+        }
+
+        tr:hover td.cell-a { background: rgba(122, 162, 247, 0.08); }
+        tr:hover td.cell-b { background: rgba(224, 175, 104, 0.08); }
+        tr:hover td.cell-status { background: rgba(158, 206, 106, 0.08); }
+
         .mono {
             font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
         }
 
         .badge {
-            font-size: 0.70rem;
-            padding: 2px 5px;
-            border-radius: 4px;
+            font-size: 0.68rem;
+            padding: 3px 8px;
+            border-radius: 6px;
             font-weight: 600;
             text-transform: uppercase;
+            display: inline-block;
+            letter-spacing: 0.3px;
         }
 
-        .badge.real {
-            background-color: rgba(158, 206, 106, 0.15);
+        .badge.matched {
+            background: rgba(158, 206, 106, 0.15);
             color: var(--success);
             border: 1px solid rgba(158, 206, 106, 0.3);
         }
 
-        .badge.demo {
-            background-color: rgba(224, 175, 104, 0.15);
+        .badge.only-a {
+            background: rgba(224, 175, 104, 0.15);
             color: var(--warning);
             border: 1px solid rgba(224, 175, 104, 0.3);
         }
 
+        .badge.only-b {
+            background: rgba(247, 118, 142, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(247, 118, 142, 0.3);
+        }
+
         .badge.buy {
-            background-color: rgba(122, 162, 247, 0.15);
+            background: rgba(122, 162, 247, 0.15);
             color: var(--accent);
             border: 1px solid rgba(122, 162, 247, 0.3);
         }
 
         .badge.sell {
-            background-color: rgba(247, 118, 142, 0.15);
+            background: rgba(247, 118, 142, 0.15);
             color: var(--danger);
             border: 1px solid rgba(247, 118, 142, 0.3);
         }
 
-        .badge.matched {
-            background-color: rgba(158, 206, 106, 0.15);
+        .check-icon {
             color: var(--success);
-            border: 1px solid rgba(158, 206, 106, 0.3);
+            font-size: 1.2rem;
         }
 
-        .badge.not-found {
-            background-color: rgba(247, 118, 142, 0.15);
+        .cross-icon {
             color: var(--danger);
-            border: 1px solid rgba(247, 118, 142, 0.3);
+            font-size: 1.1rem;
         }
 
-        .positive {
-            color: var(--success);
-        }
-
-        .negative {
-            color: var(--danger);
-        }
-
-        .neutral {
+        .dash-cell {
             color: var(--text-muted);
+            font-style: italic;
+            font-size: 0.8rem;
         }
 
         .text-right {
@@ -173,10 +447,43 @@
             text-align: center;
         }
 
+        .time-diff {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .time-diff.good { color: var(--success); }
+        .time-diff.warn { color: var(--warning); }
+
+        /* === Empty / Prompt State === */
+        .prompt-state {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .prompt-state .icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .prompt-state p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
         .back-btn {
             display: block;
             width: fit-content;
-            margin: 20px auto 0;
+            margin: 24px auto 0;
             color: var(--text-muted);
             text-decoration: none;
             font-size: 0.9rem;
@@ -187,130 +494,226 @@
             color: var(--accent);
         }
 
-        .period-buttons {
-            display: flex;
-            gap: 8px;
-            margin-top: 15px;
-            justify-content: center;
-        }
-
-        .period-btn {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-
-        .period-btn:hover {
-            color: var(--text-primary);
-            border-color: var(--hover);
-        }
-
-        .period-btn.active {
-            background-color: rgba(122, 162, 247, 0.15);
-            color: var(--accent);
-            border-color: rgba(122, 162, 247, 0.4);
+        /* === Responsive === */
+        @media (max-width: 768px) {
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group select {
+                min-width: unset;
+                width: 100%;
+            }
+            .summary-bar {
+                flex-direction: column;
+                align-items: center;
+            }
+            .comparison-container {
+                overflow-x: auto;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <h1>Trade Vergleich (Slippage & Delay)</h1>
+    <h1>🔄 Trade Vergleich (A ↔ B)</h1>
 
-    <div class="filter-container">
+    <!-- Filter Panel -->
+    <div class="filter-panel">
         <form action="/trade-comparison" method="get" id="filterForm">
-            <select name="accountId" onchange="document.getElementById('filterForm').submit()">
-                <option value="">-- Alle Real Accounts --</option>
-                <option th:each="acc : ${realAccounts}" th:value="${acc.accountId}" th:text="${acc.name}"
-                    th:selected="${acc.accountId == selectedAccountId}"></option>
-            </select>
-            <input type="hidden" name="period" id="periodInput" th:value="${selectedPeriod}" />
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>MetaTrader A</label>
+                    <select name="accountA" id="selectA">
+                        <option value="">-- Account wählen --</option>
+                        <option th:each="acc : ${allAccounts}"
+                                th:value="${acc.accountId}"
+                                th:text="${acc.name + ' (' + acc.type + ')'}"
+                                th:selected="${acc.accountId == selectedAccountA}"></option>
+                    </select>
+                </div>
+
+                <button type="button" class="swap-btn" onclick="swapAccounts()" title="Accounts tauschen">⇄</button>
+
+                <div class="filter-group">
+                    <label>MetaTrader B</label>
+                    <select name="accountB" id="selectB">
+                        <option value="">-- Account wählen --</option>
+                        <option th:each="acc : ${allAccounts}"
+                                th:value="${acc.accountId}"
+                                th:text="${acc.name + ' (' + acc.type + ')'}"
+                                th:selected="${acc.accountId == selectedAccountB}"></option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Toleranz</label>
+                    <div class="tolerance-row">
+                        <input type="range" name="toleranceSec" id="toleranceSlider"
+                               min="5" max="500" step="5"
+                               th:value="${selectedToleranceSec}"
+                               oninput="document.getElementById('toleranceValue').textContent = this.value + 's'">
+                        <span class="tolerance-display" id="toleranceValue"
+                              th:text="${selectedToleranceSec + 's'}">20s</span>
+                    </div>
+                </div>
+
+                <input type="hidden" name="period" id="periodInput" th:value="${selectedPeriod}" />
+
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn-compare">Vergleichen</button>
+                </div>
+            </div>
+
+            <!-- Period Quick-Select + Custom Date Range -->
+            <div class="period-buttons">
+                <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'today' ? 'active' : ''}"
+                    onclick="setPeriod('today')">Heute</button>
+                <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-week' ? 'active' : ''}"
+                    onclick="setPeriod('this-week')">1 Woche</button>
+                <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-month' ? 'active' : ''}"
+                    onclick="setPeriod('this-month')">1 Monat</button>
+                <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'all' ? 'active' : ''}"
+                    onclick="setPeriod('all')">Alle Trades</button>
+                <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'custom' ? 'active' : ''}"
+                    onclick="toggleCustomDates()" id="customDateBtn">📅 Zeitraum</button>
+            </div>
+
+            <div class="date-range-section" id="dateRangeSection"
+                 th:style="${selectedPeriod == 'custom' ? '' : 'display:none'}">
+                <div class="filter-group">
+                    <label>Von</label>
+                    <input type="date" name="startDate" id="startDateInput"
+                           th:value="${selectedStartDate}" />
+                </div>
+                <span class="date-separator">bis</span>
+                <div class="filter-group">
+                    <label>Bis</label>
+                    <input type="date" name="endDate" id="endDateInput"
+                           th:value="${selectedEndDate}" />
+                </div>
+                <button type="button" class="btn-clear-dates" onclick="clearDates()" title="Datum zurücksetzen">✕ Reset</button>
+            </div>
         </form>
     </div>
 
-    <div class="period-buttons" style="margin-bottom: 20px;">
-        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'today' ? 'active' : ''}"
-            onclick="setPeriod('today')">Heutige Trades</button>
-        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-week' ? 'active' : ''}"
-            onclick="setPeriod('this-week')">Diese Woche</button>
-        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'this-month' ? 'active' : ''}"
-            onclick="setPeriod('this-month')">Diesen Monat</button>
-        <button type="button" class="period-btn" th:classappend="${selectedPeriod == 'all' ? 'active' : ''}"
-            onclick="setPeriod('all')">Alle Trades</button>
+    <!-- Summary Bar (only if results exist) -->
+    <div class="summary-bar" th:if="${totalCount > 0}">
+        <div class="summary-card matched">
+            <div class="value" th:text="${matchedCount}">0</div>
+            <div class="label">✅ Gematcht</div>
+        </div>
+        <div class="summary-card only-a">
+            <div class="value" th:text="${onlyACount}">0</div>
+            <div class="label">⚠️ Nur in A</div>
+        </div>
+        <div class="summary-card only-b">
+            <div class="value" th:text="${onlyBCount}">0</div>
+            <div class="label">❌ Nur in B</div>
+        </div>
+        <div class="summary-card total">
+            <div class="value" th:text="${totalCount}">0</div>
+            <div class="label">Gesamt</div>
+        </div>
+        <div class="summary-card pct">
+            <div class="value" th:text="${totalCount > 0 ? #numbers.formatDecimal(matchedCount * 100.0 / totalCount, 1, 1) + '%' : '-'}">-</div>
+            <div class="label">Match-Rate</div>
+        </div>
     </div>
 
-    <div class="comparison-container">
+    <!-- Results Table -->
+    <div class="comparison-container" th:if="${totalCount > 0}">
         <table>
             <thead>
                 <tr>
-                    <th>Status</th>
-                    <th>Real Account</th>
-                    <th>Demo Account</th>
-                    <th>Ticket (Real)</th>
-                    <th>Symbol</th>
-                    <th class="text-center">Type</th>
-                    <th class="text-right">Vol (Real)</th>
-                    <th>Open Time (Real)</th>
-                    <th>Open Time (Demo)</th>
-                    <th class="text-right">Open Delay (s)</th>
-                    <th class="text-right">Open Slippage</th>
-                    <th class="text-right">Close Delay (s)</th>
-                    <th class="text-right">Close Slippage</th>
+                    <!-- Column Group: Account A -->
+                    <th class="col-group-a" colspan="4">Account A — Trades</th>
+                    <!-- Column Group: Account B -->
+                    <th class="col-group-b" colspan="4">Account B — Trades</th>
+                    <!-- Column Group: Status -->
+                    <th class="col-group-status" colspan="4">Status</th>
+                </tr>
+                <tr>
+                    <th class="col-group-a">Symbol</th>
+                    <th class="col-group-a text-center">Type</th>
+                    <th class="col-group-a text-right">Vol</th>
+                    <th class="col-group-a">Open Time</th>
+
+                    <th class="col-group-b">Symbol</th>
+                    <th class="col-group-b text-center">Type</th>
+                    <th class="col-group-b text-right">Vol</th>
+                    <th class="col-group-b">Open Time</th>
+
+                    <th class="col-group-status text-center">Match</th>
+                    <th class="col-group-status text-center">Δ Zeit</th>
+                    <th class="col-group-status text-right">Slip. Open</th>
+                    <th class="col-group-status text-right">Slip. Close</th>
                 </tr>
             </thead>
             <tbody>
                 <tr th:each="comp : ${comparisons}">
-                    <td class="text-center">
-                        <span th:if="${comp.status == 'MATCHED'}" class="badge matched">MATCHED</span>
-                        <span th:if="${comp.status != 'MATCHED'}" class="badge not-found">NOT FOUND</span>
+                    <!-- Account A Cells -->
+                    <td class="cell-a mono" th:if="${comp.tradeA != null}" th:text="${comp.tradeA.symbol}"></td>
+                    <td class="cell-a text-center" th:if="${comp.tradeA != null}">
+                        <span class="badge" th:classappend="${comp.tradeA.type == 'BUY' ? 'buy' : 'sell'}" th:text="${comp.tradeA.type}"></span>
                     </td>
-                    <td>
-                        <span th:text="${comp.realAccountName}"></span>
-                    </td>
-                    <td>
-                        <span th:text="${comp.demoAccountName}"></span>
-                    </td>
-                    <td class="mono" th:text="${comp.realTrade.ticket}"></td>
-                    <td class="mono" th:text="${comp.realTrade.symbol}"></td>
-                    <td class="text-center">
-                        <span class="badge" th:classappend="${comp.realTrade.type == 'BUY' ? 'buy' : 'sell'}"
-                            th:text="${comp.realTrade.type}">BUY</span>
-                    </td>
-                    <td class="text-right mono" th:text="${comp.realTrade.volume}"></td>
-                    <td class="mono neutral" th:text="${comp.realTrade.openTime}"></td>
-                    <td class="mono neutral" th:text="${comp.demoTrade != null ? comp.demoTrade.openTime : '-'}"></td>
+                    <td class="cell-a text-right mono" th:if="${comp.tradeA != null}" th:text="${comp.tradeA.volume}"></td>
+                    <td class="cell-a mono" th:if="${comp.tradeA != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeA.openTime}"></td>
 
-                    <td class="text-right mono"
-                        th:classappend="${comp.status == 'MATCHED' ? (comp.openDelaySeconds > 2 ? 'negative' : (comp.openDelaySeconds <= 0 ? 'positive' : 'neutral')) : ''}">
-                        <span th:text="${comp.openDelaySeconds != null ? comp.openDelaySeconds + 's' : '-'}"></span>
-                    </td>
+                    <td class="cell-a dash-cell" th:if="${comp.tradeA == null}" colspan="4">—</td>
 
-                    <td class="text-right mono"
-                        th:classappend="${comp.status == 'MATCHED' ? (comp.openSlippage > 0 ? 'negative' : (comp.openSlippage < 0 ? 'positive' : 'neutral')) : ''}">
-                        <span th:text="${comp.openSlippageFormatted != null ? comp.openSlippageFormatted : '-'}"></span>
+                    <!-- Account B Cells -->
+                    <td class="cell-b mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.symbol}"></td>
+                    <td class="cell-b text-center" th:if="${comp.tradeB != null}">
+                        <span class="badge" th:classappend="${comp.tradeB.type == 'BUY' ? 'buy' : 'sell'}" th:text="${comp.tradeB.type}"></span>
                     </td>
+                    <td class="cell-b text-right mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.volume}"></td>
+                    <td class="cell-b mono" th:if="${comp.tradeB != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeB.openTime}"></td>
 
-                    <td class="text-right mono"
-                        th:classappend="${comp.status == 'MATCHED' ? (comp.closeDelaySeconds > 2 ? 'negative' : (comp.closeDelaySeconds <= 0 ? 'positive' : 'neutral')) : ''}">
-                        <span th:text="${comp.closeDelaySeconds != null ? comp.closeDelaySeconds + 's' : '-'}"></span>
-                    </td>
+                    <td class="cell-b dash-cell" th:if="${comp.tradeB == null}" colspan="4">—</td>
 
-                    <td class="text-right mono"
-                        th:classappend="${comp.status == 'MATCHED' ? (comp.closeSlippage > 0 ? 'negative' : (comp.closeSlippage < 0 ? 'positive' : 'neutral')) : ''}">
-                        <span
-                            th:text="${comp.closeSlippageFormatted != null ? comp.closeSlippageFormatted : '-'}"></span>
+                    <!-- Status Cells -->
+                    <td class="cell-status text-center">
+                        <span th:if="${comp.matchStatus == 'MATCHED'}" class="check-icon">✅</span>
+                        <span th:if="${comp.matchStatus == 'ONLY_A'}" class="badge only-a">Nur A</span>
+                        <span th:if="${comp.matchStatus == 'ONLY_B'}" class="badge only-b">Nur B</span>
                     </td>
-                </tr>
-                <tr th:if="${#lists.isEmpty(comparisons)}">
-                    <td colspan="13" class="text-center neutral">Keine Trades gefunden.</td>
+                    <td class="cell-status text-center">
+                        <span th:if="${comp.timeDiffSeconds != null}"
+                              class="time-diff"
+                              th:classappend="${comp.timeDiffSeconds <= 5 ? 'good' : 'warn'}"
+                              th:text="${comp.timeDiffSeconds + 's'}"></span>
+                        <span th:if="${comp.timeDiffSeconds == null}" class="dash-cell">-</span>
+                    </td>
+                    <td class="cell-status text-right mono">
+                        <span th:if="${comp.openSlippageFormatted != null}"
+                              th:text="${comp.openSlippageFormatted}"
+                              th:style="${comp.openSlippage > 0 ? 'color: var(--danger)' : (comp.openSlippage < 0 ? 'color: var(--success)' : 'color: var(--text-muted)')}"></span>
+                        <span th:if="${comp.openSlippageFormatted == null}" class="dash-cell">-</span>
+                    </td>
+                    <td class="cell-status text-right mono">
+                        <span th:if="${comp.closeSlippageFormatted != null}"
+                              th:text="${comp.closeSlippageFormatted}"
+                              th:style="${comp.closeSlippage > 0 ? 'color: var(--danger)' : (comp.closeSlippage < 0 ? 'color: var(--success)' : 'color: var(--text-muted)')}"></span>
+                        <span th:if="${comp.closeSlippageFormatted == null}" class="dash-cell">-</span>
+                    </td>
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Prompt State: No accounts selected yet -->
+    <div class="prompt-state" th:if="${selectedAccountA == null || selectedAccountB == null}">
+        <div class="icon">🔍</div>
+        <p>Wähle oben <strong>MetaTrader A</strong> und <strong>MetaTrader B</strong> aus, um die Trades zu vergleichen.</p>
+    </div>
+
+    <!-- Empty State: Accounts selected but no trades found -->
+    <div class="prompt-state" th:if="${selectedAccountA != null && selectedAccountB != null && totalCount == 0}">
+        <div class="icon">📭</div>
+        <p>Keine Trades im gewählten Zeitraum gefunden. Versuche einen anderen Zeitraum oder eine höhere Toleranz.</p>
     </div>
 
     <a href="/" class="back-btn">← Zurück zum Dashboard</a>
@@ -318,7 +721,55 @@
     <script>
         function setPeriod(period) {
             document.getElementById('periodInput').value = period;
+            // Clear custom date fields when using preset
+            document.getElementById('startDateInput').value = '';
+            document.getElementById('endDateInput').value = '';
+            // Hide custom date section
+            document.getElementById('dateRangeSection').style.display = 'none';
+            // Update active class
+            document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
             document.getElementById('filterForm').submit();
+        }
+
+        function toggleCustomDates() {
+            const section = document.getElementById('dateRangeSection');
+            const isHidden = section.style.display === 'none';
+            section.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
+                // Deactivate preset buttons
+                document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById('customDateBtn').classList.add('active');
+                document.getElementById('periodInput').value = 'custom';
+                // Default to last 7 days if no dates set
+                const startInput = document.getElementById('startDateInput');
+                if (!startInput.value) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 7);
+                    startInput.value = d.toISOString().split('T')[0];
+                }
+                const endInput = document.getElementById('endDateInput');
+                if (!endInput.value) {
+                    endInput.value = new Date().toISOString().split('T')[0];
+                }
+            }
+        }
+
+        function clearDates() {
+            document.getElementById('startDateInput').value = '';
+            document.getElementById('endDateInput').value = '';
+            document.getElementById('dateRangeSection').style.display = 'none';
+            // Reset to 'today'
+            document.getElementById('periodInput').value = 'today';
+            document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+        }
+
+        function swapAccounts() {
+            const selectA = document.getElementById('selectA');
+            const selectB = document.getElementById('selectB');
+            const tmp = selectA.value;
+            selectA.value = selectB.value;
+            selectB.value = tmp;
         }
     </script>
 </body>

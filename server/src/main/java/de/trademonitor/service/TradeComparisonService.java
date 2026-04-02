@@ -1,5 +1,6 @@
 package de.trademonitor.service;
 
+import de.trademonitor.dto.AccountTradeComparisonDto;
 import de.trademonitor.dto.TradeComparisonDto;
 import de.trademonitor.entity.ClosedTradeEntity;
 import de.trademonitor.repository.ClosedTradeRepository;
@@ -10,7 +11,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -237,5 +240,196 @@ public class TradeComparisonService {
                 dto.setCloseSlippageFormatted(String.format(java.util.Locale.US, "%.5f", val));
             }
         }
+    }
+
+    /**
+     * Compare trades between two arbitrary accounts (A and B) with configurable tolerance.
+     * Uses preset period string (today, this-week, this-month, all).
+     */
+    public List<AccountTradeComparisonDto> compareAccounts(Long accountIdA, Long accountIdB,
+            int toleranceSeconds, String period) {
+        LocalDateTime periodStart = getPeriodStartDate(period);
+        return compareAccounts(accountIdA, accountIdB, toleranceSeconds, periodStart, null);
+    }
+
+    /**
+     * Compare trades between two arbitrary accounts (A and B) with configurable tolerance.
+     * Uses explicit start and end dates for filtering.
+     */
+    public List<AccountTradeComparisonDto> compareAccounts(Long accountIdA, Long accountIdB,
+            int toleranceSeconds, LocalDateTime startDate, LocalDateTime endDate) {
+        List<AccountTradeComparisonDto> results = new ArrayList<>();
+
+        if (accountIdA == null || accountIdB == null) {
+            return results;
+        }
+
+        // Load trades for both accounts
+        List<ClosedTradeEntity> tradesA = filterByDateRange(
+                closedTradeRepository.findByAccountId(accountIdA), startDate, endDate);
+        List<ClosedTradeEntity> tradesB = filterByDateRange(
+                closedTradeRepository.findByAccountId(accountIdB), startDate, endDate);
+
+        // Track which B-trades have already been matched
+        Set<Long> matchedBIds = new HashSet<>();
+
+        // Phase 1: For each trade in A, find best match in B
+        for (ClosedTradeEntity tradeA : tradesA) {
+            ClosedTradeEntity bestMatch = null;
+            long bestDiff = Long.MAX_VALUE;
+
+            if (tradeA.getOpenTime() == null || tradeA.getSymbol() == null || tradeA.getType() == null) {
+                // Unmatched A trade (no matching criteria)
+                AccountTradeComparisonDto dto = new AccountTradeComparisonDto();
+                dto.setTradeA(tradeA);
+                dto.setMatchStatus("ONLY_A");
+                results.add(dto);
+                continue;
+            }
+
+            LocalDateTime openTimeA;
+            try {
+                openTimeA = LocalDateTime.parse(tradeA.getOpenTime(), formatter);
+            } catch (Exception e) {
+                AccountTradeComparisonDto dto = new AccountTradeComparisonDto();
+                dto.setTradeA(tradeA);
+                dto.setMatchStatus("ONLY_A");
+                results.add(dto);
+                continue;
+            }
+
+            for (ClosedTradeEntity tradeB : tradesB) {
+                if (matchedBIds.contains(tradeB.getId())) continue;
+                if (tradeB.getOpenTime() == null) continue;
+
+                // Symbol and Type must match
+                if (!tradeA.getSymbol().equalsIgnoreCase(tradeB.getSymbol())) continue;
+                if (!tradeA.getType().equalsIgnoreCase(tradeB.getType())) continue;
+
+                try {
+                    LocalDateTime openTimeB = LocalDateTime.parse(tradeB.getOpenTime(), formatter);
+                    long diffSeconds = Math.abs(ChronoUnit.SECONDS.between(openTimeA, openTimeB));
+
+                    if (diffSeconds <= toleranceSeconds && diffSeconds < bestDiff) {
+                        bestDiff = diffSeconds;
+                        bestMatch = tradeB;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            AccountTradeComparisonDto dto = new AccountTradeComparisonDto();
+            dto.setTradeA(tradeA);
+
+            if (bestMatch != null) {
+                dto.setTradeB(bestMatch);
+                dto.setMatchStatus("MATCHED");
+                dto.setTimeDiffSeconds(bestDiff);
+                calculateSlippage(dto);
+                matchedBIds.add(bestMatch.getId());
+            } else {
+                dto.setMatchStatus("ONLY_A");
+            }
+
+            results.add(dto);
+        }
+
+        // Phase 2: Add all unmatched B-trades
+        for (ClosedTradeEntity tradeB : tradesB) {
+            if (!matchedBIds.contains(tradeB.getId())) {
+                AccountTradeComparisonDto dto = new AccountTradeComparisonDto();
+                dto.setTradeB(tradeB);
+                dto.setMatchStatus("ONLY_B");
+                results.add(dto);
+            }
+        }
+
+        // Sort: MATCHED first (newest), then ONLY_A (newest), then ONLY_B (newest)
+        results.sort((a, b) -> {
+            int statusOrder = getStatusOrder(a.getMatchStatus()) - getStatusOrder(b.getMatchStatus());
+            if (statusOrder != 0) return statusOrder;
+
+            // Within same status, sort by close time descending
+            String timeA = getCloseTime(a);
+            String timeB = getCloseTime(b);
+            if (timeA == null && timeB == null) return 0;
+            if (timeA == null) return 1;
+            if (timeB == null) return -1;
+            return timeB.compareTo(timeA);
+        });
+
+        return results;
+    }
+
+    private List<ClosedTradeEntity> filterByDateRange(List<ClosedTradeEntity> trades,
+            LocalDateTime startDate, LocalDateTime endDate) {
+        if (startDate == null && endDate == null) return trades;
+        return trades.stream().filter(t -> {
+            if (t.getCloseTime() == null) return true;
+            try {
+                LocalDateTime closeTime = LocalDateTime.parse(t.getCloseTime(), formatter);
+                if (startDate != null && closeTime.isBefore(startDate)) return false;
+                if (endDate != null && closeTime.isAfter(endDate)) return false;
+                return true;
+            } catch (Exception e) {
+                return true;
+            }
+        }).collect(Collectors.toList());
+    }
+
+    private int getStatusOrder(String status) {
+        if ("MATCHED".equals(status)) return 0;
+        if ("ONLY_A".equals(status)) return 1;
+        return 2; // ONLY_B
+    }
+
+    private void calculateSlippage(AccountTradeComparisonDto dto) {
+        ClosedTradeEntity tradeA = dto.getTradeA();
+        ClosedTradeEntity tradeB = dto.getTradeB();
+
+        if (tradeA == null || tradeB == null) return;
+
+        double openDiff = tradeA.getOpenPrice() - tradeB.getOpenPrice();
+        double closeDiff = tradeA.getClosePrice() - tradeB.getClosePrice();
+
+        if ("BUY".equalsIgnoreCase(tradeA.getType())) {
+            dto.setOpenSlippage(openDiff); 
+            dto.setCloseSlippage(closeDiff * -1);
+        } else if ("SELL".equalsIgnoreCase(tradeA.getType())) {
+            dto.setOpenSlippage(openDiff * -1); 
+            dto.setCloseSlippage(closeDiff);
+        }
+
+        if (dto.getOpenSlippage() != null) {
+            double val = Math.round(dto.getOpenSlippage() * 100000.0) / 100000.0;
+            if (Math.abs(val) < 0.00001) val = 0.0;
+            dto.setOpenSlippage(val);
+            if (val == 0.0) {
+                dto.setOpenSlippageFormatted("0");
+            } else {
+                dto.setOpenSlippageFormatted(String.format(java.util.Locale.US, "%.5f", val));
+            }
+        }
+
+        if (dto.getCloseSlippage() != null) {
+            double val = Math.round(dto.getCloseSlippage() * 100000.0) / 100000.0;
+            if (Math.abs(val) < 0.00001) val = 0.0;
+            dto.setCloseSlippage(val);
+            if (val == 0.0) {
+                dto.setCloseSlippageFormatted("0");
+            } else {
+                dto.setCloseSlippageFormatted(String.format(java.util.Locale.US, "%.5f", val));
+            }
+        }
+    }
+
+    private String getCloseTime(AccountTradeComparisonDto dto) {
+        if (dto.getTradeA() != null && dto.getTradeA().getCloseTime() != null) {
+            return dto.getTradeA().getCloseTime();
+        }
+        if (dto.getTradeB() != null && dto.getTradeB().getCloseTime() != null) {
+            return dto.getTradeB().getCloseTime();
+        }
+        return null;
     }
 }

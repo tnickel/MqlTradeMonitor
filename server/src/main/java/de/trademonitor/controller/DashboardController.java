@@ -1299,42 +1299,78 @@ public class DashboardController {
 
     @GetMapping("/trade-comparison")
     public String tradeComparison(@AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) Long accountA,
+            @RequestParam(required = false) Long accountB,
+            @RequestParam(required = false, defaultValue = "20") int toleranceSec,
             @RequestParam(required = false, defaultValue = "today") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             Model model) {
 
-        // If user is restricted and requests an account they don't have access to
-        if (accountId != null && !isAllowedAccess(userDetails, accountId)) {
+        // Access checks
+        if (accountA != null && !isAllowedAccess(userDetails, accountA)) {
+            return "redirect:/";
+        }
+        if (accountB != null && !isAllowedAccess(userDetails, accountB)) {
             return "redirect:/";
         }
 
-        List<de.trademonitor.dto.TradeComparisonDto> comparisons = tradeComparisonService.compareTrades(accountId,
-                period);
+        // Run comparison if both accounts are selected
+        List<de.trademonitor.dto.AccountTradeComparisonDto> comparisons = new ArrayList<>();
+        if (accountA != null && accountB != null) {
+            // If custom dates are provided, use them instead of the preset period
+            if (startDate != null && !startDate.isEmpty()) {
+                java.time.LocalDateTime start = null;
+                java.time.LocalDateTime end = null;
+                try {
+                    start = java.time.LocalDate.parse(startDate).atStartOfDay();
+                } catch (Exception ignored) {}
+                try {
+                    if (endDate != null && !endDate.isEmpty()) {
+                        end = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
+                    }
+                } catch (Exception ignored) {}
+                comparisons = tradeComparisonService.compareAccounts(accountA, accountB, toleranceSec, start, end);
+                period = "custom";
+            } else {
+                comparisons = tradeComparisonService.compareAccounts(accountA, accountB, toleranceSec, period);
+            }
+        }
 
-        List<Account> realAccounts = accountManager.getAccountsSortedByPrivilege().stream()
-                .filter(a -> "REAL".equalsIgnoreCase(a.getType()))
-                .collect(Collectors.toList());
+        // Provide all accounts for selection (not just Real)
+        List<Account> allAccounts = accountManager.getAccountsSortedByPrivilege();
 
-        // Filter the output list if no accountId was specified
+        // Filter by user permissions
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
-            if (accountId == null) {
-                comparisons = comparisons.stream()
-                        .filter(c -> c.getRealTrade() != null && allowed.contains(c.getRealTrade().getAccountId()))
-                        .collect(Collectors.toList());
-            }
-            realAccounts = realAccounts.stream()
+            allAccounts = allAccounts.stream()
                     .filter(a -> allowed.contains(a.getAccountId()))
                     .collect(Collectors.toList());
         }
 
+        // Summary stats
+        long matchedCount = comparisons.stream().filter(c -> "MATCHED".equals(c.getMatchStatus())).count();
+        long onlyACount = comparisons.stream().filter(c -> "ONLY_A".equals(c.getMatchStatus())).count();
+        long onlyBCount = comparisons.stream().filter(c -> "ONLY_B".equals(c.getMatchStatus())).count();
+        long totalCount = comparisons.size();
+
         model.addAttribute("comparisons", comparisons);
-        model.addAttribute("realAccounts", realAccounts);
-        model.addAttribute("selectedAccountId", accountId);
+        model.addAttribute("allAccounts", allAccounts);
+        model.addAttribute("selectedAccountA", accountA);
+        model.addAttribute("selectedAccountB", accountB);
+        model.addAttribute("selectedToleranceSec", toleranceSec);
         model.addAttribute("selectedPeriod", period);
+        model.addAttribute("selectedStartDate", startDate);
+        model.addAttribute("selectedEndDate", endDate);
+        model.addAttribute("matchedCount", matchedCount);
+        model.addAttribute("onlyACount", onlyACount);
+        model.addAttribute("onlyBCount", onlyBCount);
+        model.addAttribute("totalCount", totalCount);
 
         return "trade-comparison";
     }
+
+
 
     @GetMapping("/api/stats/system-status")
     @ResponseBody
