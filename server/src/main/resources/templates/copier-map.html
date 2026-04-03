@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Monitor - Copier Map</title>
+    <link rel="stylesheet" th:href="@{/css/style.css(v=4)}">
+    <style>
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 4rem);
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden; /* Or auto if we want to scroll */
+            background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #copier-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3000px;
+            height: 3000px;
+            transform-origin: 0 0;
+        }
+
+        .map-node {
+            position: absolute;
+            width: 220px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: var(--shadow);
+            cursor: grab;
+            user-select: none;
+            z-index: 10;
+        }
+        
+        .map-node:active {
+            cursor: grabbing;
+        }
+
+        .map-node.type-demo {
+            border-top: 3px solid var(--warning);
+        }
+
+        .map-node.type-real {
+            border-top: 3px solid var(--accent-secondary);
+        }
+
+        .node-header {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            color: var(--text-primary);
+        }
+
+
+        
+        .node-id {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .connect-anchor {
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: crosshair;
+            z-index: 20;
+            border: 2px solid white;
+        }
+        
+        .connect-anchor:hover {
+            transform: translateY(-50%) scale(1.2);
+        }
+
+        .input-anchor {
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background: var(--bg-card);
+            border: 2px solid var(--accent-secondary);
+            border-radius: 50%;
+            z-index: 20;
+        }
+
+        #links-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .link-path {
+            fill: none;
+            stroke-width: 2.5;
+            pointer-events: visibleStroke;
+            cursor: pointer;
+            transition: stroke-width 0.2s, opacity 0.2s;
+            opacity: 0.8;
+        }
+
+        .link-path:hover {
+            stroke: var(--danger) !important;
+            stroke-width: 4;
+            opacity: 1;
+            z-index: 100;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Trade Monitor</h2>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">v0.12.0</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <span style="font-size: 1.2rem;">📊</span> Dashboard
+                </a>
+                <a href="/trade-comparison" class="nav-item">
+                    <span style="font-size: 1.2rem;">⚖️</span> Trade Compare
+                </a>
+                <a href="/copier-map" class="nav-item active">
+                    <span style="font-size: 1.2rem;">🔗</span> Copier Map
+                </a>
+                <a href="/open-trades" class="nav-item">
+                    <span style="font-size: 1.2rem;">📈</span> Open Trades
+                </a>
+                
+                <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <a th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" href="/admin" class="nav-item">
+                        <span style="font-size: 1.2rem;">⚙️</span> Admin
+                    </a>
+                    <a th:if="${currentUser != null}" href="/profile" class="nav-item">
+                        <span style="font-size: 1.2rem;">👤</span> Profil
+                    </a>
+                    <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0; padding: 0;">
+                        <button type="submit" class="nav-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                            <span style="font-size: 1.2rem;">🚪</span> Logout
+                        </button>
+                    </form>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" style="padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <h2 style="font-size: 1.5rem; margin: 0;">🔗 Copier Map</h2>
+                    <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem;">Verknüpfe per Drag & Drop deine MetaTrader-Konten.</p>
+                    <div id="red-node-hint" style="display: none; margin-top: 8px; color: var(--danger); background: rgba(239, 68, 68, 0.1); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--danger); font-size: 0.85rem; font-weight: bold; width: fit-content;">
+                        <span style="font-size: 1rem; margin-right: 5px;">⚠️</span>
+                        Hinweis: Doppelklick auf die roten Kacheln, um die fehlenden Trades zu überprüfen.
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <!-- Verification Settings -->
+                    <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <span style="font-size: 0.9rem; color: var(--text-primary);">Toleranz (s):</span>
+                        <input type="number" id="setting-tolerance" value="60" style="width: 60px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 4px; border-radius: 4px; font-size: 0.9rem;">
+                        <span style="font-size: 0.9rem; color: var(--text-primary); margin-left: 5px;">Intervall (m):</span>
+                        <input type="number" id="setting-interval" value="10" style="width: 60px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 4px; border-radius: 4px; font-size: 0.9rem;">
+                        <button onclick="saveCopierSettings()" style="background: var(--accent-primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-left: 5px;">Speichern</button>
+                        <button onclick="openConfigModal()" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-left: 5px;" title="Erweiterte Match-Einstellungen konfigurieren">⚙️ Config Trade-Vergleich</button>
+                    </div>
+                    <button class="view-toggle-btn" onclick="savePositions()" style="background: var(--success); color: white; border-color: transparent;">💾 Layout Speichern</button>
+                </div>
+            </div>
+
+            <div class="canvas-wrapper" id="canvas-wrapper">
+                <div id="copier-canvas">
+                    <svg id="links-layer"></svg>
+                    <!-- Nodes injected here via JS -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Verification Modal -->
+        <div id="verification-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+            <div class="modal-content" style="background: var(--bg-main); width: 98%; max-width: 1900px; height: 95vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-color);">
+                <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-card);">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <h3 style="margin: 0; font-size: 1.25rem;">Trade Verification: <span id="vm-target-name" style="color: var(--accent-primary);">Target Account</span></h3>
+                        <div style="display: flex; gap: 15px; margin-left: 20px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); font-size: 0.95rem;">
+                                <input type="checkbox" id="filter-stage1" onchange="applyTradeFilters()"> <span style="display: inline-block; width: 12px; height: 12px; background: rgba(16, 185, 129, 0.8); border-radius: 50%;"></span> Stufe 1 ausblenden
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); font-size: 0.95rem;">
+                                <input type="checkbox" id="filter-stage2" onchange="applyTradeFilters()"> <span style="display: inline-block; width: 12px; height: 12px; background: rgba(249, 115, 22, 0.8); border-radius: 50%;"></span> Stufe 2 ausblenden
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); font-size: 0.95rem;">
+                                <input type="checkbox" id="filter-stage3" onchange="applyTradeFilters()"> <span style="display: inline-block; width: 12px; height: 12px; background: rgba(168, 85, 247, 0.8); border-radius: 50%;"></span> Stufe 3 ausblenden
+                            </label>
+                        </div>
+                    </div>
+                    <button onclick="closeVerificationModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                
+                <div style="display: flex; flex: 1; overflow: hidden;">
+                    <!-- Left: Sources (Scrollable List of Tables) -->
+                    <div style="flex: 1; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; min-height: 0;">
+                        <div id="vm-sources-header" style="padding: 10px 15px; background: rgba(255,255,255,0.05); font-weight: bold; border-bottom: 1px solid var(--border-color);">
+                            Source Accounts
+                        </div>
+                        <div id="vm-sources-container" style="flex: 1; overflow-y: auto; padding: 15px 20px 15px 15px; display: flex; flex-direction: column; gap: 40px; min-height: 0;">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Right: Target (Single Table) -->
+                    <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                        <div id="vm-target-header" style="padding: 10px 15px; background: rgba(255,255,255,0.05); font-weight: bold; border-bottom: 1px solid var(--border-color);">
+                            Target Trades
+                        </div>
+                        <div style="flex: 1; overflow-y: auto; padding: 15px; min-height: 0;">
+                            <table class="data-table" style="width: 100%; font-size: 0.9rem;">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Ticket</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Symbol</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Type</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">SL</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">TP</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Open Time</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Magic</th>
+                                        <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Match Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vm-target-tbody">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Match Config Modal -->
+    <div id="config-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1100; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: var(--bg-main); width: 600px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-color);">
+            <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-card);">
+                <h3 style="margin: 0; font-size: 1.25rem;">Mehrstufiger Trade-Vergleich</h3>
+                <button onclick="closeConfigModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 15px;">
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.5;">
+                    Der TradeMonitor sucht für jeden Ziel-Trade den passenden Quell-Trade. Dies geschieht in zwei Stufen, die Sie hier konfigurieren können.
+                </p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.05rem; cursor: pointer;">
+                        <input type="checkbox" id="conf-stage1"> Stufe 1: Exaktes Zeit-Matching
+                    </label>
+                    <p style="margin: 10px 0 0 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; padding-left: 23px;">
+                        Vergleicht das Währungspaar, die Trade-Richtung (BUY/SELL) und überprüft, ob die Öffnungszeit mit einer Toleranz von <strong><span id="label-tolerance-sec"></span> Sekunden</strong> übereinstimmt.
+                    </p>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.05rem; cursor: pointer;">
+                        <input type="checkbox" id="conf-stage2"> Stufe 2: Fallback (Daten-Matching)
+                    </label>
+                    <p style="margin: 10px 0 0 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; padding-left: 23px;">
+                        Genaue Analysestufe, falls Stufe 1 fehlschlägt. Vergleicht Währungspaar, Richtung, das reine <strong>Kalenderdatum</strong> (ohne Uhrzeit) sowie exakten <strong>Stop Loss</strong> und <strong>Take Profit</strong>.
+                    </p>
+                    <div style="margin-top: 10px; padding-left: 23px; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">SL/TP Hard-Toleranz:</span>
+                        <input type="number" id="conf-stage2-tol" step="0.00001" style="width: 100px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 4px; border-radius: 4px; font-size: 0.85rem;">
+                    </div>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.05rem; cursor: pointer;">
+                        <input type="checkbox" id="conf-stage3"> Stufe 3: Letzter Fallback (Symbol & Richtung)
+                    </label>
+                    <p style="margin: 10px 0 0 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; padding-left: 23px;">
+                        Sehr ungenaue Analysestufe. Zieht nur an, wenn beide oberen Stufen versagen. Vergleicht ausschließlich das Währungspaar und die Handelsrichtung.
+                    </p>
+                </div>
+            </div>
+            <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; background: var(--bg-card);">
+                <button onclick="saveConfigModal()" style="background: var(--accent-primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-weight: bold;">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+        let accounts = [];
+        let links = [];
+
+        const canvas = document.getElementById('copier-canvas');
+        const svgLayer = document.getElementById('links-layer');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+
+        // Dragging state for nodes
+        let isDraggingNode = false;
+        let dragNodeId = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // Drawing new link state
+        let isDrawingLink = false;
+        let drawSourceId = null;
+        let tempLinkPath = null;
+
+        // Pan/Zoom Canvas state
+        let isPanningCanvas = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let canvasTranslateX = 0;
+        let canvasTranslateY = 0;
+
+        async function init() {
+            try {
+                const [dataRes, settingsRes] = await Promise.all([
+                    fetch('/api/copier-map/data'),
+                    fetch('/api/copier-map/settings')
+                ]);
+                
+                if (!dataRes.ok || !settingsRes.ok) throw new Error("API Fehler beim Laden");
+                
+                const data = await dataRes.json();
+                const settings = await settingsRes.json();
+
+                accounts = data.nodes;
+                links = data.edges;
+                
+                document.getElementById('setting-tolerance').value = settings.toleranceSeconds;
+                window._settingsToleranceSeconds = settings.toleranceSeconds;
+                document.getElementById('setting-interval').value = settings.intervalMins;
+                
+                document.getElementById('conf-stage1').checked = settings.useStage1;
+                document.getElementById('conf-stage2').checked = settings.useStage2;
+                document.getElementById('conf-stage2-tol').value = settings.stage2Tolerance;
+                document.getElementById('conf-stage3').checked = settings.useStage3;
+
+                renderNodes();
+                renderLinks();
+            } catch (err) {
+                console.error("Fehler beim Laden der Map-Daten", err);
+            }
+        }
+
+        async function saveCopierSettings() {
+            try {
+                const tol = parseInt(document.getElementById('setting-tolerance').value);
+                const inter = parseInt(document.getElementById('setting-interval').value);
+                
+                // Fetch other existing UI inputs so we don't accidentally erase stage logic
+                const useStage1 = document.getElementById('conf-stage1').checked;
+                const useStage2 = document.getElementById('conf-stage2').checked;
+                const stage2Tol = parseFloat(document.getElementById('conf-stage2-tol').value);
+
+                await fetch('/api/copier-map/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                    body: JSON.stringify({ 
+                        toleranceSeconds: tol, 
+                        intervalMins: inter,
+                        useStage1: useStage1,
+                        useStage2: useStage2,
+                        stage2Tolerance: stage2Tol,
+                        useStage3: document.getElementById('conf-stage3').checked
+                    })
+                });
+                alert("Copier-Einstellungen gespeichert.");
+            } catch (err) {
+                console.error("Fehler beim Speichern der Settings", err);
+                alert("Fehler beim Speichern!");
+            }
+        }
+
+        function openConfigModal() {
+            document.getElementById('label-tolerance-sec').innerText = document.getElementById('setting-tolerance').value || window._settingsToleranceSeconds;
+            document.getElementById('config-modal').style.display = 'flex';
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-modal').style.display = 'none';
+        }
+
+        async function saveConfigModal() {
+            try {
+                const tol = parseInt(document.getElementById('setting-tolerance').value);
+                const inter = parseInt(document.getElementById('setting-interval').value);
+                
+                const useStage1 = document.getElementById('conf-stage1').checked;
+                const useStage2 = document.getElementById('conf-stage2').checked;
+                const stage2Tol = parseFloat(document.getElementById('conf-stage2-tol').value);
+
+                await fetch('/api/copier-map/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                    body: JSON.stringify({ 
+                        toleranceSeconds: tol, 
+                        intervalMins: inter,
+                        useStage1: useStage1,
+                        useStage2: useStage2,
+                        stage2Tolerance: stage2Tol,
+                        useStage3: document.getElementById('conf-stage3').checked
+                    })
+                });
+                closeConfigModal();
+                alert("Erweiterte Trade-Vergleichs Einstellungen gespeichert.");
+            } catch (err) {
+                console.error("Fehler beim Speichern", err);
+                alert("Fehler beim Speichern!");
+            }
+        }
+
+        function renderNodes() {
+            let hasAnyErrors = false;
+            accounts.forEach((acc, index) => {
+                // Initialize default positions if absent
+                if (acc.mapPosX == null) acc.mapPosX = 50 + (index % 5) * 250;
+                if (acc.mapPosY == null) acc.mapPosY = 50 + Math.floor(index / 5) * 120;
+
+                const nodeEl = document.createElement('div');
+                let extraClasses = '';
+                if (acc.copierError) {
+                    extraClasses += ' copier-error-shadow';
+                    hasAnyErrors = true;
+                }
+                nodeEl.className = 'map-node type-' + (acc.type || 'demo').toLowerCase() + extraClasses;
+                nodeEl.id = 'node-' + acc.accountId;
+                nodeEl.style.left = acc.mapPosX + 'px';
+                nodeEl.style.top = acc.mapPosY + 'px';
+
+                nodeEl.innerHTML = `
+                    <div class="input-anchor"></div>
+                    <div class="node-header">${acc.name || acc.accountId}</div>
+                    <div class="node-id">${acc.broker || 'Broker'} | ${acc.accountId}</div>
+                    <div class="connect-anchor" data-id="${acc.accountId}" title="Ziehen um zu verbinden"></div>
+                `;
+
+                // Double click to open verification modal
+                nodeEl.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    openVerificationModal(acc.accountId);
+                });
+
+                // Setup node dragging
+                nodeEl.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('connect-anchor')) return; // handled separately
+                    e.stopPropagation();
+                    isDraggingNode = true;
+                    dragNodeId = acc.accountId;
+                    dragOffsetX = e.clientX - acc.mapPosX;
+                    dragOffsetY = e.clientY - acc.mapPosY;
+                });
+
+                // Setup connection drawing
+                const anchor = nodeEl.querySelector('.connect-anchor');
+                anchor.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    isDrawingLink = true;
+                    drawSourceId = acc.accountId;
+                    
+                    tempLinkPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    tempLinkPath.setAttribute('class', 'link-path');
+                    tempLinkPath.setAttribute('stroke-dasharray', '5,5');
+                    svgLayer.appendChild(tempLinkPath);
+                });
+
+                // Mouse up on node: Finish link
+                nodeEl.addEventListener('mouseup', async (e) => {
+                    if (isDrawingLink && drawSourceId !== acc.accountId) {
+                        e.stopPropagation();
+                        // Create link!
+                        await createLink(drawSourceId, acc.accountId);
+                    }
+                });
+
+                canvas.appendChild(nodeEl);
+            });
+
+            // Toggle Red Node Hint
+            const hintEl = document.getElementById('red-node-hint');
+            if (hintEl) {
+                hintEl.style.display = hasAnyErrors ? 'block' : 'none';
+            }
+        }
+
+        const palette = [
+            '#3b82f6', // blue-500
+            '#0ea5e9', // sky-500
+            '#06b6d4', // cyan-500
+            '#6366f1', // indigo-500
+            '#8b5cf6', // violet-500
+            '#14b8a6', // teal-500
+            '#2563eb', // blue-600
+            '#0284c7', // sky-600
+            '#4f46e5', // indigo-600
+            '#0d9488', // teal-600
+            '#60a5fa', // blue-400
+            '#38bdf8', // sky-400
+            '#2dd4bf'  // teal-400
+        ];
+        
+        let targetColorMap = {};
+        let colorCounter = 0;
+
+        function getColorForTarget(targetId) {
+            if (!targetColorMap[targetId]) {
+                targetColorMap[targetId] = palette[colorCounter % palette.length];
+                colorCounter++;
+            }
+            return targetColorMap[targetId];
+        }
+
+        function renderLinks() {
+            // clear old links except tempLink
+            const oldPaths = svgLayer.querySelectorAll('.link-path:not([stroke-dasharray])');
+            oldPaths.forEach(p => p.remove());
+
+            // clear old dynamic markers
+            const oldMarkers = svgLayer.querySelectorAll('marker[id^="arrowhead-"]');
+            oldMarkers.forEach(p => p.remove());
+
+            links.forEach(link => {
+                const color = getColorForTarget(link.targetAccountId);
+                const markerId = 'arrowhead-' + link.targetAccountId;
+
+                // Make sure defs and specific marker exist
+                let defs = svgLayer.querySelector('defs');
+                if (!defs) {
+                    // Create defs dynamically via vanilla JS
+                    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                    svgLayer.insertBefore(defs, svgLayer.firstChild);
+                }
+                
+                if (!document.getElementById(markerId)) {
+                    defs.insertAdjacentHTML('beforeend', `
+                        <marker id="${markerId}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="${color}" />
+                        </marker>
+                    `);
+                }
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('class', 'link-path');
+                path.setAttribute('id', 'link-' + link.id);
+                path.setAttribute('d', calculatePathCurve(link.sourceAccountId, link.targetAccountId));
+                path.setAttribute('stroke', color);
+                
+                // Add Marker end
+                path.setAttribute('marker-end', `url(#${markerId})`);
+                
+                // Delete on click
+                path.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (confirm('Verknüpfung löschen?')) {
+                        await deleteLink(link.id);
+                    }
+                });
+
+                svgLayer.appendChild(path);
+            });
+        }
+
+        function calculatePathCurve(sourceId, targetId) {
+            const sourceAcc = accounts.find(a => a.accountId === sourceId);
+            const targetAcc = accounts.find(a => a.accountId === targetId);
+            if(!sourceAcc || !targetAcc) return "";
+
+            // anchor X, Y calculation
+            const x1 = sourceAcc.mapPosX + 220; // right edge
+            const y1 = sourceAcc.mapPosY + 35; // middle of 70px height node
+
+            const x2 = targetAcc.mapPosX; // left edge
+            const y2 = targetAcc.mapPosY + 35;
+
+            // Using fixed bezier control points creates an "umbilical cord" bundling effect
+            // which looks vastly cleaner than variable scaling offsets.
+            const cpOffset = 150;
+            return `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2} ${y2}`;
+        }
+
+        function updateAllLinkPathsForNode(accountId) {
+            links.forEach(link => {
+                if (link.sourceAccountId === accountId || link.targetAccountId === accountId) {
+                    const path = document.getElementById('link-' + link.id);
+                    if(path) {
+                        path.setAttribute('d', calculatePathCurve(link.sourceAccountId, link.targetAccountId));
+                    }
+                }
+            });
+        }
+
+        // Global Mouse Events
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingNode && dragNodeId) {
+                const acc = accounts.find(a => a.accountId === dragNodeId);
+                acc.mapPosX = e.clientX - dragOffsetX;
+                acc.mapPosY = e.clientY - dragOffsetY;
+                
+                // Keep in bounds
+                if(acc.mapPosX < 0) acc.mapPosX = 0;
+                if(acc.mapPosY < 0) acc.mapPosY = 0;
+
+                const el = document.getElementById('node-' + dragNodeId);
+                el.style.left = acc.mapPosX + 'px';
+                el.style.top = acc.mapPosY + 'px';
+
+                updateAllLinkPathsForNode(dragNodeId);
+            }
+
+            if (isDrawingLink && tempLinkPath && drawSourceId) {
+                const sourceAcc = accounts.find(a => a.accountId === drawSourceId);
+                const x1 = sourceAcc.mapPosX + 220; 
+                const y1 = sourceAcc.mapPosY + 35; 
+                
+                // offset by canvas translation and wrapper rect
+                const rect = canvasWrapper.getBoundingClientRect();
+                const x2 = e.clientX - rect.left - canvasTranslateX;
+                const y2 = e.clientY - rect.top - canvasTranslateY;
+
+                const cpOffset = Math.abs(x2 - x1) * 0.5 + 20;
+                tempLinkPath.setAttribute('d', `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2} ${y2}`);
+            }
+
+            if (isPanningCanvas) {
+                const dx = e.clientX - panStartX;
+                const dy = e.clientY - panStartY;
+                canvasTranslateX += dx;
+                canvasTranslateY += dy;
+                canvas.style.transform = `translate(${canvasTranslateX}px, ${canvasTranslateY}px)`;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingNode = false;
+            dragNodeId = null;
+
+            if (isDrawingLink) {
+                isDrawingLink = false;
+                drawSourceId = null;
+                if (tempLinkPath) {
+                    tempLinkPath.remove();
+                    tempLinkPath = null;
+                }
+            }
+
+            isPanningCanvas = false;
+        });
+
+        // Add pan ability to wrapper
+        canvasWrapper.addEventListener('mousedown', (e) => {
+            if(e.target === canvasWrapper || e.target === svgLayer) {
+                isPanningCanvas = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+            }
+        });
+
+        async function createLink(sourceId, targetId) {
+            // Check if exists
+            if(links.find(l => l.sourceAccountId === sourceId && l.targetAccountId === targetId)) {
+                return;
+            }
+
+            const res = await fetch('/api/copier-map/link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify({ sourceAccountId: sourceId, targetAccountId: targetId })
+            });
+
+            if(res.ok) {
+                const link = await res.json();
+                links.push(link);
+                renderLinks();
+            }
+        }
+
+        async function deleteLink(id) {
+            const res = await fetch('/api/copier-map/link/' + id, {
+                method: 'DELETE',
+                headers: { [csrfHeader]: csrfToken }
+            });
+            if(res.ok) {
+                links = links.filter(l => l.id !== id);
+                renderLinks();
+            }
+        }
+
+        async function savePositions() {
+            const dto = accounts.map(a => ({
+                accountId: a.accountId,
+                x: a.mapPosX,
+                y: a.mapPosY
+            }));
+
+            const res = await fetch('/api/copier-map/positions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify(dto)
+            });
+
+            if(res.ok) {
+                const btn = document.querySelector('button.view-toggle-btn');
+                const orig = btn.innerText;
+                btn.innerText = "✅ Gespeichert!";
+                setTimeout(() => btn.innerText = orig, 2000);
+            } else {
+                alert('Speichern fehlgeschlagen.');
+            }
+        }
+
+        function formatGmtOffset(seconds) {
+            if (seconds === undefined || seconds === null) return 'GMT+0';
+            let hours = Math.round(seconds / 3600);
+            let sign = hours >= 0 ? '+' : '';
+            return `GMT${sign}${hours}`;
+        }
+
+        async function openVerificationModal(accountId) {
+            try {
+                document.getElementById('verification-modal').style.display = 'flex';
+                document.getElementById('vm-target-name').innerText = 'Lade...';
+                document.getElementById('vm-target-tbody').innerHTML = '<tr><td colspan="5">Lade Daten...</td></tr>';
+                document.getElementById('vm-sources-container').innerHTML = '';
+
+                const res = await fetch(`/api/copier-map/verify/${accountId}`);
+                if (!res.ok) throw new Error("Verification-Daten nicht gefunden. Möglicherweise hat der Account keine Quelle.");
+                
+                const data = await res.json();
+                
+                let titleText = data.role === 'SENDER' 
+                    ? `Trade-Übersicht (Sender): ${data.targetAccountName}` 
+                    : `Trade Verification (Empfänger): ${data.targetAccountName}`;
+                document.getElementById('vm-target-name').innerText = titleText;
+
+                // Adjust layout based on role
+                const targetTradesColumn = document.getElementById('vm-target-tbody').closest('div[style*="flex: 1"]');
+
+                if (data.role === 'SENDER') {
+                    // Hide target side, expand source side
+                    targetTradesColumn.parentElement.style.display = 'none';
+                    document.getElementById('vm-sources-header').innerText = 'Offene Trades (Sender)';
+                } else {
+                    targetTradesColumn.parentElement.style.display = 'flex';
+                    document.getElementById('vm-sources-header').innerText = 'Source Accounts';
+                    document.getElementById('vm-target-header').innerHTML = `Target Trades <span style="color: #8b949e; font-weight: normal; font-size: 0.85em;">(GMT Offset: ${formatGmtOffset(data.targetGmtOffsetSeconds)})</span>`;
+                }
+
+                const matchedStage1Tickets = new Set();
+                const matchedStage2Tickets = new Set();
+                const matchedStage3Tickets = new Set();
+                if (data.targetTrades) {
+                    data.targetTrades.forEach(match => {
+                        if (match.isMatched && match.matchedBySourceTicket) {
+                            if (match.isStage3Match) {
+                                matchedStage3Tickets.add(String(match.matchedBySourceTicket));
+                            } else if (match.isStage2Match) {
+                                matchedStage2Tickets.add(String(match.matchedBySourceTicket));
+                            } else {
+                                matchedStage1Tickets.add(String(match.matchedBySourceTicket));
+                            }
+                        }
+                    });
+                }
+
+                // Render Sources
+                const sourcesContainer = document.getElementById('vm-sources-container');
+                sourcesContainer.innerHTML = '';
+                if (!data.sources || data.sources.length === 0) {
+                    sourcesContainer.innerHTML = '<div style="padding: 10px; color: var(--danger);">Keine Quell-Accounts verknüpft!</div>';
+                } else {
+                    data.sources.forEach(source => {
+                        let tableHtml = `
+                            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; margin-bottom: 5px; flex-shrink: 0;">
+                                <div style="padding: 8px 12px; background: rgba(59, 130, 246, 0.1); border-bottom: 1px solid var(--border-color); font-weight: bold;">
+                                    ${source.sourceAccountName || source.sourceAccountId} <span style="color: #8b949e; font-weight: normal; font-size: 0.85em;">(GMT Offset: ${formatGmtOffset(source.gmtOffsetSeconds)})</span>
+                                </div>
+                                <div style="max-height: 500px; overflow-y: auto; scrollbar-width: thin; padding-bottom: 5px;">
+                                    <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+                                        <thead>
+                                            <tr>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Ticket</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Symbol</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Type</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">SL</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">TP</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Time</th>
+                                                <th onclick="sortModalTable(this)" style="cursor:pointer;" title="Klicken zum Sortieren">Magic</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                        if (!source.sourceTrades || source.sourceTrades.length === 0) {
+                            tableHtml += `<tr><td colspan="7" style="text-align: center;">Keine offenen Trades</td></tr>`;
+                        } else {
+                            const unmatchedBySymbol = {};
+                            source.sourceTrades.forEach(tr => {
+                                let tType = (tr.type === '0' || tr.type === 'BUY') ? 'BUY' : 'SELL';
+                                const isStage1 = matchedStage1Tickets.has(String(tr.ticket));
+                                const isStage2 = matchedStage2Tickets.has(String(tr.ticket));
+                                const isStage3 = matchedStage3Tickets.has(String(tr.ticket));
+                                
+                                let rowClass = 'trade-row match-none';
+                                let rowStyle = '';
+                                if (isStage1) {
+                                    rowClass = 'trade-row match-stage1';
+                                    rowStyle = 'background: rgba(16, 185, 129, 0.3);';
+                                } else if (isStage2) {
+                                    rowClass = 'trade-row match-stage2';
+                                    rowStyle = 'background: rgba(249, 115, 22, 0.25);';
+                                } else if (isStage3) {
+                                    rowClass = 'trade-row match-stage3';
+                                    rowStyle = 'background: rgba(168, 85, 247, 0.25);';
+                                } else {
+                                    const sym = tr.symbol || 'UNKNOWN';
+                                    unmatchedBySymbol[sym] = (unmatchedBySymbol[sym] || 0) + 1;
+                                }
+                                
+                                tableHtml += `
+                                    <tr class="${rowClass}" style="${rowStyle}">
+                                        <td>${tr.ticket}</td>
+                                        <td>${tr.symbol}</td>
+                                        <td>${tType}</td>
+                                        <td>${tr.stopLoss || '0.0'}</td>
+                                        <td>${tr.takeProfit || '0.0'}</td>
+                                        <td>${tr.openTime}</td>
+                                        <td>${tr.magicNumber || 0}</td>
+                                    </tr>
+                                `;
+                            });
+                        }
+                        tableHtml += `</tbody></table></div>`;
+                        // Add unmatched summary OUTSIDE the scrollable div, as a footer
+                        const unmatchedBySymbol2 = {};
+                        if (source.sourceTrades && source.sourceTrades.length > 0) {
+                            source.sourceTrades.forEach(tr => {
+                                if (!matchedStage1Tickets.has(String(tr.ticket)) && !matchedStage2Tickets.has(String(tr.ticket)) && !matchedStage3Tickets.has(String(tr.ticket))) {
+                                    const sym = tr.symbol || 'UNKNOWN';
+                                    unmatchedBySymbol2[sym] = (unmatchedBySymbol2[sym] || 0) + 1;
+                                }
+                            });
+                        }
+                        const unmatchedSymKeys = Object.keys(unmatchedBySymbol2);
+                        if (unmatchedSymKeys.length > 0 && data.role !== 'SENDER') {
+                            const totalUnmatched = unmatchedSymKeys.reduce((sum, s) => sum + unmatchedBySymbol2[s], 0);
+                            const parts = unmatchedSymKeys
+                                .sort((a, b) => unmatchedBySymbol2[b] - unmatchedBySymbol2[a])
+                                .map(s => `<span style="background: rgba(239, 68, 68, 0.25); padding: 2px 8px; border-radius: 4px; margin: 2px;">${unmatchedBySymbol2[s]}× ${s}</span>`)
+                                .join(' ');
+                            tableHtml += `
+                                <div style="padding: 8px 12px; background: rgba(239, 68, 68, 0.1); border-top: 2px solid var(--danger);">
+                                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                                        <span style="color: var(--danger); font-weight: bold; margin-right: 6px;">⚠️ Fehlende Trades (${totalUnmatched}):</span>
+                                        ${parts}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        tableHtml += `</div>`;
+                        sourcesContainer.insertAdjacentHTML('beforeend', tableHtml);
+                    });
+                }
+
+                // Render Targets
+                const targetTbody = document.getElementById('vm-target-tbody');
+                targetTbody.innerHTML = '';
+                if (!data.targetTrades || data.targetTrades.length === 0) {
+                    targetTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Keine offenen Trades</td></tr>';
+                } else {
+                    // Count missing trades by symbol
+                    const missingBySymbol = {};
+                    
+                    data.targetTrades.forEach(match => {
+                        const tr = match.targetTrade;
+                        let tType = (tr.type === '0' || tr.type === 'BUY') ? 'BUY' : 'SELL';
+                        
+                        let statusHtml;
+                        let rowStyle = '';
+                        let rowClass = 'trade-row match-none';
+                        if (match.isMatched) {
+                            if (match.isStage3Match) {
+                                statusHtml = `<span style="color: #a855f7; font-weight: bold;">⚠️ Match in: ${match.matchedBySourceName} (${match.matchedBySourceTicket}) (Stufe 3)</span>`;
+                                rowStyle = 'background: rgba(168, 85, 247, 0.25);';
+                                rowClass = 'trade-row match-stage3';
+                            } else if (match.isStage2Match) {
+                                statusHtml = `<span style="color: #f97316; font-weight: bold;">⚠️ Match in: ${match.matchedBySourceName} (${match.matchedBySourceTicket}) (Stufe 2)</span>`;
+                                rowStyle = 'background: rgba(249, 115, 22, 0.25);';
+                                rowClass = 'trade-row match-stage2';
+                            } else {
+                                statusHtml = `<span style="color: var(--success);">✅ Match in: ${match.matchedBySourceName} (${match.matchedBySourceTicket})</span>`;
+                                rowStyle = 'background: rgba(16, 185, 129, 0.25);';
+                                rowClass = 'trade-row match-stage1';
+                            }
+                        } else if (match.isExempt) {
+                            statusHtml = `<span style="color: #60a5fa; font-weight: bold;">ℹ️ Nicht überwacht</span>`;
+                            rowStyle = 'background: rgba(96, 165, 250, 0.15);';
+                        } else {
+                            statusHtml = `<span style="color: var(--danger); font-weight: bold;">❌ Fehlt in Quellen!</span>`;
+                            rowStyle = 'background: rgba(239, 68, 68, 0.3);';
+                            // Count this missing trade
+                            const sym = tr.symbol || 'UNKNOWN';
+                            missingBySymbol[sym] = (missingBySymbol[sym] || 0) + 1;
+                        }
+                        
+                        targetTbody.insertAdjacentHTML('beforeend', `
+                            <tr class="${rowClass}" style="${rowStyle}">
+                                <td>${tr.ticket}</td>
+                                <td>${tr.symbol}</td>
+                                <td>${tType}</td>
+                                <td>${tr.stopLoss || '0.0'}</td>
+                                <td>${tr.takeProfit || '0.0'}</td>
+                                <td>${tr.openTime}</td>
+                                <td>${tr.magicNumber || 0}</td>
+                                <td>${statusHtml}</td>
+                            </tr>
+                        `);
+                    });
+                    
+                    // Render missing trades summary if any
+                    const missingSymbols = Object.keys(missingBySymbol);
+                    if (missingSymbols.length > 0) {
+                        const totalMissing = missingSymbols.reduce((sum, s) => sum + missingBySymbol[s], 0);
+                        const summaryParts = missingSymbols
+                            .sort((a, b) => missingBySymbol[b] - missingBySymbol[a])
+                            .map(s => `<span style="background: rgba(239, 68, 68, 0.25); padding: 2px 8px; border-radius: 4px; margin: 2px;">${missingBySymbol[s]}× ${s}</span>`)
+                            .join(' ');
+                        
+                        targetTbody.insertAdjacentHTML('beforeend', `
+                            <tr style="background: rgba(239, 68, 68, 0.08); border-top: 2px solid var(--danger);">
+                                <td colspan="8" style="padding: 10px 12px;">
+                                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                                        <span style="color: var(--danger); font-weight: bold; margin-right: 8px;">⚠️ Fehlende Trades (${totalMissing}):</span>
+                                        ${summaryParts}
+                                    </div>
+                                </td>
+                            </tr>
+                        `);
+                    }
+                }
+
+                // Apply filters in case they are already checked
+                applyTradeFilters();
+
+            } catch (err) {
+                document.getElementById('vm-target-name').innerText = 'Fehler';
+                document.getElementById('vm-target-tbody').innerHTML = `<tr><td colspan="8" style="color:red;">Fehler beim Laden: ${err.message}</td></tr>`;
+            }
+        }
+
+        function closeVerificationModal() {
+            document.getElementById('verification-modal').style.display = 'none';
+        }
+
+        function applyTradeFilters() {
+            const hideStage1 = document.getElementById('filter-stage1').checked;
+            const hideStage2 = document.getElementById('filter-stage2').checked;
+            const hideStage3 = document.getElementById('filter-stage3').checked;
+            
+            document.querySelectorAll('.trade-row.match-stage1').forEach(row => {
+                row.style.display = hideStage1 ? 'none' : '';
+            });
+            
+            document.querySelectorAll('.trade-row.match-stage2').forEach(row => {
+                row.style.display = hideStage2 ? 'none' : '';
+            });
+
+            document.querySelectorAll('.trade-row.match-stage3').forEach(row => {
+                row.style.display = hideStage3 ? 'none' : '';
+            });
+        }
+
+        function sortModalTable(th) {
+            const table = th.closest('table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            if (rows.length === 0 || rows[0].cells.length <= 1) return; // Ignore "Loading..." or "No trades"
+
+            const colIndex = th.cellIndex;
+            const isAscending = th.classList.contains('asc');
+            
+            // reset header classes and text
+            table.querySelectorAll('th').forEach(header => {
+                header.classList.remove('asc', 'desc');
+                header.innerText = header.innerText.replace(/ [▲▼]/, '');
+            });
+
+            const dir = isAscending ? -1 : 1;
+            th.classList.add(isAscending ? 'desc' : 'asc');
+            th.innerText = th.innerText + (isAscending ? ' ▼' : ' ▲');
+
+            rows.sort((a, b) => {
+                const aText = a.cells[colIndex].innerText.trim();
+                const bText = b.cells[colIndex].innerText.trim();
+                
+                const isNumA = /^-?\d+(\.\d+)?$/.test(aText);
+                const isNumB = /^-?\d+(\.\d+)?$/.test(bText);
+                if (isNumA && isNumB) {
+                    return (parseFloat(aText) - parseFloat(bText)) * dir;
+                }
+                
+                return aText.localeCompare(bText) * dir;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // INIT
+        init();
+
+    </script>
+</body>
+
+</html>

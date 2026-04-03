@@ -23,6 +23,9 @@ public class AdminController {
     private de.trademonitor.repository.ClientErrorLogRepository clientErrorLogRepository;
 
     @Autowired
+    private de.trademonitor.repository.NetworkStatusLogRepository networkStatusLogRepository;
+
+    @Autowired
     private de.trademonitor.repository.AccountRepository accountRepository;
 
     @Autowired
@@ -131,6 +134,10 @@ public class AdminController {
         model.addAttribute("homeyTriggerOffline", globalConfigService.isHomeyTriggerOffline());
         model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
         model.addAttribute("syncAlarmDelayMins", globalConfigService.getSyncAlarmDelayMins());
+
+        // Network Monitor Config
+        model.addAttribute("maintenanceTimeoutMins", globalConfigService.getMaintenanceTimeoutMins());
+        model.addAttribute("networkOfflineThresholdMins", globalConfigService.getNetworkOfflineThresholdMins());
 
         // --- 3. Magic Mappings ---
         java.util.Set<Long> allMagics = new java.util.HashSet<>();
@@ -339,6 +346,17 @@ public class AdminController {
         return "redirect:/admin";
     }
 
+    @PostMapping("/network-monitor")
+    public String saveNetworkMonitor(
+            @RequestParam int maintenanceTimeoutMins,
+            @RequestParam int networkOfflineThresholdMins,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        globalConfigService.setMaintenanceTimeoutMins(maintenanceTimeoutMins);
+        globalConfigService.setNetworkOfflineThresholdMins(networkOfflineThresholdMins);
+        redirectAttrs.addFlashAttribute("successMessage", "Network Monitor configuration saved.");
+        return "redirect:/admin";
+    }
+
     @PostMapping("/broker-comm-factor/delete")
     public String deleteBrokerCommFactor(
             @RequestParam String brokerName,
@@ -405,7 +423,7 @@ public class AdminController {
         java.util.Map<String, Long> monthlyTotals = new java.util.LinkedHashMap<>();
         for (de.trademonitor.entity.ClientActionCounter c : monthRaw) {
             String key = c.getAccountId() + "|" + c.getAction();
-            monthlyTotals.merge(key, c.getCount(), Long::sum);
+            monthlyTotals.merge(key, Long.valueOf(c.getCount()), (a, b) -> a + b);
         }
 
         // Available accounts
@@ -603,6 +621,51 @@ public class AdminController {
         model.addAttribute("health", health);
         
         return "admin-health";
+    }
+
+    @GetMapping("/api/network-timeline")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> networkTimeline(
+            @org.springframework.web.bind.annotation.RequestParam(value="period", defaultValue="24h") String period) {
+            
+        java.time.LocalDateTime cutoff;
+        long totalSecsRange;
+
+        if ("1w".equalsIgnoreCase(period)) {
+            cutoff = java.time.LocalDateTime.now().minusDays(7);
+            totalSecsRange = 7 * 24 * 60 * 60;
+        } else if ("1m".equalsIgnoreCase(period)) {
+            cutoff = java.time.LocalDateTime.now().minusDays(30);
+            totalSecsRange = 30L * 24 * 60 * 60;
+        } else if ("6m".equalsIgnoreCase(period)) {
+            cutoff = java.time.LocalDateTime.now().minusDays(180);
+            totalSecsRange = 180L * 24 * 60 * 60;
+        } else {
+            cutoff = java.time.LocalDateTime.now().minusHours(24);
+            totalSecsRange = 24 * 60 * 60;
+        }
+        
+        java.util.List<de.trademonitor.entity.NetworkStatusLogEntity> logs = networkStatusLogRepository.findLogsSince(cutoff);
+        
+        java.util.List<java.util.Map<String, Object>> events = new java.util.ArrayList<>();
+        for (de.trademonitor.entity.NetworkStatusLogEntity log : logs) {
+            java.util.Map<String, Object> event = new java.util.LinkedHashMap<>();
+            event.put("status", log.getStatus());
+            event.put("startTime", log.getStartTime().toString());
+            event.put("endTime", log.getEndTime() != null ? log.getEndTime().toString() : java.time.LocalDateTime.now().toString());
+            
+            java.time.LocalDateTime realStart = log.getStartTime().isBefore(cutoff) ? cutoff : log.getStartTime();
+            java.time.LocalDateTime end = log.getEndTime() != null ? log.getEndTime() : java.time.LocalDateTime.now();
+            long durationSeconds = java.time.temporal.ChronoUnit.SECONDS.between(realStart, end);
+            
+            event.put("durationSeconds", durationSeconds);
+            events.add(event);
+        }
+        
+        return java.util.Map.of(
+            "events", events,
+            "totalSecsRange", totalSecsRange
+        );
     }
 
     @GetMapping("/security-audit")

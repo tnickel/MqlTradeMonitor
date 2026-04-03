@@ -65,6 +65,9 @@ public class CopierVerificationService {
             de.trademonitor.dto.CopierVerificationReportDto report = generateReport(targetId);
             if (report == null || report.getTargetTrades() == null) continue;
 
+            int worstStage = 0;
+            boolean hasError = false;
+
             // 3. Check if any target trade is unmatched (skip exempt trades)
             for (de.trademonitor.dto.TargetTradeMatchDto match : report.getTargetTrades()) {
                 if (!match.getIsMatched() && !match.getIsExempt()) {
@@ -75,8 +78,20 @@ public class CopierVerificationService {
                             targetTrade.getSymbol(), readableType);
                     LOG.warning("Copier Error on Account " + targetId + ": " + errorMsg);
                     accountManager.updateCopierError(targetId, true, errorMsg);
+                    hasError = true;
                     break; // One error is enough to highlight the account
                 }
+
+                if (match.getIsMatched()) {
+                    int stage = 1;
+                    if (match.getIsStage3Match()) stage = 3;
+                    else if (match.getIsStage2Match()) stage = 2;
+                    if (stage > worstStage) worstStage = stage;
+                }
+            }
+
+            if (!hasError) {
+                accountManager.updateCopierWorstStage(targetId, worstStage);
             }
         }
     }
@@ -151,21 +166,66 @@ public class CopierVerificationService {
             de.trademonitor.dto.TargetTradeMatchDto matchDto = new de.trademonitor.dto.TargetTradeMatchDto();
             matchDto.setTargetTrade(targetTrade);
             matchDto.setIsMatched(false);
+            matchDto.setIsStage2Match(false);
+            matchDto.setIsStage3Match(false);
 
             // Check if this trade's magic number is in the exempt list
             if (exemptMagics.contains(targetTrade.getMagicNumber())) {
                 matchDto.setIsExempt(true);
             }
 
-            for (Account source : sources) {
-                Trade matchedSourceTrade = findMatchingSourceTrade(targetTrade, target, source, toleranceSeconds, matchedSourceTickets);
-                if (matchedSourceTrade != null) {
-                    matchDto.setIsMatched(true);
-                    matchDto.setMatchedBySourceName(source.getName() != null ? source.getName() : String.valueOf(source.getAccountId()));
-                    matchDto.setMatchedBySourceTicket(matchedSourceTrade.getTicket());
-                    break;
+            boolean useStage1 = globalConfigService.isCopierUseStage1();
+            boolean useStage2 = globalConfigService.isCopierUseStage2();
+            double stage2Tol = globalConfigService.getCopierStage2Tolerance();
+            boolean useStage3 = globalConfigService.isCopierUseStage3();
+
+            boolean foundMatch = false;
+
+            // STAGE 1: Exact time match with tolerance
+            if (useStage1 && !foundMatch) {
+                for (Account source : sources) {
+                    Trade matchedSourceTrade = findStage1Match(targetTrade, target, source, toleranceSeconds, matchedSourceTickets);
+                    if (matchedSourceTrade != null) {
+                        foundMatch = true;
+                        matchDto.setIsMatched(true);
+                        matchDto.setIsStage2Match(false);
+                        matchDto.setMatchedBySourceName(source.getName() != null ? source.getName() : String.valueOf(source.getAccountId()));
+                        matchDto.setMatchedBySourceTicket(matchedSourceTrade.getTicket());
+                        break;
+                    }
                 }
             }
+
+            // STAGE 2: Fallback exact data match (Date, Symbol, Type, SL, TP)
+            if (useStage2 && !foundMatch) {
+                for (Account source : sources) {
+                    Trade matchedSourceTrade = findStage2Match(targetTrade, source, stage2Tol, matchedSourceTickets);
+                    if (matchedSourceTrade != null) {
+                        foundMatch = true;
+                        matchDto.setIsMatched(true);
+                        matchDto.setIsStage2Match(true);
+                        matchDto.setMatchedBySourceName(source.getName() != null ? source.getName() : String.valueOf(source.getAccountId()));
+                        matchDto.setMatchedBySourceTicket(matchedSourceTrade.getTicket());
+                        break;
+                    }
+                }
+            }
+
+            // STAGE 3: Letzter Fallback (Nur Symbol & Richtung)
+            if (useStage3 && !foundMatch) {
+                for (Account source : sources) {
+                    Trade matchedSourceTrade = findStage3Match(targetTrade, source, matchedSourceTickets);
+                    if (matchedSourceTrade != null) {
+                        foundMatch = true;
+                        matchDto.setIsMatched(true);
+                        matchDto.setIsStage3Match(true);
+                        matchDto.setMatchedBySourceName(source.getName() != null ? source.getName() : String.valueOf(source.getAccountId()));
+                        matchDto.setMatchedBySourceTicket(matchedSourceTrade.getTicket());
+                        break;
+                    }
+                }
+            }
+
             targetMatches.add(matchDto);
         }
 
@@ -173,7 +233,7 @@ public class CopierVerificationService {
         return report;
     }
 
-    private Trade findMatchingSourceTrade(Trade targetTrade, Account targetAcc, Account sourceAcc, int toleranceSeconds, java.util.Set<Long> matchedSourceTickets) {
+    private Trade findStage1Match(Trade targetTrade, Account targetAcc, Account sourceAcc, int toleranceSeconds, java.util.Set<Long> matchedSourceTickets) {
         LocalDateTime targetTime;
         try {
             targetTime = LocalDateTime.parse(targetTrade.getOpenTime(), MT_TIME_FORMAT);
@@ -237,6 +297,50 @@ public class CopierVerificationService {
                     return sourceTrade; // Match found
                 }
             }
+        }
+
+        return null;
+    }
+
+    private Trade findStage2Match(Trade targetTrade, Account sourceAcc, double tol, java.util.Set<Long> matchedSourceTickets) {
+        for (Trade sourceTrade : sourceAcc.getOpenTrades()) {
+            if (matchedSourceTickets != null && matchedSourceTickets.contains(sourceTrade.getTicket())) continue;
+            if (sourceTrade.getType() == null || !sourceTrade.getType().equals(targetTrade.getType())) continue;
+
+            String tSym = normalizeSymbol(targetTrade.getSymbol().toUpperCase());
+            String sSym = normalizeSymbol(sourceTrade.getSymbol().toUpperCase());
+            if (!tSym.contains(sSym) && !sSym.contains(tSym)) continue;
+
+            // Stage 2 specific checks: SL and TP comparison with tolerance
+            if (Math.abs(targetTrade.getStopLoss() - sourceTrade.getStopLoss()) > tol) continue;
+            if (Math.abs(targetTrade.getTakeProfit() - sourceTrade.getTakeProfit()) > tol) continue;
+
+            // Match found! (Stage 2 relies purely on Symbol, Type, SL and TP, ignoring time)
+
+            // Match found!
+            if (matchedSourceTickets != null) {
+                matchedSourceTickets.add(sourceTrade.getTicket());
+            }
+            return sourceTrade;
+        }
+
+        return null;
+    }
+
+    private Trade findStage3Match(Trade targetTrade, Account sourceAcc, java.util.Set<Long> matchedSourceTickets) {
+        for (Trade sourceTrade : sourceAcc.getOpenTrades()) {
+            if (matchedSourceTickets != null && matchedSourceTickets.contains(sourceTrade.getTicket())) continue;
+            if (sourceTrade.getType() == null || !sourceTrade.getType().equals(targetTrade.getType())) continue;
+
+            String tSym = normalizeSymbol(targetTrade.getSymbol().toUpperCase());
+            String sSym = normalizeSymbol(sourceTrade.getSymbol().toUpperCase());
+            if (!tSym.contains(sSym) && !sSym.contains(tSym)) continue;
+
+            // Match found! (Stage 3 relies purely on Symbol and Type)
+            if (matchedSourceTickets != null) {
+                matchedSourceTickets.add(sourceTrade.getTicket());
+            }
+            return sourceTrade;
         }
 
         return null;

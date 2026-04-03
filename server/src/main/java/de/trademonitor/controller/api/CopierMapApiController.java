@@ -48,15 +48,26 @@ public class CopierMapApiController {
     public ResponseEntity<?> getSettings() {
         return ResponseEntity.ok(Map.of(
             "toleranceSeconds", globalConfigService.getCopierToleranceSeconds(),
-            "intervalMins", globalConfigService.getCopierIntervalMins()
+            "intervalMins", globalConfigService.getCopierIntervalMins(),
+            "useStage1", globalConfigService.isCopierUseStage1(),
+            "useStage2", globalConfigService.isCopierUseStage2(),
+            "stage2Tolerance", globalConfigService.getCopierStage2Tolerance(),
+            "useStage3", globalConfigService.isCopierUseStage3()
         ));
     }
 
     @PostMapping("/settings")
-    public ResponseEntity<?> updateSettings(@RequestBody Map<String, Integer> payload) {
-        int tol = payload.getOrDefault("toleranceSeconds", globalConfigService.getCopierToleranceSeconds());
-        int inter = payload.getOrDefault("intervalMins", globalConfigService.getCopierIntervalMins());
+    public ResponseEntity<?> updateSettings(@RequestBody Map<String, Object> payload) {
+        int tol = payload.containsKey("toleranceSeconds") ? ((Number) payload.get("toleranceSeconds")).intValue() : globalConfigService.getCopierToleranceSeconds();
+        int inter = payload.containsKey("intervalMins") ? ((Number) payload.get("intervalMins")).intValue() : globalConfigService.getCopierIntervalMins();
+        
+        boolean useStage1 = payload.containsKey("useStage1") ? (boolean) payload.get("useStage1") : globalConfigService.isCopierUseStage1();
+        boolean useStage2 = payload.containsKey("useStage2") ? (boolean) payload.get("useStage2") : globalConfigService.isCopierUseStage2();
+        double stage2Tol = payload.containsKey("stage2Tolerance") ? ((Number) payload.get("stage2Tolerance")).doubleValue() : globalConfigService.getCopierStage2Tolerance();
+        boolean useStage3 = payload.containsKey("useStage3") ? (boolean) payload.get("useStage3") : globalConfigService.isCopierUseStage3();
+
         globalConfigService.saveCopierConfig(tol, inter);
+        globalConfigService.saveCopierStageConfig(useStage1, useStage2, stage2Tol, useStage3);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 

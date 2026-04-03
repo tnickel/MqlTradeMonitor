@@ -251,6 +251,42 @@
             </p>
         </div>
 
+        <!-- Network Monitor Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🌐 Health & Netzwerk-Überwachung</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">Der TradeMonitor verfolgt global, ob das Netzwerk aktiv ist und wann das .war Archiv aktualisiert wurde.</p>
+
+            <form th:action="@{/admin/network-monitor}" method="post"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+                <div class="form-group">
+                    <label for="maintenanceTimeoutMins" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Wartungsmodus Timeout (Minuten)
+                        <span title="Wie lange nach dem Upload des .war-Files der Server im Wartungsmodus (keine Offline-Alarme) bleibt." style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="maintenanceTimeoutMins" name="maintenanceTimeoutMins" th:value="${maintenanceTimeoutMins}" min="1"
+                        required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Zeit nach Deployment.</small>
+                </div>
+                <div class="form-group">
+                    <label for="networkOfflineThresholdMins" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Global Offline Timeout (Minuten)
+                        <span title="Dauer ohne ein einziges MetaTrader-Heartbeat bis Status auf Offline geht." style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="networkOfflineThresholdMins" name="networkOfflineThresholdMins" th:value="${networkOfflineThresholdMins}" min="1" required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Keine Heartbeats.</small>
+                </div>
+                
+                <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; margin-top: 10px;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                </div>
+            </form>
+        </div>
+
         <!-- Log Retention Config -->
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">

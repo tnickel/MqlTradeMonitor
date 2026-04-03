@@ -112,6 +112,22 @@
             </div>
         </div>
 
+        <!-- Global Maintenance Banner -->
+        <div id="maintenance-banner" style="display: none; background: linear-gradient(135deg, #7f1d1d, #450a0a); border: 2px solid #ef4444; border-radius: 8px; padding: 20px; margin-bottom: 20px; align-items: center; gap: 20px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);">
+            <div style="font-size: 3rem; animation: pulse-icon 2s infinite;">🔥</div>
+            <div>
+                <h2 style="margin: 0; color: #fca5a5; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px;">Wartungsmodus Aktiv</h2>
+                <p style="margin: 5px 0 0 0; color: #fecaca; font-size: 1.1rem;">Der Server empfängt aktuell neue Updates. Währenddessen werden Systemmeldungen möglicherweise verzögert. Verbindungen zu MetaTrader-Terminals bleiben bestehen, aber das Dashboard könnte vorübergehend unvollständige Daten anzeigen.</p>
+            </div>
+        </div>
+        <style>
+            @keyframes pulse-icon {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+                100% { transform: scale(1); }
+            }
+        </style>
+
         <!-- Header Cards Container (Sync & Global) -->
         <div class="header-cards-container" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
             <!-- System Status Card -->
@@ -389,13 +405,22 @@
                         const badge = document.getElementById('system-status-badge');
                         const text = document.getElementById('system-status-text');
                         
-                        if (data.overallOk) {
+                        if (data.networkStatus === 'MAINTENANCE') {
+                            document.getElementById('maintenance-banner').style.display = 'flex';
+                            tileCard.style.borderColor = '#3b82f6';
+                            tileCard.style.background = 'linear-gradient(to bottom right, #2a2e39, rgba(59, 130, 246, 0.15))';
+                            badge.style.color = '#3b82f6';
+                            text.style.color = '#3b82f6';
+                            text.textContent = '⚙️ Wartungsmodus';
+                        } else if (data.overallOk) {
+                            document.getElementById('maintenance-banner').style.display = 'none';
                             tileCard.style.borderColor = '#10b981';
                             tileCard.style.background = 'linear-gradient(to bottom right, #2a2e39, rgba(16, 185, 129, 0.1))';
                             badge.style.color = '#10b981';
                             text.style.color = '#10b981';
                             text.textContent = 'System OK';
                         } else {
+                            document.getElementById('maintenance-banner').style.display = 'none';
                             tileCard.style.borderColor = '#ef4444';
                             tileCard.style.background = 'linear-gradient(to bottom right, #2a2e39, rgba(239, 68, 68, 0.1))';
                             badge.style.color = '#ef4444';
@@ -534,12 +559,9 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <div class="account-broker" th:text="${acc.broker}" style="margin: 0;">Broker</div>
                             <span th:if="${acc.lastSeenMins != null}"
-                                th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
-                                    (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
-                                    (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
-                                    (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
-                                    (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
-                                th:title="(${acc.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${acc.lastSeen} != null ? ${#temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${acc.lastSeenMins} + ' Min)')">
+                                th:with="isOffline=${acc.lastSeenMins &lt; 0 || acc.lastSeenMins &gt; liveOrangeMins}, stage=${acc.worstCopierStage != null ? acc.worstCopierStage : 0}"
+                                th:style="${'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + (isOffline ? liveColorRed : (stage == 3 ? '#a78bfa' : (stage == 2 ? '#fb923c' : (stage == 1 ? '#34d399' : (acc.lastSeenMins &lt;= liveGreenMins ? liveColorGreen : (acc.lastSeenMins &lt;= liveYellowMins ? liveColorYellow : liveColorOrange))))))}"
+                                th:title="${(stage > 0 ? 'Copier Map Stage: ' + stage + '&#10;' : '') + (acc.lastSeenMins &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (acc.lastSeen != null ? #temporals.format(acc.lastSeen, 'dd.MM.yyyy HH:mm:ss') : '') + ' (vor ' + acc.lastSeenMins + ' Min)')}">
                             </span>
                         </div>
                         <div class="account-metrics">
@@ -763,16 +785,29 @@
         const liveYellowMins = parseInt('[[${liveYellowMins}]]') || 5;
         const liveOrangeMins = parseInt('[[${liveOrangeMins}]]') || 15;
 
-        function getLiveDotHtml(lastSeenMins, lastSeenString) {
+        function getLiveDotHtml(lastSeenMins, lastSeenString, worstCopierStage) {
             if (lastSeenMins === null || lastSeenMins === undefined) return '';
             let color = liveColorRed;
             let title = 'Kein Signal empfangen';
-            if (lastSeenMins >= 0) {
+            let isOffline = (lastSeenMins < 0 || lastSeenMins > liveOrangeMins);
+            
+            if (isOffline) {
+                color = liveColorRed;
+            } else if (worstCopierStage === 3) {
+                color = '#a78bfa'; // violet
+            } else if (worstCopierStage === 2) {
+                color = '#fb923c'; // orange
+            } else if (worstCopierStage === 1) {
+                color = '#34d399'; // green
+            } else if (lastSeenMins >= 0) {
                 if (lastSeenMins <= liveGreenMins) color = liveColorGreen;
                 else if (lastSeenMins <= liveYellowMins) color = liveColorYellow;
                 else if (lastSeenMins <= liveOrangeMins) color = liveColorOrange;
+            }
+            
+            if (lastSeenMins >= 0) {
                 const timeStr = lastSeenString ? 'Letzter Kontakt: ' + lastSeenString : 'Letzter Kontakt';
-                title = timeStr + ' (vor ' + lastSeenMins + ' Min)';
+                title = (worstCopierStage > 0 ? 'Copier Map Stage: ' + worstCopierStage + '\n' : '') + timeStr + ' (vor ' + lastSeenMins + ' Min)';
             }
             return `<span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ${color};" title="${title}"></span>`;
         }
@@ -1209,7 +1244,7 @@
                                         <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
                                             ${accountName}
                                         </a>
-                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString) : ''}
+                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString, groupItems[0].worstCopierStage) : ''}
                                     </div>
                                     <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
                                 </td>

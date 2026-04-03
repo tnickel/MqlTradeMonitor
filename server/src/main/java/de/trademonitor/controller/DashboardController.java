@@ -65,6 +65,9 @@ public class DashboardController {
     private de.trademonitor.service.ServerHealthMonitorService serverHealthMonitorService;
 
     @Autowired
+    private de.trademonitor.service.NetworkStatusService networkStatusService;
+
+    @Autowired
     private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
 
     @Autowired
@@ -1452,6 +1455,7 @@ public class DashboardController {
         }
         
         result.put("overallOk", overallOk);
+        result.put("networkStatus", networkStatusService.getCurrentStatus());
         result.put("realAccounts", realAccounts);
         
         return result;

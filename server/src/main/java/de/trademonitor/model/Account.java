@@ -49,6 +49,8 @@ public class Account {
     private Long serverTimeOffsetSeconds = 0L;
     private Boolean copierError = false;
     private String copierErrorMessage;
+    private int worstCopierStage = 0; // 0=none/offline, 1=stage1, 2=stage2, 3=stage3
+
     public boolean isSyncWarning() {
         return syncWarning;
     }
@@ -157,6 +159,14 @@ public class Account {
 
     public void setCopierErrorMessage(String copierErrorMessage) {
         this.copierErrorMessage = copierErrorMessage;
+    }
+
+    public int getWorstCopierStage() {
+        return worstCopierStage;
+    }
+
+    public void setWorstCopierStage(int worstCopierStage) {
+        this.worstCopierStage = worstCopierStage;
     }
 
     public double getCommissionFactor() {

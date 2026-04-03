@@ -368,12 +368,22 @@ public class AccountManager {
     /**
      * Update copier error state for an account.
      */
-    public void updateCopierError(long accountId, boolean isError, String errorMessage) {
+    public void updateCopierError(long accountId, boolean copierError, String msg) {
         Account account = accounts.get(accountId);
         if (account != null) {
-            account.setCopierError(isError);
-            account.setCopierErrorMessage(errorMessage);
-            tradeStorage.updateCopierError(accountId, isError, errorMessage);
+            account.setCopierError(copierError);
+            account.setCopierErrorMessage(msg);
+            if (!copierError) {
+                account.setWorstCopierStage(0);
+            }
+            tradeStorage.updateCopierError(accountId, copierError, msg);
+        }
+    }
+
+    public void updateCopierWorstStage(long accountId, int stage) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setWorstCopierStage(stage);
         }
     }
 
@@ -431,6 +441,7 @@ public class AccountManager {
             info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
             info.put("copierError", account.getCopierError());
             info.put("copierErrorMessage", account.getCopierErrorMessage());
+            info.put("worstCopierStage", account.getWorstCopierStage());
 
             // Use CACHED performance metrics instead of recalculating every time
             Map<String, Object> perfMetrics = cachedPerformanceMetrics.get(account.getAccountId());

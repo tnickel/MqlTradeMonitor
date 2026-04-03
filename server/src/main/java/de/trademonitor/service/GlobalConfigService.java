@@ -219,14 +219,44 @@ public class GlobalConfigService {
                 cachedCopierIntervalMins = Integer.parseInt(e.getConfValue());
             } catch (NumberFormatException ex) {}
         });
+        repository.findById(KEY_COPIER_USE_STAGE_1).ifPresent(e -> {
+            cachedCopierUseStage1 = Boolean.parseBoolean(e.getConfValue());
+        });
+        repository.findById(KEY_COPIER_USE_STAGE_2).ifPresent(e -> {
+            cachedCopierUseStage2 = Boolean.parseBoolean(e.getConfValue());
+        });
+        repository.findById(KEY_COPIER_STAGE_2_TOLERANCE).ifPresent(e -> {
+            try {
+                cachedCopierStage2Tolerance = Double.parseDouble(e.getConfValue());
+            } catch (NumberFormatException ex) {}
+        });
+        repository.findById(KEY_COPIER_USE_STAGE_3).ifPresent(e -> {
+            cachedCopierUseStage3 = Boolean.parseBoolean(e.getConfValue());
+        });
+        
+        // Load Network Monitoring Config
+        repository.findById(KEY_MAINTENANCE_TIMEOUT_MINS).ifPresent(e -> {
+            try { cachedMaintenanceTimeoutMins = Integer.parseInt(e.getConfValue()); } catch(Exception ex){}
+        });
+        repository.findById(KEY_NETWORK_OFFLINE_THRESHOLD_MINS).ifPresent(e -> {
+            try { cachedNetworkOfflineThresholdMins = Integer.parseInt(e.getConfValue()); } catch(Exception ex){}
+        });
     }
 
     // --- Copier Verification Config ---
     public static final String KEY_COPIER_TOLERANCE_SECONDS = "COPIER_TOLERANCE_SECONDS";
     public static final String KEY_COPIER_INTERVAL_MINS = "COPIER_INTERVAL_MINS";
+    public static final String KEY_COPIER_USE_STAGE_1 = "COPIER_USE_STAGE_1";
+    public static final String KEY_COPIER_USE_STAGE_2 = "COPIER_USE_STAGE_2";
+    public static final String KEY_COPIER_STAGE_2_TOLERANCE = "COPIER_STAGE_2_TOLERANCE";
+    public static final String KEY_COPIER_USE_STAGE_3 = "COPIER_USE_STAGE_3";
 
     private int cachedCopierToleranceSeconds = 60; // default 60s
     private int cachedCopierIntervalMins = 10; // default 10 mins
+    private boolean cachedCopierUseStage1 = true;
+    private boolean cachedCopierUseStage2 = true;
+    private double cachedCopierStage2Tolerance = 0.00001;
+    private boolean cachedCopierUseStage3 = true;
 
     public int getCopierToleranceSeconds() {
         return cachedCopierToleranceSeconds;
@@ -236,11 +266,63 @@ public class GlobalConfigService {
         return cachedCopierIntervalMins;
     }
 
+    public boolean isCopierUseStage1() {
+        return cachedCopierUseStage1;
+    }
+
+    public boolean isCopierUseStage2() {
+        return cachedCopierUseStage2;
+    }
+
+    public boolean isCopierUseStage3() {
+        return cachedCopierUseStage3;
+    }
+
+    public double getCopierStage2Tolerance() {
+        return cachedCopierStage2Tolerance;
+    }
+
     public void saveCopierConfig(int toleranceSeconds, int intervalMins) {
         this.cachedCopierToleranceSeconds = toleranceSeconds;
         this.cachedCopierIntervalMins = intervalMins;
         repository.save(new GlobalConfigEntity(KEY_COPIER_TOLERANCE_SECONDS, String.valueOf(toleranceSeconds)));
         repository.save(new GlobalConfigEntity(KEY_COPIER_INTERVAL_MINS, String.valueOf(intervalMins)));
+    }
+
+    public void saveCopierStageConfig(boolean useStage1, boolean useStage2, double stage2Tolerance, boolean useStage3) {
+        this.cachedCopierUseStage1 = useStage1;
+        this.cachedCopierUseStage2 = useStage2;
+        this.cachedCopierStage2Tolerance = stage2Tolerance;
+        this.cachedCopierUseStage3 = useStage3;
+        repository.save(new GlobalConfigEntity(KEY_COPIER_USE_STAGE_1, String.valueOf(useStage1)));
+        repository.save(new GlobalConfigEntity(KEY_COPIER_USE_STAGE_2, String.valueOf(useStage2)));
+        repository.save(new GlobalConfigEntity(KEY_COPIER_STAGE_2_TOLERANCE, String.valueOf(stage2Tolerance)));
+        repository.save(new GlobalConfigEntity(KEY_COPIER_USE_STAGE_3, String.valueOf(useStage3)));
+    }
+
+    // --- Network Monitoring Config ---
+    public static final String KEY_MAINTENANCE_TIMEOUT_MINS = "MAINTENANCE_TIMEOUT_MINS";
+    public static final String KEY_NETWORK_OFFLINE_THRESHOLD_MINS = "NETWORK_OFFLINE_THRESHOLD_MINS";
+
+    private int cachedMaintenanceTimeoutMins = 20; // default 20 minutes
+    private int cachedNetworkOfflineThresholdMins = 5; // default 5 minutes
+
+    public int getMaintenanceTimeoutMins() {
+        return cachedMaintenanceTimeoutMins;
+    }
+
+    public void setMaintenanceTimeoutMins(int mins) {
+        this.cachedMaintenanceTimeoutMins = mins;
+        repository.save(new GlobalConfigEntity(KEY_MAINTENANCE_TIMEOUT_MINS, String.valueOf(mins)));
+    }
+
+    public int getNetworkOfflineThresholdMins() {
+        return cachedNetworkOfflineThresholdMins;
+    }
+
+    public void setNetworkOfflineThresholdMins(int mins) {
+        this.cachedNetworkOfflineThresholdMins = mins;
+        repository.save(new GlobalConfigEntity(KEY_NETWORK_OFFLINE_THRESHOLD_MINS, String.valueOf(mins)));
     }
 
     // getMagicNumberMaxAge() and setMagicNumberMaxAge() removed — now per-account

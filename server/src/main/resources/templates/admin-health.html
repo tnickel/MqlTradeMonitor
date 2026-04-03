@@ -65,26 +65,32 @@
         .db-chart-wrap { max-width: 220px; margin: 15px auto 0; }
 
         .nav-dashboard-btn {
-            display: inline-block;
-            padding: 0.75rem 1.75rem;
-            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
-            border: 2px solid rgba(59,130,246,0.4);
-            border-radius: 12px;
-            color: #93c5fd;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.65rem 1.4rem;
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 3px solid #3b82f6;
+            border-radius: 10px;
+            color: #94a3b8;
             text-decoration: none;
-            font-size: 1rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            transition: all 0.25s ease;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            transition: all 0.2s ease;
             cursor: pointer;
         }
 
         .nav-dashboard-btn:hover {
-            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
-            border-color: rgba(59,130,246,0.7);
-            color: #fff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+            background: rgba(30, 41, 59, 0.9);
+            border-color: rgba(255, 255, 255, 0.15);
+            border-left-color: #60a5fa;
+            color: #f8fafc;
+            transform: translateX(3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         }
     </style>
 </head>
@@ -96,8 +102,28 @@
             <a href="/admin" class="view-details-btn">← Zurück zum Admin</a>
             <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
         </div>
+        <div class="config-section" style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>📈 Netzwerk Verfügbarkeit (Letzte 24h)</h2>
+                <button class="view-details-btn" onclick="openNetworkDetails()" style="font-size: 0.8rem; padding: 5px 10px; margin-bottom: 15px; cursor: pointer;">📋 Detailliertere Infos</button>
+            </div>
+            <div style="background-color: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid #30363d;">
+                <div id="timelineContainer" style="display: flex; width: 100%; height: 40px; border-radius: 4px; overflow: hidden; background-color: #21262d;">
+                    <!-- Filled dynamically by JS -->
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.85rem; color: #8b949e;">
+                    <span>Vor 24h</span>
+                    <span>Jetzt</span>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 20px; font-size: 0.85rem; margin-top: 15px;">
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #3fb950; border-radius: 2px;"></div> Online</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #58a6ff; border-radius: 2px;"></div> Wartungsmodus</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #f85149; border-radius: 2px;"></div> Offline / Störung</div>
+                </div>
+            </div>
+        </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
             <div>
                 <div class="config-section">
                     <h2>🖥️ System Metriken</h2>
@@ -216,6 +242,59 @@
                         </tr>
                     </thead>
                     <tbody id="dbTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Details Modal -->
+    <div class="db-modal-overlay" id="networkModal">
+        <div class="db-modal">
+            <button class="db-modal-close" onclick="closeNetworkDetails()">&times;</button>
+            <h2>
+                📋 Netzwerk & Wartungs-Protokoll 
+                <span style="margin-left: 15px; font-size: 0.9rem; background: #21262d; padding: 4px; border-radius: 6px;">
+                    <button class="timeframe-btn active" style="background:none; border:none; color:#c9d1d9; cursor:pointer;" onclick="changeNetworkPeriod('24h', this)">24h</button>
+                    <button class="timeframe-btn" style="background:none; border:none; color:#8b949e; cursor:pointer;" onclick="changeNetworkPeriod('1w', this)">1W</button>
+                    <button class="timeframe-btn" style="background:none; border:none; color:#8b949e; cursor:pointer;" onclick="changeNetworkPeriod('1m', this)">1M</button>
+                    <button class="timeframe-btn" style="background:none; border:none; color:#8b949e; cursor:pointer;" onclick="changeNetworkPeriod('6m', this)">6M</button>
+                </span>
+            </h2>
+            <div id="networkModalLoading" style="text-align:center; padding: 30px; color: #8b949e;">
+                ⏳ Lade Timeline...
+            </div>
+            <div id="networkModalContent" style="display:none;">
+                <div style="margin-bottom: 25px; border-bottom: 1px solid #30363d; padding-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0; color: #c9d1d9;">Visuelle Analyse</h3>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.8rem; color: #8b949e;">Zoom:</span>
+                            <input type="range" id="timelineZoom" min="100" max="1000" value="300" style="width: 150px; cursor: pointer;" oninput="updateDetailedTimelineZoom()">
+                        </div>
+                    </div>
+                    <div id="detailedTimelineWrapper" style="width: 100%; overflow-x: auto; background-color: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; position: relative;">
+                        <!-- Time tooltips will float here -->
+                        <div id="detailedTimelineHoverInfo" style="display: none; position: absolute; top: 5px; background: rgba(0,0,0,0.8); color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; z-index: 10; pointer-events: none; border: 1px solid #30363d;">Hover Info</div>
+                        <div id="detailedTimelineTrack" style="display: flex; width: 300%; height: 60px; border-radius: 4px; overflow: hidden; background-color: #21262d; position: relative; transition: width 0.1s ease-out;">
+                            <!-- Blocks added by JS -->
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.8rem; color: #8b949e;">
+                        <span id="networkTimelineStartLabel">Vor 24h</span>
+                        <span>Jetzt</span>
+                    </div>
+                </div>
+                <h3 style="margin-top: 0; color: #c9d1d9;">Ereignis-Tabelle</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Start</th>
+                            <th>Ende</th>
+                            <th>Dauer (Minuten)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="networkTableBody"></tbody>
                 </table>
             </div>
         </div>
@@ -371,6 +450,170 @@
         document.getElementById('dbModal').addEventListener('click', function(e) {
             if (e.target === this) closeDbDetails();
         });
+
+        document.getElementById('networkModal').addEventListener('click', function(e) {
+            if (e.target === this) closeNetworkDetails();
+        });
+
+        let lastNetworkEvents = [];
+        let currentNetworkRangeSecs = 24 * 60 * 60;
+        let currentNetworkPeriod = '24h';
+
+        function changeNetworkPeriod(period, btnEl) {
+            document.querySelectorAll('.timeframe-btn').forEach(btn => btn.style.color = '#8b949e');
+            if (btnEl) btnEl.style.color = '#c9d1d9';
+            currentNetworkPeriod = period;
+            
+            const startLabel = document.getElementById('networkTimelineStartLabel');
+            if (startLabel) {
+                if (period === '1w') startLabel.textContent = 'Vor 1 Woche';
+                else if (period === '1m') startLabel.textContent = 'Vor 1 Monat';
+                else if (period === '6m') startLabel.textContent = 'Vor 6 Monaten';
+                else startLabel.textContent = 'Vor 24h';
+            }
+            
+            loadNetworkTimeline(period);
+        }
+
+        // --- Network Timeline ---
+        function loadNetworkTimeline(period = '24h') {
+            fetch('/admin/api/network-timeline?period=' + period)
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('timelineContainer');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    
+                    if (!data.events || data.events.length === 0) {
+                        return;
+                    }
+                    
+                    lastNetworkEvents = data.events;
+                    currentNetworkRangeSecs = data.totalSecsRange || (24 * 60 * 60);
+                    
+                    data.events.forEach(ev => {
+                        const pct = (ev.durationSeconds / currentNetworkRangeSecs) * 100;
+                        if (pct <= 0) return;
+                        
+                        let color = '#3fb950'; // ONLINE
+                        if (ev.status === 'MAINTENANCE') color = '#58a6ff';
+                        if (ev.status === 'OFFLINE') color = '#f85149';
+                        
+                        const block = document.createElement('div');
+                        block.style.height = '100%';
+                        block.style.width = pct + '%';
+                        block.style.backgroundColor = color;
+                        block.style.borderRight = '1px solid #0d1117';
+                        block.title = `${ev.status}: ${new Date(ev.startTime).toLocaleTimeString()} - ${new Date(ev.endTime).toLocaleTimeString()} (${Math.round(ev.durationSeconds/60)} Min)`;
+                        
+                        container.appendChild(block);
+                    });
+
+                    // If modal is open, refresh it gracefully
+                    if (document.getElementById('networkModal').classList.contains('active')) {
+                        openNetworkDetails(); 
+                    }
+                })
+                .catch(console.error);
+        }
+
+        function updateDetailedTimelineZoom() {
+            const zoomVal = document.getElementById('timelineZoom').value;
+            const track = document.getElementById('detailedTimelineTrack');
+            if (track) {
+                track.style.width = zoomVal + '%';
+            }
+        }
+
+        function openNetworkDetails() {
+            document.getElementById('networkModal').classList.add('active');
+            document.getElementById('networkModalLoading').style.display = 'none';
+            document.getElementById('networkModalContent').style.display = 'block';
+
+            const tbody = document.getElementById('networkTableBody');
+            tbody.innerHTML = '';
+            
+            const detailedTrack = document.getElementById('detailedTimelineTrack');
+            detailedTrack.innerHTML = '';
+
+            if (lastNetworkEvents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Keine Daten vorhanden</td></tr>';
+                return;
+            }
+
+            // Fill Detailed Timeline View
+            const hoverInfo = document.getElementById('detailedTimelineHoverInfo');
+            const wrapper = document.getElementById('detailedTimelineWrapper');
+
+            // Find current time relative offset
+            const now = new Date().getTime();
+
+            lastNetworkEvents.forEach(ev => {
+                const pct = (ev.durationSeconds / currentNetworkRangeSecs) * 100;
+                if (pct <= 0) return;
+                
+                let color = '#3fb950'; // ONLINE
+                let icon = '🟢';
+                if (ev.status === 'MAINTENANCE') { color = '#58a6ff'; icon = '⚙️'; }
+                if (ev.status === 'OFFLINE') { color = '#f85149'; icon = '🔴'; }
+
+                const block = document.createElement('div');
+                block.style.height = '100%';
+                block.style.width = pct + '%';
+                block.style.backgroundColor = color;
+                block.style.borderRight = '1px solid #0d1117';
+                block.style.cursor = 'crosshair';
+                
+                block.onmouseover = (e) => {
+                    block.style.opacity = '0.8';
+                    hoverInfo.style.display = 'block';
+                    hoverInfo.innerHTML = `${icon} <b>${ev.status}</b><br>${new Date(ev.startTime).toLocaleTimeString()} - ${new Date(ev.endTime).toLocaleTimeString()}<br>Dauer: ${Math.round(ev.durationSeconds/60)} Min`;
+                };
+                block.onmousemove = (e) => {
+                    const rect = wrapper.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    hoverInfo.style.left = (x + 15) + 'px';
+                };
+                block.onmouseout = () => {
+                    block.style.opacity = '1';
+                    hoverInfo.style.display = 'none';
+                };
+                
+                detailedTrack.appendChild(block);
+            });
+
+            // sort descending for the table
+            const sortedEvents = [...lastNetworkEvents].reverse();
+
+            sortedEvents.forEach(ev => {
+                let color = '#3fb950'; // ONLINE
+                let icon = '🟢';
+                if (ev.status === 'MAINTENANCE') { color = '#58a6ff'; icon = '⚙️'; }
+                if (ev.status === 'OFFLINE') { color = '#f85149'; icon = '🔴'; }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="color: ${color}; font-weight: bold;">${icon} ${ev.status}</td>
+                    <td>${new Date(ev.startTime).toLocaleString()}</td>
+                    <td>${new Date(ev.endTime).toLocaleString()}</td>
+                    <td>${Math.round(ev.durationSeconds / 60)} Min</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            // Re-apply zoom properly and scroll to end 
+            setTimeout(() => {
+                updateDetailedTimelineZoom();
+                wrapper.scrollLeft = wrapper.scrollWidth;
+            }, 50);
+        }
+
+        function closeNetworkDetails() {
+            document.getElementById('networkModal').classList.remove('active');
+        }
+        
+        setTimeout(loadNetworkTimeline, 500);
+
     </script>
 </body>
 </html>

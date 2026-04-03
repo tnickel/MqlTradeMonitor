@@ -40,6 +40,9 @@ public class ApiController {
     @Autowired
     private de.trademonitor.service.EmailService emailService;
 
+    @Autowired
+    private de.trademonitor.service.NetworkStatusService networkStatusService;
+
     private void logClientAction(Long accountId, String action, String message,
             jakarta.servlet.http.HttpServletRequest request) {
         try {
@@ -239,6 +242,7 @@ public class ApiController {
         try {
             logClientAction(request.getAccountId(), "HEARTBEAT", "Alive", httpRequest);
             accountManager.updateHeartbeat(request.getAccountId());
+            networkStatusService.registerHeartbeat();
             
             // Calculate Server Time Offset from Broker Time
             if (request.getTimestamp() != null && !request.getTimestamp().isEmpty()) {
