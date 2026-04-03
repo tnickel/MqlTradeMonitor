@@ -95,6 +95,29 @@
         .filter-btn.filter-inactive:hover {
             opacity: 0.6;
         }
+
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -104,9 +127,7 @@
             <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                 <i class="fa-solid fa-file-code mr-2"></i> EA Logs
             </h1>
-            <a href="/" class="glass-button text-slate-200 hover:text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg">
-                <i class="fa-solid fa-arrow-left mr-2"></i> Zurück
-            </a>
+            <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
         </div>
 
         <div class="glass-panel overflow-hidden shadow-2xl">
@@ -478,5 +499,8 @@
             }
         }
     </script>
+    <div style="margin: 2rem 0;">
+        <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+    </div>
 </body>
 </html>

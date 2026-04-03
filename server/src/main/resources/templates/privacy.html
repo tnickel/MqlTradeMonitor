@@ -25,10 +25,34 @@
         li { margin-bottom: 0.5rem; }
         .back-link { display: inline-block; margin-top: 2rem; color: var(--accent-primary); text-decoration: none; font-weight: 500; }
         .back-link:hover { text-decoration: underline; }
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div style="max-width: 800px; margin: 20px auto 0;">
+            <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+        </div>
         <div class="legal-container">
             <h1>Datenschutzerklärung</h1>
             
@@ -49,7 +73,7 @@
             <p><strong>Eigener Server / Externes Hosting</strong><br>
             Die Daten werden auf einem Server in Deutschland/EU verarbeitet.</p>
 
-            <a href="javascript:history.back()" class="back-link">← Zurück</a>
+            <a href="/" class="nav-dashboard-btn" style="margin-top: 2rem;">🏠 Zurück zum Dashboard</a>
         </div>
     </div>
 </body>

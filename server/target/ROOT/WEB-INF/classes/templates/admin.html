@@ -118,11 +118,35 @@
             border-radius: 8px;
             border: 1px solid #30363d;
         }
+
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <a href="/" class="nav-dashboard-btn" style="margin-bottom: 20px;">🏠 Zurück zum Dashboard</a>
         <h1>Admin Dashboard</h1>
 
         <div class="action-bar">
@@ -131,7 +155,7 @@
             <a href="/admin/client-logs" class="view-details-btn" style="background-color: #1f6feb;">👤 Client Logs</a>
             <a href="/admin/health" class="view-details-btn" style="background-color: #9b59b6;">🩺 Server Health</a>
             <a href="/admin/security-audit" class="view-details-btn" style="background-color: #e74c3c;">🛡️ Security Audit</a>
-            <a href="/" class="view-details-btn">← Zum Dashboard</a>
+            <a href="/" class="nav-dashboard-btn">🏠 Zum Dashboard</a>
 
             <form th:action="@{/logout}" method="post" style="display: inline; margin-left: auto;">
                 <button type="submit" class="view-details-btn"
@@ -1200,6 +1224,9 @@
                 .catch(error => alert('Netzwerkfehler: ' + error));
         }
     </script>
+    <div style="margin: 2rem 0;">
+        <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+    </div>
 </body>
 
 </html>

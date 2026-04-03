@@ -480,18 +480,27 @@
             line-height: 1.6;
         }
 
-        .back-btn {
-            display: block;
-            width: fit-content;
-            margin: 24px auto 0;
-            color: var(--text-muted);
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
             text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
         }
 
-        .back-btn:hover {
-            color: var(--accent);
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
         }
 
         /* === Responsive === */
@@ -516,6 +525,10 @@
 </head>
 
 <body>
+
+    <div style="max-width: 1400px; margin: 0 auto 1rem;">
+        <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+    </div>
 
     <h1>🔄 Trade Vergleich (A ↔ B)</h1>
 
@@ -716,7 +729,9 @@
         <p>Keine Trades im gewählten Zeitraum gefunden. Versuche einen anderen Zeitraum oder eine höhere Toleranz.</p>
     </div>
 
-    <a href="/" class="back-btn">← Zurück zum Dashboard</a>
+    <div style="max-width: 1400px; margin: 2rem auto 0;">
+        <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+    </div>
 
     <script>
         function setPeriod(period) {

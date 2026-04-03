@@ -59,14 +59,27 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .back-link {
-            color: var(--text-secondary);
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
             text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: color 0.2s;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
         }
-        .back-link:hover { color: #fff; }
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        }
 
         /* ===== TABS ===== */
         .tab-bar {
@@ -412,7 +425,7 @@
                 <h1>📈 Analytics</h1>
                 <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Strategy Performance • Portfolio Korrelation • Risk Analytics</p>
             </div>
-            <a href="/" class="back-link">← Dashboard</a>
+            <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
         </div>
 
         <!-- Tab Navigation -->
@@ -1134,5 +1147,8 @@
             }
         });
     </script>
+    <div style="max-width: 1400px; margin: 2rem auto 0;">
+        <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+    </div>
 </body>
 </html>

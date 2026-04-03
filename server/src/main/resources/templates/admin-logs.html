@@ -51,6 +51,29 @@
             border: 1px solid var(--border-color);
         }
 
+        .nav-dashboard-btn {
+            display: inline-block;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+            border: 2px solid rgba(59,130,246,0.4);
+            border-radius: 12px;
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .nav-dashboard-btn:hover {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3));
+            border-color: rgba(59,130,246,0.7);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -85,7 +108,7 @@
     <div class="container">
         <div class="header">
             <h1>Login Logs</h1>
-            <a href="/" class="back-btn">← Back to Dashboard</a>
+            <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
         </div>
 
         <table>
@@ -114,6 +137,9 @@
                 </tr>
             </tbody>
         </table>
+        <div style="margin: 2rem 0;">
+            <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
+        </div>
     </div>
 </body>
 

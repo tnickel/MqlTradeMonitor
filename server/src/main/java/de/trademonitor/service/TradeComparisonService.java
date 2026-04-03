@@ -153,11 +153,11 @@ public class TradeComparisonService {
             if (demoTrade.getOpenTime() == null)
                 continue;
 
-            // 1. Symbol and Type MUST match exactly
-            if (!realTrade.getSymbol().equalsIgnoreCase(demoTrade.getSymbol()))
-                continue;
-            if (!realTrade.getType().equalsIgnoreCase(demoTrade.getType()))
-                continue;
+            // 1. Symbol and Type MUST match
+            String rSym = normalizeSymbol(realTrade.getSymbol().toUpperCase());
+            String dSym = normalizeSymbol(demoTrade.getSymbol().toUpperCase());
+            if (!rSym.contains(dSym) && !dSym.contains(rSym)) continue;
+            if (!realTrade.getType().equalsIgnoreCase(demoTrade.getType())) continue;
 
             try {
                 LocalDateTime demoOpenTime = LocalDateTime.parse(demoTrade.getOpenTime(), formatter);
@@ -303,7 +303,9 @@ public class TradeComparisonService {
                 if (tradeB.getOpenTime() == null) continue;
 
                 // Symbol and Type must match
-                if (!tradeA.getSymbol().equalsIgnoreCase(tradeB.getSymbol())) continue;
+                String symA = normalizeSymbol(tradeA.getSymbol().toUpperCase());
+                String symB = normalizeSymbol(tradeB.getSymbol().toUpperCase());
+                if (!symA.contains(symB) && !symB.contains(symA)) continue;
                 if (!tradeA.getType().equalsIgnoreCase(tradeB.getType())) continue;
 
                 try {
@@ -431,5 +433,20 @@ public class TradeComparisonService {
             return dto.getTradeB().getCloseTime();
         }
         return null;
+    }
+
+    /**
+     * Normalize common symbol aliases to canonical names.
+     * E.g. GOLD -> XAUUSD, SILVER -> XAGUSD
+     */
+    private String normalizeSymbol(String symbol) {
+        if (symbol == null) return "";
+        // Strip common suffixes like .m, .pro, .i etc.
+        String clean = symbol.replaceAll("\\.[a-zA-Z]+$", "");
+        switch (clean) {
+            case "GOLD": return "XAUUSD";
+            case "SILVER": return "XAGUSD";
+            default: return clean;
+        }
     }
 }
