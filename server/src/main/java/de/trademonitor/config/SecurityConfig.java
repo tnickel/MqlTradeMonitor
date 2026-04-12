@@ -75,6 +75,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "https://*.janeway.replit.dev", 
+            "https://*.replit.dev",
+            "https://*.replit.app",
             "http://localhost:*",
             "https://monitor.ki-software-schmiede.de",
             "http://monitor.ki-software-schmiede.de",

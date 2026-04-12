@@ -23,12 +23,16 @@ public class MagicProfitEntry {
     private double maxDrawdownPercent;
     private double maxEquityDrawdownEur;
     private double maxEquityDrawdownPercent;
+    
+    private double totalProfitPct;
+    private double netClosedProfitPct;
 
     public MagicProfitEntry(long magicNumber, String magicName, double openProfit, double closedProfit,
             double totalSwap, double totalCommission, double openSwap,
             int openTradeCount, int closedTradeCount, Map<String, Integer> tradedSymbols,
             double maxDrawdownEur, double maxDrawdownPercent,
-            double maxEquityDrawdownEur, double maxEquityDrawdownPercent) {
+            double maxEquityDrawdownEur, double maxEquityDrawdownPercent,
+            double totalProfitPct, double netClosedProfitPct) {
         this.magicNumber = magicNumber;
         this.magicName = magicName;
         this.openProfit = openProfit;
@@ -44,6 +48,8 @@ public class MagicProfitEntry {
         this.maxDrawdownPercent = maxDrawdownPercent;
         this.maxEquityDrawdownEur = maxEquityDrawdownEur;
         this.maxEquityDrawdownPercent = maxEquityDrawdownPercent;
+        this.totalProfitPct = totalProfitPct;
+        this.netClosedProfitPct = netClosedProfitPct;
     }
 
     public long getMagicNumber() {
@@ -69,6 +75,14 @@ public class MagicProfitEntry {
     /** Net closed profit = closedProfit + swap + commission (what's actually realized) */
     public double getNetClosedProfit() {
         return closedProfit + totalSwap + totalCommission;
+    }
+
+    public double getTotalProfitPct() {
+        return totalProfitPct;
+    }
+
+    public double getNetClosedProfitPct() {
+        return netClosedProfitPct;
     }
 
     public double getTotalSwap() {

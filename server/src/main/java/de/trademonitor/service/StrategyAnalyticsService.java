@@ -67,9 +67,10 @@ public class StrategyAnalyticsService {
                 LocalDateTime dt = LocalDateTime.parse(trade.getCloseTime(), TRADE_FMT);
                 int dayIdx = dt.getDayOfWeek().getValue() - 1; // Mon=0, Sun=6
                 int hour = dt.getHour();
-                profit[dayIdx][hour] += trade.getProfit();
+                double netProfit = getNetProfit(trade);
+                profit[dayIdx][hour] += netProfit;
                 tradeCount[dayIdx][hour]++;
-                if (trade.getProfit() > 0) winCount[dayIdx][hour]++;
+                if (netProfit > 0) winCount[dayIdx][hour]++;
             } catch (Exception ignored) {}
         }
 
@@ -123,28 +124,41 @@ public class StrategyAnalyticsService {
             trades.sort(Comparator.comparing(t -> t.getCloseTime() == null ? "" : t.getCloseTime()));
 
             // Profit Factor
-            double grossProfit = trades.stream().filter(t -> t.getProfit() > 0).mapToDouble(ClosedTradeEntity::getProfit).sum();
-            double grossLoss = Math.abs(trades.stream().filter(t -> t.getProfit() < 0).mapToDouble(ClosedTradeEntity::getProfit).sum());
+            double grossProfit = trades.stream().mapToDouble(this::getNetProfit).filter(p -> p > 0).sum();
+            double grossLoss = Math.abs(trades.stream().mapToDouble(this::getNetProfit).filter(p -> p < 0).sum());
             double profitFactor = grossLoss > 0 ? Math.round(grossProfit / grossLoss * 100.0) / 100.0 : (grossProfit > 0 ? 99.99 : 0.0);
             kpi.put("profitFactor", profitFactor);
 
             // Win Rate
-            long wins = trades.stream().filter(t -> t.getProfit() > 0).count();
+            long wins = trades.stream().filter(t -> getNetProfit(t) > 0).count();
             double winRate = Math.round(wins * 1000.0 / trades.size()) / 10.0;
             kpi.put("winRate", winRate);
 
             // Average Trade
-            double avgTrade = Math.round(trades.stream().mapToDouble(ClosedTradeEntity::getProfit).average().orElse(0.0) * 100.0) / 100.0;
+            double avgTrade = Math.round(trades.stream().mapToDouble(this::getNetProfit).average().orElse(0.0) * 100.0) / 100.0;
             kpi.put("avgTrade", avgTrade);
 
             // Total net profit
-            double totalProfit = Math.round(trades.stream().mapToDouble(ClosedTradeEntity::getProfit).sum() * 100.0) / 100.0;
+            double totalProfit = Math.round(trades.stream().mapToDouble(this::getNetProfit).sum() * 100.0) / 100.0;
             kpi.put("totalProfit", totalProfit);
+            
+            // Total Profit %
+            Account accForPct = accountManager.getAccount(accountId);
+            double totalProfitPct = 0.0;
+            if (accForPct != null) {
+                double netDeposits = accForPct.getBalance() - accForPct.getTotalHistoryProfit();
+                if (netDeposits > 0) {
+                    totalProfitPct = (totalProfit / netDeposits) * 100.0;
+                } else if (accForPct.getBalance() > 0) {
+                    totalProfitPct = (totalProfit / accForPct.getBalance()) * 100.0;
+                }
+            }
+            kpi.put("totalProfitPct", Math.round(totalProfitPct * 100.0) / 100.0);
 
             // Max Drawdown (from cumulative P/L curve)
             double cumulative = 0, hwm = 0, maxDD = 0;
             for (ClosedTradeEntity t : trades) {
-                cumulative += t.getProfit();
+                cumulative += getNetProfit(t);
                 if (cumulative > hwm) hwm = cumulative;
                 double dd = hwm - cumulative;
                 if (dd > maxDD) maxDD = dd;
@@ -162,7 +176,7 @@ public class StrategyAnalyticsService {
             // Longest Win/Loss Streaks
             int winStreak = 0, lossStreak = 0, maxWinStreak = 0, maxLossStreak = 0;
             for (ClosedTradeEntity t : trades) {
-                if (t.getProfit() > 0) {
+                if (getNetProfit(t) > 0) {
                     winStreak++;
                     lossStreak = 0;
                     maxWinStreak = Math.max(maxWinStreak, winStreak);
@@ -180,7 +194,7 @@ public class StrategyAnalyticsService {
             double cum = 0;
             int step = Math.max(1, trades.size() / 50);
             for (int i = 0; i < trades.size(); i++) {
-                cum += trades.get(i).getProfit();
+                cum += getNetProfit(trades.get(i));
                 if (i % step == 0 || i == trades.size() - 1) {
                     sparkline.add(Math.round(cum * 100.0) / 100.0);
                 }
@@ -370,7 +384,7 @@ public class StrategyAnalyticsService {
         for (ClosedTradeEntity t : trades) {
             if (t.getCloseTime() == null) continue;
             String day = t.getCloseTime().substring(0, 10); // yyyy.MM.dd
-            dailyProfit.merge(day, t.getProfit(), Double::sum);
+            dailyProfit.merge(day, getNetProfit(t), Double::sum);
         }
 
         if (dailyProfit.size() < 3) return 0.0;
@@ -425,4 +439,11 @@ public class StrategyAnalyticsService {
                 return s -> true;
         }
     }
+
+    private double getNetProfit(ClosedTradeEntity trade) {
+        Account account = accountManager.getAccount(trade.getAccountId());
+        double commissionFactor = account != null ? account.getCommissionFactor() : 1.0;
+        return trade.getProfit() + trade.getSwap() + (trade.getCommission() * commissionFactor);
+    }
 }
+

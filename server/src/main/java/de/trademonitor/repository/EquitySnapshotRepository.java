@@ -14,6 +14,8 @@ public interface EquitySnapshotRepository extends JpaRepository<EquitySnapshotEn
 
     List<EquitySnapshotEntity> findByAccountIdOrderByTimestampAsc(long accountId);
 
+    List<EquitySnapshotEntity> findByAccountIdAndTimestampBetweenOrderByTimestampAsc(long accountId, String from, String to);
+
     /**
      * Delete snapshots older than the given timestamp string (ISO format comparison
      * works lexicographically).

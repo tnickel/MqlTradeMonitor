@@ -110,10 +110,11 @@ Der `AccountManager` hält alle Accounts im Speicher für schnellen Dashboard-Zu
 | `LogCleanupService` | Täglich 2:00 Uhr | Alte Logs bereinigen |
 
 ### 2.4 Equity-Snapshots
+Anstatt bei jedem Seitenaufruf den Profit neu zu berechnen, sendet der MetaTrader regelmäßige Equity-Werte. Der Server berechnet dann den Profit anhand der Differenz zwischen aktueller Equity und den Balance-Operationen (Deposits/Withdrawals).
 
-- Rate-limitiert auf 1 Snapshot pro Minute pro Account.
-- Automatische Bereinigung von Snapshots älter als 90 Tage.
-- Index auf `(accountId, timestamp)` für schnelle Abfragen.
+### 2.5 Asynchrone Datenverarbeitung & Server Health
+Um die initiale Ladezeit des Dashboards zu minimieren, werden rechenintensive Operationen (wie z.B. Trade History oder Chart-Rendern) asynchron via Fetch-API in JavaScript geladen (Endpunkte wie `/api/stats/system-status`, `/api/accounts/{id}/equity-history`).
+**Wartungsmodus (`NetworkStatusService`):** Der Server überwacht selbstständig das letzte Änderungsdatum seiner WAR-Datei. Wird die Datei durch einen Hot-Deploy aktualisiert, schaltet das System für 20 Minuten (konfigurierbar) in den Zustand `MAINTENANCE`. Dieses Event wird über `networkStatusLogRepository` persistiert und über den Endpunkt `/admin/api/network-timeline` chronologisch an das Frontend ausgeliefert.
 
 ---
 

@@ -73,9 +73,26 @@ public class NetworkStatusService {
     private boolean isWarFileModifiedRecently() {
         File warFile = getWarFile();
         if (warFile != null && warFile.exists()) {
-            long lastModified = warFile.lastModified();
+            long fileTimeMillis = 0;
+
+            // WildFly creates a .deployed marker file when it finishes deploying.
+            // This file is never touched again, making it immune to whatever is touching the .war file.
+            File deployedMarker = new File(warFile.getAbsolutePath() + ".deployed");
+            if (deployedMarker.exists()) {
+                fileTimeMillis = deployedMarker.lastModified();
+            } else {
+                // Determine write time of the WAR file
+                try {
+                    java.nio.file.attribute.BasicFileAttributes attr = java.nio.file.Files.readAttributes(warFile.toPath(), java.nio.file.attribute.BasicFileAttributes.class);
+                    fileTimeMillis = attr.creationTime().toMillis();
+                    // On some Linux systems creationTime might equal lastModified if not supported.
+                } catch (Exception e) {
+                    fileTimeMillis = warFile.lastModified();
+                }
+            }
+
             long now = System.currentTimeMillis();
-            long diffMins = (now - lastModified) / (1000 * 60);
+            long diffMins = (now - fileTimeMillis) / (1000 * 60);
 
             return diffMins < globalConfigService.getMaintenanceTimeoutMins();
         }

@@ -386,6 +386,13 @@ public class TradeStorage {
     }
 
     /**
+     * Load equity snapshots for an account within a specific time range.
+     */
+    public List<EquitySnapshotEntity> loadEquitySnapshotsBetween(long accountId, String from, String to) {
+        return equitySnapshotRepository.findByAccountIdAndTimestampBetweenOrderByTimestampAsc(accountId, from, to);
+    }
+
+    /**
      * Delete ALL trade data for an account (open trades, closed trades, equity
      * snapshots).
      * The account entity itself is preserved.

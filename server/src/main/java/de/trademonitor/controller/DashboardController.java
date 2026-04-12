@@ -76,6 +76,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.repository.TimelineRepository timelineRepository;
 
+    @Autowired
+    private de.trademonitor.repository.LoginLogRepository loginLogRepository;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -871,11 +874,27 @@ public class DashboardController {
         if (!isAllowedAccess(userDetails, accountId)) {
             return ResponseEntity.status(403).body("Access Denied");
         }
-        List<de.trademonitor.entity.ClosedTradeEntity> allTrades = closedTradeRepository.findByAccountId(accountId);
-        java.util.function.Predicate<String> dateFilter = getDateFilter(period);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate startDt = today;
+        java.time.LocalDate endDt = today;
+        switch (period.toLowerCase()) {
+            case "weekly":
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                startDt = today.with(fieldISO, 1);
+                endDt = today.with(fieldISO, 7);
+                break;
+            case "monthly":
+                startDt = today.withDayOfMonth(1);
+                endDt = today.withDayOfMonth(today.lengthOfMonth());
+                break;
+        }
+        java.time.format.DateTimeFormatter tradeDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        String startCloseTime = startDt.format(tradeDateFormatter) + " 00:00:00";
+        String endCloseTime = endDt.format(tradeDateFormatter) + " 23:59:59";
+
+        List<de.trademonitor.entity.ClosedTradeEntity> allTrades = closedTradeRepository.findByAccountIdAndDateRange(accountId, startCloseTime, endCloseTime);
 
         return ResponseEntity.ok(allTrades.stream()
-                .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
                 .sorted((a, b) -> b.getCloseTime().compareTo(a.getCloseTime())) // Newest first
                 .collect(Collectors.toList()));
     }
@@ -910,16 +929,27 @@ public class DashboardController {
         // Based on the tiles, it seems to show global performance for that period.
 
         // 1. Collect all relevant trades
-        java.util.function.Predicate<String> dateFilter = getDateFilter(period);
-        List<de.trademonitor.entity.ClosedTradeEntity> allRelevantTrades = new ArrayList<>();
+        java.time.LocalDate startDt = today;
+        java.time.LocalDate endDt = today;
+        switch (period.toLowerCase()) {
+            case "weekly":
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                startDt = today.with(fieldISO, 1);
+                endDt = today.with(fieldISO, 7);
+                break;
+            case "monthly":
+                startDt = today.withDayOfMonth(1);
+                endDt = today.withDayOfMonth(today.lengthOfMonth());
+                break;
+        }
+        java.time.format.DateTimeFormatter tradeDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        String startCloseTime = startDt.format(tradeDateFormatter) + " 00:00:00";
+        String endCloseTime = endDt.format(tradeDateFormatter) + " 23:59:59";
 
-        for (Map<String, Object> acc : accounts) {
-            Long accountId = (Long) acc.get("accountId");
-            List<de.trademonitor.entity.ClosedTradeEntity> accountTrades = closedTradeRepository
-                    .findByAccountId(accountId);
-            allRelevantTrades.addAll(accountTrades.stream()
-                    .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
-                    .collect(Collectors.toList()));
+        List<Long> accIds = accounts.stream().map(acc -> (Long) acc.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
+        List<de.trademonitor.entity.ClosedTradeEntity> allRelevantTrades = new ArrayList<>();
+        if (!accIds.isEmpty()) {
+            allRelevantTrades = closedTradeRepository.findByAccountIdsAndDateRange(accIds, startCloseTime, endCloseTime);
         }
 
         // 2. Aggregate based on period
@@ -1051,6 +1081,32 @@ public class DashboardController {
         }
     }
 
+    private String[] getIsoRange(String period) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate startDt = today;
+        java.time.LocalDate endDt = today;
+
+        switch (period.toLowerCase()) {
+            case "daily":
+                startDt = today;
+                endDt = today;
+                break;
+            case "weekly":
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                startDt = today.with(fieldISO, 1);
+                endDt = today.with(fieldISO, 7);
+                break;
+            case "monthly":
+                startDt = today.withDayOfMonth(1);
+                endDt = today.withDayOfMonth(today.lengthOfMonth());
+                break;
+        }
+
+        String fromIso = startDt.toString() + "T00:00:00";
+        String toIso = endDt.toString() + "T23:59:59";
+        return new String[]{fromIso, toIso};
+    }
+
     @GetMapping("/report/{period}")
     public String getReport(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable String period,
             Model model, HttpServletRequest request) {
@@ -1100,29 +1156,20 @@ public class DashboardController {
         model.addAttribute("startDate", startDt.format(dateFormatter));
         model.addAttribute("endDate", endDt.format(dateFormatter));
 
-        // Build the closeTime prefix for DB-level aggregation (daily/monthly only)
-        String closeTimePrefix = null;
         java.time.format.DateTimeFormatter tradeDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
-        java.time.format.DateTimeFormatter tradeMonthFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM");
-        if ("daily".equalsIgnoreCase(period)) {
-            closeTimePrefix = today.format(tradeDateFormatter);
-        } else if ("monthly".equalsIgnoreCase(period)) {
-            closeTimePrefix = today.format(tradeMonthFormatter);
-        }
+        String startCloseTime = startDt.format(tradeDateFormatter) + " 00:00:00";
+        String endCloseTime = endDt.format(tradeDateFormatter) + " 23:59:59";
 
-        // Batch-aggregate closed trades for daily/monthly (much faster than loading all trades)
-        Map<Long, long[]> batchAggregation = null; // [count, sumProfit*100]
-        if (closeTimePrefix != null) {
-            List<Long> accIds = accounts.stream().map(acc -> (Long) acc.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
-            if (!accIds.isEmpty()) {
-                batchAggregation = new HashMap<>();
-                List<Object[]> rows = closedTradeRepository.aggregateByAccountIdsAndPrefix(accIds, closeTimePrefix);
-                for (Object[] row : rows) {
-                    Long accId = ((Number) row[0]).longValue();
-                    long count = ((Number) row[1]).longValue();
-                    double sum = ((Number) row[2]).doubleValue();
-                    batchAggregation.put(accId, new long[]{count, Math.round(sum * 100)});
-                }
+        // Batch-aggregate closed trades (much faster than loading all trades)
+        Map<Long, long[]> batchAggregation = new HashMap<>(); // [count, sumProfit*100]
+        List<Long> accIds = accounts.stream().map(acc -> (Long) acc.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
+        if (!accIds.isEmpty()) {
+            List<Object[]> rows = closedTradeRepository.aggregateByAccountIdsAndDateRange(accIds, startCloseTime, endCloseTime);
+            for (Object[] row : rows) {
+                Long accId = ((Number) row[0]).longValue();
+                long count = ((Number) row[1]).longValue();
+                double sum = ((Number) row[2]).doubleValue();
+                batchAggregation.put(accId, new long[]{count, Math.round(sum * 100)});
             }
         }
 
@@ -1131,39 +1178,19 @@ public class DashboardController {
         for (Map<String, Object> acc : accounts) {
             Long accountId = (Long) acc.get("accountId");
 
-            long closedCount;
-            double closedProfit;
-
-            if (batchAggregation != null) {
-                // Use batch DB aggregation (daily/monthly)
-                long[] agg = batchAggregation.getOrDefault(accountId, new long[]{0, 0});
-                closedCount = agg[0];
-                closedProfit = agg[1] / 100.0;
-            } else {
-                // Fallback for weekly: load and filter in Java
-                List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
-                        .findByAccountId(accountId);
-                java.util.DoubleSummaryStatistics closedStats = closedTrades.stream()
-                        .filter(t -> t.getCloseTime() != null && dateFilter.test(t.getCloseTime()))
-                        .collect(java.util.DoubleSummaryStatistics::new,
-                                (stats, t) -> stats.accept(t.getProfit()),
-                                java.util.DoubleSummaryStatistics::combine);
-                closedCount = closedStats.getCount();
-                closedProfit = closedStats.getSum();
-            }
+            long[] agg = batchAggregation.getOrDefault(accountId, new long[]{0, 0});
+            long closedCount = agg[0];
+            double closedProfit = agg[1] / 100.0;
 
             // Get equity snapshots for the period (still needed for sparkline)
-            java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> snapshotFilter = getSnapshotDateFilter(
-                    period);
-            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
+            String[] isoRange = getIsoRange(period);
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshotsBetween(accountId, isoRange[0], isoRange[1]);
             List<Double> equityH = new ArrayList<>();
             List<Double> balanceH = new ArrayList<>();
 
             for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
-                if (snapshotFilter.test(snap)) {
-                    equityH.add(snap.getEquity());
-                    balanceH.add(snap.getBalance());
-                }
+                equityH.add(snap.getEquity());
+                balanceH.add(snap.getBalance());
             }
 
             Map<String, Object> row = new HashMap<>(acc);
@@ -1220,8 +1247,7 @@ public class DashboardController {
                     .collect(Collectors.toList());
         }
 
-        java.util.function.Predicate<de.trademonitor.entity.EquitySnapshotEntity> snapshotFilter = getSnapshotDateFilter(
-                period);
+        String[] isoRange = getIsoRange(period);
 
         List<Map<String, Object>> result = new ArrayList<>();
 
@@ -1231,7 +1257,7 @@ public class DashboardController {
             String type = (String) acc.get("type");
             Double currentBalance = (Double) acc.get("balance");
 
-            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshots(accountId);
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots = tradeStorage.loadEquitySnapshotsBetween(accountId, isoRange[0], isoRange[1]);
 
             List<String> timestamps = new ArrayList<>();
             List<Double> scaledEquity = new ArrayList<>();
@@ -1246,31 +1272,29 @@ public class DashboardController {
             long lastIncludedMillis = 0;
 
             for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
-                if (snapshotFilter.test(snap)) {
-                    // Apply downsampling for weekly/monthly
-                    if (sampleIntervalMinutes > 0 && snap.getTimestamp() != null) {
-                        try {
-                            long snapMillis = java.time.LocalDateTime
-                                    .parse(snap.getTimestamp(),
-                                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-                            if (lastIncludedMillis > 0
-                                    && (snapMillis - lastIncludedMillis) < sampleIntervalMinutes * 60000L) {
-                                continue; // Skip this snapshot (too close to the last included one)
-                            }
-                            lastIncludedMillis = snapMillis;
-                        } catch (Exception e) {
-                            // If parsing fails, include the snapshot
+                // Apply downsampling for weekly/monthly
+                if (sampleIntervalMinutes > 0 && snap.getTimestamp() != null) {
+                    try {
+                        long snapMillis = java.time.LocalDateTime
+                                .parse(snap.getTimestamp(),
+                                        java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                        if (lastIncludedMillis > 0
+                                && (snapMillis - lastIncludedMillis) < sampleIntervalMinutes * 60000L) {
+                            continue; // Skip this snapshot (too close to the last included one)
                         }
+                        lastIncludedMillis = snapMillis;
+                    } catch (Exception e) {
+                        // If parsing fails, include the snapshot
                     }
-                    if (!scaleFactorSet && snap.getEquity() > 0) {
-                        scaleFactor = 10000.0 / snap.getEquity();
-                        scaleFactorSet = true;
-                    }
-                    timestamps.add(snap.getTimestamp());
-                    scaledEquity.add(Math.round(snap.getEquity() * scaleFactor * 100.0) / 100.0);
-                    rawEquity.add(Math.round(snap.getEquity() * 100.0) / 100.0);
                 }
+                if (!scaleFactorSet && snap.getEquity() > 0) {
+                    scaleFactor = 10000.0 / snap.getEquity();
+                    scaleFactorSet = true;
+                }
+                timestamps.add(snap.getTimestamp());
+                scaledEquity.add(Math.round(snap.getEquity() * scaleFactor * 100.0) / 100.0);
+                rawEquity.add(Math.round(snap.getEquity() * 100.0) / 100.0);
             }
 
             if (!scaledEquity.isEmpty()) {
@@ -1393,39 +1417,48 @@ public class DashboardController {
                     .collect(Collectors.toList());
         }
         
-        List<Map<String, Object>> realAccounts = new ArrayList<>();
-        boolean accountsOk = true;
-        for (Map<String, Object> acc : accounts) {
-            if ("REAL".equals(acc.get("type"))) {
-                Map<String, Object> rAcc = new LinkedHashMap<>();
-                Long accountId = (Long) acc.get("accountId");
-                rAcc.put("accountId", accountId);
-                rAcc.put("name", acc.get("name"));
-                
-                boolean isOnline = Boolean.TRUE.equals(acc.get("online"));
-                boolean hasError = Boolean.TRUE.equals(acc.get("errorState"));
-                boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("syncWarning"));
-                boolean hasAlarm = Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered"));
-                
-                boolean statusOk = isOnline && !hasError && !hasSyncWarning && !hasAlarm;
-                if (!statusOk) accountsOk = false;
-                
-                rAcc.put("statusOk", statusOk);
-                rAcc.put("online", isOnline);
-                rAcc.put("error", hasError);
-                rAcc.put("syncWarning", hasSyncWarning);
-                rAcc.put("alarm", hasAlarm);
-                rAcc.put("openTrades", acc.get("trades"));
-                rAcc.put("profit", acc.get("profit"));
-                rAcc.put("currency", acc.get("currency"));
-                
-                // Use CACHED daily profit instead of iterating all closed trades
-                double dailyProfit = accountManager.getCachedDailyProfit(accountId);
-                rAcc.put("dailyProfit", dailyProfit);
-                
-                realAccounts.add(rAcc);
+        List<Map<String, Object>> allAccounts = new ArrayList<>();
+        boolean[] accountsOkRef = {true};
+
+        for (int pass = 0; pass < 2; pass++) {
+            boolean includeReal = (pass == 0);
+            for (Map<String, Object> acc : accounts) {
+                boolean isReal = "REAL".equals(acc.get("type"));
+                if (isReal == includeReal) {
+                    Map<String, Object> rAcc = new LinkedHashMap<>();
+                    Long accountId = (Long) acc.get("accountId");
+                    rAcc.put("accountId", accountId);
+                    rAcc.put("name", acc.get("name"));
+                    rAcc.put("type", acc.get("type"));
+                    
+                    boolean isOnline = Boolean.TRUE.equals(acc.get("online"));
+                    boolean hasError = Boolean.TRUE.equals(acc.get("errorState"));
+                    boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("syncWarning"));
+                    boolean hasAlarm = Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered"));
+                    
+                    boolean statusOk = isOnline && !hasError && !hasSyncWarning && !hasAlarm;
+                    if (isReal && !statusOk) {
+                        accountsOkRef[0] = false;
+                    }
+                    
+                    rAcc.put("statusOk", statusOk);
+                    rAcc.put("online", isOnline);
+                    rAcc.put("error", hasError);
+                    rAcc.put("syncWarning", hasSyncWarning);
+                    rAcc.put("alarm", hasAlarm);
+                    rAcc.put("openTrades", acc.get("trades"));
+                    rAcc.put("profit", acc.get("profit"));
+                    rAcc.put("currency", acc.get("currency"));
+                    
+                    double dailyProfit = accountManager.getCachedDailyProfit(accountId);
+                    rAcc.put("dailyProfit", dailyProfit);
+                    
+                    allAccounts.add(rAcc);
+                }
             }
         }
+        
+        boolean accountsOk = accountsOkRef[0];
         
         boolean overallOk = accountsOk;
         
@@ -1456,8 +1489,28 @@ public class DashboardController {
         
         result.put("overallOk", overallOk);
         result.put("networkStatus", networkStatusService.getCurrentStatus());
-        result.put("realAccounts", realAccounts);
+        result.put("allAccounts", allAccounts);
+        // Keep realAccounts for backwards compatibility just in case other dashboards use it
+        result.put("realAccounts", allAccounts.stream().filter(a -> "REAL".equals(a.get("type"))).collect(Collectors.toList()));
         
+        return result;
+    }
+
+    @GetMapping("/api/login-logs")
+    @ResponseBody
+    public java.util.List<java.util.Map<String, Object>> getRecentLoginLogs() {
+        java.util.List<de.trademonitor.entity.LoginLog> all = loginLogRepository.findAllByOrderByTimestampDesc();
+        int limit = Math.min(all.size(), 20);
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for(int i=0; i<limit; i++) {
+             de.trademonitor.entity.LoginLog log = all.get(i);
+             java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+             map.put("time", log.getTimestamp() != null ? log.getTimestamp().toString() : "");
+             map.put("user", log.getUsername());
+             map.put("ip", log.getIpAddress());
+             map.put("status", log.isSuccess() ? "SUCCESS" : "FAILED");
+             result.add(map);
+        }
         return result;
     }
 

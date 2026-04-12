@@ -777,7 +777,7 @@
                     + '<td class="' + srClass + '">' + row.sharpeRatio.toFixed(2) + '</td>'
                     + '<td class="' + wrClass + '">' + row.winRate.toFixed(1) + '%</td>'
                     + '<td class="' + (row.avgTrade >= 0 ? 'positive' : 'negative') + '">' + row.avgTrade.toFixed(2) + '</td>'
-                    + '<td class="' + profClass + '" style="font-weight:800;">' + row.totalProfit.toFixed(2) + '</td>'
+                    + '<td class="' + profClass + '" style="font-weight:800;">' + row.totalProfit.toFixed(2) + (row.totalProfitPct !== undefined ? ' <span style="font-size: 0.75rem; opacity: 0.8; font-weight: 500;">(' + (row.totalProfitPct > 0 ? '+' : '') + row.totalProfitPct.toFixed(1) + '%)</span>' : '') + '</td>'
                     + '<td class="negative">-' + row.maxDrawdown.toFixed(2) + '</td>'
                     + '<td class="' + (row.recoveryFactor >= 2 ? 'kpi-good' : 'kpi-neutral') + '">' + row.recoveryFactor.toFixed(2) + '</td>'
                     + '<td>' + row.totalTrades + '</td>'

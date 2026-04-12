@@ -58,4 +58,13 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
      */
     @Query("SELECT c.accountId, COUNT(c), COALESCE(SUM(c.profit), 0) FROM ClosedTradeEntity c WHERE c.accountId IN ?1 AND c.closeTime LIKE CONCAT(?2, '%') GROUP BY c.accountId")
     java.util.List<Object[]> aggregateByAccountIdsAndPrefix(java.util.Collection<Long> accountIds, String prefix);
+
+    @Query("SELECT c.accountId, COUNT(c), COALESCE(SUM(c.profit), 0) FROM ClosedTradeEntity c WHERE c.accountId IN ?1 AND c.closeTime >= ?2 AND c.closeTime <= ?3 GROUP BY c.accountId")
+    java.util.List<Object[]> aggregateByAccountIdsAndDateRange(java.util.Collection<Long> accountIds, String startCloseTime, String endCloseTime);
+
+    @Query("SELECT c FROM ClosedTradeEntity c WHERE c.accountId IN ?1 AND c.closeTime >= ?2 AND c.closeTime <= ?3")
+    List<ClosedTradeEntity> findByAccountIdsAndDateRange(java.util.Collection<Long> accountIds, String startCloseTime, String endCloseTime);
+
+    @Query("SELECT c FROM ClosedTradeEntity c WHERE c.accountId = ?1 AND c.closeTime >= ?2 AND c.closeTime <= ?3")
+    List<ClosedTradeEntity> findByAccountIdAndDateRange(long accountId, String startCloseTime, String endCloseTime);
 }

@@ -538,12 +538,18 @@ public class Account {
                 maxDrawdownPercent = (maxDrawdownEur / denominator) * 100.0;
                 maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / denominator) * 100.0;
             }
+            
+            double magicTotalProfit = openProfit + closedProfit + totalSwap + totalCommission;
+            double magicNetClosedProfit = closedProfit + totalSwap + totalCommission;
+            double baseAmount = netDeposits > 0 ? netDeposits : (this.balance > 0 ? this.balance : 1.0);
+            double totalProfitPct = (magicTotalProfit / baseAmount) * 100.0;
+            double netClosedProfitPct = (magicNetClosedProfit / baseAmount) * 100.0;
 
             entries.add(
                     new MagicProfitEntry(magic, magicName, openProfit, closedProfit, totalSwap, totalCommission, openSwap,
                             openCount, closedCount,
                             tradedSymbols, maxDrawdownEur, maxDrawdownPercent, estimatedMaxEquityDrawdownEur,
-                            maxEquityDrawdownPercent));
+                            maxEquityDrawdownPercent, totalProfitPct, netClosedProfitPct));
         }
         return entries;
     }

@@ -70,8 +70,10 @@ Das Dashboard-Layout ist vollstaendig personalisierbar:
 4. Klicken Sie auf **"Speichern"** &mdash; das Layout wird serverseitig persistiert.
 
 ### 3.4 Globales Alarm-Banner
+Sollte die Trade-Synchronisation fehlschlagen (z. B. ein Trade wurde auf dem Real-Account geöffnet, aber kein entsprechender MetaTrader-Client gefunden), erscheint oben ein auffälliges rotes Banner: "WARNUNG: Trade Sync Fehler".
 
-Wenn ein Open-Profit-Alarm oder eine Sync-Warnung aktiv ist, erscheint ein auffaelliges Banner am oberen Bildschirmrand. Ein Klick fuehrt direkt zum betroffenen Account.
+### 3.5 System Status & Wartungsmodus
+Das Dashboard verfügt über eine permanente System-Status-Kachel, die Auskunft über den Gesundheitszustand des Servers liefert. Befindet sich der Server durch kürzliche Wartungsarbeiten (z.B. Einspielen von Updates auf dem Contabo-Server) im Wartungsmodus, erscheint ein massives rotes Banner **"🔥 WARTUNGSMODUS AKTIV"** auf der Hauptseite. In dieser Zeit bleiben bestehende MetaTrader-Verbindungen unangetastet, jedoch können Daten im Dashboard leicht verzögert dargestellt werden. Die Kachel verfärbt sich passend dazu blau mit der Kennzeichnung "⚙️ Wartungsmodus".
 
 ---
 
@@ -262,10 +264,15 @@ Alle Security-Parameter sind live konfigurierbar:
 | H2-Konsole | Datenbank-Konsole aktivieren/deaktivieren |
 
 ### 11.10 Logs einsehen
+Direkt im Admin-Bereich lassen sich Logs sichten (u. a. `server.log`, Fehlermeldungen von EAs und HTTP-Requests). Diese können gefiltert und nach Datum durchsucht werden, was das Debugging erheblich vereinfacht. Eine Heatmap-Visualisierung hilft zudem, Aktivitäts-Muster der MetaTrader Clients auf einen Blick zu erkennen.
 
-- **Login-Logs** (`/admin/logs`): Wer hat sich wann von welcher IP angemeldet (Erfolg/Fehlschlag).
-- **Request-Logs** (`/admin/requests`): HTTP-Anfragen neuer IP-Adressen.
-- **Client-Logs** (`/admin/client-logs`): MetaTrader-Aktionen (Register, Update, Heartbeat), filterbar nach Account.
+### 11.11 Server Health & Netzwerk-Überwachung
+Unter **"Server Health"** bietet TradeMonitor eine tiefgehende Gesundheitsüberwachung der Server-Infrastruktur. 
+- **Ressourcen:** Überwachung von RAM-Auslastung, Speicherplatz (Disk), und CPU-Last.
+- **Größenstatistiken:** Anzeige detaillierter Größen (H2-Datenbank `trademonitor.mv.db`, WAR-Files).
+- **Netzwerk-Verfügbarkeit / Timeline:** Eine optisch ansprechende interaktive Verlaufsanzeige dokumentiert lückenlos, wann der Server "Online", "Offline" oder im "Wartungsmodus" war.
+  - Der zeitliche Horizont ("24h", "1W", "1M", "6M") lässt sich nativ in der Oberfläche umschalten.
+  - Ein Klick auf *"📋 Detailliertere Infos"* öffnet ein visuell aufbereitetes Popup inklusive stufenlosem Zoom für die Timeline-Log-Ereignisse (inkl. Hover-Tooltips) und chronologischer Tabelle.
 
 ---
 

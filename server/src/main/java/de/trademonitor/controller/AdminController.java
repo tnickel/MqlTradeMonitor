@@ -83,7 +83,13 @@ public class AdminController {
             // Sum up total profit from closed trades
             java.util.List<de.trademonitor.entity.ClosedTradeEntity> closedTrades = closedTradeRepository
                     .findByAccountId(acc.getAccountId());
-            double totalProfit = closedTrades.stream().mapToDouble(t -> t.getProfit()).sum();
+                    
+            de.trademonitor.model.Account runtimeAcc = accountManager.getAccount(acc.getAccountId());
+            double commissionFactor = runtimeAcc != null ? runtimeAcc.getCommissionFactor() : 1.0;
+            
+            double totalProfit = closedTrades.stream().mapToDouble(t -> 
+                t.getProfit() + t.getSwap() + (t.getCommission() * commissionFactor)
+            ).sum();
             stats.setTotalProfit(totalProfit);
 
             totalOpen += openCount;
