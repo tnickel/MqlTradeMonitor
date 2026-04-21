@@ -678,7 +678,44 @@ public class AdminController {
     public String securityAudit(Model model) {
         de.trademonitor.dto.SecurityAuditDto audit = securityAuditService.getLatestAudit();
         model.addAttribute("audit", audit);
+        model.addAttribute("fail2banWhitelist", globalConfigService.getFail2banWhitelistIps());
         return "admin-security";
+    }
+
+    @PostMapping("/fail2ban/whitelist")
+    public String addFail2banWhitelist(
+            @RequestParam String ipAddress,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            if (ipAddress != null && !ipAddress.trim().isEmpty()) {
+                securityAuditService.syncFail2banWhitelist(ipAddress.trim());
+                redirectAttrs.addFlashAttribute("successMessage", "IP " + ipAddress + " wurde zur Fail2Ban Whitelist hinzugefügt und entsperrt.");
+            }
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Whitelisten der IP: " + e.getMessage());
+        }
+        return "redirect:/admin/security-audit";
+    }
+
+    @GetMapping("/api/fail2ban/details")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<java.util.List<java.util.Map<String, Object>>> getFail2banDetails() {
+        return org.springframework.http.ResponseEntity.ok(securityAuditService.getFail2banLiveDetails());
+    }
+
+    @PostMapping("/api/fail2ban/unban")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<java.util.Map<String, String>> unbanIp(@org.springframework.web.bind.annotation.RequestParam("ipAddress") String ipAddress) {
+        boolean success = securityAuditService.unbanIp(ipAddress);
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        if (success) {
+            response.put("status", "success");
+            response.put("message", "IP " + ipAddress + " erfolgreich freigegeben.");
+        } else {
+            response.put("status", "error");
+            response.put("message", "Fehler beim Freigeben der IP.");
+        }
+        return org.springframework.http.ResponseEntity.ok(response);
     }
 
     @PostMapping("/notifications/acknowledge")

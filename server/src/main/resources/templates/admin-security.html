@@ -146,6 +146,35 @@
             transform: translateX(3px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75); z-index: 1000;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal-content {
+            background-color: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;
+        }
+        .modal-header {
+            padding: 15px 20px; border-bottom: 1px solid #30363d; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .modal-header h2 { margin: 0; font-size: 1.2rem; }
+        .close-btn {
+            background: none; border: none; color: #8b949e; font-size: 1.5rem;
+            cursor: pointer; padding: 0; line-height: 1;
+        }
+        .close-btn:hover { color: #f8fafc; }
+        .modal-body {
+            padding: 20px; overflow-y: auto; flex: 1;
+        }
+        .console-output {
+            background-color: #0d1117; color: #3fb950; font-family: 'SF Mono', 'Cascadia Code', monospace;
+            padding: 15px; border-radius: 6px; font-size: 0.85rem; white-space: pre-wrap; margin: 0;
+            border: 1px solid #30363d;
+        }
     </style>
 </head>
 <body>
@@ -260,19 +289,37 @@
 
                 <!-- Fail2Ban -->
                 <div class="section">
-                    <h2>🚫 Fail2Ban Status</h2>
-                    <p style="color: #8b949e; font-size: 0.85rem; margin-bottom: 12px;">
-                        Aktuell gebannte IPs durch Fail2Ban SSH-Jail
-                    </p>
-                    <div th:if="${audit.fail2banBannedIps.isEmpty()}" class="empty-state">
-                        <div class="icon">✅</div>
-                        <p>Keine IPs aktuell gebannt.</p>
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                        <div>
+                            <h2>🚫 Fail2Ban Status</h2>
+                            <p style="color: #8b949e; font-size: 0.85rem; margin: 0;">Aktuell gebannte IPs (alle Jails)</p>
+                        </div>
+                        <button type="button" class="view-details-btn" onclick="openFail2BanDetails()" style="background-color: #238636; font-size: 0.8rem;">Live-Details 🔍</button>
                     </div>
-                    <div th:if="${!audit.fail2banBannedIps.isEmpty()}" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <div th:if="${audit.fail2banBannedIps.isEmpty()}" class="empty-state" style="padding: 10px;">
+                        <div class="icon" style="font-size: 1.5rem;">✅</div>
+                        <p style="font-size: 0.85rem; margin: 0;">Keine IPs aktuell gebannt.</p>
+                    </div>
+                    <div th:if="${!audit.fail2banBannedIps.isEmpty()}" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
                         <span th:each="ip : ${audit.fail2banBannedIps}" class="ip-badge"
                               style="background-color: rgba(248, 81, 73, 0.15); color: #f85149;"
                               th:text="${ip}">1.2.3.4</span>
                     </div>
+
+                    <h3 style="font-size: 0.95rem; color: #e1e1e1; margin: 20px 0 10px 0; border-top: 1px solid #30363d; padding-top: 15px;">🛡️ Whitelist (Max. 3 IPs)</h3>
+                    <p style="color: #8b949e; font-size: 0.8rem; margin-bottom: 12px;">Diese IPs sind dauerhaft vor Banns geschützt. Admins werden bei Login automatisch whitelisted.</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+                        <span th:if="${fail2banWhitelist == null || fail2banWhitelist.isEmpty()}" style="color: #6e7681; font-size: 0.85rem;">Keine IPs whitelisted.</span>
+                        <span th:each="ip : ${fail2banWhitelist}" class="ip-badge"
+                              style="background-color: rgba(63, 185, 80, 0.15); color: #3fb950;"
+                              th:text="${ip}">1.2.3.4</span>
+                    </div>
+
+                    <form th:action="@{/admin/fail2ban/whitelist}" method="post" style="display: flex; gap: 10px;">
+                        <input type="text" name="ipAddress" placeholder="zz.B. IP manuell hinzufügen..." required
+                               style="flex: 1; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem;">
+                        <button type="submit" class="view-details-btn" style="background-color: #3fb950; color: #fff;">Verifizieren & Whitelisten</button>
+                    </form>
                 </div>
             </div>
 
@@ -348,7 +395,7 @@
 
                 <!-- Recent Logins -->
                 <div class="section">
-                    <h2>👤 Letzte Server-Logins</h2>
+                    <h2>👤 Letzte Admin-Logins (Web & SSH)</h2>
                     <div th:if="${audit.recentLogins.isEmpty()}" class="empty-state">
                         <div class="icon">📭</div>
                         <p>Keine Login-Daten verfügbar.</p>
@@ -364,5 +411,109 @@
             <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
         </div>
     </div>
+
+    <!-- Fail2Ban Details Modal -->
+    <div id="f2bModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔍 Fail2Ban Live-Details</h2>
+                <button class="close-btn" onclick="closeFail2BanDetails()">&times;</button>
+            </div>
+            <div class="modal-body" id="f2bOutput">
+                <!-- Data will be populated here by JavaScript -->
+                <div style="color: #8b949e; padding: 15px;">Lade Daten...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openFail2BanDetails() {
+            document.getElementById('f2bModal').style.display = 'flex';
+            document.getElementById('f2bOutput').innerHTML = "<div style='color:#8b949e; padding: 15px;'>Lade Daten vom Server...</div>";
+            
+            fetch('/admin/api/fail2ban/details')
+                .then(r => r.json())
+                .then(data => {
+                    if(!data || data.length === 0) {
+                        document.getElementById('f2bOutput').innerHTML = "<div style='color:#f85149; padding: 15px;'>Fail2Ban liefert keine Daten (evtl. inaktiv oder Permission-Fehler).</div>";
+                        return;
+                    }
+                    
+                    let html = '<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; padding: 5px;">';
+                    data.forEach(jail => {
+                         let ipsHtml = '';
+                         if(jail.bannedIpList && jail.bannedIpList.length > 0) {
+                             ipsHtml = jail.bannedIpList.map(ip => `
+                             <span class="ip-badge" style="background: rgba(248, 81, 73, 0.15); color: #f85149; font-size: 0.75rem; margin-right: 4px; display: inline-flex; align-items: center; margin-bottom: 4px; padding: 2px 6px; border: 1px solid rgba(248, 81, 73, 0.3);">
+                                ${ip}
+                                <a href="javascript:void(0)" onclick="triggerUnban('${ip}')" style="margin-left: 6px; color: #f85149; text-decoration: none; font-weight: bold; cursor: pointer; padding: 0 4px; background: rgba(248, 81, 73, 0.1); border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem;" title="IP entbannen">✖</a>
+                             </span>`).join('');
+                         } else {
+                             ipsHtml = '<span style="color: #8b949e; font-size: 0.8rem; font-style: italic;">Keine IPs gebannt</span>';
+                         }
+                         
+                         html += `
+                            <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <h3 style="margin: 0 0 12px 0; color: #58a6ff; font-size: 1.1rem; border-bottom: 1px solid #21262d; padding-bottom: 8px; display: flex; align-items: center;">
+                                    <span style="margin-right: 8px;">🛡️</span> ${jail.name}
+                                </h3>
+                                
+                                <div style="display:flex; justify-content: space-between; margin-bottom: 6px;">
+                                    <span style="color: #8b949e; font-size: 0.85rem;">Currently Failed:</span>
+                                    <span style="color: #c9d1d9; font-weight: 500;">${jail.currentlyFailed}</span>
+                                </div>
+                                <div style="display:flex; justify-content: space-between; margin-bottom: 6px;">
+                                    <span style="color: #8b949e; font-size: 0.85rem;">Total Failed:</span>
+                                    <span style="color: #c9d1d9; font-weight: 500;">${jail.totalFailed}</span>
+                                </div>
+                                <div style="display:flex; justify-content: space-between; margin-bottom: 6px;">
+                                    <span style="color: #8b949e; font-size: 0.85rem;">Currently Banned:</span>
+                                    <span style="color: ${jail.currentlyBanned > 0 ? '#f85149' : '#3fb950'}; font-weight: bold;">${jail.currentlyBanned}</span>
+                                </div>
+                                <div style="display:flex; justify-content: space-between; margin-bottom: 15px;">
+                                    <span style="color: #8b949e; font-size: 0.85rem;">Total Banned:</span>
+                                    <span style="color: #c9d1d9; font-weight: 500;">${jail.totalBanned}</span>
+                                </div>
+                                
+                                <div>
+                                    <div style="color: #8b949e; font-size: 0.8rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Banned IPs</div>
+                                    <div style="display: flex; flex-wrap: wrap;">${ipsHtml}</div>
+                                </div>
+                            </div>
+                         `;
+                    });
+                    html += '</div>';
+                    
+                    document.getElementById('f2bOutput').innerHTML = html;
+                })
+                .catch(err => {
+                    document.getElementById('f2bOutput').innerHTML = "<div style='color:#f85149; padding: 15px;'>Fehler beim Laden der Live-Daten: " + err + "</div>";
+                });
+        }
+        
+        function triggerUnban(ip) {
+            if(!confirm("Soll die IP " + ip + " wirklich aus allen Jails entbannt werden?")) return;
+            
+            fetch('/admin/api/fail2ban/unban', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ 'ipAddress': ip })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    // Mute alert to just reload immediately seamlessly
+                    openFail2BanDetails(); 
+                } else {
+                    alert("Gesperrt: " + data.message);
+                }
+            })
+            .catch(err => alert("Kritischer Fehler: " + err));
+        }
+
+        function closeFail2BanDetails() {
+            document.getElementById('f2bModal').style.display = 'none';
+        }
+    </script>
 </body>
 </html>

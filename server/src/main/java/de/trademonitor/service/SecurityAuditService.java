@@ -31,6 +31,9 @@ public class SecurityAuditService {
     private AdminNotificationService notificationService;
 
     @Autowired
+    private de.trademonitor.repository.LoginLogRepository loginLogRepository;
+
+    @Autowired
     private HomeyService homeyService;
 
     @Autowired
@@ -202,7 +205,7 @@ public class SecurityAuditService {
     }
 
     private void checkFail2ban(SecurityAuditDto dto) throws Exception {
-        String output = execCommand("bash", "-c", "fail2ban-client status sshd 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
+        String output = execCommand("bash", "-c", "sudo fail2ban-client status sshd 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
 
         if (output.contains("FAIL2BAN_NOT_AVAILABLE")) {
             dto.setFail2banBannedCount(0);
@@ -367,15 +370,107 @@ public class SecurityAuditService {
     }
 
     private void checkRecentLogins(SecurityAuditDto dto) throws Exception {
-        String output = execCommand("last", "-n", "20");
         List<String> logins = new ArrayList<>();
+        
+        // 1. Web Admin Logins
+        List<de.trademonitor.entity.LoginLog> webLogins = loginLogRepository.findAllByOrderByTimestampDesc()
+                .stream().filter(de.trademonitor.entity.LoginLog::isSuccess).limit(20)
+                .collect(java.util.stream.Collectors.toList());
+        for (de.trademonitor.entity.LoginLog wl : webLogins) {
+            String ts = wl.getTimestamp() != null ? wl.getTimestamp().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
+            logins.add(String.format("WEB-ADMIN %-10s %-16s %s", wl.getUsername(), wl.getIpAddress(), ts));
+        }
+
+        // 2. SSH Logins
+        String output = execCommand("last", "-n", "20");
         for (String line : output.split("\n")) {
             line = line.trim();
             if (!line.isEmpty() && !line.startsWith("wtmp") && !line.startsWith("reboot")) {
-                logins.add(line);
+                logins.add("SSH       " + line);
             }
         }
+        
         dto.setRecentLogins(logins);
+    }
+
+    // ---- Fail2Ban Dynamic Methods ----
+
+    public void syncFail2banWhitelist(String newIp) {
+        if (newIp != null && !newIp.isBlank()) {
+            globalConfigService.addFail2banWhitelistIp(newIp);
+        }
+        List<String> ips = globalConfigService.getFail2banWhitelistIps();
+        String ipsString = String.join(" ", ips);
+        
+        try {
+            // Use the wrapper script we created to bypass permission issues safely
+            execCommand("bash", "-c", "sudo /usr/local/bin/update-fail2ban-whitelist.sh " + ipsString);
+            if (newIp != null && !newIp.isBlank()) {
+                execCommand("bash", "-c", "sudo fail2ban-client unban " + newIp + " --all");
+            }
+        } catch (Exception e) {
+            System.err.println("[SecurityAudit] Failed to sync fail2ban whitelist: " + e.getMessage());
+        }
+    }
+
+    public boolean unbanIp(String ipToUnban) {
+        if (ipToUnban == null || ipToUnban.isBlank()) return false;
+        try {
+            String output = execCommand("bash", "-c", "sudo fail2ban-client unban " + ipToUnban.trim() + " --all");
+            return !output.toLowerCase().contains("error");
+        } catch (Exception e) {
+            System.err.println("[SecurityAudit] Failed to unban IP " + ipToUnban + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public java.util.List<java.util.Map<String, Object>> getFail2banLiveDetails() {
+        java.util.List<java.util.Map<String, Object>> jailsData = new ArrayList<>();
+        try {
+            String status = execCommand("bash", "-c", "sudo fail2ban-client status 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
+            if (status.contains("FAIL2BAN_NOT_AVAILABLE")) return jailsData;
+
+            Pattern p = Pattern.compile("Jail list:\\s+(.+)");
+            Matcher m = p.matcher(status);
+            if (m.find()) {
+                String[] jails = m.group(1).split(",");
+                for (String jail : jails) {
+                    jail = jail.trim();
+                    if (!jail.isEmpty()) {
+                        java.util.Map<String, Object> jailInfo = new java.util.HashMap<>();
+                        jailInfo.put("name", jail);
+                        
+                        String jailStatus = execCommand("bash", "-c", "sudo fail2ban-client status " + jail);
+                        
+                        jailInfo.put("currentlyFailed", extractRegex(jailStatus, "Currently failed:\\s+(\\d+)"));
+                        jailInfo.put("totalFailed", extractRegex(jailStatus, "Total failed:\\s+(\\d+)"));
+                        jailInfo.put("currentlyBanned", extractRegex(jailStatus, "Currently banned:\\s+(\\d+)"));
+                        jailInfo.put("totalBanned", extractRegex(jailStatus, "Total banned:\\s+(\\d+)"));
+                        
+                        String bannedIps = extractRegex(jailStatus, "Banned IP list:\\s+(.*)");
+                        if (bannedIps.trim().isEmpty() || bannedIps.equals("0")) {
+                            jailInfo.put("bannedIpList", new ArrayList<String>());
+                        } else {
+                            jailInfo.put("bannedIpList", Arrays.asList(bannedIps.trim().split("\\s+")));
+                        }
+                        jailsData.add(jailInfo);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error parsing fail2ban details: " + e.getMessage());
+        }
+        return jailsData;
+    }
+
+    private String extractRegex(String text, String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(text);
+        if (matcher.find() && matcher.groupCount() > 0) {
+            String res = matcher.group(1);
+            return res != null ? res : "0";
+        }
+        return "0";
     }
 
     // ---- Utility methods ----

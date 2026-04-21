@@ -87,6 +87,10 @@ public class GlobalConfigService {
     public static final String KEY_BROKER_COMM_FACTOR_PREFIX = "BROKER_COMM_FACTOR.";
     private Map<String, Double> cachedBrokerCommFactors = new LinkedHashMap<>();
 
+    // Fail2Ban Whitelist
+    public static final String KEY_FAIL2BAN_WHITELIST_IPS = "FAIL2BAN_WHITELIST_IPS";
+    private java.util.LinkedList<String> cachedFail2banWhitelistIps = new java.util.LinkedList<>();
+
     @PostConstruct
     public void init() {
         // Load on startup
@@ -240,6 +244,17 @@ public class GlobalConfigService {
         });
         repository.findById(KEY_NETWORK_OFFLINE_THRESHOLD_MINS).ifPresent(e -> {
             try { cachedNetworkOfflineThresholdMins = Integer.parseInt(e.getConfValue()); } catch(Exception ex){}
+        });
+
+        // Load Fail2Ban Whitelist
+        repository.findById(KEY_FAIL2BAN_WHITELIST_IPS).ifPresent(e -> {
+            String val = e.getConfValue();
+            if (val != null && !val.isBlank()) {
+                for (String ip : val.split(",")) {
+                    String trimmed = ip.trim();
+                    if (!trimmed.isEmpty()) cachedFail2banWhitelistIps.add(trimmed);
+                }
+            }
         });
     }
 
@@ -653,5 +668,23 @@ public class GlobalConfigService {
     public void deleteBrokerCommFactor(String brokerName) {
         cachedBrokerCommFactors.remove(brokerName);
         repository.deleteById(KEY_BROKER_COMM_FACTOR_PREFIX + brokerName);
+    }
+
+    // --- Fail2Ban Whitelist ---
+    public java.util.List<String> getFail2banWhitelistIps() {
+        return new java.util.ArrayList<>(cachedFail2banWhitelistIps);
+    }
+
+    public void addFail2banWhitelistIp(String ip) {
+        if (ip == null || ip.isBlank()) return;
+        String trimmed = ip.trim();
+        if (!cachedFail2banWhitelistIps.contains(trimmed)) {
+            cachedFail2banWhitelistIps.addFirst(trimmed);
+            while (cachedFail2banWhitelistIps.size() > 3) {
+                cachedFail2banWhitelistIps.removeLast();
+            }
+            String joined = String.join(",", cachedFail2banWhitelistIps);
+            repository.save(new GlobalConfigEntity(KEY_FAIL2BAN_WHITELIST_IPS, joined));
+        }
     }
 }
