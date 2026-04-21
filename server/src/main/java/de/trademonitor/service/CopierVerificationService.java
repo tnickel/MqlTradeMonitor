@@ -26,6 +26,12 @@ public class CopierVerificationService {
     // Key format: "targetId_sourceId"
     private static final Map<String, Long> knownOffsets = new ConcurrentHashMap<>();
 
+    // Metrics & Alarms
+    private Long syncErrorStartTime = null;
+    private boolean warningEmailSent = false;
+    private String lastSyncStatus = "OK";
+    private int lastCheckedTradeCount = 0;
+
     @Autowired
     private AccountManager accountManager;
 
@@ -35,7 +41,24 @@ public class CopierVerificationService {
     @Autowired
     private GlobalConfigService globalConfigService;
 
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private HomeyService homeyService;
+
     private LocalDateTime lastRunTime = LocalDateTime.MIN;
+
+    public Map<String, Object> getMetrics() {
+        Map<String, Object> metrics = new java.util.HashMap<>();
+        metrics.put("lastCheckTime", lastRunTime == LocalDateTime.MIN ? 0L : lastRunTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+        int intervalSeconds = globalConfigService.getCopierIntervalMins() * 60;
+        metrics.put("nextCheckTime", (lastRunTime == LocalDateTime.MIN ? 0L : lastRunTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) + (intervalSeconds * 1000L));
+        metrics.put("status", lastSyncStatus);
+        metrics.put("checkedCount", lastCheckedTradeCount);
+        metrics.put("interval", intervalSeconds);
+        return metrics;
+    }
 
     @Scheduled(fixedDelay = 60000) // Check every minute
     public void verifyTrades() {
@@ -61,17 +84,37 @@ public class CopierVerificationService {
             targetIdsToVerify.add(link.getTargetAccountId());
         }
 
+        boolean globalErrorDetected = false;
+        int totalCheckedTrades = 0;
+
         for (Long targetId : targetIdsToVerify) {
             de.trademonitor.dto.CopierVerificationReportDto report = generateReport(targetId);
             if (report == null || report.getTargetTrades() == null) continue;
 
             int worstStage = 0;
             boolean hasError = false;
+            
+            Account targetAcc = accountManager.getAccount(targetId);
+            if (targetAcc != null && "REAL".equalsIgnoreCase(targetAcc.getType())) {
+                totalCheckedTrades += targetAcc.getOpenTrades().size();
+            }
 
             // 3. Check if any target trade is unmatched (skip exempt trades)
+            java.util.Map<Long, String> newStatuses = new java.util.HashMap<>();
+            
             for (de.trademonitor.dto.TargetTradeMatchDto match : report.getTargetTrades()) {
-                if (!match.getIsMatched() && !match.getIsExempt()) {
-                    Trade targetTrade = match.getTargetTrade();
+                Trade targetTrade = match.getTargetTrade();
+                
+                if (match.getIsMatched()) {
+                    newStatuses.put(targetTrade.getTicket(), "MATCHED");
+                    int stage = 1;
+                    if (match.getIsStage3Match()) stage = 3;
+                    else if (match.getIsStage2Match()) stage = 2;
+                    if (stage > worstStage) worstStage = stage;
+                } else if (match.getIsExempt()) {
+                    newStatuses.put(targetTrade.getTicket(), "EXEMPTED");
+                } else {
+                    newStatuses.put(targetTrade.getTicket(), "WARNING");
                     String typeStr = targetTrade.getType() != null ? targetTrade.getType().toUpperCase() : "";
                     String readableType = (typeStr.equals("0") || typeStr.equals("BUY")) ? "BUY" : "SELL";
                     String errorMsg = String.format("Trade %s (%s) hat keinen entsprechenden Source-Trade",
@@ -79,20 +122,51 @@ public class CopierVerificationService {
                     LOG.warning("Copier Error on Account " + targetId + ": " + errorMsg);
                     accountManager.updateCopierError(targetId, true, errorMsg);
                     hasError = true;
-                    break; // One error is enough to highlight the account
+                    
+                    // Trigger global alert logic only for REAL accounts
+                    if (targetAcc != null && "REAL".equalsIgnoreCase(targetAcc.getType())) {
+                        globalErrorDetected = true;
+                    }
                 }
+            }
 
-                if (match.getIsMatched()) {
-                    int stage = 1;
-                    if (match.getIsStage3Match()) stage = 3;
-                    else if (match.getIsStage2Match()) stage = 2;
-                    if (stage > worstStage) worstStage = stage;
-                }
+            if (targetAcc != null) {
+                targetAcc.updateSyncStatuses(newStatuses);
             }
 
             if (!hasError) {
                 accountManager.updateCopierWorstStage(targetId, worstStage);
             }
+        }
+
+        lastCheckedTradeCount = totalCheckedTrades;
+
+        // --- Global Alerting Logic ---
+        if (globalErrorDetected) {
+            lastSyncStatus = "WARNING";
+            if (syncErrorStartTime == null) {
+                syncErrorStartTime = System.currentTimeMillis();
+            }
+
+            long delayMs = globalConfigService.getSyncAlarmDelayMins() * 60L * 1000L;
+
+            if (System.currentTimeMillis() - syncErrorStartTime >= delayMs) {
+                if (!warningEmailSent) {
+                    emailService.sendSyncWarningEmail("Trade Monitor Warnung",
+                            "Achtung: Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten! Bitte Dashboard prüfen.");
+
+                    // Trigger Homey Siren if enabled
+                    if (globalConfigService.isHomeyTriggerSync()) {
+                        homeyService.triggerSiren();
+                    }
+
+                    warningEmailSent = true;
+                }
+            }
+        } else {
+            lastSyncStatus = "OK";
+            syncErrorStartTime = null;
+            warningEmailSent = false;
         }
     }
 

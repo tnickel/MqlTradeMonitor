@@ -452,10 +452,18 @@
                              ipsHtml = '<span style="color: #8b949e; font-size: 0.8rem; font-style: italic;">Keine IPs gebannt</span>';
                          }
                          
+                         let tooltipText = '';
+                         if (jail.name === 'sshd') tooltipText = 'Ban: 1 Stunde / Trigger: 3 falsche Logins in 10 Min';
+                         else if (jail.name === 'recidive') tooltipText = 'Ban: 1 Woche / Trigger: 5x sshd Bans (Wiederholungstäter)';
+                         else if (jail.name === 'nginx-limit-req') tooltipText = 'Ban: 10 Minuten / Trigger: Spamming (Limit req)';
+                         else if (jail.name === 'nginx-botsearch') tooltipText = 'Ban: 1 Stunde / Trigger: Suche nach Bot-Exploits (z.B. wp-admin)';
+                         
+                         let infoIconHtml = tooltipText ? `<span style="margin-left: 8px; font-size: 0.85rem; cursor: help; color: #8b949e; opacity: 0.8; font-weight: normal;" title="${tooltipText}">ⓘ</span>` : '';
+
                          html += `
                             <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                 <h3 style="margin: 0 0 12px 0; color: #58a6ff; font-size: 1.1rem; border-bottom: 1px solid #21262d; padding-bottom: 8px; display: flex; align-items: center;">
-                                    <span style="margin-right: 8px;">🛡️</span> ${jail.name}
+                                    <span style="margin-right: 8px;">🛡️</span> ${jail.name} ${infoIconHtml}
                                 </h3>
                                 
                                 <div style="display:flex; justify-content: space-between; margin-bottom: 6px;">

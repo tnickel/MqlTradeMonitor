@@ -44,7 +44,7 @@ public class DashboardController {
     private de.trademonitor.service.GlobalConfigService globalConfigService;
 
     @Autowired
-    private de.trademonitor.service.TradeSyncService tradeSyncService;
+    private de.trademonitor.service.CopierVerificationService copierVerificationService;
 
     @Autowired
     private de.trademonitor.service.MagicMappingService magicMappingService;
@@ -223,7 +223,7 @@ public class DashboardController {
                 .collect(Collectors.toList());
         model.addAttribute("alarmedAccounts", alarmedAccounts);
 
-        model.addAttribute("syncMetrics", tradeSyncService.getMetrics());
+        model.addAttribute("syncMetrics", copierVerificationService.getMetrics());
 
         // Global Export Stats
         List<Long> allowedAccountIds = allAccounts.stream()
@@ -1433,7 +1433,7 @@ public class DashboardController {
                     
                     boolean isOnline = Boolean.TRUE.equals(acc.get("online"));
                     boolean hasError = Boolean.TRUE.equals(acc.get("errorState"));
-                    boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("syncWarning"));
+                    boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("copierError"));
                     boolean hasAlarm = Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered"));
                     
                     boolean statusOk = isOnline && !hasError && !hasSyncWarning && !hasAlarm;
@@ -1469,7 +1469,7 @@ public class DashboardController {
             String healthStatus = serverHealthMonitorService.getLastStatus();
             boolean healthOk = "OK".equals(healthStatus);
             
-            Map<String, Object> syncMetrics = tradeSyncService.getMetrics();
+            Map<String, Object> syncMetrics = copierVerificationService.getMetrics();
             boolean syncOk = "OK".equals(syncMetrics.get("status"));
             
             overallOk = accountsOk && attackOk && healthOk && syncOk;
