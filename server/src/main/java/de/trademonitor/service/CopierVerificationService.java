@@ -154,19 +154,19 @@ public class CopierVerificationService {
                 if (!warningEmailSent) {
                     emailService.sendSyncWarningEmail("Trade Monitor Warnung",
                             "Achtung: Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten! Bitte Dashboard prüfen.");
-
-                    // Trigger Homey Siren if enabled
-                    if (globalConfigService.isHomeyTriggerSync()) {
-                        homeyService.triggerSiren();
-                    }
-
                     warningEmailSent = true;
+                }
+
+                // Activate Homey Siren alarm state if enabled
+                if (globalConfigService.isHomeyTriggerSync()) {
+                    homeyService.setAlarmState("COPIER_SYNC", true);
                 }
             }
         } else {
             lastSyncStatus = "OK";
             syncErrorStartTime = null;
             warningEmailSent = false;
+            homeyService.setAlarmState("COPIER_SYNC", false);
         }
     }
 

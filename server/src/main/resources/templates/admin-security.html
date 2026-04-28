@@ -175,7 +175,21 @@
             padding: 15px; border-radius: 6px; font-size: 0.85rem; white-space: pre-wrap; margin: 0;
             border: 1px solid #30363d;
         }
+
+        #globeViz {
+            width: 100%;
+            height: 500px;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #30363d;
+            display: none; /* hidden by default */
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.32.1/dist/globe.gl.min.js"></script>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
 <body>
     <div class="container">
@@ -294,7 +308,10 @@
                             <h2>🚫 Fail2Ban Status</h2>
                             <p style="color: #8b949e; font-size: 0.85rem; margin: 0;">Aktuell gebannte IPs (alle Jails)</p>
                         </div>
-                        <button type="button" class="view-details-btn" onclick="openFail2BanDetails()" style="background-color: #238636; font-size: 0.8rem;">Live-Details 🔍</button>
+                        <div>
+                            <button type="button" class="view-details-btn" onclick="openIpLocations()" style="background-color: #1f6feb; font-size: 0.8rem; margin-right: 8px;">📍 IP Locations</button>
+                            <button type="button" class="view-details-btn" onclick="openFail2BanDetails()" style="background-color: #238636; font-size: 0.8rem;">Live-Details 🔍</button>
+                        </div>
                     </div>
                     <div th:if="${audit.fail2banBannedIps.isEmpty()}" class="empty-state" style="padding: 10px;">
                         <div class="icon" style="font-size: 1.5rem;">✅</div>
@@ -426,7 +443,316 @@
         </div>
     </div>
 
+    <!-- IP Locations Modal -->
+    <div id="ipLocationsModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 1300px; max-height: 95vh; width: 95%;">
+            <div class="modal-header">
+                <h2>📍 Banned IP Locations</h2>
+                <div>
+                    <button class="view-details-btn" id="syncBtn" onclick="syncIpLocations()" style="background-color: #e3b341; font-size: 0.8rem; margin-right: 8px;">🔄 Data Sync (API)</button>
+                    <button class="view-details-btn" id="toggleMapBtn" onclick="toggleGlobe()" style="background-color: #8957e5; font-size: 0.8rem;">🌍 Show 3D Globe</button>
+                    <button class="close-btn" onclick="closeIpLocations()" style="margin-left: 15px;">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 15px; display: flex; flex-direction: column;">
+                <div id="syncStatusDiv" style="color: #3fb950; font-size: 0.85rem; margin-bottom: 15px; display: none; background: rgba(63, 185, 80, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid #3fb950;">
+                    🔄 <span id="syncStatusText">Sync läuft...</span>
+                </div>
+                <div id="globeViz"></div>
+                <div id="ipTableContainer" style="overflow-y: auto; max-height: 60vh;">
+                    <table class="data-table" id="ipLocationsTable">
+                        <thead>
+                            <tr>
+                                <th>IP-Adresse</th>
+                                <th>Country</th>
+                                <th>City</th>
+                                <th>ISP / Org</th>
+                                <th>Attacks</th>
+                                <th>Last Seen</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ipLocationsBody">
+                            <tr><td colspan="7" style="text-align: center; color: #8b949e;">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let myGlobe = null;
+        let isGlobeVisible = false;
+        let allIpData = [];
+        let syncPollInterval = null;
+
+        function openIpLocations() {
+            document.getElementById('ipLocationsModal').style.display = 'flex';
+            loadIpLocations();
+            checkSyncStatus(); // check once on open
+        }
+
+        function closeIpLocations() {
+            document.getElementById('ipLocationsModal').style.display = 'none';
+            if (syncPollInterval) {
+                clearInterval(syncPollInterval);
+                syncPollInterval = null;
+            }
+        }
+
+        function toggleGlobe() {
+            const globeDiv = document.getElementById('globeViz');
+            const tableDiv = document.getElementById('ipTableContainer');
+            const toggleBtn = document.getElementById('toggleMapBtn');
+
+            if (isGlobeVisible) {
+                globeDiv.style.display = 'none';
+                tableDiv.style.display = 'block';
+                toggleBtn.innerText = '🌍 Show 3D Globe';
+                isGlobeVisible = false;
+            } else {
+                globeDiv.style.display = 'block';
+                tableDiv.style.display = 'none';
+                toggleBtn.innerText = '📋 Show Table';
+                isGlobeVisible = true;
+                
+                // Initialize Globe after layout updates to avoid 0x0 container size
+                setTimeout(() => {
+                    try {
+                        if (!myGlobe) {
+                            initGlobe();
+                        } else {
+                            // Update data in case it changed
+                            updateGlobeData();
+                        }
+                    } catch (e) {
+                        globeDiv.innerHTML = '<div style="color:#f85149; padding: 20px; font-family: sans-serif;"><b>Error loading 3D Globe:</b><br/>' + e.message + '</div>';
+                    }
+                }, 50);
+            }
+        }
+
+        function initGlobe() {
+            const globeContainer = document.getElementById('globeViz');
+            myGlobe = Globe()(globeContainer)
+                .width(globeContainer.clientWidth)
+                .height(500)
+                .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-dark.jpg')
+                .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+                .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+                .pointAltitude(d => d.isPole ? 0.001 : 0.01)
+                .pointRadius(d => d.isPole ? 12 : 0.6)
+                .pointColor(d => d.isPole ? 'rgba(255, 255, 255, 0.8)' : '#f85149')
+                .pointResolution(32) // Smooth circle for the poles
+                .pointLabel(d => {
+                    if (d.isPole) return '';
+                    return `
+                    <div style="background: rgba(0,0,0,0.8); padding: 5px; border-radius: 4px; border: 1px solid #30363d; color: #c9d1d9; font-family: sans-serif; font-size: 12px;">
+                        <b>${d.ipAddress}</b><br/>
+                        <i>${d.city || 'Unknown'}, ${d.country || 'Unknown'}</i><br/>
+                        ISP: ${d.isp || 'N/A'}<br/>
+                        Attacks: ${d.attackCount}
+                    </div>
+                `})
+                .htmlElement(d => {
+                    const el = document.createElement('div');
+                    
+                    // Render continent label
+                    if (d.isContinent) {
+                        el.innerHTML = `<div style="color: rgba(255,255,255,0.3); font-size: 7px; font-family: sans-serif; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; pointer-events: none; user-select: none; transform: translate(-50%, -50%); text-shadow: 0 0 5px rgba(0,0,0,0.8);">${d.name}</div>`;
+                        return el;
+                    }
+                    
+                    // Render city flag
+                    const countLabel = d.count > 1 ? `<span style="color:#8b949e; font-size: 9px; margin-left: 4px;">(+${d.count - 1})</span>` : '';
+                    const cityName = d.city && d.city !== 'Unknown' ? d.city : (d.country || 'Unknown');
+                    el.innerHTML = `
+                        <div style="color: #f8fafc; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: sans-serif; font-weight: 500; border: 1px solid rgba(248, 81, 73, 0.5); white-space: nowrap; pointer-events: auto; user-select: none; transform: translate(-50%, -100%); margin-top: -8px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                            📍 ${cityName} ${countLabel}
+                        </div>
+                    `;
+                    return el;
+                })
+                .pointsTransitionDuration(1000);
+            
+            // Auto-rotate
+            myGlobe.controls().autoRotate = true;
+            myGlobe.controls().autoRotateSpeed = 1.0;
+            
+            // Add subtle ambient light for the surface
+            const ambientLight = new THREE.AmbientLight(0x2563eb, 0.4);
+            myGlobe.scene().add(ambientLight);
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (isGlobeVisible && myGlobe) {
+                    myGlobe.width(globeContainer.clientWidth);
+                }
+            });
+            
+            updateGlobeData();
+        }
+
+        function updateGlobeData() {
+            if (!myGlobe) return;
+            const validPoints = allIpData.filter(d => d.latitude !== null && d.longitude !== null);
+            
+            // Map our fields to the fields Globe.gl expects for points (lat, lng)
+            const gData = validPoints.map(d => ({
+                lat: d.latitude,
+                lng: d.longitude,
+                ...d
+            }));
+            
+            // Add Polar Ice Caps as large flat points
+            gData.push({ lat: 90, lng: 0, isPole: true });
+            gData.push({ lat: -90, lng: 0, isPole: true });
+            
+            // Clustering for flags to avoid clutter (cluster size approx. 4 degrees)
+            const clusters = {};
+            validPoints.forEach(p => {
+                const gridLat = Math.round(p.latitude / 4) * 4;
+                const gridLng = Math.round(p.longitude / 4) * 4;
+                const key = gridLat + '_' + gridLng;
+                
+                if (!clusters[key]) {
+                    clusters[key] = { lat: p.latitude, lng: p.longitude, city: p.city, country: p.country, count: 1 };
+                } else {
+                    clusters[key].count++;
+                    // Prioritize clusters that actually have a city name
+                    if (!clusters[key].city && p.city) {
+                        clusters[key].city = p.city;
+                        clusters[key].lat = p.latitude; // Adjust anchor to known city
+                        clusters[key].lng = p.longitude;
+                    }
+                }
+            });
+            
+            const htmlData = Object.values(clusters);
+            
+            // Add Continent Labels
+            const continents = [
+                { isContinent: true, name: 'North America', lat: 45, lng: -100 },
+                { isContinent: true, name: 'South America', lat: -15, lng: -60 },
+                { isContinent: true, name: 'Europe', lat: 50, lng: 15 },
+                { isContinent: true, name: 'Africa', lat: 5, lng: 20 },
+                { isContinent: true, name: 'Asia', lat: 45, lng: 90 },
+                { isContinent: true, name: 'Oceania', lat: -25, lng: 135 }
+            ];
+            
+            myGlobe.pointsData(gData);
+            myGlobe.htmlElementsData([...continents, ...htmlData]);
+        }
+
+        function checkSyncStatus(isImmediateCheck = false) {
+            fetch('/admin/api/banned-ips/sync-status')
+                .then(r => r.json())
+                .then(data => {
+                    const statusDiv = document.getElementById('syncStatusDiv');
+                    const statusText = document.getElementById('syncStatusText');
+                    const syncBtn = document.getElementById('syncBtn');
+                    
+                    // Hide sync button if we have all data
+                    if (data.f2bCount > 0 && data.dbCount >= data.f2bCount) {
+                        if(syncBtn) syncBtn.style.display = 'none';
+                    } else {
+                        if(syncBtn) syncBtn.style.display = 'inline-block';
+                    }
+                    
+                    if (data.running) {
+                        statusDiv.style.display = 'block';
+                        statusText.innerText = `Sync läuft... verarbeitet: ${data.processed} von ${data.total} IPs (ca. 1.5s/IP)`;
+                        
+                        if (!syncPollInterval) {
+                            syncPollInterval = setInterval(() => checkSyncStatus(false), 2000);
+                        }
+                    } else {
+                        if (syncPollInterval || isImmediateCheck) {
+                            statusDiv.style.display = 'block';
+                            statusText.innerText = `✅ Sync abgeschlossen. (Datenbank enthält ${data.dbCount} IPs)`;
+                            setTimeout(() => { statusDiv.style.display = 'none'; }, 4000);
+                        }
+                        
+                        if (syncPollInterval) {
+                            clearInterval(syncPollInterval);
+                            syncPollInterval = null;
+                            loadIpLocations(); // Reload table/map when sync finishes
+                        }
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+
+        function syncIpLocations() {
+            if (!confirm("Sollen jetzt alle IPs aus Fail2Ban mit der Geoloc-API (ip-api.com) abgeglichen werden? Das kann bei vielen IPs etwas dauern.")) return;
+            
+            const csrfTokenElement = document.querySelector('meta[name="_csrf"]');
+            const csrfHeaderElement = document.querySelector('meta[name="_csrf_header"]');
+            
+            let headers = {};
+            if (csrfTokenElement && csrfHeaderElement) {
+                headers[csrfHeaderElement.getAttribute('content')] = csrfTokenElement.getAttribute('content');
+            }
+            
+            fetch('/admin/api/banned-ips/sync', { 
+                method: 'POST',
+                headers: headers
+            })
+                .then(r => r.json())
+                .then(data => {
+                    // Do not alert, just check status immediately to show the green bar
+                    checkSyncStatus(true);
+                })
+                .catch(err => alert("Error: " + err));
+        }
+
+        function loadIpLocations() {
+            fetch('/admin/api/banned-ips/data')
+                .then(r => r.json())
+                .then(data => {
+                    allIpData = data;
+                    const tbody = document.getElementById('ipLocationsBody');
+                    
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #8b949e;">Keine IPs in der Datenbank. Klicke auf "Data Sync" um die aktuellen Fail2Ban IPs zu importieren.</td></tr>';
+                        return;
+                    }
+                    
+                    // Sort primarily by currentlyBanned, then by attackCount
+                    data.sort((a, b) => {
+                        if (a.currentlyBanned !== b.currentlyBanned) return b.currentlyBanned - a.currentlyBanned;
+                        return b.attackCount - a.attackCount;
+                    });
+                    
+                    let html = '';
+                    data.forEach(ip => {
+                        const dateStr = ip.lastSeen ? new Date(ip.lastSeen).toLocaleString('de-DE') : 'N/A';
+                        const statusBadge = ip.currentlyBanned 
+                            ? '<span class="count-badge" style="background-color: rgba(248, 81, 73, 0.15); color: #f85149;">Aktiv gebannt</span>' 
+                            : '<span class="count-badge" style="background-color: rgba(139, 148, 158, 0.15); color: #8b949e;">Historisch</span>';
+                        
+                        html += `
+                            <tr style="${ip.currentlyBanned ? 'background-color: rgba(248, 81, 73, 0.05);' : ''}">
+                                <td><span class="ip-badge">${ip.ipAddress}</span></td>
+                                <td>${ip.country || '-'}</td>
+                                <td>${ip.city || '-'}</td>
+                                <td><div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${ip.isp || ''}">${ip.isp || '-'}</div></td>
+                                <td style="text-align: center;"><b>${ip.attackCount}</b></td>
+                                <td>${dateStr}</td>
+                                <td>${statusBadge}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                    
+                    if (isGlobeVisible) updateGlobeData();
+                })
+                .catch(err => {
+                    document.getElementById('ipLocationsBody').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #f85149;">Fehler beim Laden: ' + err + '</td></tr>';
+                });
+        }
+
         function openFail2BanDetails() {
             document.getElementById('f2bModal').style.display = 'flex';
             document.getElementById('f2bOutput').innerHTML = "<div style='color:#8b949e; padding: 15px;'>Lade Daten vom Server...</div>";

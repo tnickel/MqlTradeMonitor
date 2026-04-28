@@ -205,7 +205,7 @@ public class SecurityAuditService {
     }
 
     private void checkFail2ban(SecurityAuditDto dto) throws Exception {
-        String output = execCommand("bash", "-c", "sudo fail2ban-client status sshd 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
+        String output = execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client status sshd 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
 
         if (output.contains("FAIL2BAN_NOT_AVAILABLE")) {
             dto.setFail2banBannedCount(0);
@@ -291,6 +291,7 @@ public class SecurityAuditService {
             53,    // DNS (systemd-resolved) — localhost only
             631,   // CUPS (print service) — localhost only
             3002,  // Kursplaner App (Node.js)
+            3003,  // Chatbot Backend API (Node.js)
             8080,  // WildFly HTTP
             8443,  // WildFly HTTPS
             9990,  // WildFly Management
@@ -406,7 +407,7 @@ public class SecurityAuditService {
             // Use the wrapper script we created to bypass permission issues safely
             execCommand("bash", "-c", "sudo /usr/local/bin/update-fail2ban-whitelist.sh " + ipsString);
             if (newIp != null && !newIp.isBlank()) {
-                execCommand("bash", "-c", "sudo fail2ban-client unban " + newIp + " --all");
+                execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client unban " + newIp + " --all");
             }
         } catch (Exception e) {
             System.err.println("[SecurityAudit] Failed to sync fail2ban whitelist: " + e.getMessage());
@@ -416,7 +417,7 @@ public class SecurityAuditService {
     public boolean unbanIp(String ipToUnban) {
         if (ipToUnban == null || ipToUnban.isBlank()) return false;
         try {
-            String output = execCommand("bash", "-c", "sudo fail2ban-client unban " + ipToUnban.trim() + " --all");
+            String output = execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client unban " + ipToUnban.trim() + " --all");
             return !output.toLowerCase().contains("error");
         } catch (Exception e) {
             System.err.println("[SecurityAudit] Failed to unban IP " + ipToUnban + ": " + e.getMessage());
@@ -427,7 +428,7 @@ public class SecurityAuditService {
     public java.util.List<java.util.Map<String, Object>> getFail2banLiveDetails() {
         java.util.List<java.util.Map<String, Object>> jailsData = new ArrayList<>();
         try {
-            String status = execCommand("bash", "-c", "sudo fail2ban-client status 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
+            String status = execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client status 2>/dev/null || echo 'FAIL2BAN_NOT_AVAILABLE'");
             if (status.contains("FAIL2BAN_NOT_AVAILABLE")) return jailsData;
 
             Pattern p = Pattern.compile("Jail list:\\s+(.+)");
@@ -440,7 +441,7 @@ public class SecurityAuditService {
                         java.util.Map<String, Object> jailInfo = new java.util.HashMap<>();
                         jailInfo.put("name", jail);
                         
-                        String jailStatus = execCommand("bash", "-c", "sudo fail2ban-client status " + jail);
+                        String jailStatus = execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client status " + jail);
                         
                         jailInfo.put("currentlyFailed", extractRegex(jailStatus, "Currently failed:\\s+(\\d+)"));
                         jailInfo.put("totalFailed", extractRegex(jailStatus, "Total failed:\\s+(\\d+)"));
@@ -507,6 +508,7 @@ public class SecurityAuditService {
      */
     private void sendAuditAlertIfNeeded(SecurityAuditDto result) {
         if (result.getOverallStatus() == SecurityAuditDto.Status.GREEN) {
+            homeyService.setAlarmState("SECURITY", false);
             return; // All good, no alert needed
         }
 
@@ -558,7 +560,7 @@ public class SecurityAuditService {
         // Trigger Homey Siren if enabled for security alerts
         if (globalConfigService.isHomeyTriggerSecurity()) {
             System.out.println("[SecurityAudit] Triggering Homey siren for security alert.");
-            homeyService.triggerSiren();
+            homeyService.setAlarmState("SECURITY", true);
         }
     }
 }

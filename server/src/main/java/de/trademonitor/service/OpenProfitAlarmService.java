@@ -36,6 +36,7 @@ public class OpenProfitAlarmService {
             if (!account.isOpenProfitAlarmEnabled()) {
                 account.setOpenProfitAlarmTriggered(false);
                 alarmFiredMap.remove(account.getAccountId());
+                homeyService.setAlarmState("PROFIT_" + account.getAccountId(), false);
                 continue;
             }
 
@@ -64,10 +65,14 @@ public class OpenProfitAlarmService {
                 if (!alreadyFired) {
                     triggerAlarm(account, openProfit, balance);
                     alarmFiredMap.put(account.getAccountId(), true);
+                    if (globalConfigService.isHomeyTriggerSync()) {
+                        homeyService.setAlarmState("PROFIT_" + account.getAccountId(), true);
+                    }
                 }
             } else {
                 account.setOpenProfitAlarmTriggered(false);
                 alarmFiredMap.put(account.getAccountId(), false);
+                homeyService.setAlarmState("PROFIT_" + account.getAccountId(), false);
             }
         }
     }
@@ -95,10 +100,7 @@ public class OpenProfitAlarmService {
 
         emailService.sendSyncWarningEmail(subject, body);
 
-        // Trigger Homey Siren (reuse sync trigger config)
-        if (globalConfigService.isHomeyTriggerSync()) {
-            homeyService.triggerSiren();
-        }
+        // Siren is triggered via stateful alarm in checkOpenProfitAlarms
 
         System.out.println("OPEN PROFIT ALARM triggered for account " + account.getAccountId()
                 + " (" + accountName + ") - Open Profit: " + openProfit);

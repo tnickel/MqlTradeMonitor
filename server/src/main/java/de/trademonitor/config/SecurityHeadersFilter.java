@@ -61,10 +61,10 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
             response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
             response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
             response.setHeader("Content-Security-Policy",
-                    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
+                    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; " +
                             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
                             "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
-                            "img-src 'self' data:; " +
+                            "img-src 'self' data: https://unpkg.com; " +
                             "connect-src 'self';");
 
             // Only enable HSTS if the request came over HTTPS

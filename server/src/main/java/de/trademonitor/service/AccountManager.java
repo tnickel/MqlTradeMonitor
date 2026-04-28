@@ -568,11 +568,13 @@ public class AccountManager {
                     LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
                             + ") went OFFLINE — triggering Homey siren.");
-                    homeyService.triggerSiren();
+                    homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
                 }
             } else if (isOnline) {
                 // Account is back online — reset the latch
-                offlineSirenLatch.remove(account.getAccountId());
+                if (offlineSirenLatch.remove(account.getAccountId())) {
+                    homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), false);
+                }
             }
         }
     }

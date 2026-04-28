@@ -859,10 +859,11 @@ public class DashboardController {
             @RequestParam(required = false) boolean triggerSecurity,
             @RequestParam(required = false) boolean triggerOffline,
             @RequestParam int repeatCount,
-            @RequestParam(defaultValue = "5") int syncAlarmDelayMins) {
+            @RequestParam(defaultValue = "5") int syncAlarmDelayMins,
+            @RequestParam(defaultValue = "15") int homeyRepeatIntervalMins) {
 
         globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi,
-                triggerHealth, triggerSecurity, triggerOffline, repeatCount, syncAlarmDelayMins);
+                triggerHealth, triggerSecurity, triggerOffline, repeatCount, syncAlarmDelayMins, homeyRepeatIntervalMins);
         return "redirect:/admin";
     }
 

@@ -454,6 +454,7 @@ public class GlobalConfigService {
     public static final String KEY_HOMEY_TRIGGER_SECURITY = "HOMEY_TRIGGER_SECURITY";
     public static final String KEY_HOMEY_TRIGGER_OFFLINE = "HOMEY_TRIGGER_OFFLINE";
     public static final String KEY_HOMEY_REPEAT_COUNT = "HOMEY_REPEAT_COUNT";
+    public static final String KEY_HOMEY_REPEAT_INTERVAL_MINS = "HOMEY_REPEAT_INTERVAL_MINS";
     public static final String KEY_SYNC_ALARM_DELAY_MINS = "SYNC_ALARM_DELAY_MINS";
 
     private int cachedSyncAlarmDelayMins = 5; // Default 5 minutes
@@ -473,6 +474,10 @@ public class GlobalConfigService {
 
     public int getHomeyRepeatCount() {
         return repository.findById(KEY_HOMEY_REPEAT_COUNT).map(e -> Integer.parseInt(e.getConfValue())).orElse(1);
+    }
+
+    public int getHomeyRepeatIntervalMins() {
+        return repository.findById(KEY_HOMEY_REPEAT_INTERVAL_MINS).map(e -> Integer.parseInt(e.getConfValue())).orElse(15);
     }
 
     public boolean isHomeyTriggerSync() {
@@ -501,8 +506,7 @@ public class GlobalConfigService {
     }
 
     public void saveHomeyConfig(String homeyId, String eventName, boolean triggerSync, boolean triggerApi,
-            boolean triggerHealth, boolean triggerSecurity, boolean triggerOffline,
-            int repeatCount, int syncAlarmDelayMins) {
+                                boolean triggerHealth, boolean triggerSecurity, boolean triggerOffline, int repeatCount, int syncAlarmDelayMins, int repeatIntervalMins) {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_ID, homeyId));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_EVENT, eventName));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
@@ -511,6 +515,7 @@ public class GlobalConfigService {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SECURITY, String.valueOf(triggerSecurity)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_OFFLINE, String.valueOf(triggerOffline)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_INTERVAL_MINS, String.valueOf(repeatIntervalMins)));
         repository.save(new GlobalConfigEntity(KEY_SYNC_ALARM_DELAY_MINS, String.valueOf(syncAlarmDelayMins)));
         this.cachedSyncAlarmDelayMins = syncAlarmDelayMins;
     }

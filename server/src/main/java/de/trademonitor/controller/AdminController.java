@@ -53,6 +53,12 @@ public class AdminController {
     private de.trademonitor.service.AccountManager accountManager;
 
     @Autowired
+    private de.trademonitor.repository.BannedIpRepository bannedIpRepository;
+
+    @Autowired
+    private de.trademonitor.service.IpGeolocationService ipGeolocationService;
+
+    @Autowired
     private javax.sql.DataSource dataSource;
 
     @GetMapping("")
@@ -139,6 +145,7 @@ public class AdminController {
         model.addAttribute("homeyTriggerSecurity", globalConfigService.isHomeyTriggerSecurity());
         model.addAttribute("homeyTriggerOffline", globalConfigService.isHomeyTriggerOffline());
         model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
+        model.addAttribute("homeyRepeatIntervalMins", globalConfigService.getHomeyRepeatIntervalMins());
         model.addAttribute("syncAlarmDelayMins", globalConfigService.getSyncAlarmDelayMins());
 
         // Network Monitor Config
@@ -539,8 +546,7 @@ public class AdminController {
         return result;
     }
 
-    @GetMapping("/health")
-    public String serverHealth(Model model) {
+    private de.trademonitor.dto.ServerHealthDto gatherServerHealthInfo(Model model) {
         de.trademonitor.dto.ServerHealthDto health = new de.trademonitor.dto.ServerHealthDto();
         
         // OS info
@@ -564,14 +570,18 @@ public class AdminController {
             health.setSystemTotalMemory(formatSize(sysTotal));
             health.setSystemFreeMemory(formatSize(sysFree));
             health.setSystemUsedMemory(formatSize(sysUsed));
-            model.addAttribute("sysFreeRaw", sysFree);
-            model.addAttribute("sysUsedRaw", sysUsed);
+            if (model != null) {
+                model.addAttribute("sysFreeRaw", sysFree);
+                model.addAttribute("sysUsedRaw", sysUsed);
+            }
         } catch (Throwable t) {
             health.setSystemTotalMemory("N/A");
             health.setSystemFreeMemory("N/A");
             health.setSystemUsedMemory("N/A");
-            model.addAttribute("sysFreeRaw", 0);
-            model.addAttribute("sysUsedRaw", 0);
+            if (model != null) {
+                model.addAttribute("sysFreeRaw", 0);
+                model.addAttribute("sysUsedRaw", 0);
+            }
         }
         
         // Disk (working dir)
@@ -622,11 +632,25 @@ public class AdminController {
         }
         health.setLogFileSize(logFile.exists() ? formatSize(logFile.length()) : "Not Found");
 
-        model.addAttribute("diskFreeRaw", freeSpace);
-        model.addAttribute("diskUsedRaw", usedSpace);
-        model.addAttribute("health", health);
+        if (model != null) {
+            model.addAttribute("diskFreeRaw", freeSpace);
+            model.addAttribute("diskUsedRaw", usedSpace);
+            model.addAttribute("health", health);
+        }
         
+        return health;
+    }
+
+    @GetMapping("/health")
+    public String serverHealth(Model model) {
+        gatherServerHealthInfo(model);
         return "admin-health";
+    }
+
+    @GetMapping("/api/health/data")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public de.trademonitor.dto.ServerHealthDto getServerHealthData() {
+        return gatherServerHealthInfo(null);
     }
 
     @GetMapping("/api/network-timeline")
@@ -716,6 +740,48 @@ public class AdminController {
             response.put("message", "Fehler beim Freigeben der IP.");
         }
         return org.springframework.http.ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/api/banned-ips/data")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<java.util.List<de.trademonitor.entity.BannedIpEntity>> getBannedIpsData() {
+        return org.springframework.http.ResponseEntity.ok(bannedIpRepository.findAll());
+    }
+
+    @PostMapping("/api/banned-ips/sync")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<java.util.Map<String, String>> syncBannedIps() {
+        java.util.Map<String, Object> currentStatus = ipGeolocationService.getSyncStatus();
+        if (Boolean.TRUE.equals(currentStatus.get("running"))) {
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("status", "success", "message", "Sync läuft bereits!"));
+        }
+        
+        java.util.List<java.util.Map<String, Object>> fail2banDetails = securityAuditService.getFail2banLiveDetails();
+        java.util.Set<String> allBannedIps = new java.util.HashSet<>();
+        for (java.util.Map<String, Object> jail : fail2banDetails) {
+            Object ipListObj = jail.get("bannedIpList");
+            if (ipListObj instanceof java.util.List) {
+                @SuppressWarnings("unchecked")
+                java.util.List<String> ips = (java.util.List<String>) ipListObj;
+                allBannedIps.addAll(ips);
+            }
+        }
+        
+        // Run async so we don't block the UI request while rate limiting
+        new Thread(() -> {
+            ipGeolocationService.processBannedIps(new java.util.ArrayList<>(allBannedIps));
+        }).start();
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Sync gestartet.");
+        return org.springframework.http.ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/api/banned-ips/sync-status")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> getSyncStatus() {
+        return org.springframework.http.ResponseEntity.ok(ipGeolocationService.getSyncStatus());
     }
 
     @PostMapping("/notifications/acknowledge")

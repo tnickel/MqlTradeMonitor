@@ -137,6 +137,25 @@ Aktuell existiert eine experimentelle Web-App, die über Replit (Replit AI) entw
 - Eigene REST-API-Auth-Endpunkte (`/api/login`, `/api/demo-login`, `/api/logout`) ohne CSRF-Zwang
 - Sämtliche Dokumentation, Prompts und Beschreibungen für die Replit App befinden sich im separaten Verzeichnis `replit/` (z.B. `Replit_Erweiterung.md`)
 
+### 4.6 MCP Server (AI-Sidecar)
+
+Der TradeMonitor bringt einen eigenen Model Context Protocol (MCP) Server mit, um sich nahtlos in KI-Agenten wie die Claude Desktop App zu integrieren. Der MCP-Server läuft lokal als Node.js/TypeScript-Anwendung und spricht über REST mit dem TradeMonitor-Backend.
+
+**Verfügbare Tools (Schnittstellen) für die KI:**
+- `get_accounts`, `get_open_trades`, `get_closed_trades`: Trading-Daten lesen
+- `get_system_status`, `get_daily_profits`: Dashboard-Metriken aggregieren
+- `get_ea_logs`: Logs der Expert Advisors auslesen
+- `get_blocked_ips`, `get_server_health`: Fail2Ban und System-Ressourcen (erfordert Admin-Rechte)
+
+### 4.6 KI-Integration (Model Context Protocol)
+
+Der Server verfügt über einen voll integrierten **MCP (Model Context Protocol) Server**, der es modernen Large Language Models (wie Claude) ermöglicht, als intelligente Agenten mit dem TradeMonitor-Backend zu kommunizieren.
+
+**Besonderheiten:**
+- **Natürliche Sprache zu API:** Das LLM übersetzt menschliche Anfragen ("Wie sieht der Serverstatus aus?", "Welche IPs sind geblockt?") in exakte Tool-Aufrufe (REST-Endpoints).
+- **Verfügbare Tools:** `get_server_health`, `get_system_status`, `get_accounts`, `get_open_trades`, `get_closed_trades`, `get_daily_profits`, `get_ea_logs`, `get_blocked_ips`.
+- **Produktionstauglich:** Das System ruft Live-Daten aus der H2-Datenbank und vom Contabo-Server (z.B. Fail2Ban) ab. 
+
 ---
 
 ## 5. Datenbankschema (11 Tabellen)

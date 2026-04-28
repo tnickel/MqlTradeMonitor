@@ -68,6 +68,7 @@ public class ServerHealthMonitorService {
         if (lastProblems.isEmpty()) {
             lastStatus = "OK";
             System.out.println("[HealthMonitor] All checks passed.");
+            homeyService.setAlarmState("HEALTH", false);
         } else {
             lastStatus = "PROBLEM";
             System.out.println("[HealthMonitor] Problems detected: " + lastProblems.size());
@@ -180,7 +181,7 @@ public class ServerHealthMonitorService {
         // Trigger Homey Siren if enabled for health alerts
         if (globalConfigService.isHomeyTriggerHealth()) {
             System.out.println("[HealthMonitor] Triggering Homey siren for health alert.");
-            homeyService.triggerSiren();
+            homeyService.setAlarmState("HEALTH", true);
         }
     }
 

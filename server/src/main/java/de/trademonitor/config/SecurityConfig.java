@@ -43,8 +43,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Disable CSRF for API endpoints used by EA
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+                // Disable CSRF for API endpoints used by EA and Admin AJAX
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/admin/api/**"))
                 .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
