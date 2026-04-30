@@ -78,9 +78,9 @@ public class SecurityConfig {
             "https://*.replit.dev",
             "https://*.replit.app",
             "http://localhost:*",
-            "https://monitor.ki-software-schmiede.de",
-            "http://monitor.ki-software-schmiede.de",
-            "https://*.ki-software-schmiede.de"
+            "https://monitor.tnickel-ki.de",
+            "http://monitor.tnickel-ki.de",
+            "https://*.tnickel-ki.de"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
