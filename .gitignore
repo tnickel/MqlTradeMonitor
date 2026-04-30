@@ -23,3 +23,18 @@ Doku/tips.md
 # Claude/Antigravity
 .claude/
 .gemini/
+
+# Node Modules
+node_modules/
+mcp-server/node_modules/
+
+# Logs and runtime artifacts
+*.log
+server/*.log
+server/cookies.txt
+server/login_output.html
+
+# Database files
+server/*.mv.db
+server/*.trace.db
+*.db

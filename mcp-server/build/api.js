@@ -30,6 +30,21 @@ class TradeMonitorApi {
             }
             return config;
         });
+        // Detect expired session (server returns login HTML) and re-authenticate
+        this.client.interceptors.response.use(async (response) => {
+            const contentType = String(response.headers['content-type'] || '');
+            if (contentType.includes('text/html')) {
+                this.jsessionId = null;
+                await this.authenticate();
+                // Retry the original request with the new session
+                const config = response.config;
+                if (this.jsessionId) {
+                    config.headers['Cookie'] = `JSESSIONID=${this.jsessionId}`;
+                }
+                return this.client.request(config);
+            }
+            return response;
+        });
     }
     async authenticate() {
         const username = process.env.TRADEMONITOR_USERNAME;
