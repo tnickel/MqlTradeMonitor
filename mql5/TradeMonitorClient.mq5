@@ -9,7 +9,7 @@
 
 //--- Input parameters (defaults, overridden by config file if present)
 input string   ServerURL = "https://monitor.tnickel-ki.de"; // Server URL (use HTTPS!)
-input string   InpUserKey = "DEIN_API_KEY_HIER"; // User API-Key (from Admin Dashboard)
+input string   InpUserKey = "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4"; // User API-Key (from Admin Dashboard)
 input int      UpdateIntervalSeconds = 15;             // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
@@ -174,7 +174,7 @@ void InitConfig()
       bool uiChanged = false;
       
       if(ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de" && ServerURL != cfg_ServerURL) uiChanged = true;
-      if(InpUserKey != "" && InpUserKey != "DEIN_API_KEY_HIER" && InpUserKey != cfg_UserKey) uiChanged = true;
+      if(InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4" && InpUserKey != cfg_UserKey) uiChanged = true;
       if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
@@ -192,7 +192,7 @@ void InitConfig()
       {
          Print("UI inputs differ from config file. Updating config file with new UI values.");
          cfg_ServerURL = (ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de") ? ServerURL : cfg_ServerURL;
-         cfg_UserKey = (InpUserKey != "" && InpUserKey != "DEIN_API_KEY_HIER") ? InpUserKey : cfg_UserKey;
+         cfg_UserKey = (InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4") ? InpUserKey : cfg_UserKey;
          cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
