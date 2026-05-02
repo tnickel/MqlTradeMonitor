@@ -74,4 +74,23 @@ public class LogCleanupService {
 
         System.out.println("Finished daily log cleanup routine.");
     }
+
+    /**
+     * Manual one-time purge: keeps only the last N days of EA logs.
+     * Returns the number of rows deleted.
+     */
+    public String purgeEaLogs(int keepDays) {
+        long countBefore = eaLogEntryRepository.count();
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(keepDays);
+        eaLogEntryRepository.deleteByTimestampBefore(cutoff);
+        long countAfter = eaLogEntryRepository.count();
+        long deleted = countBefore - countAfter;
+        String msg = "EA Log Purge: deleted " + deleted + " rows (kept last " + keepDays + " days). Before: " + countBefore + ", After: " + countAfter;
+        System.out.println(msg);
+        return msg;
+    }
+
+    public long getEaLogCount() {
+        return eaLogEntryRepository.count();
+    }
 }

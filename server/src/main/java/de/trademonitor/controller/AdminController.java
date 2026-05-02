@@ -562,10 +562,31 @@ public class AdminController {
         
         // Memory System
         try {
-            javax.management.MBeanServer mbs = java.lang.management.ManagementFactory.getPlatformMBeanServer();
-            javax.management.ObjectName name = javax.management.ObjectName.getInstance("java.lang:type=OperatingSystem");
-            long sysTotal = (Long) mbs.getAttribute(name, "TotalPhysicalMemorySize");
-            long sysFree = (Long) mbs.getAttribute(name, "FreePhysicalMemorySize");
+            long sysTotal = -1;
+            long sysFree = -1; // We will use 'available' memory as 'free' on Linux for realistic usage
+            
+            if (System.getProperty("os.name").toLowerCase().contains("linux")) {
+                try {
+                    java.util.List<String> lines = java.nio.file.Files.readAllLines(java.nio.file.Paths.get("/proc/meminfo"));
+                    for (String line : lines) {
+                        if (line.startsWith("MemTotal:")) {
+                            sysTotal = Long.parseLong(line.replaceAll("\\D", "")) * 1024L;
+                        } else if (line.startsWith("MemAvailable:")) {
+                            sysFree = Long.parseLong(line.replaceAll("\\D", "")) * 1024L;
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore, fallback to JMX
+                }
+            }
+            
+            if (sysTotal == -1 || sysFree == -1) {
+                javax.management.MBeanServer mbs = java.lang.management.ManagementFactory.getPlatformMBeanServer();
+                javax.management.ObjectName name = javax.management.ObjectName.getInstance("java.lang:type=OperatingSystem");
+                sysTotal = (Long) mbs.getAttribute(name, "TotalPhysicalMemorySize");
+                sysFree = (Long) mbs.getAttribute(name, "FreePhysicalMemorySize");
+            }
+            
             long sysUsed = sysTotal - sysFree;
             health.setSystemTotalMemory(formatSize(sysTotal));
             health.setSystemFreeMemory(formatSize(sysFree));
@@ -926,5 +947,24 @@ public class AdminController {
         result.put("dbFileBytes", fileSize);
         result.put("dbFileFormatted", formatSize(fileSize));
         return result;
+    }
+
+    @Autowired
+    private de.trademonitor.service.LogCleanupService logCleanupService;
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/purge-ea-logs")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> purgeEaLogs(
+            @RequestParam(defaultValue = "3") int keepDays) {
+        String result = logCleanupService.purgeEaLogs(keepDays);
+        long remaining = logCleanupService.getEaLogCount();
+        return java.util.Map.of("message", result, "remainingRows", remaining);
+    }
+
+    @GetMapping("/api/ea-log-count")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> eaLogCount() {
+        long count = logCleanupService.getEaLogCount();
+        return java.util.Map.of("totalEaLogRows", count);
     }
 }

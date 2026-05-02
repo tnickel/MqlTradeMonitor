@@ -188,6 +188,7 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.32.1/dist/globe.gl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
@@ -450,6 +451,7 @@
                 <h2>📍 Banned IP Locations</h2>
                 <div>
                     <button class="view-details-btn" id="syncBtn" onclick="syncIpLocations()" style="background-color: #e3b341; font-size: 0.8rem; margin-right: 8px;">🔄 Data Sync (API)</button>
+                    <button class="view-details-btn" id="toggleChartBtn" onclick="toggleChart()" style="background-color: #1f6feb; font-size: 0.8rem; margin-right: 8px;">📊 Balkendiagramm</button>
                     <button class="view-details-btn" id="toggleMapBtn" onclick="toggleGlobe()" style="background-color: #8957e5; font-size: 0.8rem;">🌍 Show 3D Globe</button>
                     <button class="close-btn" onclick="closeIpLocations()" style="margin-left: 15px;">&times;</button>
                 </div>
@@ -457,6 +459,9 @@
             <div class="modal-body" style="padding: 15px; display: flex; flex-direction: column;">
                 <div id="syncStatusDiv" style="color: #3fb950; font-size: 0.85rem; margin-bottom: 15px; display: none; background: rgba(63, 185, 80, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid #3fb950;">
                     🔄 <span id="syncStatusText">Sync läuft...</span>
+                </div>
+                <div id="chartViz" style="display: none; height: 500px; width: 100%; background-color: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 15px;">
+                    <canvas id="countryChart"></canvas>
                 </div>
                 <div id="globeViz"></div>
                 <div id="ipTableContainer" style="overflow-y: auto; max-height: 60vh;">
@@ -483,7 +488,8 @@
 
     <script>
         let myGlobe = null;
-        let isGlobeVisible = false;
+        let myChart = null;
+        let currentView = 'table'; // 'table', 'globe', 'chart'
         let allIpData = [];
         let syncPollInterval = null;
 
@@ -501,35 +507,118 @@
             }
         }
 
-        function toggleGlobe() {
+        function showView(view) {
             const globeDiv = document.getElementById('globeViz');
             const tableDiv = document.getElementById('ipTableContainer');
-            const toggleBtn = document.getElementById('toggleMapBtn');
+            const chartDiv = document.getElementById('chartViz');
+            const toggleGlobeBtn = document.getElementById('toggleMapBtn');
+            const toggleChartBtn = document.getElementById('toggleChartBtn');
 
-            if (isGlobeVisible) {
-                globeDiv.style.display = 'none';
+            globeDiv.style.display = 'none';
+            tableDiv.style.display = 'none';
+            chartDiv.style.display = 'none';
+            toggleGlobeBtn.innerText = '🌍 Show 3D Globe';
+            toggleChartBtn.innerText = '📊 Balkendiagramm';
+
+            currentView = view;
+
+            if (view === 'table') {
                 tableDiv.style.display = 'block';
-                toggleBtn.innerText = '🌍 Show 3D Globe';
-                isGlobeVisible = false;
-            } else {
+            } else if (view === 'globe') {
                 globeDiv.style.display = 'block';
-                tableDiv.style.display = 'none';
-                toggleBtn.innerText = '📋 Show Table';
-                isGlobeVisible = true;
-                
-                // Initialize Globe after layout updates to avoid 0x0 container size
+                toggleGlobeBtn.innerText = '📋 Show Table';
                 setTimeout(() => {
                     try {
                         if (!myGlobe) {
                             initGlobe();
                         } else {
-                            // Update data in case it changed
                             updateGlobeData();
                         }
                     } catch (e) {
                         globeDiv.innerHTML = '<div style="color:#f85149; padding: 20px; font-family: sans-serif;"><b>Error loading 3D Globe:</b><br/>' + e.message + '</div>';
                     }
                 }, 50);
+            } else if (view === 'chart') {
+                chartDiv.style.display = 'block';
+                toggleChartBtn.innerText = '📋 Show Table';
+                updateChartData();
+            }
+        }
+
+        function toggleGlobe() {
+            if (currentView === 'globe') showView('table');
+            else showView('globe');
+        }
+
+        function toggleChart() {
+            if (currentView === 'chart') showView('table');
+            else showView('chart');
+        }
+
+        function updateChartData() {
+            if (!allIpData || allIpData.length === 0) return;
+            
+            const countryCounts = {};
+            allIpData.forEach(ip => {
+                const country = ip.country && ip.country !== 'Unknown' ? ip.country : 'Unknown';
+                if (!countryCounts[country]) countryCounts[country] = 0;
+                countryCounts[country] += ip.attackCount;
+            });
+
+            const sortedCountries = Object.keys(countryCounts).sort((a, b) => countryCounts[b] - countryCounts[a]);
+            const labels = sortedCountries;
+            const data = sortedCountries.map(c => countryCounts[c]);
+
+            const ctx = document.getElementById('countryChart').getContext('2d');
+            
+            if (myChart) {
+                myChart.data.labels = labels;
+                myChart.data.datasets[0].data = data;
+                myChart.update();
+            } else {
+                Chart.defaults.color = '#8b949e';
+                Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+                myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Angriffe',
+                            data: data,
+                            backgroundColor: 'rgba(248, 81, 73, 0.6)',
+                            borderColor: 'rgba(248, 81, 73, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: 'Angriffe nach Ländern',
+                                color: '#c9d1d9',
+                                font: { size: 16 }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { color: '#30363d' },
+                                title: { display: true, text: 'Anzahl Angriffe', color: '#8b949e' },
+                                ticks: { color: '#c9d1d9' }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { color: '#c9d1d9' }
+                            }
+                        }
+                    }
+                });
             }
         }
 
@@ -746,7 +835,8 @@
                     });
                     tbody.innerHTML = html;
                     
-                    if (isGlobeVisible) updateGlobeData();
+                    if (currentView === 'globe') updateGlobeData();
+                    if (currentView === 'chart') updateChartData();
                 })
                 .catch(err => {
                     document.getElementById('ipLocationsBody').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #f85149;">Fehler beim Laden: ' + err + '</td></tr>';

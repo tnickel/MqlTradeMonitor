@@ -544,6 +544,11 @@ public class AccountManager {
         return timeoutSeconds;
     }
 
+    private boolean isWeekend() {
+        java.time.DayOfWeek day = java.time.LocalDateTime.now().getDayOfWeek();
+        return day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY;
+    }
+
     /**
      * Scheduled check (every 2 minutes) for REAL accounts going offline.
      * Triggers Homey siren if HOMEY_TRIGGER_OFFLINE is enabled.
@@ -567,8 +572,11 @@ public class AccountManager {
                 if (offlineSirenLatch.add(account.getAccountId())) {
                     LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
-                            + ") went OFFLINE — triggering Homey siren.");
-                    homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
+                            + ") went OFFLINE.");
+                    if (!isWeekend()) {
+                        LOG.info("Triggering Homey siren for offline account.");
+                        homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
+                    }
                 }
             } else if (isOnline) {
                 // Account is back online — reset the latch

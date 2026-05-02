@@ -17,9 +17,63 @@ Der MQL Trade Monitor implementiert ein mehrschichtiges Sicherheitskonzept basie
 
 ### 2.2 Passwort-Sicherheit
 
-- Passwörter werden mit **BCrypt** gehasht und gespeichert (UserEntity).
-- Standard-Admin-Account wird beim Start aus `application.properties` erstellt/zurückgesetzt.
-- Passwortänderung über `/profile/change-password` möglich.
+- Passwörter werden mit **BCrypt** gehasht und in der H2-Datenbank gespeichert (`UserEntity`).
+- Standard-Admin-Account wird **nur beim allerersten Start** aus `application.properties` erstellt (wenn noch kein Admin existiert). Danach hat `app.admin.password` keine Wirkung mehr.
+- Passwortänderung über `/profile/change-password` oder das Admin-Panel möglich.
+- Das aktive Produktions-Passwort liegt ausschließlich als BCrypt-Hash in der H2-Datenbank.
+
+---
+
+## 12. Secrets & Zugangsdaten
+
+### 12.1 Übersicht der Secrets
+
+| Secret | Speicherort | Beschreibung |
+|---|---|---|
+| **Web-Admin-Passwort** | H2-Datenbank (BCrypt-Hash) | Login für `/admin` – wird über UI geändert |
+| **H2-Datenbank** | `application.properties` | User: `sa`, Passwort: leer (nur lokal erreichbar) |
+| **API-Key (X-User-Key)** | H2-Datenbank | Automatisch generiert, pro User, für EA-Authentifizierung |
+| **SMTP-Zugangsdaten** | H2-Datenbank (GlobalConfig) | Konfiguriert über Admin-Panel |
+| **Homey Webhook-ID** | H2-Datenbank (GlobalConfig) | Konfiguriert über Admin-Panel |
+
+### 12.2 Was NICHT ins Git darf
+
+Die folgenden Dateien/Informationen dürfen **niemals** ins Git-Repository gelangen:
+
+- **Produktions-Passwörter** (Web-Login, SMTP, etc.)
+- **API-Keys** (`X-User-Key`, Homey-ID)
+- **H2-Datenbankdateien** (`*.mv.db`, `*.trace.db`) – enthalten alle Secrets als Hash/Klartext
+- **Server-spezifische Konfiguration** (IP-Adressen, SSH-Keys)
+
+Die `.gitignore` enthält bereits Regeln für Datenbankdateien (`*.db`).
+
+### 12.3 Sicheres Deployment
+
+Das Default-Passwort in `application.properties` ist `password` und dient nur der initialen Einrichtung. **Nach dem ersten Login** muss das Passwort über `/profile/change-password` geändert werden.
+
+> **Wichtig:** Da die Spring Boot App innerhalb von WildFly läuft (nicht standalone), können Properties **nicht** per `--app.admin.password=...` Kommandozeile überschrieben werden. Das Passwort wird einmalig beim ersten Start verwendet und danach nur noch aus der Datenbank gelesen.
+
+### 12.4 H2-Datenbank-Zugang
+
+Die H2-Datenbank ist mit User `sa` und **leerem Passwort** konfiguriert. Dies ist akzeptabel, da:
+- Die H2-Konsole (`/h2-console`) nur für eingeloggte Admins erreichbar ist
+- Der H2 AUTO_SERVER-Modus nur auf `localhost` hört
+- Der Server über Nginx als Reverse-Proxy abgesichert ist
+
+---
+
+## 13. Sicherheits-Checkliste für Produktionsbetrieb
+
+1. Nach erstem Login das Admin-Passwort über `/profile/change-password` ändern.
+2. HTTPS aktivieren (TLS-Zertifikat konfigurieren oder Reverse-Proxy).
+3. H2-Konsole im Admin-Panel deaktivieren.
+4. Brute-Force-Schutz aktiviert lassen.
+5. Rate-Limiting mit angemessenen Werten konfigurieren.
+6. Security-Headers aktiviert lassen.
+7. Regelmäßig Login-Logs auf verdächtige Aktivitäten prüfen.
+8. Log-Aufbewahrungsdauer an Compliance-Anforderungen anpassen.
+9. API-Zugriff per Firewall/Reverse-Proxy einschränken.
+10. Keine Produktions-Passwörter im Git-Repository speichern.
 
 ### 2.3 Account-Berechtigungen
 

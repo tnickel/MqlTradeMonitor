@@ -296,7 +296,7 @@
                 erhalten.</p>
 
             <form th:action="@{/admin/log-retention}" method="post"
-                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px;">
 
                 <div class="form-group">
                     <label for="logLoginDays" style="color: #8b949e; display: block; margin-bottom: 5px;">
@@ -331,8 +331,19 @@
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
                     <small style="color: #6b7280; display: block; margin-top: 4px;">Account Statusmeldungen.</small>
                 </div>
+                <div class="form-group">
+                    <label for="logEaDays" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        EA Logs (Tage)
+                        <span title="Detaillierte Logmeldungen der MetaTrader Expert Advisors. Kann bei vielen Accounts sehr schnell wachsen!"
+                            style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="number" id="logEaDays" name="logEaDays" th:value="${logEaDays}" min="1"
+                        required
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">EA Detail-Logs (größte Tabelle).</small>
+                </div>
 
-                <div class="form-group" style="grid-column: span 3;">
+                <div class="form-group" style="grid-column: span 4;">
                     <button type="submit"
                         style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
                 </div>

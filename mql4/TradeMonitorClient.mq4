@@ -4,13 +4,13 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.03"
+#property version   "1.09"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
-input string   ServerURL = "https://DEINE-DOMAIN.DE:8080";   // Server URL (use HTTPS!)
-input string   InpUserKey = "";                        // User API-Key (from Admin Dashboard)
-input int      UpdateIntervalSeconds = 5;              // Update interval (seconds)
+input string   ServerURL = "https://monitor.tnickel-ki.de"; // Server URL (use HTTPS!)
+input string   InpUserKey = "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4"; // User API-Key (from Admin Dashboard)
+input int      UpdateIntervalSeconds = 15;             // Update interval (seconds)
 input int      HeartbeatIntervalSeconds = 30;          // Heartbeat interval (seconds)
 input int      ReconnectIntervalSeconds = 30;          // Reconnect interval (seconds)
 input int      MaxReconnectAttempts = 10;               // Max reconnect attempts (0=unlimited)
@@ -24,7 +24,7 @@ bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExis
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.04"
+#define EA_VERSION "1.09"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -43,7 +43,7 @@ uint lastReconnectAttemptTick = 0;
 uint lastLogUploadTick = 0;
 bool isRegistered = false;
 int httpTimeout = 5000;          // 5 seconds timeout for normal requests
-int httpTimeoutInit = 180000;    // 180 seconds (3 min) timeout for initial trade list (large payload)
+int httpTimeoutInit = 300000;    // 300 seconds (5 min) timeout for initial trade list (large payload)
 
 //--- EA Log tracking
 int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
@@ -95,7 +95,6 @@ void CreateStatusLabel();
 void UpdateStatusLabel(string text, color col);
 void LoadLastSyncTime();
 void SaveLastSyncTime(string closeTime);
-void DiagnosticWebRequestTest();
 void SendEaLogs();
 
 //+------------------------------------------------------------------+
@@ -189,9 +188,9 @@ void InitConfig()
       
       bool uiChanged = false;
       
-      if(ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080" && ServerURL != cfg_ServerURL) uiChanged = true;
-      if(InpUserKey != "" && InpUserKey != cfg_UserKey) uiChanged = true;
-      if(UpdateIntervalSeconds != 5 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
+       if(ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de" && ServerURL != cfg_ServerURL) uiChanged = true;
+       if(InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4" && InpUserKey != cfg_UserKey) uiChanged = true;
+       if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
       if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
       if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
       if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
@@ -207,9 +206,9 @@ void InitConfig()
       if(uiChanged)
       {
          Print("UI inputs differ from config file. Updating config file with new UI values.");
-         cfg_ServerURL = (ServerURL != "" && ServerURL != "https://DEINE-DOMAIN.DE:8080") ? ServerURL : cfg_ServerURL;
-         cfg_UserKey = (InpUserKey != "") ? InpUserKey : cfg_UserKey;
-         cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
+          cfg_ServerURL = (ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de") ? ServerURL : cfg_ServerURL;
+          cfg_UserKey = (InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4") ? InpUserKey : cfg_UserKey;
+          cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
          cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
          cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
          cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
@@ -243,14 +242,30 @@ void InitConfig()
    if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)
       cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
    
-   Print("Active config: ServerURL=", cfg_ServerURL,
-         " (len=", StringLen(cfg_ServerURL), ")",
-         " UpdateInterval=", cfg_UpdateIntervalSeconds,
-         " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
-         " ReconnectInterval=", cfg_ReconnectIntervalSeconds,
-         " MaxReconnectAttempts=", cfg_MaxReconnectAttempts,
-         " LogUploadInterval=", cfg_LogUploadIntervalSeconds);
-   Print(">>> MT4 Allowed URL must be EXACTLY: ", cfg_ServerURL, " (copy this!)");
+    Print("Active config: ServerURL=", cfg_ServerURL,
+          " UpdateInterval=", cfg_UpdateIntervalSeconds,
+          " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
+          " ReconnectInterval=", cfg_ReconnectIntervalSeconds,
+          " LogUploadInterval=", cfg_LogUploadIntervalSeconds,
+          " MaxReconnectAttempts=", cfg_MaxReconnectAttempts,
+          " DebugMode=", cfg_DebugMode);
+
+    // Enforce minimum intervals
+    if(cfg_UpdateIntervalSeconds < 15)
+    {
+       Print("Warning: UpdateIntervalSeconds cannot be less than 15. Enforcing 15s.");
+       cfg_UpdateIntervalSeconds = 15;
+    }
+    if(cfg_HeartbeatIntervalSeconds < 30)
+    {
+       Print("Warning: HeartbeatIntervalSeconds cannot be less than 30. Enforcing 30s.");
+       cfg_HeartbeatIntervalSeconds = 30;
+    }
+    if(cfg_ReconnectIntervalSeconds < 30)
+    {
+       Print("Warning: ReconnectIntervalSeconds cannot be less than 30. Enforcing 30s.");
+       cfg_ReconnectIntervalSeconds = 30;
+    }
 }
 
 //+------------------------------------------------------------------+
@@ -259,8 +274,6 @@ void InitConfig()
 int OnInit()
 {
    Print("TradeMonitorClient EA v" + EA_VERSION + " initialized");
-   
-   DiagnosticWebRequestTest();
    
    InitConfig();
    
@@ -354,6 +367,13 @@ void OnTimer()
 {
    uint currentTick = GetTickCount();
    datetime now = TimeCurrent();
+   
+   // Check if the terminal is actually connected to the broker
+   if(!IsConnected())
+   {
+      UpdateStatusLabel("Disconnected from Broker", clrRed);
+      return;
+   }
    
    if(!IsTradeAllowed())
    {
@@ -683,14 +703,18 @@ bool SendInitialTradeList()
    Print("Sending payload (", payloadSizeKB, " KB) to server (timeout: ", httpTimeoutInit/1000, "s)...");
    
    // Use extended timeout for initial large payload
-   if(SendHttpPostWithTimeout(url, json, httpTimeoutInit))
-   {
-      // Remember what we synced so incremental updates only send new trades
-      g_lastSyncedCloseTime = latestCloseTime;
-      SaveLastSyncTime(latestCloseTime);
-      Print("Last synced close time: ", latestCloseTime);
-      return true;
-   }
+    if(SendHttpPostWithTimeout(url, json, httpTimeoutInit))
+    {
+       // Remember what we synced so incremental updates only send new trades
+       // If no closed trades exist yet, set sync time to "now" so future
+       // SendHistoryUpdate() calls run in incremental mode.
+       if(latestCloseTime == "")
+          latestCloseTime = TimeToString(TimeCurrent() - 1, TIME_DATE|TIME_SECONDS);
+       g_lastSyncedCloseTime = latestCloseTime;
+       SaveLastSyncTime(latestCloseTime);
+       Print("Last synced close time: ", latestCloseTime);
+       return true;
+    }
    return false;
 }
 
@@ -859,6 +883,17 @@ void SendHistoryUpdate()
 {
    string url = cfg_ServerURL + "/api/history";
    
+   // Guard: if sync time is missing but init was already marked as done,
+   // force a clean re-init instead of doing a full-history scan with 5s timeout.
+   if(g_lastSyncedCloseTime == "")
+   {
+      Print("Warning: g_lastSyncedCloseTime empty despite g_tradeListSent=true. Forcing re-init.");
+      g_tradeListSent = false;
+      GlobalVariableSet(GV_TRADELIST_SENT, 0);
+      g_initRetryCount = 0;
+      return;
+   }
+   
    // Only send trades newer than last synced close time (incremental)
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson(g_lastSyncedCloseTime, latestCloseTime);
@@ -881,7 +916,8 @@ void SendHistoryUpdate()
       {
          g_lastSyncedCloseTime = latestCloseTime;
          SaveLastSyncTime(latestCloseTime);
-         Print("History sync updated, latest close time: ", latestCloseTime);
+         if(cfg_DebugMode > 0)
+            Print("History sync updated, latest close time: ", latestCloseTime);
       }
    }
 }
@@ -964,9 +1000,23 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
       }
       return false;
    }
-   
-   return true;
-}
+    
+    string responseBody = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+    if(res == 200 || res == 201)
+    {
+       return true;
+    }
+    else
+    {
+       if(res != -1)
+       {
+          Print("HTTP request returned status: ", res, " URL: ", url);
+          if(cfg_DebugMode > 0)
+             Print("Server response: ", responseBody);
+       }
+       return false;
+    }
+ }
 
 //+------------------------------------------------------------------+
 //| Save last synced close time to config file                         |
@@ -1106,71 +1156,6 @@ void SendEaLogs()
       if(cfg_DebugMode > 0)
          Print("EA logs sent: ", maxLines, " new lines (total tracked: ", g_lastLogLinesSent, ")");
    }
-}
-
-//+------------------------------------------------------------------+
-//| Diagnostic: Extended WebRequest URL matching test                 |
-//+------------------------------------------------------------------+
-void DiagnosticTestUrl(string label, string url)
-{
-   char getData[];
-   char result[];
-   string resultHeaders;
-   string headers = "Content-Type: application/json\r\n";
-   char postData[];
-   string json = "{\"accountId\":0,\"test\":true}";
-   StringToCharArray(json, postData, 0, WHOLE_ARRAY, CP_UTF8);
-   int sz = ArraySize(postData);
-   if(sz > 0 && postData[sz-1] == 0) ArrayResize(postData, sz - 1);
-   
-   ResetLastError();
-   int res = WebRequest("POST", url, headers, 3000, postData, result, resultHeaders);
-   int err = GetLastError();
-   
-   string status = "";
-   if(res == -1)
-   {
-      if(err == 4060) status = "ERROR 4060 (WebRequest disabled in build!)";
-      else if(err == 5200) status = "ERROR 5200 (WHITELIST MISS - URL not in allowed list)";
-      else if(err == 5201) status = "ERROR 5201 (Connect failed - server not reachable)";
-      else if(err == 5202) status = "ERROR 5202 (Timeout)";
-      else if(err == 5203) status = "ERROR 5203 (Request failed - but whitelist OK!)";
-      else status = "ERROR " + IntegerToString(err);
-   }
-   else
-      status = "HTTP " + IntegerToString(res);
-      
-   Print("[DIAG] ", label, " -> ", status, " | url='", url, "' len=", StringLen(url));
-}
-
-void DiagnosticWebRequestTest()
-{
-   Print("=== DIAGNOSTIC WebRequest Test ===");
-   string ip = "192.168.178.143";
-   
-   // --- URL info ---
-   Print("[DIAG] cfg_ServerURL = '", cfg_ServerURL, "' len=", StringLen(cfg_ServerURL));
-   for(int i = StringLen(cfg_ServerURL)-3; i < StringLen(cfg_ServerURL); i++)
-      if(i >= 0) Print("[DIAG] char[", i, "] = ", StringGetCharacter(cfg_ServerURL, i));
-   
-   // --- Test 1: Public URL (worldtimeapi.org) ---
-   // Add 'http://worldtimeapi.org' to whitelist to test internet access
-   DiagnosticTestUrl("PUBLIC  worldtimeapi.org", "http://worldtimeapi.org/api/timezone/Europe/Berlin");
-   
-   // --- Test 2: Local IP + Port (what the EA currently uses) ---
-   DiagnosticTestUrl("LOCAL   with :8080", "http://" + ip + ":8080/api/register");
-   
-   // --- Test 3: Local IP without Port (what portproxy should handle) ---
-   DiagnosticTestUrl("LOCAL   no port  ", "http://" + ip + "/api/register");
-   
-   // --- Test 4: localhost without port ---
-   DiagnosticTestUrl("LOCAL   localhost ", "http://localhost/api/register");
-   
-   // --- Test 5: 127.0.0.1 without port ---
-   DiagnosticTestUrl("LOCAL   127.0.0.1", "http://127.0.0.1/api/register");
-   
-   Print("=== DIAGNOSTIC End ===");
-   Print("[DIAG] Whitelist hint: 5200=not whitelisted, 5201=whitelisted+no reach, 5203=whitelisted+reached");
 }
 
 //+------------------------------------------------------------------+

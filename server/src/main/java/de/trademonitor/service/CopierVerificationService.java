@@ -60,6 +60,11 @@ public class CopierVerificationService {
         return metrics;
     }
 
+    private boolean isWeekend() {
+        java.time.DayOfWeek day = java.time.LocalDateTime.now().getDayOfWeek();
+        return day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY;
+    }
+
     @Scheduled(fixedDelay = 60000) // Check every minute
     public void verifyTrades() {
         int intervalMins = globalConfigService.getCopierIntervalMins();
@@ -151,7 +156,7 @@ public class CopierVerificationService {
             long delayMs = globalConfigService.getSyncAlarmDelayMins() * 60L * 1000L;
 
             if (System.currentTimeMillis() - syncErrorStartTime >= delayMs) {
-                if (!warningEmailSent) {
+                if (!warningEmailSent && !isWeekend()) {
                     emailService.sendSyncWarningEmail("Trade Monitor Warnung",
                             "Achtung: Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten! Bitte Dashboard prüfen.");
                     warningEmailSent = true;
@@ -159,7 +164,11 @@ public class CopierVerificationService {
 
                 // Activate Homey Siren alarm state if enabled
                 if (globalConfigService.isHomeyTriggerSync()) {
-                    homeyService.setAlarmState("COPIER_SYNC", true);
+                    if (isWeekend()) {
+                        homeyService.setAlarmState("COPIER_SYNC", false);
+                    } else {
+                        homeyService.setAlarmState("COPIER_SYNC", true);
+                    }
                 }
             }
         } else {
