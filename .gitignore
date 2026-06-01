@@ -38,3 +38,14 @@ server/login_output.html
 server/*.mv.db
 server/*.trace.db
 *.db
+
+# Android ignores
+android-app/.gradle/
+android-app/.idea/
+android-app/.kotlin/
+android-app/local.properties
+android-app/build/
+android-app/app/build/
+*.iml
+.externalNativeBuild/
+.cxx/

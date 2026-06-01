@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<title>Drawdown Analyzer</title>
+<script src="vue.global.prod.js"></script>
+<style>
+:root {
+  --bg-body: #ffffff;
+  --bg-surface: #f8f8f8;
+  --bg-surface-2: #ffffff;
+  --text-main: #333333;
+  --text-muted: #777777;
+  --border-color: #dddddd;
+  --primary: #337ab7;
+  --primary-hover: #286090;
+  --success: #5cb85c;
+  --danger: #d9534f;
+  --warning: #f0ad4e;
+  --grid: rgba(0,0,0,0.06);
+}
+[data-theme="dark"] {
+  --bg-body: #1e1e1e;
+  --bg-surface: #2d2d2d;
+  --bg-surface-2: #383838;
+  --text-main: #e0e0e0;
+  --text-muted: #aaaaaa;
+  --border-color: #444444;
+  --primary: #4a9fe0;
+  --primary-hover: #6ab2eb;
+  --success: #5cb85c;
+  --danger: #d9534f;
+  --warning: #f0ad4e;
+  --grid: rgba(255,255,255,0.08);
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 16px 20px;
+  background: var(--bg-body);
+  color: var(--text-main);
+  font-family: "Open Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+h1 { font-size: 16px; margin: 0; font-weight: 600; flex: 1; min-width: 200px; }
+
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctrl-label { color: var(--text-muted); font-size: 12px; }
+.controls input[type=number] {
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 110px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.controls button {
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.controls button:hover { background: var(--bg-surface); }
+.controls .badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg button {
+  background: transparent;
+  color: var(--text-main);
+  border: none;
+  border-radius: 0;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.seg button.active { background: var(--primary); color: #fff; }
+.seg button:not(.active):hover { background: var(--bg-surface); }
+
+.summary {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.stat .label {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stat .value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.stat .value.bad { color: var(--danger); }
+.stat .value.warn { color: var(--warning); }
+
+.chart-wrap {
+  flex: 1 1 0;
+  min-height: 180px;
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  border-left: 1px dashed var(--text-muted);
+  opacity: 0.55;
+}
+.tooltip-box {
+  position: absolute;
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  z-index: 50;
+  white-space: nowrap;
+}
+.tooltip-box .tt-title { font-weight: 600; margin-bottom: 3px; color: var(--text-muted); }
+.tooltip-box .tt-row { display: flex; align-items: center; gap: 6px; }
+.tooltip-box .tt-label { color: var(--text-muted); }
+.tooltip-box .tt-value { font-weight: 600; margin-left: auto; }
+
+.table-section {
+  flex: 1 1 0;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.table-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.table-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.table-scroll {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-surface);
+}
+table.dd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.dd-table th, table.dd-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+table.dd-table th:last-child, table.dd-table td:last-child {
+  border-right: none;
+}
+table.dd-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface-2);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  z-index: 1;
+}
+table.dd-table th.sortable { cursor: pointer; user-select: none; }
+table.dd-table th.sortable:hover { color: var(--text-main); }
+table.dd-table th.sortable.active { color: var(--primary); }
+table.dd-table th.sortable.active.desc::after { content: ' \25BC'; font-size: 9px; }
+table.dd-table th.sortable.active.asc::after  { content: ' \25B2'; font-size: 9px; }
+table.dd-table tbody tr { cursor: pointer; }
+table.dd-table tbody tr:hover { background: var(--bg-surface-2); }
+table.dd-table tbody tr.selected { background: rgba(240, 173, 78, 0.18); }
+table.dd-table tbody tr.selected:hover { background: rgba(240, 173, 78, 0.28); }
+table.dd-table tbody tr.selected td:first-child::before {
+  content: '\25B6  ';
+  color: var(--warning);
+  font-size: 10px;
+}
+table.dd-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.dd-table td.bad { color: var(--danger); }
+table.dd-table td.ongoing { color: var(--warning); font-weight: 600; }
+
+[data-tip] { position: relative; }
+[data-tip].metric { border-bottom: 1px dotted var(--text-muted); cursor: help; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 6px;
+  white-space: pre-line;
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: normal;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.4;
+  width: max-content;
+  max-width: 420px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+
+.disclaimer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  text-align: justify;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>{{ headerTitle }}</h1>
+    <div class="controls" v-if="hasData">
+      <span class="ctrl-label">X-axis</span>
+      <div class="seg">
+        <button :class="{active: xMode==='trades'}" @click="setXMode('trades')">Trade #</button>
+        <button :class="{active: xMode==='time'}" @click="setXMode('time')">Date</button>
+      </div>
+      <span class="ctrl-label metric" style="margin-left:8px" data-tip="Account starting balance used to compute drawdown %.&#10;Auto-detected from the first order's Balance field (the value SQX used in the backtest).&#10;Override here to see how DD % would look at a different account size.">Starting equity</span>
+      <input type="number" min="1" step="1000"
+             :value="startingEquityOverride ?? ''"
+             :placeholder="fmtMoney(detectedStartingEquity || 100000)"
+             @input="onStartingEquityInput">
+      <button v-if="startingEquityOverride != null" @click="startingEquityOverride = null" data-tip="Reset to auto-detected starting equity">Auto</button>
+      <span v-else class="badge">auto: {{ fmtMoney(effectiveStartingEquity) }}</span>
+    </div>
+  </header>
+
+  <div class="summary" v-if="hasData">
+    <div class="stat">
+      <span class="label metric" data-tip="Number of distinct peak-to-recovery drawdown periods identified in the equity curve.">Drawdowns</span>
+      <span class="value">{{ summary.count }}<span v-if="summary.ongoingCount" class="value warn" style="font-size:12px; margin-left:6px;">({{ summary.ongoingCount }} ongoing)</span></span>
+    </div>
+    <div class="stat">
+      <span class="label metric" data-tip="Deepest peak-to-trough loss across all periods, in account currency. The realistic worst-case pain.">Max DD $</span>
+      <span class="value bad">{{ fmtMoney(-summary.maxDepth) }}</span>
+    </div>
+    <div class="stat">
+      <span class="label metric" data-tip="Deepest peak-to-trough loss as % of the equity peak.&#10;Computed against real account equity (starting equity + cumulative P&L), not raw P&L.&#10;Change starting equity in the header to see what-if values.">Max DD %</span>
+      <span class="value bad">{{ summary.maxDepthPct.toFixed(2) }}%</span>
+    </div>
+    <div class="stat">
+      <span class="label metric" data-tip="Average % depth across all drawdown periods. High avg means even routine pullbacks are deep.">Avg DD %</span>
+      <span class="value">{{ summary.avgDepthPct.toFixed(2) }}%</span>
+    </div>
+    <div class="stat">
+      <span class="label metric" data-tip="Average calendar days from trough back above the previous peak (closed DDs only). Long averages = slow comebacks.">Avg Recovery</span>
+      <span class="value">{{ summary.avgRecoveryDays == null ? '—' : summary.avgRecoveryDays.toFixed(0) + ' d' }}</span>
+    </div>
+    <div class="stat">
+      <span class="label metric" data-tip="Most calendar days the account has ever spent below a prior peak (incl. ongoing). The patience your live deployment must have.">Longest Underwater</span>
+      <span class="value warn">{{ summary.longestUnderwater.toFixed(0) }} d</span>
+    </div>
+  </div>
+
+  <div class="chart-wrap" ref="wrap">
+    <canvas ref="chart"
+            @mousemove="onCanvasMove"
+            @mouseleave="onCanvasLeave"></canvas>
+    <div v-if="!hasData" class="empty">{{ emptyMsg }}</div>
+    <div v-if="hover && hasData" class="crosshair" :style="{ left: hover.px + 'px' }"></div>
+    <div v-if="hover && hasData" class="tooltip-box"
+         :style="{ left: tooltipPos.left + 'px', top: tooltipPos.top + 'px' }">
+      <div class="tt-title">Trade #{{ hover.idx }} · {{ fmtDate(hover.t) }}</div>
+      <div class="tt-row">
+        <span class="tt-label">Underwater</span>
+        <span class="tt-value">{{ hover.uw.toFixed(2) }}%</span>
+      </div>
+      <div class="tt-row">
+        <span class="tt-label">Equity</span>
+        <span class="tt-value">{{ fmtMoney(hover.eq) }}</span>
+      </div>
+      <div class="tt-row" v-if="hover.peak !== hover.eq">
+        <span class="tt-label">Peak</span>
+        <span class="tt-value">{{ fmtMoney(hover.peak) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-section" v-if="hasData && drawdownPeriods.length">
+    <div class="table-header">
+      <h2>All Drawdowns ({{ drawdownPeriods.length }})</h2>
+    </div>
+    <div class="table-scroll">
+      <table class="dd-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable" :class="sortClass('depth')"        @click="setSort('depth')">Depth $</th>
+            <th class="sortable" :class="sortClass('depthPct')"     @click="setSort('depthPct')">Depth %</th>
+            <th class="sortable" :class="sortClass('peakTime')"     @click="setSort('peakTime')">Peak Date</th>
+            <th class="sortable" :class="sortClass('troughTime')"   @click="setSort('troughTime')">Trough Date</th>
+            <th class="sortable" :class="sortClass('declineDays')"  @click="setSort('declineDays')">Decline (d)</th>
+            <th class="sortable" :class="sortClass('underwaterDays')" @click="setSort('underwaterDays')">Underwater (d)</th>
+            <th class="sortable" :class="sortClass('recoveryDays')" @click="setSort('recoveryDays')">Recovery (d)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(d, i) in sortedDDs" :key="d.peakIdx + '-' + d.troughIdx"
+              :class="{selected: isSelected(d)}"
+              @click="toggleSelected(d)">
+            <td>{{ i + 1 }}</td>
+            <td class="num bad">{{ fmtMoney(-d.depth) }}</td>
+            <td class="num bad">{{ d.peakValue === 0 ? '—' : d.depthPct.toFixed(2) + '%' }}</td>
+            <td>{{ fmtDate(d.peakTime) }}</td>
+            <td>{{ fmtDate(d.troughTime) }}</td>
+            <td class="num">{{ d.declineDays.toFixed(1) }}</td>
+            <td class="num">{{ d.underwaterDays.toFixed(1) }}</td>
+            <td class="num">{{ d.ongoing ? '—' : d.recoveryDays.toFixed(1) }}</td>
+            <td :class="d.ongoing ? 'ongoing' : ''">{{ d.ongoing ? 'Ongoing' : 'Recovered' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This analysis is provided strictly for informational and educational purposes within StrategyQuant X.
+    It does not constitute financial, investment, or trading advice. All results, including backtests and simulations,
+    are based on historical data and hypothetical performance, which may not reflect future market conditions.
+    Past performance is not indicative of future results. Trading involves substantial risk, and you should conduct your
+    own independent research and consult a licensed financial advisor before making any investment or trading decisions.
+    <strong>Drawdown periods are reconstructed from completed trades only; intra-trade equity excursions are not visualized.</strong>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+const NON_TRADING_TYPES = new Set([9, 10, 11]);
+const NOT_DEFINED = -99999999;
+const DAY_MS = 24 * 3600 * 1000;
+
+createApp({
+  setup() {
+    const strategy = ref(null);
+    const orders = ref([]);
+    const chart = ref(null);
+    const wrap = ref(null);
+    const hover = ref(null);
+    const sortKey = ref('depth');
+    const sortDir = ref('desc');
+    const startingEquityOverride = ref(null);
+    const xMode = ref('trades');
+    const selectedDD = ref(null);
+    let resizeObs = null;
+    let layout = null;
+
+    const headerTitle = computed(() => {
+      if (!strategy.value?.strategyName) return 'Select a strategy...';
+      return `${strategy.value.strategyName} — Drawdown Analyzer`;
+    });
+
+    const filteredTrades = computed(() => {
+      return orders.value
+        .filter(o => o && !NON_TRADING_TYPES.has(o.Type))
+        .filter(o => o.CloseTime != null
+          && o.ProfitLoss != null
+          && o.ProfitLoss !== NOT_DEFINED)
+        .map(o => ({ t: parseTs(o.CloseTime), pl: Number(o.ProfitLoss) || 0 }))
+        .filter(o => !isNaN(o.t) && o.t > 0)
+        .sort((a, b) => a.t - b.t);
+    });
+
+    const detectedStartingEquity = computed(() => {
+      for (const o of orders.value) {
+        if (!o || NON_TRADING_TYPES.has(o.Type)) continue;
+        if (o.Balance == null || o.Balance === NOT_DEFINED) continue;
+        if (o.ProfitLoss == null || o.ProfitLoss === NOT_DEFINED) continue;
+        const start = Number(o.Balance) - Number(o.ProfitLoss);
+        if (isFinite(start) && start > 0) return start;
+      }
+      return null;
+    });
+
+    const effectiveStartingEquity = computed(() => {
+      const ov = startingEquityOverride.value;
+      if (ov != null && isFinite(ov) && ov > 0) return ov;
+      const det = detectedStartingEquity.value;
+      if (det != null && isFinite(det)) return det;
+      return 100000;
+    });
+
+    const equityCurve = computed(() => {
+      const trades = filteredTrades.value;
+      if (!trades.length) return [];
+      const out = [];
+      let cum = effectiveStartingEquity.value;
+      for (let i = 0; i < trades.length; i++) {
+        cum += trades[i].pl;
+        out.push({ idx: i + 1, t: trades[i].t, y: cum });
+      }
+      return out;
+    });
+
+    const underwaterSeries = computed(() => {
+      const eq = equityCurve.value;
+      if (!eq.length) return [];
+      const out = new Array(eq.length);
+      let peak = eq[0].y;
+      for (let i = 0; i < eq.length; i++) {
+        if (eq[i].y > peak) peak = eq[i].y;
+        const denom = Math.abs(peak) || 1;
+        out[i] = {
+          t: eq[i].t,
+          idx: eq[i].idx,
+          y: eq[i].y,
+          peak,
+          uw: (eq[i].y - peak) / denom * 100,
+        };
+      }
+      return out;
+    });
+
+    const drawdownPeriods = computed(() => computeDrawdownPeriods(equityCurve.value));
+
+    const summary = computed(() => {
+      const p = drawdownPeriods.value;
+      if (!p.length) {
+        return { count: 0, avgDepthPct: 0, maxDepth: 0, maxDepthPct: 0,
+                 avgRecoveryDays: null, longestUnderwater: 0, ongoingCount: 0 };
+      }
+      const closed = p.filter(d => !d.ongoing);
+      return {
+        count: p.length,
+        avgDepthPct: p.reduce((s, d) => s + d.depthPct, 0) / p.length,
+        maxDepth: p.reduce((m, d) => d.depth > m ? d.depth : m, 0),
+        maxDepthPct: p.reduce((m, d) => d.depthPct > m ? d.depthPct : m, 0),
+        avgRecoveryDays: closed.length
+          ? closed.reduce((s, d) => s + d.recoveryDays, 0) / closed.length
+          : null,
+        longestUnderwater: p.reduce((m, d) => d.underwaterDays > m ? d.underwaterDays : m, 0),
+        ongoingCount: p.length - closed.length,
+      };
+    });
+
+    const sortedDDs = computed(() => {
+      const arr = [...drawdownPeriods.value];
+      const key = sortKey.value;
+      const dir = sortDir.value === 'asc' ? 1 : -1;
+      arr.sort((a, b) => {
+        const av = a[key], bv = b[key];
+        // Push nulls to the end regardless of direction
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av === bv) return 0;
+        return av < bv ? -1 * dir : 1 * dir;
+      });
+      return arr;
+    });
+
+    const hasData = computed(() => equityCurve.value.length > 0);
+    const emptyMsg = computed(() => {
+      if (!strategy.value?.projectName?.trim()) return 'Select a strategy to analyze drawdowns.';
+      if (!orders.value.length) return 'Loading orders...';
+      return 'No closed trades available — run a backtest to populate the equity curve.';
+    });
+
+    const tooltipPos = computed(() => {
+      if (!hover.value || !layout) return { left: 0, top: 0 };
+      const TT_W = 180, TT_H = 84, MARGIN = 12;
+      const containerW = layout.cw + layout.padL + layout.padR;
+      let left = hover.value.px + MARGIN;
+      if (left + TT_W > containerW) left = hover.value.px - TT_W - MARGIN;
+      let top = (hover.value.pyTooltip ?? 30);
+      if (top + TT_H > layout.padT + layout.ch) top = layout.padT + layout.ch - TT_H - 4;
+      if (top < 4) top = 4;
+      return { left, top };
+    });
+
+    function parseTs(t) {
+      if (t == null) return NaN;
+      if (typeof t === 'number') return t > 1e12 ? t : t * 1000;
+      if (typeof t === 'string') {
+        const n = Date.parse(t);
+        if (!isNaN(n)) return n;
+        return Date.parse(t.replace(/\./g, '-').replace(' ', 'T'));
+      }
+      if (t instanceof Date) return t.getTime();
+      return NaN;
+    }
+
+    function computeDrawdownPeriods(eq) {
+      if (eq.length < 2) return [];
+      const periods = [];
+      let peakIdx = 0;
+      let troughIdx = -1;
+
+      for (let i = 1; i < eq.length; i++) {
+        const cur = eq[i];
+        const peak = eq[peakIdx];
+
+        if (cur.y > peak.y) {
+          if (troughIdx !== -1) {
+            const trough = eq[troughIdx];
+            periods.push({
+              peakIdx, peakTime: peak.t, peakValue: peak.y,
+              troughIdx, troughTime: trough.t, troughValue: trough.y,
+              recoveryIdx: i, recoveryTime: cur.t,
+              depth: peak.y - trough.y,
+              depthPct: peak.y !== 0 ? (peak.y - trough.y) / Math.abs(peak.y) * 100 : 0,
+              underwaterDays: (cur.t - peak.t) / DAY_MS,
+              declineDays:    (trough.t - peak.t) / DAY_MS,
+              recoveryDays:   (cur.t - trough.t) / DAY_MS,
+              ongoing: false,
+            });
+            troughIdx = -1;
+          }
+          peakIdx = i;
+        } else if (cur.y < peak.y) {
+          if (troughIdx === -1 || cur.y < eq[troughIdx].y) troughIdx = i;
+        }
+      }
+
+      if (troughIdx !== -1) {
+        const peak = eq[peakIdx];
+        const trough = eq[troughIdx];
+        const last = eq[eq.length - 1];
+        periods.push({
+          peakIdx, peakTime: peak.t, peakValue: peak.y,
+          troughIdx, troughTime: trough.t, troughValue: trough.y,
+          recoveryIdx: null, recoveryTime: null,
+          depth: peak.y - trough.y,
+          depthPct: peak.y !== 0 ? (peak.y - trough.y) / Math.abs(peak.y) * 100 : 0,
+          underwaterDays: (last.t - peak.t) / DAY_MS,
+          declineDays:    (trough.t - peak.t) / DAY_MS,
+          recoveryDays:   null,
+          ongoing: true,
+        });
+      }
+
+      return periods;
+    }
+
+    function fmtMoney(v) {
+      if (v == null || !isFinite(v)) return '—';
+      const sign = v < 0 ? '-' : '';
+      const a = Math.abs(v);
+      if (a >= 1e6) return sign + (a / 1e6).toFixed(2) + 'M';
+      if (a >= 1e3) return sign + (a / 1e3).toFixed(2) + 'k';
+      return sign + a.toFixed(0);
+    }
+
+    function formatXLabel(v) {
+      if (xMode.value === 'trades') return '#' + Math.round(v);
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, { year: '2-digit', month: 'short' });
+    }
+
+    function fmtDate(ms) {
+      if (!ms) return '—';
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return '—';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function niceTickStep(range, targetTicks) {
+      if (range <= 0) return 1;
+      const rough = range / Math.max(1, targetTicks);
+      const exp = Math.floor(Math.log10(rough));
+      const base = Math.pow(10, exp);
+      const m = rough / base;
+      let nice;
+      if (m < 1.5) nice = 1;
+      else if (m < 3) nice = 2;
+      else if (m < 7) nice = 5;
+      else nice = 10;
+      return nice * base;
+    }
+
+    function niceScale(minVal, maxVal, targetTicks) {
+      if (!isFinite(minVal) || !isFinite(maxVal) || minVal === maxVal) {
+        const span = Math.abs(maxVal) || 1;
+        return { min: minVal - span * 0.1, max: maxVal + span * 0.1, step: span * 0.1, count: 2 };
+      }
+      const step = niceTickStep(maxVal - minVal, targetTicks);
+      const min = Math.floor(minVal / step) * step;
+      const max = Math.ceil(maxVal / step) * step;
+      const count = Math.max(1, Math.round((max - min) / step));
+      return { min, max, step, count };
+    }
+
+    function hexWithAlpha(hex, a) {
+      const m = hex.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      if (!m) return hex;
+      let h = m[1];
+      if (h.length === 3) h = h.split('').map(c => c + c).join('');
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function draw() {
+      const canvas = chart.value;
+      if (!canvas || !canvas.parentElement) return;
+      const wrapEl = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
+      const w = wrapEl.clientWidth, h = wrapEl.clientHeight;
+      if (w < 10 || h < 10) return;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const uw = underwaterSeries.value;
+      if (!uw.length) { layout = null; return; }
+
+      const padL = 56, padR = 16, padT = 18, padB = 28;
+      const cw = w - padL - padR, ch = h - padT - padB;
+      if (cw <= 0 || ch <= 0) { layout = null; return; }
+
+      const xKey = xMode.value === 'trades' ? 'idx' : 't';
+      const xMin = uw[0][xKey];
+      const xMax = uw[uw.length - 1][xKey];
+      const xRange = (xMax - xMin) || 1;
+
+      let minUw = 0;
+      for (const p of uw) if (p.uw < minUw) minUw = p.uw;
+      const yMaxRaw = 0;
+      const yMinRaw = Math.min(-1, minUw * 1.1);
+      const yScale = niceScale(yMinRaw, yMaxRaw, 5);
+      const yMin = yScale.min;
+      const yMax = Math.max(0, yScale.max);
+      const yRange = (yMax - yMin) || 1;
+
+      const css = getComputedStyle(document.documentElement);
+      const colGrid = css.getPropertyValue('--grid').trim() || 'rgba(0,0,0,0.06)';
+      const colMuted = css.getPropertyValue('--text-muted').trim() || '#777';
+      const colDanger = css.getPropertyValue('--danger').trim() || '#d9534f';
+      const colBorder = css.getPropertyValue('--border-color').trim() || '#ddd';
+      const colWarning = css.getPropertyValue('--warning').trim() || '#f0ad4e';
+      const colTextMain = css.getPropertyValue('--text-main').trim() || '#333';
+
+      const xToPx = (v) => padL + ((v - xMin) / xRange) * cw;
+      const yToPx = (v) => padT + ch - ((v - yMin) / yRange) * ch;
+
+      ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+
+      // Y gridlines + labels
+      ctx.strokeStyle = colGrid;
+      ctx.lineWidth = 1;
+      ctx.fillStyle = colMuted;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= yScale.count; i++) {
+        const yv = yMin + i * yScale.step;
+        if (yv > yMax + 1e-9) break;
+        const py = yToPx(yv);
+        ctx.beginPath();
+        ctx.moveTo(padL, py);
+        ctx.lineTo(padL + cw, py);
+        ctx.stroke();
+        ctx.fillText(yv.toFixed(yScale.step < 1 ? 1 : 0) + '%', padL - 6, py);
+      }
+
+      // Zero baseline emphasized
+      const zeroY = yToPx(0);
+      ctx.strokeStyle = colMuted;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, zeroY);
+      ctx.lineTo(padL + cw, zeroY);
+      ctx.stroke();
+
+      // X labels
+      ctx.fillStyle = colMuted;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const xTicks = Math.min(8, Math.max(2, Math.floor(cw / 90)));
+      for (let i = 0; i <= xTicks; i++) {
+        const xv = xMin + (xRange * i / xTicks);
+        const px = padL + (cw * i / xTicks);
+        ctx.fillText(formatXLabel(xv), px, padT + ch + 6);
+      }
+
+      // Underwater filled area
+      ctx.beginPath();
+      ctx.moveTo(xToPx(uw[0][xKey]), zeroY);
+      for (const p of uw) ctx.lineTo(xToPx(p[xKey]), yToPx(p.uw));
+      ctx.lineTo(xToPx(uw[uw.length - 1][xKey]), zeroY);
+      ctx.closePath();
+      ctx.fillStyle = hexWithAlpha(colDanger, 0.28);
+      ctx.fill();
+
+      // Underwater line
+      ctx.strokeStyle = colDanger;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      uw.forEach((p, i) => {
+        const px = xToPx(p[xKey]), py = yToPx(p.uw);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+
+      // Selected DD highlight
+      if (selectedDD.value) {
+        const d = selectedDD.value;
+        const peakX  = xMode.value === 'trades' ? d.peakIdx + 1 : d.peakTime;
+        const trX    = xMode.value === 'trades' ? d.troughIdx + 1 : d.troughTime;
+        const recX   = d.ongoing
+          ? (xMode.value === 'trades' ? uw[uw.length - 1].idx : uw[uw.length - 1].t)
+          : (xMode.value === 'trades' ? d.recoveryIdx + 1 : d.recoveryTime);
+
+        const pxPeak = xToPx(peakX);
+        const pxTr   = xToPx(trX);
+        const pxRec  = xToPx(recX);
+
+        // Background band peak → recovery (clipped to plot area)
+        const bandLeft  = Math.max(padL, Math.min(padL + cw, pxPeak));
+        const bandRight = Math.max(padL, Math.min(padL + cw, pxRec));
+        ctx.fillStyle = hexWithAlpha(colWarning, 0.18);
+        ctx.fillRect(bandLeft, padT, Math.max(2, bandRight - bandLeft), ch);
+
+        // Vertical lines at peak and trough
+        ctx.strokeStyle = colWarning;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        for (const px of [pxPeak, pxTr]) {
+          if (px < padL - 1 || px > padL + cw + 1) continue;
+          ctx.beginPath();
+          ctx.moveTo(px, padT);
+          ctx.lineTo(px, padT + ch);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        // Highlight underwater segment between peak and recovery (or end)
+        const peakI = d.peakIdx;
+        const lastI = d.ongoing ? uw.length - 1 : d.recoveryIdx;
+        if (peakI != null && lastI != null && lastI >= peakI) {
+          ctx.beginPath();
+          ctx.moveTo(xToPx(uw[peakI][xKey]), zeroY);
+          for (let i = peakI; i <= lastI; i++) {
+            ctx.lineTo(xToPx(uw[i][xKey]), yToPx(uw[i].uw));
+          }
+          ctx.lineTo(xToPx(uw[lastI][xKey]), zeroY);
+          ctx.closePath();
+          ctx.fillStyle = hexWithAlpha(colWarning, 0.32);
+          ctx.fill();
+          ctx.strokeStyle = colWarning;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i = peakI; i <= lastI; i++) {
+            const px = xToPx(uw[i][xKey]), py = yToPx(uw[i].uw);
+            if (i === peakI) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+
+        // Markers: peak (▼ at top), trough (▲ at bottom)
+        ctx.fillStyle = colWarning;
+        if (pxPeak >= padL && pxPeak <= padL + cw) {
+          ctx.beginPath();
+          ctx.moveTo(pxPeak, padT);
+          ctx.lineTo(pxPeak - 5, padT - 7);
+          ctx.lineTo(pxPeak + 5, padT - 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+        if (pxTr >= padL && pxTr <= padL + cw) {
+          const pyTr = yToPx(uw[d.troughIdx].uw);
+          ctx.beginPath();
+          ctx.arc(pxTr, pyTr, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Label "DD #N" near top-left of band
+        const label = (d.ongoing ? 'Ongoing DD · ' : 'DD · ') +
+                      (d.peakValue !== 0 ? d.depthPct.toFixed(2) + '%' : fmtMoney(-d.depth));
+        ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+        const labelX = Math.max(padL + 4, Math.min(padL + cw - 80, bandLeft + 4));
+        ctx.fillStyle = hexWithAlpha(colWarning, 0.85);
+        const tw = ctx.measureText(label).width + 10;
+        ctx.fillRect(labelX, padT + 4, tw, 16);
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, labelX + 5, padT + 12);
+      }
+
+      // Border around plot area
+      ctx.strokeStyle = colBorder;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(padL, padT, cw, ch);
+
+      // Hover crosshair dot
+      if (hover.value) {
+        const px = xToPx(hover.value.idx);
+        const py = yToPx(hover.value.uw);
+        ctx.fillStyle = colDanger;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      layout = { padL, padR, padT, padB, cw, ch, xMin, xMax, xRange, yMin, yMax, yRange, xKey, xToPx, yToPx };
+    }
+
+    function onCanvasMove(ev) {
+      if (!layout) return;
+      const uw = underwaterSeries.value;
+      if (!uw.length) return;
+      const rect = chart.value.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      if (px < layout.padL || px > layout.padL + layout.cw) {
+        if (hover.value) { hover.value = null; nextTick(() => draw()); }
+        return;
+      }
+      const xv = layout.xMin + ((px - layout.padL) / layout.cw) * layout.xRange;
+      const xKey = layout.xKey;
+      let lo = 0, hi = uw.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (uw[mid][xKey] < xv) lo = mid + 1; else hi = mid;
+      }
+      let nearest = uw[lo];
+      if (lo > 0 && Math.abs(uw[lo - 1][xKey] - xv) < Math.abs(uw[lo][xKey] - xv)) nearest = uw[lo - 1];
+      const pyHover = layout.yToPx(nearest.uw);
+      hover.value = {
+        idx: nearest.idx,
+        t: nearest.t,
+        uw: nearest.uw,
+        eq: nearest.y,
+        peak: nearest.peak,
+        px: layout.xToPx(nearest[xKey]),
+        pyTooltip: Math.max(layout.padT + 4, Math.min(pyHover - 30, layout.padT + layout.ch - 80)),
+      };
+      nextTick(() => draw());
+    }
+
+    function onCanvasLeave() {
+      if (hover.value) {
+        hover.value = null;
+        nextTick(() => draw());
+      }
+    }
+
+    function setSort(key) {
+      if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc';
+      } else {
+        sortKey.value = key;
+        // Sensible default direction per column
+        sortDir.value = (key === 'peakTime' || key === 'troughTime') ? 'asc' : 'desc';
+      }
+    }
+
+    function sortClass(key) {
+      return {
+        active: sortKey.value === key,
+        desc: sortKey.value === key && sortDir.value === 'desc',
+        asc:  sortKey.value === key && sortDir.value === 'asc',
+      };
+    }
+
+    function setXMode(mode) {
+      if (xMode.value === mode) return;
+      xMode.value = mode;
+      hover.value = null;
+      nextTick(() => draw());
+    }
+
+    function isSelected(d) {
+      const s = selectedDD.value;
+      return !!s && s.peakIdx === d.peakIdx && s.troughIdx === d.troughIdx;
+    }
+
+    function toggleSelected(d) {
+      selectedDD.value = isSelected(d) ? null : d;
+      nextTick(() => draw());
+    }
+
+    function onStartingEquityInput(ev) {
+      const raw = ev.target.value;
+      if (raw === '' || raw == null) {
+        startingEquityOverride.value = null;
+        return;
+      }
+      const n = Number(raw);
+      if (!isFinite(n) || n <= 0) {
+        startingEquityOverride.value = null;
+      } else {
+        startingEquityOverride.value = n;
+      }
+      nextTick(() => draw());
+    }
+
+    function requestOrders() {
+      if (!strategy.value?.projectName?.trim()) return;
+      window.parent.postMessage({
+        type: 'GET_ORDERS',
+        params: { resultKey: 'Portfolio', direction: '0', sampleType: '127' }
+      }, '*');
+    }
+
+    function handleMessage(e) {
+      const msg = e.data || {};
+      const { type, data, theme } = msg;
+      if (type === 'SET_THEME') {
+        document.documentElement.setAttribute('data-theme', theme);
+        nextTick(() => draw());
+      }
+      if (type === 'STRATEGY_DATA') {
+        strategy.value = data;
+        if (data?.projectName?.trim()) {
+          orders.value = [];
+          hover.value = null;
+          selectedDD.value = null;
+          requestOrders();
+        }
+      }
+      if (type === 'ORDERS_RESPONSE') {
+        orders.value = (data && data.orders) || [];
+        hover.value = null;
+        selectedDD.value = null;
+        nextTick(() => draw());
+      }
+    }
+
+    onMounted(() => {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      window.addEventListener('message', handleMessage);
+      resizeObs = new ResizeObserver(() => draw());
+      if (chart.value?.parentElement) resizeObs.observe(chart.value.parentElement);
+      nextTick(() => draw());
+    });
+
+    return {
+      strategy, orders, chart, wrap, hover, sortKey, sortDir,
+      startingEquityOverride, detectedStartingEquity, effectiveStartingEquity,
+      xMode, selectedDD,
+      headerTitle, hasData, emptyMsg,
+      drawdownPeriods, summary, sortedDDs,
+      tooltipPos,
+      fmtMoney, fmtDate,
+      onCanvasMove, onCanvasLeave, onStartingEquityInput,
+      setXMode, isSelected, toggleSelected,
+      setSort, sortClass,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

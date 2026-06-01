@@ -23,6 +23,10 @@
       <td>MQL5 Expert Advisor &bull; HTTP REST &bull; Stateful Reconnect-Logik</td>
     </tr>
     <tr>
+      <td><strong>Android App</strong></td>
+      <td>Kotlin &bull; Jetpack Compose &bull; Material 3 &bull; Retrofit 2 &bull; Canvas Custom Charts</td>
+    </tr>
+    <tr>
       <td><strong>Security</strong></td>
       <td>BCrypt &bull; RBAC &bull; Brute-Force-Schutz &bull; Rate-Limiting &bull; CSP &bull; HSTS</td>
     </tr>
@@ -89,34 +93,35 @@ Die Plattform ueberwacht in Echtzeit mehrere MetaTrader 5 Trading-Konten, aggreg
 ## Architektur-Uebersicht
 
 ```
-  MetaTrader 5 Terminal(s)             Spring Boot Server
- +-----------------------+          +---------------------------+
- | MQL5 Expert Advisor   |  REST    |  Controller Layer         |
- | - Trade Monitoring    | -------> |  - ApiController          |
- | - Heartbeat           |  HTTP    |  - DashboardController    |
- | - History Export       |  POST   |  - AdminController        |
- | - Auto-Reconnect      |          |  - SecurityController     |
- +-----------------------+          +---------------------------+
-                                    |  Service Layer            |
-                                    |  - AccountManager (Cache) |
-                                    |  - TradeSyncService       |
-                                    |  - OpenProfitAlarmService |
-                                    |  - TradeComparisonService |
-                                    |  - EmailService           |
-                                    |  - HomeyService           |
-                                    +---------------------------+
-                                    |  Persistence Layer        |
-                                    |  - Spring Data JPA        |
-                                    |  - H2 File Database       |
-                                    |  - 11 Entity Tables       |
-                                    +---------------------------+
-                                              |
-                                    +---------------------------+
-                                    |  Web Dashboard            |
-                                    |  - Thymeleaf SSR          |
-                                    |  - Chart.js               |
-                                    |  - Responsive Dark UI     |
-                                    +---------------------------+
+  MetaTrader 5 Terminal(s)               Spring Boot Server
+ +-----------------------+            +---------------------------+
+ | MQL5 Expert Advisor   |   REST     |  Controller Layer         |
+ | - Trade Monitoring    |  ------->  |  - ApiController          |
+ | - Heartbeat           |   HTTP     |  - DashboardController    |
+ | - History Export      |   POST     |  - AdminController        |
+ | - Auto-Reconnect      |            |  - SecurityController     |
+ +-----------------------+            +---------------------------+
+                                      |  Service Layer            |
+                                      |  - AccountManager (Cache) |
+   Android Companion App              |  - TradeSyncService       |
+ +-----------------------+            |  - OpenProfitAlarmService |
+ | Kotlin & Compose UI   |   REST     |  - TradeComparisonService |
+ | - Real-time Dashboard |  ------->  |  - EmailService           |
+ | - Canvas Equity Chart |   HTTP/    |  - HomeyService           |
+ | - Session Persistence |   JSON     +---------------------------+
+ +-----------------------+            |  Persistence Layer        |
+                                      |  - Spring Data JPA        |
+   MCP Server (AI-Sidecar)            |  - H2 File Database       |
+ +-----------------------+            |  - 11 Entity Tables       |
+ | Node.js / TypeScript  |   REST     +---------------------------+
+ | - Tools for Claude    |  ------->            |
+ | - Local REST Bridge   |   HTTP               v
+ +-----------------------+            +---------------------------+
+                                      |  Web Dashboard            |
+                                      |  - Thymeleaf SSR          |
+                                      |  - Chart.js               |
+                                      |  - Responsive Dark UI     |
+                                      +---------------------------+
 ```
 
 ---
@@ -134,6 +139,8 @@ Die Plattform ueberwacht in Echtzeit mehrere MetaTrader 5 Trading-Konten, aggreg
 | **Admin-Panel** | Benutzerverwaltung, DB-Statistiken, Magic-Number-Mapping, Live-Konfiguration aller Parameter |
 | **Berichte** | Tages-/Wochen-/Monatsreports mit aggregierten Profit-Charts |
 | **Mobile** | Responsive Drawdown-Monitor fuer unterwegs |
+| **Android App** | Native App, Compose UI, Autologin, Live-Equity Chart, offene/geschlossene Trades, Drawdowns |
+| **MCP Server** | REST-Schnittstelle als lokales AI-Sidecar für Claude Desktop & Co. |
 | **Integration** | MetaTrader 5 EA, SMTP E-Mail, Homey Smart-Home Webhook |
 
 ---
@@ -152,7 +159,9 @@ Die Plattform ueberwacht in Echtzeit mehrere MetaTrader 5 Trading-Konten, aggreg
 | **Serialisierung** | Jackson (inkl. JSR-310) | JSON-Verarbeitung mit Java-Time-Support |
 | **E-Mail** | Spring Boot Starter Mail | SMTP-basiertes Alerting |
 | **Client** | MQL5 (MetaTrader 5) | Nativer Trading-Plattform-Client |
-| **Build** | Maven | Dependency-Management und Build-Automatisierung |
+| **Android App** | Kotlin, Jetpack Compose, Retrofit 2 | Native Android-Begleit-App |
+| **MCP Server** | Node.js, TypeScript | Model Context Protocol Server (AI-Schnittstelle) |
+| **Build** | Maven, Gradle | Build-Automatisierung für Server und Android |
 
 ---
 
@@ -260,6 +269,9 @@ MqlTradeMonitor/
 |       +-- templates/               # 12 Thymeleaf Templates
 |       +-- static/                  # CSS, JavaScript
 |       +-- application.properties   # Spring-Konfiguration
++-- android-app/                     # Native Android Companion App (Kotlin/Compose)
+|   +-- app/                         # Jetpack Compose UI & Business-Logik
++-- mcp-server/                      # Node.js/TypeScript MCP Server (AI-Schnittstelle)
 +-- mql5/
 |   +-- TradeMonitorClient.mq5       # MQL5 Expert Advisor
 +-- Doku/                            # Ausfuehrliche Dokumentation
@@ -268,6 +280,7 @@ MqlTradeMonitor/
     +-- API-Referenz.md              # Vollstaendige API-Dokumentation
     +-- Sicherheit.md               # Security-Dokumentation
     +-- Entwickler.md               # Entwickler-Guide
+    +-- Android_App.md               # Dokumentation der Android App
 ```
 
 ---
@@ -283,6 +296,7 @@ Im Ordner [`Doku/`](Doku/) finden Sie detaillierte Dokumentation:
 | [API-Referenz](Doku/API-Referenz.md) | Alle REST-Endpunkte mit Request/Response-Beispielen |
 | [Sicherheit](Doku/Sicherheit.md) | Security-Konzept, Brute-Force, Rate-Limiting, Headers, Audit |
 | [Entwickler](Doku/Entwickler.md) | Architektur-Patterns, Datenmodell, Algorithmen, Konventionen |
+| [Android App](Doku/Android_App.md) | Architektur, Struktur und Build-Anleitung der Android-App |
 
 ---
 

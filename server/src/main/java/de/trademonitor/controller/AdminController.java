@@ -967,4 +967,60 @@ public class AdminController {
         long count = logCleanupService.getEaLogCount();
         return java.util.Map.of("totalEaLogRows", count);
     }
+
+    @GetMapping("/api/top-processes")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.List<java.util.Map<String, Object>> getTopProcesses() {
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                Process p = Runtime.getRuntime().exec(new String[]{"powershell.exe", "-Command", 
+                    "Get-WmiObject Win32_PerfFormattedData_PerfProc_Process | Sort-Object PercentProcessorTime -Descending | Select-Object Name, PercentProcessorTime, IDProcess -First 15"});
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("Name") || line.startsWith("----")) continue;
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 3) {
+                        String name = parts[0];
+                        String cpu = parts[parts.length - 2];
+                        String pid = parts[parts.length - 1];
+                        if (!"_Total".equals(name) && !"Idle".equals(name)) {
+                            java.util.Map<String, Object> map = new java.util.HashMap<>();
+                            map.put("pid", pid);
+                            map.put("cpu", cpu);
+                            map.put("mem", "N/A");
+                            map.put("name", name);
+                            result.add(map);
+                            if (result.size() >= 10) break;
+                        }
+                    }
+                }
+            } else {
+                Process p = Runtime.getRuntime().exec(new String[]{"sh", "-c", "ps -eo pid,pcpu,pmem,comm --sort=-pcpu | head -n 11"});
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+                String line;
+                boolean headerSkipped = false;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!headerSkipped) { headerSkipped = true; continue; }
+                    if (line.isEmpty()) continue;
+                    String[] parts = line.split("\\s+", 4);
+                    if (parts.length >= 4) {
+                        java.util.Map<String, Object> map = new java.util.HashMap<>();
+                        map.put("pid", parts[0]);
+                        map.put("cpu", parts[1]);
+                        map.put("mem", parts[2]);
+                        map.put("name", parts[3]);
+                        result.add(map);
+                        if (result.size() >= 10) break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error fetching top processes: " + e.getMessage());
+        }
+        return result;
+    }
 }

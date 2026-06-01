@@ -70,6 +70,10 @@ MqlTradeMonitor/
 │           ├── static/css/style.css     # CSS (Dark Mode)
 │           ├── static/js/global-warnings.js
 │           └── application.properties
+├── android-app/                         # Native Android Companion App
+│   ├── app/                             # Jetpack Compose Quellcode & Ressourcen
+│   ├── build.gradle.kts                 # Modul- & Projekt-Gradle-Build
+│   └── settings.gradle.kts              # Repositories & App-Deklarationen
 ├── mql5/
 │   └── TradeMonitorClient.mq5           # MQL5 Expert Advisor
 ├── mql4/                                # MQL4 EA (Legacy)
@@ -363,6 +367,23 @@ Die Zugangsdaten und die Server-URL werden in der Claude-Konfiguration oder in d
   }
 }
 ```
+
+### 9.6 Android App-Entwicklung & Build
+
+Die Android-Begleit-App ist als Single-Activity-Anwendung in Kotlin mit Jetpack Compose und Retrofit 2 konzipiert.
+
+**Entwicklung & Build:**
+- **Entwicklungsumgebung:** Android Studio (Jellyfish+)
+- **Target SDK:** API Level 34 (Android 14)
+- **Minimum SDK:** API Level 26 (Android 8.0)
+- **Verzeichnis:** `android-app/`
+
+**Session-Management:**
+- `de.trademonitor.app.api.ApiClient` verwaltet die Server-URL und stellt eine Retrofit-Instanz mit einem persistenten `CookieJar` bereit.
+- Nach erfolgreichem Login speichert der `CookieJar` das `JSESSIONID`-Session-Cookie im In-Memory Speicher der App, um alle nachfolgenden Anfragen automatisch zu authentifizieren.
+
+**Custom Canvas Zeichnung:**
+- Das Equity-Chart in `AccountDetailScreen` wird direkt in einem Jetpack Compose Canvas gerendert. Es normiert die Werte auf die Breite und Höhe des Widgets und zeichnet die Linien (`drawPath`) und Farbverläufe ohne den Einsatz von rechenintensiven Chart-Bibliotheken.
 
 ---
 

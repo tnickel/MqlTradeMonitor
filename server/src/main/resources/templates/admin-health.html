@@ -135,6 +135,7 @@
                         <div class="metric-card">
                             <div class="metric-label">CPU Auslastung</div>
                             <div class="metric-value" th:text="${health.cpuLoad}">10.5 %</div>
+                            <button class="details-btn" onclick="openCpuDetails()">🔍 Top Prozesse</button>
                         </div>
                         <div class="metric-card">
                             <div class="metric-label">Total RAM (System)</div>
@@ -242,6 +243,31 @@
                         </tr>
                     </thead>
                     <tbody id="dbTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- CPU Details Modal -->
+    <div class="db-modal-overlay" id="cpuModal">
+        <div class="db-modal">
+            <button class="db-modal-close" onclick="closeCpuDetails()">&times;</button>
+            <h2>⚙️ Top Prozesse (CPU)</h2>
+            <div id="cpuModalLoading" style="text-align:center; padding: 30px; color: #8b949e;">
+                ⏳ Lade Prozesse...
+            </div>
+            <div id="cpuModalContent" style="display:none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>Name</th>
+                            <th>CPU %</th>
+                            <th>RAM %</th>
+                            <th class="bar-cell">Auslastung</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cpuTableBody"></tbody>
                 </table>
             </div>
         </div>
@@ -611,6 +637,56 @@
         function closeNetworkDetails() {
             document.getElementById('networkModal').classList.remove('active');
         }
+
+        // --- CPU Details Modal ---
+        function openCpuDetails() {
+            document.getElementById('cpuModal').classList.add('active');
+            document.getElementById('cpuModalLoading').style.display = 'block';
+            document.getElementById('cpuModalContent').style.display = 'none';
+
+            fetch('/admin/api/top-processes')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('cpuModalLoading').style.display = 'none';
+                    document.getElementById('cpuModalContent').style.display = 'block';
+
+                    const tbody = document.getElementById('cpuTableBody');
+                    tbody.innerHTML = '';
+                    
+                    data.forEach(p => {
+                        const cpuVal = parseFloat(p.cpu) || 0;
+                        const pct = Math.min(cpuVal, 100);
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="color: #8b949e;">${p.pid}</td>
+                            <td style="font-weight: 600; color: #e1e1e1;">${p.name}</td>
+                            <td style="color: #f85149; font-weight: bold;">${p.cpu} %</td>
+                            <td style="color: #58a6ff;">${p.mem} %</td>
+                            <td class="bar-cell">
+                                <div class="bar-bg"><div class="bar-fill" style="width: ${pct}%; background: linear-gradient(90deg, #f0883e, #f85149);"></div></div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    if(data.length === 0) {
+                         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Keine Daten gefunden.</td></tr>';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('cpuModalLoading').innerHTML = '❌ Fehler beim Laden: ' + err.message;
+                    document.getElementById('cpuModalLoading').style.display = 'block';
+                    document.getElementById('cpuModalContent').style.display = 'none';
+                });
+        }
+
+        function closeCpuDetails() {
+            document.getElementById('cpuModal').classList.remove('active');
+        }
+
+        document.getElementById('cpuModal').addEventListener('click', function(e) {
+            if (e.target === this) closeCpuDetails();
+        });
         
         setTimeout(loadNetworkTimeline, 500);
 

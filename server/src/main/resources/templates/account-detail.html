@@ -279,6 +279,17 @@
             </div>
         </section>
 
+        <!-- ======= MONTHLY PERFORMANCE ======= -->
+        <section class="trades-section monthly-performance-section"
+            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+            <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📅 Monatliche Performance</h2>
+            
+            <div class="chart-container"
+                style="position: relative; height: 350px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
+                <canvas id="monthly-performance-chart"></canvas>
+            </div>
+        </section>
+
         <!-- ======= DASHBOARD (Chart + Stats) ======= -->
         <section class="trades-section dashboard-section"
             style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
@@ -356,6 +367,494 @@
                 </div>
             </div>
         </section>
+
+        <!-- ======= DRAWDOWN ANALYZER DASHBOARD ======= -->
+        <section class="trades-section drawdown-section"
+            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+            
+            <style>
+                .dd-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+                .dd-header h2 { color: #fff; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+                .dd-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+                .dd-ctrl-label { color: var(--text-muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+                .dd-seg { display: inline-flex; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+                .dd-seg button { background: transparent; color: var(--text-secondary); border: none; padding: 6px 14px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s; }
+                .dd-seg button.active { background: var(--accent-primary); color: #fff; }
+                .dd-seg button:not(.active):hover { background: var(--bg-card); color: var(--text-primary); }
+                .dd-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+                .dd-stat { background: rgba(255,255,255,0.03); padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); transition: all 0.2s; }
+                .dd-stat:hover { background: rgba(255,255,255,0.05); transform: translateY(-1px); }
+                .dd-stat .dd-stat-label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+                .dd-stat .dd-stat-value { display: block; font-size: 1.35rem; font-weight: 700; color: #fff; }
+                .dd-stat .dd-stat-value.dd-bad { color: var(--danger); }
+                .dd-stat .dd-stat-value.dd-warn { color: var(--warning); }
+                .dd-chart-wrap { position: relative; height: 320px; background: rgba(30,41,59,0.3); border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 1.5rem; overflow: hidden; }
+                .dd-chart-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+                .dd-empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px; flex-direction: column; gap: 8px; }
+                .dd-empty-state .dd-empty-icon { font-size: 2rem; opacity: 0.5; }
+                .dd-crosshair { position: absolute; top: 0; bottom: 0; width: 1px; pointer-events: none; border-left: 1px dashed var(--text-muted); opacity: 0.5; }
+                .dd-tooltip { position: absolute; background: rgba(30,41,59,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; font-size: 0.8rem; line-height: 1.6; pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 50; white-space: nowrap; }
+                .dd-tooltip .dd-tt-title { font-weight: 700; margin-bottom: 4px; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+                .dd-tooltip .dd-tt-row { display: flex; align-items: center; gap: 8px; }
+                .dd-tooltip .dd-tt-label { color: var(--text-muted); }
+                .dd-tooltip .dd-tt-value { font-weight: 700; margin-left: auto; }
+                .dd-table-section { margin-bottom: 1rem; }
+                .dd-table-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+                .dd-table-header h3 { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+                .dd-table-scroll { max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(255,255,255,0.02); }
+                table.dd-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+                table.dd-table th, table.dd-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+                table.dd-table thead th { position: sticky; top: 0; background: rgba(15,23,42,0.95); backdrop-filter: blur(8px); font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; z-index: 1; }
+                table.dd-table th.dd-sortable { cursor: pointer; user-select: none; transition: color 0.2s; }
+                table.dd-table th.dd-sortable:hover { color: var(--text-primary); }
+                table.dd-table th.dd-sortable.dd-sort-active { color: var(--accent-primary); }
+                table.dd-table th.dd-sortable.dd-sort-active.dd-desc::after { content: ' \25BC'; font-size: 0.6rem; }
+                table.dd-table th.dd-sortable.dd-sort-active.dd-asc::after { content: ' \25B2'; font-size: 0.6rem; }
+                table.dd-table tbody tr { cursor: pointer; transition: background 0.15s; }
+                table.dd-table tbody tr:hover { background: var(--bg-card); }
+                table.dd-table tbody tr.dd-selected { background: rgba(245,158,11,0.12); }
+                table.dd-table tbody tr.dd-selected:hover { background: rgba(245,158,11,0.2); }
+                table.dd-table tbody tr.dd-selected td:first-child::before { content: '\25B6  '; color: var(--warning); font-size: 0.65rem; }
+                table.dd-table td.dd-num { text-align: right; font-variant-numeric: tabular-nums; }
+                table.dd-table td.dd-bad { color: var(--danger); }
+                table.dd-table td.dd-ongoing { color: var(--warning); font-weight: 700; }
+                .dd-data-info { margin-top: 12px; padding: 10px 14px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+                .dd-data-info strong { color: var(--text-secondary); }
+                .dd-info-btn { background: none; border: 1px solid var(--border-color); color: var(--text-muted); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.25s; margin-left: 12px; font-family: serif; }
+                .dd-info-btn:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); transform: scale(1.1); }
+                .dd-info-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 2000; align-items: center; justify-content: center; padding: 2rem; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+                .dd-info-modal.dd-visible { display: flex; }
+                .dd-info-content { background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(30,41,59,0.98)); backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: 20px; padding: 2.5rem; max-width: 820px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 60px rgba(0,0,0,0.5); position: relative; }
+                .dd-info-content::-webkit-scrollbar { width: 6px; }
+                .dd-info-content::-webkit-scrollbar-track { background: transparent; }
+                .dd-info-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+                .dd-info-close { position: absolute; top: 1rem; right: 1.5rem; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 10; }
+                .dd-info-close:hover { background: var(--danger); }
+                .dd-info-content h3 { color: #fff; font-size: 1.4rem; margin: 0 0 1.25rem 0; display: flex; align-items: center; gap: 10px; }
+                .dd-info-content h4 { color: var(--accent-secondary); font-size: 0.9rem; margin: 1.5rem 0 0.75rem 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
+                .dd-info-content p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.7; margin: 0 0 0.75rem 0; }
+                .dd-info-content ul { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.7; margin: 0 0 0.75rem 0; padding-left: 1.25rem; }
+                .dd-info-content li { margin-bottom: 0.4rem; }
+                .dd-info-content code { background: rgba(59,130,246,0.1); color: var(--accent-secondary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-family: 'Consolas', monospace; }
+                .dd-info-content .dd-info-metric { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 8px; }
+                .dd-info-content .dd-info-metric .dd-im-icon { font-size: 1.2rem; min-width: 28px; text-align: center; padding-top: 2px; }
+                .dd-info-content .dd-info-metric .dd-im-title { font-weight: 700; color: #fff; font-size: 0.85rem; margin-bottom: 2px; }
+                .dd-info-content .dd-info-metric .dd-im-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+            </style>
+
+            <div class="dd-header">
+                <h2>📉 Drawdown Analyzer <button class="dd-info-btn" onclick="document.getElementById('dd-info-modal').classList.add('dd-visible')" title="Was ist der Drawdown Analyzer?">i</button></h2>
+                <div class="dd-controls" id="dd-controls" style="display: none;">
+                    <span class="dd-ctrl-label">X-Achse</span>
+                    <div class="dd-seg">
+                        <button id="dd-xmode-index" onclick="ddSetXMode('index')">Snapshot #</button>
+                        <button id="dd-xmode-time" class="active" onclick="ddSetXMode('time')">Datum</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Modal -->
+            <div class="dd-info-modal" id="dd-info-modal" onclick="if(event.target===this)this.classList.remove('dd-visible')">
+                <div class="dd-info-content">
+                    <button class="dd-info-close" onclick="document.getElementById('dd-info-modal').classList.remove('dd-visible')">✕</button>
+                    <h3>📉 Drawdown Analyzer — Dokumentation</h3>
+                    <p>Der Drawdown Analyzer untersucht die <strong>Equity-Kurve</strong> deines Accounts und identifiziert alle Phasen, in denen das Konto unter einem vorherigen Höchststand lag. Dies gibt dir einen präzisen Überblick über das Risikoverhalten deiner Strategie.</p>
+
+                    <h4>📊 Was ist ein Drawdown?</h4>
+                    <p>Ein <strong>Drawdown</strong> ist der Rückgang der Equity von einem lokalen Höchststand (Peak) bis zum tiefsten Punkt (Trough), bevor die Equity den vorherigen Peak wieder übersteigt. Er wird sowohl absolut (in Kontowährung) als auch relativ (in Prozent des Peaks) gemessen.</p>
+                    <p>Beispiel: Steigt die Equity auf <code>10.000 €</code> und fällt dann auf <code>9.200 €</code>, beträgt der Drawdown <code>800 €</code> bzw. <code>8.00%</code>.</p>
+
+                    <h4>📈 Der Underwater-Chart</h4>
+                    <p>Der Chart zeigt die <strong>Underwater-Equity</strong> über die Zeit: Die Differenz zwischen aktuellem Equity-Wert und dem bisherigen Höchststand, ausgedrückt in Prozent. Die Null-Linie (0%) bedeutet: Die Equity ist auf einem neuen High. Alles darunter zeigt, wie weit die Equity unter dem Peak liegt.</p>
+                    <ul>
+                        <li><strong>Rote Fläche</strong> — Zeigt die Tiefe des aktuellen Drawdowns. Je tiefer und breiter, desto gravierender.</li>
+                        <li><strong>Null-Linie</strong> — Die Equity hat einen neuen Peak erreicht. Häufige Berührungen = gutes Recovery-Verhalten.</li>
+                        <li><strong>X-Achse umschaltbar</strong> — "Snapshot #" zeigt den Index (gleichmäßig verteilt), "Datum" zeigt die tatsächliche Zeitachse.</li>
+                    </ul>
+
+                    <h4>🔢 Kennzahlen erklärt</h4>
+                    <div class="dd-info-metric"><div class="dd-im-icon">🔢</div><div><div class="dd-im-title">Drawdowns</div><div class="dd-im-desc">Anzahl identifizierter Drawdown-Perioden. Jede Periode beginnt, wenn die Equity unter den Peak fällt, und endet, wenn sie den Peak wieder übersteigt. Laufende (noch nicht erholte) Drawdowns werden separat angezeigt.</div></div></div>
+                    <div class="dd-info-metric"><div class="dd-im-icon">📉</div><div><div class="dd-im-title">Max DD € / Max DD %</div><div class="dd-im-desc">Der tiefste Peak-to-Trough Verlust, sowohl absolut als auch in Prozent. Dies ist die wichtigste Risikokennzahl — sie zeigt den schlimmsten historischen Rückgang deines Kontos.</div></div></div>
+                    <div class="dd-info-metric"><div class="dd-im-icon">📊</div><div><div class="dd-im-title">Avg DD %</div><div class="dd-im-desc">Durchschnittliche Drawdown-Tiefe über alle identifizierten Perioden. Ein niedriger Wert zeigt an, dass Rückgänge typischerweise flach sind.</div></div></div>
+                    <div class="dd-info-metric"><div class="dd-im-icon">⏱️</div><div><div class="dd-im-title">Avg Recovery</div><div class="dd-im-desc">Durchschnittliche Anzahl Tage vom Trough (Tief) zurück zum Peak. Nur abgeschlossene Drawdowns fließen ein. Kurze Recovery-Zeiten sind vorteilhaft.</div></div></div>
+                    <div class="dd-info-metric"><div class="dd-im-icon">🌊</div><div><div class="dd-im-title">Longest Underwater</div><div class="dd-im-desc">Die längste zusammenhängende Zeitspanne, in der die Equity unter einem vorherigen Peak lag (vom Beginn des Drawdowns bis zur vollständigen Erholung). Inklusive noch laufender Drawdowns.</div></div></div>
+
+                    <h4>📋 Drawdown-Tabelle</h4>
+                    <p>Die Tabelle listet <strong>jede einzelne Drawdown-Periode</strong> auf. Alle Spalten sind sortierbar (Klick auf Spaltenüberschrift):</p>
+                    <ul>
+                        <li><strong>Depth € / %</strong> — Tiefe des Drawdowns (Peak minus Trough)</li>
+                        <li><strong>Peak Datum</strong> — Wann wurde der Höchststand erreicht?</li>
+                        <li><strong>Trough Datum</strong> — Wann war der tiefste Punkt?</li>
+                        <li><strong>Decline (d)</strong> — Tage vom Peak zum Trough</li>
+                        <li><strong>Underwater (d)</strong> — Gesamtdauer unter dem Peak (Peak → Recovery)</li>
+                        <li><strong>Recovery (d)</strong> — Tage vom Trough zurück zum neuen Peak</li>
+                        <li><strong>Status</strong> — ✅ Erholt (Equity hat Peak überschritten) oder ⏳ Laufend (noch im Drawdown)</li>
+                    </ul>
+                    <p>💡 <strong>Tipp:</strong> Klicke auf eine Zeile in der Tabelle, um die entsprechende Drawdown-Periode im Chart <span style="color:var(--warning);font-weight:700">orange hervorgehoben</span> zu sehen. Das Dreieck markiert den Peak, der Punkt den Trough.</p>
+
+                    <h4>⚙️ Datengrundlage</h4>
+                    <p>Die Analyse basiert auf <strong>Equity-Snapshots</strong>, die minütlich vom Expert Advisor an den TradeMonitor gesendet werden. Jeder Snapshot enthält den exakten Equity- und Balance-Wert zum jeweiligen Zeitpunkt.</p>
+                    <ul>
+                        <li>Equity-Snapshots existieren seit ca. <strong>März 2026</strong> — ältere Daten sind nicht verfügbar.</li>
+                        <li>Equity-Bewegungen <em>zwischen</em> den Snapshots (z.B. Intra-Minute Spikes) werden nicht erfasst.</li>
+                        <li>Deposits und Withdrawals sind in der Equity automatisch enthalten — keine manuelle Korrektur nötig.</li>
+                    </ul>
+                </div>
+            </div>
+
+
+            <div class="dd-summary" id="dd-summary" style="display: none;">
+                <div class="dd-stat"><span class="dd-stat-label" title="Anzahl identifizierter Drawdown-Perioden (Peak → Recovery)">Drawdowns</span><span class="dd-stat-value" id="dd-count">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label" title="Tiefster Peak-to-Trough Verlust in EUR">Max DD €</span><span class="dd-stat-value dd-bad" id="dd-max-depth">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label" title="Tiefster Peak-to-Trough Verlust als % des Equity Peaks">Max DD %</span><span class="dd-stat-value dd-bad" id="dd-max-pct">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label" title="Durchschnittliche Drawdown-Tiefe über alle Perioden">Avg DD %</span><span class="dd-stat-value" id="dd-avg-pct">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label" title="Durchschnittliche Tage von Tief zurück über den Peak (nur abgeschlossene DDs)">Avg Recovery</span><span class="dd-stat-value" id="dd-avg-recovery">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label" title="Längste Zeitspanne unter einem vorherigen Equity-Peak (inkl. laufende)">Longest Underwater</span><span class="dd-stat-value dd-warn" id="dd-longest-uw">—</span></div>
+            </div>
+
+            <div class="dd-chart-wrap" id="dd-chart-wrap">
+                <canvas id="dd-canvas"></canvas>
+                <div class="dd-empty-state" id="dd-empty-state"><span class="dd-empty-icon">📊</span><span>Lade Equity-Daten für Drawdown-Analyse...</span></div>
+                <div class="dd-crosshair" id="dd-crosshair" style="display: none;"></div>
+                <div class="dd-tooltip" id="dd-tooltip" style="display: none;">
+                    <div class="dd-tt-title" id="dd-tt-title"></div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Underwater</span><span class="dd-tt-value" id="dd-tt-uw"></span></div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Equity</span><span class="dd-tt-value" id="dd-tt-eq"></span></div>
+                    <div class="dd-tt-row" id="dd-tt-peak-row"><span class="dd-tt-label">Peak</span><span class="dd-tt-value" id="dd-tt-peak"></span></div>
+                </div>
+            </div>
+
+            <div class="dd-table-section" id="dd-table-section" style="display: none;">
+                <div class="dd-table-header"><h3 id="dd-table-title">Alle Drawdowns</h3></div>
+                <div class="dd-table-scroll">
+                    <table class="dd-table">
+                        <thead><tr>
+                            <th>#</th>
+                            <th class="dd-sortable" data-sort="depth" onclick="ddSetSort('depth')">Depth €</th>
+                            <th class="dd-sortable" data-sort="depthPct" onclick="ddSetSort('depthPct')">Depth %</th>
+                            <th class="dd-sortable" data-sort="peakTime" onclick="ddSetSort('peakTime')">Peak Datum</th>
+                            <th class="dd-sortable" data-sort="troughTime" onclick="ddSetSort('troughTime')">Trough Datum</th>
+                            <th class="dd-sortable" data-sort="declineDays" onclick="ddSetSort('declineDays')">Decline (d)</th>
+                            <th class="dd-sortable" data-sort="underwaterDays" onclick="ddSetSort('underwaterDays')">Underwater (d)</th>
+                            <th class="dd-sortable" data-sort="recoveryDays" onclick="ddSetSort('recoveryDays')">Recovery (d)</th>
+                            <th>Status</th>
+                        </tr></thead>
+                        <tbody id="dd-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="dd-data-info" id="dd-data-info" style="display: none;">
+                <strong>ℹ️ Datenbereich:</strong> <span id="dd-data-range">—</span>
+                · Basiert auf Equity-Snapshots (minütlich). Intra-Snapshot Equity-Bewegungen werden nicht erfasst.
+            </div>
+        </section>
+
+        <script th:inline="javascript">
+        (function() {
+            'use strict';
+            var ACCOUNT_ID = /*[[${accountId}]]*/ 0;
+            var ACCOUNT_CURRENCY = /*[[${account.currency}]]*/ 'EUR';
+            var DAY_MS = 86400000;
+            var ddSnapshots = [], ddAllSnapshots = [], ddEquityCurve = [], ddUnderwaterSeries = [], ddDrawdownPeriods = [];
+            var ddXMode = 'time', ddSortKey = 'depth', ddSortDir = 'desc', ddSelectedDD = null, ddHover = null, ddLayout = null;
+            var ddSelectedTimeStartTs = 0, ddSelectedTimeEndTs = 0, ddSelectedTimeFilterTs = null;
+            var ddCanvas = document.getElementById('dd-canvas');
+            var ddChartWrap = document.getElementById('dd-chart-wrap');
+            var ddEmptyState = document.getElementById('dd-empty-state');
+            var ddCrosshair = document.getElementById('dd-crosshair');
+            var ddTooltip = document.getElementById('dd-tooltip');
+
+            function ddLoadData() {
+                fetch('/api/equity-history/' + ACCOUNT_ID)
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data || data.length < 2) {
+                            ddEmptyState.innerHTML = '<span class="dd-empty-icon">📭</span><span>Keine Equity-Snapshots vorhanden.<br>Snapshots werden minütlich gesammelt, sobald der EA verbunden ist.</span>';
+                            return;
+                        }
+                        ddAllSnapshots = data;
+                        if (ddSelectedTimeFilterTs !== null) {
+                            window.ddApplyTimeFilter(ddSelectedTimeFilterTs, ddSelectedTimeStartTs, ddSelectedTimeEndTs);
+                        } else {
+                            ddSnapshots = data;
+                            ddProcessData();
+                            ddShowUI();
+                            ddRenderAll();
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('DD: Fehler beim Laden', err);
+                        ddEmptyState.innerHTML = '<span class="dd-empty-icon">⚠️</span><span>Fehler beim Laden der Equity-Daten.</span>';
+                    });
+            }
+
+            function ddProcessData() {
+                ddEquityCurve = [];
+                for (var i = 0; i < ddSnapshots.length; i++) {
+                    ddEquityCurve.push({ idx: i + 1, t: ddParseTs(ddSnapshots[i].timestamp), y: ddSnapshots[i].equity, bal: ddSnapshots[i].balance });
+                }
+                ddUnderwaterSeries = [];
+                var peak = ddEquityCurve[0].y;
+                for (var i = 0; i < ddEquityCurve.length; i++) {
+                    var e = ddEquityCurve[i];
+                    if (e.y > peak) peak = e.y;
+                    ddUnderwaterSeries.push({ t: e.t, idx: e.idx, y: e.y, bal: e.bal, peak: peak, uw: (e.y - peak) / (Math.abs(peak) || 1) * 100 });
+                }
+                ddDrawdownPeriods = ddComputePeriods(ddEquityCurve);
+            }
+
+            function ddComputePeriods(eq) {
+                if (eq.length < 2) return [];
+                var periods = [], peakIdx = 0, troughIdx = -1;
+                for (var i = 1; i < eq.length; i++) {
+                    if (eq[i].y > eq[peakIdx].y) {
+                        if (troughIdx !== -1) {
+                            var p = eq[peakIdx], tr = eq[troughIdx];
+                            periods.push({ peakIdx: peakIdx, peakTime: p.t, peakValue: p.y, troughIdx: troughIdx, troughTime: tr.t, troughValue: tr.y, recoveryIdx: i, recoveryTime: eq[i].t, depth: p.y - tr.y, depthPct: p.y !== 0 ? (p.y - tr.y) / Math.abs(p.y) * 100 : 0, underwaterDays: (eq[i].t - p.t) / DAY_MS, declineDays: (tr.t - p.t) / DAY_MS, recoveryDays: (eq[i].t - tr.t) / DAY_MS, ongoing: false });
+                            troughIdx = -1;
+                        }
+                        peakIdx = i;
+                    } else if (eq[i].y < eq[peakIdx].y) {
+                        if (troughIdx === -1 || eq[i].y < eq[troughIdx].y) troughIdx = i;
+                    }
+                }
+                if (troughIdx !== -1) {
+                    var p = eq[peakIdx], tr = eq[troughIdx], last = eq[eq.length - 1];
+                    periods.push({ peakIdx: peakIdx, peakTime: p.t, peakValue: p.y, troughIdx: troughIdx, troughTime: tr.t, troughValue: tr.y, recoveryIdx: null, recoveryTime: null, depth: p.y - tr.y, depthPct: p.y !== 0 ? (p.y - tr.y) / Math.abs(p.y) * 100 : 0, underwaterDays: (last.t - p.t) / DAY_MS, declineDays: (tr.t - p.t) / DAY_MS, recoveryDays: null, ongoing: true });
+                }
+                return periods;
+            }
+
+            function ddShowUI() {
+                ddEmptyState.style.display = 'none';
+                document.getElementById('dd-controls').style.display = 'flex';
+                document.getElementById('dd-summary').style.display = 'grid';
+                document.getElementById('dd-data-info').style.display = 'block';
+                ddUpdateSummary();
+                if (ddSnapshots.length > 0) {
+                    document.getElementById('dd-data-range').textContent = ddFmtDateISO(ddSnapshots[0].timestamp) + ' bis ' + ddFmtDateISO(ddSnapshots[ddSnapshots.length - 1].timestamp) + ' (' + ddSnapshots.length + ' Snapshots)';
+                }
+                if (ddDrawdownPeriods.length > 0) {
+                    document.getElementById('dd-table-section').style.display = 'block';
+                    document.getElementById('dd-table-title').textContent = 'Alle Drawdowns (' + ddDrawdownPeriods.length + ')';
+                    ddRenderTable();
+                }
+            }
+
+            function ddUpdateSummary() {
+                var p = ddDrawdownPeriods;
+                if (!p.length) { return; }
+                var closed = [], maxD = 0, maxP = 0, sumP = 0, lwUW = 0, sumR = 0, oc = 0;
+                for (var i = 0; i < p.length; i++) {
+                    if (!p[i].ongoing) closed.push(p[i]); else oc++;
+                    if (p[i].depth > maxD) maxD = p[i].depth;
+                    if (p[i].depthPct > maxP) maxP = p[i].depthPct;
+                    sumP += p[i].depthPct;
+                    if (p[i].underwaterDays > lwUW) lwUW = p[i].underwaterDays;
+                }
+                for (var i = 0; i < closed.length; i++) sumR += closed[i].recoveryDays;
+                document.getElementById('dd-count').innerHTML = p.length + (oc > 0 ? ' <span style="font-size:0.8rem;color:var(--warning)">(' + oc + ' laufend)</span>' : '');
+                document.getElementById('dd-max-depth').textContent = '-' + ddFmtMoney(maxD) + ' ' + ACCOUNT_CURRENCY;
+                document.getElementById('dd-max-pct').textContent = maxP.toFixed(2) + '%';
+                document.getElementById('dd-avg-pct').textContent = (sumP / p.length).toFixed(2) + '%';
+                document.getElementById('dd-avg-recovery').textContent = closed.length ? (sumR / closed.length).toFixed(0) + ' d' : '—';
+                document.getElementById('dd-longest-uw').textContent = lwUW.toFixed(0) + ' d';
+            }
+
+            function ddRenderAll() { ddDraw(); ddRenderTable(); }
+
+            function ddDraw() {
+                if (!ddCanvas || !ddCanvas.parentElement) return;
+                var wE = ddCanvas.parentElement, dpr = window.devicePixelRatio || 1;
+                var w = wE.clientWidth, h = wE.clientHeight;
+                if (w < 10 || h < 10) return;
+                ddCanvas.width = Math.floor(w * dpr); ddCanvas.height = Math.floor(h * dpr);
+                var ctx = ddCanvas.getContext('2d');
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+                var uw = ddUnderwaterSeries;
+                if (!uw.length) { ddLayout = null; return; }
+                var pL = 64, pR = 20, pT = 22, pB = 32, cw = w - pL - pR, ch = h - pT - pB;
+                if (cw <= 0 || ch <= 0) { ddLayout = null; return; }
+                var xK = ddXMode === 'index' ? 'idx' : 't';
+                var xMn = uw[0][xK], xMx = uw[uw.length - 1][xK];
+                if (ddXMode === 'time') {
+                    if (ddSelectedTimeStartTs > 0) xMn = ddSelectedTimeStartTs;
+                    if (ddSelectedTimeEndTs > 0) xMx = ddSelectedTimeEndTs;
+                }
+                var xR = (xMx - xMn) || 1;
+                var mnUw = 0;
+                for (var i = 0; i < uw.length; i++) if (uw[i].uw < mnUw) mnUw = uw[i].uw;
+                var yS = ddNiceScale(Math.min(-1, mnUw * 1.1), 0, 5);
+                var yMn = yS.min, yMx = Math.max(0, yS.max), yR = (yMx - yMn) || 1;
+                var x2p = function(v) { return pL + ((v - xMn) / xR) * cw; };
+                var y2p = function(v) { return pT + ch - ((v - yMn) / yR) * ch; };
+                ctx.font = '500 12px "Inter","Segoe UI",sans-serif';
+                // Y grid
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                for (var i = 0; i <= yS.count; i++) { var yv = yMn + i * yS.step; if (yv > yMx + 1e-9) break; var py = y2p(yv); ctx.beginPath(); ctx.moveTo(pL, py); ctx.lineTo(pL + cw, py); ctx.stroke(); ctx.fillText(yv.toFixed(yS.step < 1 ? 1 : 0) + '%', pL - 8, py); }
+                // Zero
+                var z0 = y2p(0); ctx.strokeStyle = 'rgba(148,163,184,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pL, z0); ctx.lineTo(pL + cw, z0); ctx.stroke();
+                // X labels
+                ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                var xT = Math.min(8, Math.max(2, Math.floor(cw / 100)));
+                for (var i = 0; i <= xT; i++) { var xv = xMn + (xR * i / xT); ctx.fillText(ddFmtXL(xv), pL + (cw * i / xT), pT + ch + 8); }
+                // Fill
+                var gr = ctx.createLinearGradient(0, z0, 0, pT + ch); gr.addColorStop(0, 'rgba(239,68,68,0.05)'); gr.addColorStop(1, 'rgba(239,68,68,0.35)');
+                ctx.beginPath(); ctx.moveTo(x2p(uw[0][xK]), z0);
+                for (var i = 0; i < uw.length; i++) ctx.lineTo(x2p(uw[i][xK]), y2p(uw[i].uw));
+                ctx.lineTo(x2p(uw[uw.length - 1][xK]), z0); ctx.closePath(); ctx.fillStyle = gr; ctx.fill();
+                // Line
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.beginPath();
+                for (var i = 0; i < uw.length; i++) { var px = x2p(uw[i][xK]), py = y2p(uw[i].uw); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+                ctx.stroke();
+                // Selected DD
+                if (ddSelectedDD) {
+                     var d = ddSelectedDD;
+                     var pkX = ddXMode === 'index' ? d.peakIdx + 1 : d.peakTime;
+                     var trX = ddXMode === 'index' ? d.troughIdx + 1 : d.troughTime;
+                     var rcX = d.ongoing ? (ddXMode === 'index' ? uw[uw.length-1].idx : uw[uw.length-1].t) : (ddXMode === 'index' ? d.recoveryIdx + 1 : d.recoveryTime);
+                     var ppk = x2p(pkX), ptr = x2p(trX), prc = x2p(rcX);
+                     var bL = Math.max(pL, Math.min(pL+cw, ppk)), bR = Math.max(pL, Math.min(pL+cw, prc));
+                     ctx.fillStyle = 'rgba(245,158,11,0.12)'; ctx.fillRect(bL, pT, Math.max(2, bR - bL), ch);
+                     ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+                     [ppk, ptr].forEach(function(vl) { if (vl >= pL-1 && vl <= pL+cw+1) { ctx.beginPath(); ctx.moveTo(vl, pT); ctx.lineTo(vl, pT+ch); ctx.stroke(); } });
+                     ctx.setLineDash([]);
+                     var sS = d.peakIdx, sE = d.ongoing ? uw.length-1 : d.recoveryIdx;
+                     if (sS != null && sE != null && sE >= sS) {
+                         ctx.beginPath(); ctx.moveTo(x2p(uw[sS][xK]), z0);
+                         for (var si = sS; si <= sE; si++) ctx.lineTo(x2p(uw[si][xK]), y2p(uw[si].uw));
+                         ctx.lineTo(x2p(uw[sE][xK]), z0); ctx.closePath(); ctx.fillStyle = 'rgba(245,158,11,0.25)'; ctx.fill();
+                         ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.beginPath();
+                         for (var si = sS; si <= sE; si++) { var sx = x2p(uw[si][xK]), sy = y2p(uw[si].uw); if (si === sS) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy); }
+                         ctx.stroke();
+                     }
+                     ctx.fillStyle = '#f59e0b';
+                     if (ppk >= pL && ppk <= pL+cw) { ctx.beginPath(); ctx.moveTo(ppk, pT); ctx.lineTo(ppk-5, pT-7); ctx.lineTo(ppk+5, pT-7); ctx.closePath(); ctx.fill(); }
+                     if (ptr >= pL && ptr <= pL+cw) { ctx.beginPath(); ctx.arc(ptr, y2p(uw[d.troughIdx].uw), 4, 0, Math.PI*2); ctx.fill(); }
+                     var lb = (d.ongoing ? 'Laufend · ' : 'DD · ') + d.depthPct.toFixed(2) + '%';
+                     ctx.font = '600 12px "Inter","Segoe UI",sans-serif';
+                     var lx = Math.max(pL+4, Math.min(pL+cw-100, bL+4));
+                     ctx.fillStyle = 'rgba(245,158,11,0.85)'; var tw2 = ctx.measureText(lb).width + 12;
+                     ctx.fillRect(lx, pT+6, tw2, 20); ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(lb, lx+6, pT+16);
+                }
+                // Border
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.strokeRect(pL, pT, cw, ch);
+                // Hover dot
+                if (ddHover) {
+                    var hx = x2p(ddHover[xK]), hy = y2p(ddHover.uw);
+                    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                }
+                ddLayout = { pL:pL, pR:pR, pT:pT, pB:pB, cw:cw, ch:ch, xMn:xMn, xMx:xMx, xR:xR, yMn:yMn, yMx:yMx, yR:yR, xK:xK, x2p:x2p, y2p:y2p };
+            }
+
+            function ddRenderTable() {
+                var tb = document.getElementById('dd-table-body'); if (!tb) return;
+                var arr = ddDrawdownPeriods.slice(), k = ddSortKey, dir = ddSortDir === 'asc' ? 1 : -1;
+                arr.sort(function(a,b) { var av=a[k],bv=b[k]; if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return av<bv?-dir:av>bv?dir:0; });
+                var h = '';
+                for (var i = 0; i < arr.length; i++) {
+                    var d = arr[i], sel = ddSelectedDD && ddSelectedDD.peakIdx === d.peakIdx && ddSelectedDD.troughIdx === d.troughIdx;
+                    h += '<tr class="' + (sel?'dd-selected':'') + '" data-pi="'+d.peakIdx+'" data-ti="'+d.troughIdx+'">';
+                    h += '<td>'+(i+1)+'</td><td class="dd-num dd-bad">-'+ddFmtMoney(d.depth)+'</td><td class="dd-num dd-bad">'+d.depthPct.toFixed(2)+'%</td>';
+                    h += '<td>'+ddFmtDate(d.peakTime)+'</td><td>'+ddFmtDate(d.troughTime)+'</td>';
+                    h += '<td class="dd-num">'+d.declineDays.toFixed(1)+'</td><td class="dd-num">'+d.underwaterDays.toFixed(1)+'</td>';
+                    h += '<td class="dd-num">'+(d.ongoing?'—':d.recoveryDays.toFixed(1))+'</td>';
+                    h += '<td class="'+(d.ongoing?'dd-ongoing':'')+'">'+(d.ongoing?'⏳ Laufend':'✅ Erholt')+'</td></tr>';
+                }
+                tb.innerHTML = h;
+                var rows = tb.querySelectorAll('tr');
+                for (var i = 0; i < rows.length; i++) rows[i].addEventListener('click', function() { ddToggleSel(parseInt(this.getAttribute('data-pi')), parseInt(this.getAttribute('data-ti'))); });
+                // Sort headers
+                var ths = document.querySelectorAll('table.dd-table th.dd-sortable');
+                for (var i = 0; i < ths.length; i++) { var sk = ths[i].getAttribute('data-sort'); ths[i].className = 'dd-sortable' + (sk===ddSortKey?' dd-sort-active '+(ddSortDir==='desc'?'dd-desc':'dd-asc'):''); }
+            }
+
+            ddCanvas.addEventListener('mousemove', function(ev) {
+                if (!ddLayout) return;
+                var uw = ddUnderwaterSeries; if (!uw.length) return;
+                var rect = ddCanvas.getBoundingClientRect(), px = ev.clientX - rect.left;
+                if (px < ddLayout.pL || px > ddLayout.pL + ddLayout.cw) { if (ddHover) { ddHover = null; ddHideTT(); ddDraw(); } return; }
+                var xv = ddLayout.xMn + ((px - ddLayout.pL) / ddLayout.cw) * ddLayout.xR;
+                var lo = 0, hi = uw.length - 1;
+                while (lo < hi) { var mid = (lo+hi)>>1; if (uw[mid][ddLayout.xK] < xv) lo = mid+1; else hi = mid; }
+                var near = uw[lo];
+                if (lo > 0 && Math.abs(uw[lo-1][ddLayout.xK]-xv) < Math.abs(uw[lo][ddLayout.xK]-xv)) near = uw[lo-1];
+                
+                // Only hover if cursor is reasonably close horizontally (e.g., within 40 pixels)
+                var nearPx = ddLayout.x2p(near[ddLayout.xK]);
+                if (Math.abs(nearPx - px) > 40) {
+                    if (ddHover) { ddHover = null; ddHideTT(); ddDraw(); }
+                    return;
+                }
+                
+                ddHover = near;
+                var hpx = ddLayout.x2p(near[ddLayout.xK]), hpy = ddLayout.y2p(near.uw);
+                ddCrosshair.style.display = 'block'; ddCrosshair.style.left = hpx + 'px';
+                ddTooltip.style.display = 'block';
+                document.getElementById('dd-tt-title').textContent = '#' + near.idx + ' · ' + ddFmtDate(near.t);
+                document.getElementById('dd-tt-uw').textContent = near.uw.toFixed(2) + '%';
+                document.getElementById('dd-tt-eq').textContent = ddFmtMoney(near.y) + ' ' + ACCOUNT_CURRENCY;
+                var pr = document.getElementById('dd-tt-peak-row');
+                if (near.peak !== near.y) { pr.style.display = 'flex'; document.getElementById('dd-tt-peak').textContent = ddFmtMoney(near.peak) + ' ' + ACCOUNT_CURRENCY; } else { pr.style.display = 'none'; }
+                var cW = ddChartWrap.clientWidth, ttL = hpx + 14; if (ttL + 200 > cW) ttL = hpx - 214;
+                var ttT = Math.max(ddLayout.pT+4, Math.min(hpy-30, ddLayout.pT+ddLayout.ch-94));
+                ddTooltip.style.left = ttL+'px'; ddTooltip.style.top = Math.max(4,ttT)+'px';
+                ddDraw();
+            });
+            ddCanvas.addEventListener('mouseleave', function() { if (ddHover) { ddHover = null; ddHideTT(); ddDraw(); } });
+            function ddHideTT() { ddCrosshair.style.display='none'; ddTooltip.style.display='none'; }
+
+            function ddToggleSel(pi, ti) {
+                if (ddSelectedDD && ddSelectedDD.peakIdx===pi && ddSelectedDD.troughIdx===ti) ddSelectedDD=null;
+                else for (var i=0;i<ddDrawdownPeriods.length;i++) if (ddDrawdownPeriods[i].peakIdx===pi&&ddDrawdownPeriods[i].troughIdx===ti) { ddSelectedDD=ddDrawdownPeriods[i]; break; }
+                ddRenderAll();
+            }
+            window.ddSetXMode = function(m) { if (ddXMode===m) return; ddXMode=m; ddHover=null; ddHideTT(); document.getElementById('dd-xmode-index').className=m==='index'?'active':''; document.getElementById('dd-xmode-time').className=m==='time'?'active':''; ddDraw(); };
+            window.ddSetSort = function(k) { if (ddSortKey===k) ddSortDir=ddSortDir==='desc'?'asc':'desc'; else { ddSortKey=k; ddSortDir=(k==='peakTime'||k==='troughTime')?'asc':'desc'; } ddRenderTable(); };
+
+            function ddParseTs(ts) { if(!ts) return 0; var n=Date.parse(ts); if(!isNaN(n)) return n; return Date.parse(ts.replace(/\./g,'-').replace(' ','T')); }
+            function ddFmtMoney(v) { if(v==null||!isFinite(v)) return '—'; var a=Math.abs(v); if(a>=1e6) return (v<0?'-':'')+(a/1e6).toFixed(2)+'M'; if(a>=10000) return (v<0?'-':'')+(a/1e3).toFixed(1)+'k'; return v.toFixed(2); }
+            function ddFmtDate(ms) { if(!ms) return '—'; var d=new Date(ms); if(isNaN(d.getTime())) return '—'; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+            function ddFmtDateISO(s) { return s ? s.substring(0,10) : '—'; }
+            function ddFmtXL(v) { if(ddXMode==='index') return '#'+Math.round(v); var d=new Date(v); if(isNaN(d.getTime())) return ''; var m=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']; return d.getDate()+'. '+m[d.getMonth()]; }
+            function ddNiceScale(mn,mx,tt) { if(!isFinite(mn)||!isFinite(mx)||mn===mx){var sp=Math.abs(mx)||1; return {min:mn-sp*0.1,max:mx+sp*0.1,step:sp*0.1,count:2};} var r=mx-mn,rough=r/Math.max(1,tt),exp=Math.floor(Math.log10(rough)),base=Math.pow(10,exp),m2=rough/base,nice; if(m2<1.5)nice=1;else if(m2<3)nice=2;else if(m2<7)nice=5;else nice=10; var step=nice*base,min=Math.floor(mn/step)*step,max=Math.ceil(mx/step)*step; return {min:min,max:max,step:step,count:Math.max(1,Math.round((max-min)/step))}; }
+
+            // Time range filter integration
+            window.ddApplyTimeFilter = function(timeStartTs, visualStart, visualEnd) {
+                ddSelectedTimeFilterTs = timeStartTs;
+                ddSelectedTimeStartTs = visualStart || timeStartTs || 0;
+                ddSelectedTimeEndTs = visualEnd || 0;
+                if (!ddAllSnapshots || ddAllSnapshots.length < 2) return;
+                if (!timeStartTs || timeStartTs <= 0) {
+                    ddSnapshots = ddAllSnapshots;
+                } else {
+                    ddSnapshots = ddAllSnapshots.filter(function(s) {
+                        var ts = ddParseTs(s.timestamp);
+                        return ts >= timeStartTs;
+                    });
+                }
+                if (ddSnapshots.length < 2) {
+                    ddEmptyState.style.display = 'flex';
+                    ddEmptyState.innerHTML = '<span class="dd-empty-icon">📭</span><span>Keine Equity-Snapshots im gewählten Zeitraum.</span>';
+                    document.getElementById('dd-summary').style.display = 'none';
+                    document.getElementById('dd-table-section').style.display = 'none';
+                    ddUnderwaterSeries = []; ddDrawdownPeriods = []; ddSelectedDD = null;
+                    ddDraw();
+                    return;
+                }
+                ddEmptyState.style.display = 'none';
+                ddSelectedDD = null;
+                ddProcessData();
+                ddShowUI();
+                ddRenderAll();
+            };
+
+            if (window.ResizeObserver) { new ResizeObserver(function(){ddDraw();}).observe(ddChartWrap); } else { window.addEventListener('resize',function(){ddDraw();}); }
+            ddLoadData();
+        })();
+        </script>
 
         <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
             <div style="display: flex; align-items: center; gap: 15px;">
@@ -680,6 +1179,15 @@
                     <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px;">
                         <span>📥</span> Export all Trades (CSV)
                     </button>
+                </div>
+            </div>
+
+            <!-- ======= MONTHLY TRADE COUNT ======= -->
+            <div th:if="${#lists.size(account.closedTrades) > 0}" style="margin-top: 3rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                <h3 style="color: #fff; margin-bottom: 2rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Anzahl Trades pro Monat</h3>
+                <div class="chart-container"
+                    style="position: relative; height: 300px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
+                    <canvas id="monthly-trade-count-chart"></canvas>
                 </div>
             </div>
         </section>
@@ -1738,6 +2246,11 @@
             // Update Stats
             updateStats(range);
 
+            // Update Monthly Charts
+            if (historyMgr && historyMgr.filteredRows) {
+                renderMonthlyCharts(historyMgr.filteredRows);
+            }
+
             // Update Magic Table
             updateMagicStats(range);
 
@@ -1745,6 +2258,8 @@
             if (magicChartMgr && historyMgr) {
                 magicChartMgr.update(historyMgr.filteredRows);
             }
+
+            // (Moved ddApplyTimeFilter call to the end of applyHistoryFilter to ensure visual bounds are calculated)
 
             // Update Global Pie Chart
             updateGlobalPieChart();
@@ -1806,6 +2321,13 @@
             var stickyDateLabel = document.getElementById('sticky-date-range');
             if (stickyDateLabel) {
                 stickyDateLabel.textContent = dateStr || '';
+            }
+
+            // Update Drawdown Analyzer Chart with same time range
+            if (typeof window.ddApplyTimeFilter === 'function') {
+                var visualStart = startD ? startD.getTime() : 0;
+                var visualEnd = endD ? endD.getTime() : Date.now();
+                window.ddApplyTimeFilter(timeStartTs, visualStart, visualEnd);
             }
         }
 
@@ -2578,6 +3100,186 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closeChartModal();
         });
+
+        function renderMonthlyCharts(trades) {
+            if (!trades || trades.length === 0) {
+                var ctxPerf = document.getElementById('monthly-performance-chart');
+                if (ctxPerf) {
+                    var chart = Chart.getChart(ctxPerf);
+                    if (chart) chart.destroy();
+                }
+                var ctxCount = document.getElementById('monthly-trade-count-chart');
+                if (ctxCount) {
+                    var chartCount = Chart.getChart(ctxCount);
+                    if (chartCount) chartCount.destroy();
+                }
+                return;
+            }
+
+            var sortedTrades = trades.slice().sort(function(a, b) {
+                return new Date(a.closeTime.replace(/\./g, '-')) - new Date(b.closeTime.replace(/\./g, '-'));
+            });
+
+            var runningBal = currentBalance;
+            for (var i = sortedTrades.length - 1; i >= 0; i--) {
+                var t = sortedTrades[i];
+                var netP = parseFloat(t.profit || 0) + parseFloat(t.swap || 0) + (parseFloat(t.commission || 0) * commissionFactor);
+                runningBal -= netP;
+                t._balanceBefore = runningBal;
+            }
+
+            var monthlyData = {};
+            
+            sortedTrades.forEach(function(t) {
+                if (!t.closeTime) return;
+                var match = t.closeTime.match(/^(\d{4})[-.](\d{2})/);
+                if (!match) return;
+                var monthStr = match[1] + '-' + match[2];
+                
+                var netProfit = parseFloat(t.profit || 0) + parseFloat(t.swap || 0) + (parseFloat(t.commission || 0) * commissionFactor);
+
+                if (!monthlyData[monthStr]) {
+                    monthlyData[monthStr] = {
+                        profitEur: 0,
+                        startBalance: Math.max(t._balanceBefore, 1),
+                        tradeCount: 0
+                    };
+                }
+                monthlyData[monthStr].profitEur += netProfit;
+                monthlyData[monthStr].tradeCount += 1;
+            });
+
+            var labels = Object.keys(monthlyData).sort();
+            var profitDataEur = [];
+            var profitDataPct = [];
+            var tradeCountData = [];
+            var bgColors = [];
+            var borderColors = [];
+
+            labels.forEach(function(m) {
+                var d = monthlyData[m];
+                var pct = (d.profitEur / d.startBalance) * 100;
+                profitDataEur.push(d.profitEur);
+                profitDataPct.push(pct);
+                tradeCountData.push(d.tradeCount);
+                
+                if (d.profitEur >= 0) {
+                    bgColors.push('rgba(16, 185, 129, 0.4)');
+                    borderColors.push('rgba(16, 185, 129, 1)');
+                } else {
+                    bgColors.push('rgba(239, 68, 68, 0.4)');
+                    borderColors.push('rgba(239, 68, 68, 1)');
+                }
+            });
+
+            var ctxPerf = document.getElementById('monthly-performance-chart');
+            if (ctxPerf) {
+                var existingChart = Chart.getChart(ctxPerf);
+                if (existingChart) existingChart.destroy();
+
+                new Chart(ctxPerf, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Profit (' + accountCurrency + ')',
+                                data: profitDataEur,
+                                backgroundColor: bgColors,
+                                borderColor: borderColors,
+                                borderWidth: 1,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Profit (%)',
+                                data: profitDataPct,
+                                type: 'line',
+                                borderColor: '#6366f1',
+                                backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                pointRadius: 4,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { labels: { color: '#a0a0c0' } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        var val = context.parsed.y;
+                                        if (context.dataset.label === 'Profit (%)') {
+                                            return val.toFixed(2) + '%';
+                                        }
+                                        return val.toFixed(2) + ' ' + accountCurrency;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#a0a0c0' }, grid: { display: false } },
+                            y: { 
+                                type: 'linear', display: true, position: 'left',
+                                ticks: { color: '#a0a0c0', callback: function(val) { return val.toFixed(2); } },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            },
+                            y1: { 
+                                type: 'linear', display: true, position: 'right',
+                                ticks: { color: '#6366f1', callback: function(val) { return val.toFixed(2) + '%'; } },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            var ctxCount = document.getElementById('monthly-trade-count-chart');
+            if (ctxCount) {
+                var existingCountChart = Chart.getChart(ctxCount);
+                if (existingCountChart) existingCountChart.destroy();
+
+                new Chart(ctxCount, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Anzahl Trades',
+                            data: tradeCountData,
+                            backgroundColor: 'rgba(99, 102, 241, 0.4)',
+                            borderColor: 'rgba(99, 102, 241, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#a0a0c0' }, grid: { display: false } },
+                            y: { 
+                                beginAtZero: true, 
+                                ticks: { color: '#a0a0c0', stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
     </script>
     <div style="max-width: 1400px; margin: 2rem auto 0;">
         <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>

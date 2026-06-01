@@ -7,8 +7,8 @@
 | **Projekttyp** | Full-Stack Eigenentwicklung (Solo-Projekt) |
 | **Status** | Produktiv im Einsatz &mdash; ueberwacht taeglich reale Trading-Konten |
 | **Entwicklungszeit** | Laufende Weiterentwicklung seit Projektstart |
-| **Umfang** | ~60 Java-Klassen, 12 Templates, 11 DB-Tabellen, 1 MQL5-Client |
-| **Technologie** | Java 17, Spring Boot 3.2, Spring Security, JPA/Hibernate, H2, Thymeleaf, Chart.js, MQL5 |
+| **Umfang** | ~60 Java-Klassen, 12 Templates, 11 DB-Tabellen, 1 MQL5-Client, 1 Android-App, 1 MCP-Server |
+| **Technologie** | Java 17, Spring Boot 3.2, Spring Security, JPA/Hibernate, H2, Thymeleaf, Chart.js, MQL5, Kotlin, Jetpack Compose, Retrofit 2, Node.js, TypeScript |
 
 ---
 
@@ -32,30 +32,32 @@ Eine vollstaendig selbst entwickelte Monitoring-Plattform, die:
 ### 3.1 Systemuebersicht
 
 ```
-  MetaTrader 5 Terminal(s)             Spring Boot Server
- +-----------------------+          +---------------------------+
- | MQL5 Expert Advisor   |  REST    |  Controller Layer (5)     |
- | - Trade Monitoring    | -------> |  - Api / Dashboard / Admin|
- | - Heartbeat           |  HTTP    |  - Security / User        |
- | - History Export       |  POST   +---------------------------+
- | - Auto-Reconnect      |          |  Service Layer (11)       |
- +-----------------------+          |  - AccountManager (Cache) |
-                                    |  - TradeSyncService       |
-                                    |  - OpenProfitAlarmService |
-                                    |  - TradeComparisonService |
-                                    |  - Email / Homey Service  |
-                                    +---------------------------+
-                                    |  Persistence Layer        |
-                                    |  - Spring Data JPA (11)   |
-                                    |  - H2 File Database       |
-                                    +---------------------------+
-                                              |
-                                    +---------------------------+
-                                    |  Web Frontend             |
-                                    |  - 12 Thymeleaf Templates |
-                                    |  - Chart.js Visualisierung|
-                                    |  - Responsive Dark UI     |
-                                    +---------------------------+
+  MetaTrader 5 Terminal(s)               Spring Boot Server
+ +-----------------------+            +---------------------------+
+ | MQL5 Expert Advisor   |   REST     |  Controller Layer (5)     |
+ | - Trade Monitoring    |  ------->  |  - Api / Dashboard / Admin|
+ | - Heartbeat           |   HTTP     |  - Security / User        |
+ | - History Export      |   POST     +---------------------------+
+ | - Auto-Reconnect      |            |  Service Layer (11)       |
+ +-----------------------+            |  - AccountManager (Cache) |
+                                      |  - TradeSyncService       |
+   Android Companion App              |  - OpenProfitAlarmService |
+ +-----------------------+            |  - TradeComparisonService |
+ | Kotlin & Compose UI   |   REST     |  - Email / Homey Service  |
+ | - Real-time Dashboard |  ------->  |  +------------------------+
+ | - Canvas Equity Chart |   HTTP/    |  Persistence Layer        |
+ | - Session Persistence |   JSON     |  - Spring Data JPA (11)   |
+ +-----------------------+            |  - H2 File Database       |
+                                      +---------------------------+
+   MCP Server (AI-Sidecar)                         |
+ +-----------------------+                         |
+ | Node.js / TypeScript  |   REST                  v
+ | - Tools for Claude    |  ------->  +---------------------------+
+ | - Local REST Bridge   |   HTTP     |  Web Frontend             |
+ +-----------------------+            |  - 12 Thymeleaf Templates |
+                                      |  - Chart.js Visualisierung|
+                                      |  - Responsive Dark UI     |
+                                      +---------------------------+
 ```
 
 ### 3.2 Zentrale Architekturentscheidungen
@@ -137,24 +139,26 @@ Aktuell existiert eine experimentelle Web-App, die über Replit (Replit AI) entw
 - Eigene REST-API-Auth-Endpunkte (`/api/login`, `/api/demo-login`, `/api/logout`) ohne CSRF-Zwang
 - Sämtliche Dokumentation, Prompts und Beschreibungen für die Replit App befinden sich im separaten Verzeichnis `replit/` (z.B. `Replit_Erweiterung.md`)
 
-### 4.6 MCP Server (AI-Sidecar)
+### 4.6 MCP Server & KI-Integration (Model Context Protocol)
 
-Der TradeMonitor bringt einen eigenen Model Context Protocol (MCP) Server mit, um sich nahtlos in KI-Agenten wie die Claude Desktop App zu integrieren. Der MCP-Server läuft lokal als Node.js/TypeScript-Anwendung und spricht über REST mit dem TradeMonitor-Backend.
-
-**Verfügbare Tools (Schnittstellen) für die KI:**
-- `get_accounts`, `get_open_trades`, `get_closed_trades`: Trading-Daten lesen
-- `get_system_status`, `get_daily_profits`: Dashboard-Metriken aggregieren
-- `get_ea_logs`: Logs der Expert Advisors auslesen
-- `get_blocked_ips`, `get_server_health`: Fail2Ban und System-Ressourcen (erfordert Admin-Rechte)
-
-### 4.6 KI-Integration (Model Context Protocol)
-
-Der Server verfügt über einen voll integrierten **MCP (Model Context Protocol) Server**, der es modernen Large Language Models (wie Claude) ermöglicht, als intelligente Agenten mit dem TradeMonitor-Backend zu kommunizieren.
+Der TradeMonitor verfügt über einen voll integrierten **MCP (Model Context Protocol) Server**, der es modernen Large Language Models (wie Claude) ermöglicht, als intelligente Agenten mit dem TradeMonitor-Backend zu kommunizieren. Der MCP-Server läuft lokal als Node.js/TypeScript-Anwendung und spricht über REST mit dem Backend.
 
 **Besonderheiten:**
 - **Natürliche Sprache zu API:** Das LLM übersetzt menschliche Anfragen ("Wie sieht der Serverstatus aus?", "Welche IPs sind geblockt?") in exakte Tool-Aufrufe (REST-Endpoints).
 - **Verfügbare Tools:** `get_server_health`, `get_system_status`, `get_accounts`, `get_open_trades`, `get_closed_trades`, `get_daily_profits`, `get_ea_logs`, `get_blocked_ips`.
-- **Produktionstauglich:** Das System ruft Live-Daten aus der H2-Datenbank und vom Contabo-Server (z.B. Fail2Ban) ab. 
+- **Produktionstauglich:** Das System ruft Live-Daten aus der H2-Datenbank und vom Contabo-Server (z.B. Fail2Ban) ab.
+
+### 4.7 Android Companion App
+
+Die native Android-Begleit-App ist in Kotlin und Jetpack Compose geschrieben und ermöglicht die mobile Echtzeit-Überwachung aller Handelskonten.
+
+**Kernfunktionalitäten:**
+- **Auto-Login:** Speichert die Server-URL (standardmäßig vorbelegt mit `https://monitor.tnickel-ki.de`), Benutzername/Passwort und hält die Session (`JSESSIONID` Cookie) im Hintergrund aufrecht.
+- **Gesamtübersicht:** Aggregierte Statistiken über alle aktiven Accounts (Gesamt-Balance, Equity, offene Positionen und Gewinn/Verlust).
+- **Custom Canvas Charting:** Eine hocheffiziente, performante Darstellung der Equity- und Balance-Kurven, die direkt über ein Jetpack Compose Canvas gezeichnet wird.
+- **Echtzeit-Updates:** Pull-to-Refresh und automatische Hintergrundaktualisierung alle 30 Sekunden.
+- **Details & Historie:** Tabs für offene Trades (inkl. EA-Sync-Status), geschlossene Trades und detaillierte Kontoparameter (z.B. Drawdown-Alarme).
+- **Magic Drawdowns:** Eine globale Übersicht aller aktiven Strategien (Magic Numbers), sortiert nach dem aktuellen prozentualen Drawdown.
 
 ---
 
