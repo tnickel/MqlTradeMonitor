@@ -7,7 +7,7 @@
 | **Projekttyp** | Full-Stack Eigenentwicklung (Solo-Projekt) |
 | **Status** | Produktiv im Einsatz &mdash; ueberwacht taeglich reale Trading-Konten |
 | **Entwicklungszeit** | Laufende Weiterentwicklung seit Projektstart |
-| **Umfang** | ~60 Java-Klassen, 12 Templates, 11 DB-Tabellen, 1 MQL5-Client, 1 Android-App, 1 MCP-Server |
+| **Umfang** | ~60 Java-Klassen, 12 Templates, 12 DB-Tabellen, 1 MQL5-Client, 1 Android-App, 1 MCP-Server |
 | **Technologie** | Java 17, Spring Boot 3.2, Spring Security, JPA/Hibernate, H2, Thymeleaf, Chart.js, MQL5, Kotlin, Jetpack Compose, Retrofit 2, Node.js, TypeScript |
 
 ---
@@ -103,7 +103,7 @@ Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickel
 | **SecurityController** | `GET /login` | Login-Seite |
 | **UserController** | `GET /profile`; `POST /profile/change-password` | Benutzerprofil und Passwortverwaltung |
 
-### 4.3 Service Layer (11 Services)
+### 4.3 Service Layer (12 Services)
 
 | Service | Intervall | Kernaufgabe |
 |---|---|---|
@@ -112,6 +112,7 @@ Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickel
 | **TradeSyncService** | 1 Sekunde | REAL/DEMO-Sync-Check mit zweistufigem Matching (Strict: Symbol+Typ+Zeit; Fallback: Symbol+Typ+SL) |
 | **TradeComparisonService** | On-Demand | Slippage- und Delay-Analyse fuer Copy-Trading (Matching ueber 120s-Zeitfenster) |
 | **OpenProfitAlarmService** | 5 Sekunden | Schwellwert-Monitoring (absolut/prozentual) mit Latch-Logik gegen Alarm-Fluten |
+| **LlmService** | On-Demand | KI-gestuetzte Trade-Bewertung und Risiko-Analyse via OpenRouter API |
 | **GlobalConfigService** | On-Demand | Zentrale Key-Value-Konfiguration (25+ Parameter), persistiert in DB |
 | **MagicMappingService** | On-Demand | Magic Number zu lesbarem Strategienamen, Auto-Discovery neuer Magic Numbers |
 | **EmailService** | On-Demand | SMTP-Alerting mit konfigurierbarem taeglichem Rate-Limit |
@@ -162,11 +163,11 @@ Die native Android-Begleit-App ist in Kotlin und Jetpack Compose geschrieben und
 
 ---
 
-## 5. Datenbankschema (11 Tabellen)
+## 5. Datenbankschema (12 Tabellen)
 
 | Tabelle | Entity | Besonderheit |
 |---|---|---|
-| `accounts` | `AccountEntity` | PK: accountId, Typ DEMO/REAL, pro-Account Alarm-Schwellwerte, Sektionszuordnung |
+| `accounts` | `AccountEntity` | PK: accountId, Typ DEMO/REAL, pro-Account Alarm-Schwellwerte, prompt_analysis_enabled, custom_prompt |
 | `equity_snapshots` | `EquitySnapshotEntity` | Index auf (accountId, timestamp), Rate-limitiert 1x/Min, Auto-Cleanup >90 Tage |
 | `closed_trades` | `ClosedTradeEntity` | Unique Key: (accountId, ticket), Duplikat-Erkennung beim Import |
 | `open_trades` | `OpenTradeEntity` | Vollstaendiger Ersatz bei jedem Update-Zyklus |
@@ -177,6 +178,7 @@ Die native Android-Begleit-App ist in Kotlin und Jetpack Compose geschrieben und
 | `login_logs` | `LoginLog` | Zeitstempel, Benutzer, IP, Erfolg/Fehlschlag, Details |
 | `request_logs` | `RequestLog` | IP, Methode, URI, Query, User-Agent, Status (max. 1000 Zeichen) |
 | `client_logs` | `ClientLog` | Account-ID, Aktion (REGISTER/UPDATE/HEARTBEAT/HISTORY), IP, Nachricht |
+| `llm_analysis_logs` | `LlmAnalysisLogEntity` | Verlauf der KI-basierten Trade-Analysen pro Account |
 
 ---
 

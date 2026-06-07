@@ -189,6 +189,38 @@ Im Dashboard koennen Sie fuer jeden Account individuelle Alarmgrenzen setzen:
 
 Der Alarm setzt sich automatisch zurueck, sobald die Bedingung nicht mehr zutrifft (Latch-Logik).
 
+### 9.3 KI-gestuetzte Risiko-Analyse & Alarmsystem
+
+Zusaetzlich zu den klassischen Schwellwert-Alarmen bietet die Plattform eine KI-gestuetzte Analyse der offenen Trades. Hierbei werden die aktuellen Positionen unter Beruecksichtigung definierter Strategievorgaben bewertet.
+
+#### 9.3.1 Konfiguration
+Die KI-Analyse kann fuer jeden Account in der jeweiligen Detailansicht individuell eingerichtet werden:
+- **Aktivierung:** Ueber eine Checkbox kann die Prompt-Analyse fuer das jeweilige Konto ein- oder ausgeschaltet werden.
+- **Benutzerdefinierter Prompt:** Im Textfeld kann ein individueller Analyse-Prompt hinterlegt werden. Ist dieses Feld leer, wird der globale System-Prompt der Plattform als Standard herangezogen.
+- **Globale Einstellungen:** Administratoren koennen im Admin-Bereich das zu verwendende KI-Modell (z. B. `google/gemini-2.5-flash` oder `x-ai/grok-2`) sowie den globalen System-Prompt konfigurieren.
+
+#### 9.3.2 Datenuebergabe an die KI
+Bei der Ausfuehrung der Analyse uebermittelt der Server folgende Informationen an das KI-Modell (via OpenRouter API):
+- Kontoinformationen: Name, Broker, Waehrung, Kontostand (Balance), aktuelles Eigenkapital (Equity) sowie der offene Gewinn oder Verlust.
+- Liste der offenen Trades: Ticketnummer, Handelssymbol, Richtung (BUY/SELL), Losgroesse (Volume), Einstiegskurs, aktueller Profit/Loss, Swap, Magic Number, Eroeffnungszeit und der Trade-Kommentar.
+- Die spezifischen Beurteilungskriterien des Accounts sowie die allgemeinen System-Prompts.
+
+#### 9.3.3 Risikoampel und Alarmausloesung
+Das KI-Modell bewertet das Risiko auf Deutsch und gibt eine detaillierte Analyse im Markdown-Format zurueck. Die Bewertung soll mit einer Risikoampel eingeleitet werden.
+Das System scannt das Ergebnis der Analyse nach bestimmten kritischen Schluesselwoertern. Ein KI-Alarm wird ausgeloest, wenn der Text eines der folgenden Muster enthaelt:
+- Das rote Ampelsymbol: 🔴
+- Den Text: KRITISCHER ALARM
+- Den Text: REISSLEINE ZIEHEN
+- Den Text: CRITICAL ALARM
+
+#### 9.3.4 UI-Verhalten bei KI-Alarm
+Wenn ein KI-Alarm aktiv ist, reagiert die Web-Oberflaeche wie folgt:
+- Die entsprechende Kachel auf dem Dashboard wird durch ein abwechselndes rot-weisses Blinken optisch hervorgehoben.
+- Oben auf dem Dashboard und in der Detailansicht wird ein permanentes rotes Warnbanner eingeblendet, das auf den kritischen Zustand hinweist.
+- In der mobilen Ansicht wird der betroffene Account ebenfalls durch Warnhinweise und Pulsieren markiert.
+
+Ueber die Schaltflaeche "Offene Trades bewerten" in den Account-Details kann die Analyse jederzeit manuell gestartet werden. Das Ergebnis der Analyse wird auf der Detailseite dauerhaft gespeichert und mit einem Zeitstempel versehen.
+
 ---
 
 ## 10. Benutzerprofil

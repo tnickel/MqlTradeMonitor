@@ -123,6 +123,14 @@ Anstatt bei jedem Seitenaufruf den Profit neu zu berechnen, sendet der MetaTrade
 Um die initiale Ladezeit des Dashboards zu minimieren, werden rechenintensive Operationen (wie z.B. Trade History oder Chart-Rendern) asynchron via Fetch-API in JavaScript geladen (Endpunkte wie `/api/stats/system-status`, `/api/accounts/{id}/equity-history`).
 **Wartungsmodus (`NetworkStatusService`):** Der Server überwacht selbstständig das letzte Änderungsdatum seiner WAR-Datei. Wird die Datei durch einen Hot-Deploy aktualisiert, schaltet das System für 20 Minuten (konfigurierbar) in den Zustand `MAINTENANCE`. Dieses Event wird über `networkStatusLogRepository` persistiert und über den Endpunkt `/admin/api/network-timeline` chronologisch an das Frontend ausgeliefert.
 
+### 2.6 KI-gestuetzte Risiko-Analyse (LlmService)
+Der `LlmService` uebernimmt die Anbindung an die OpenRouter API zur Bewertung des Portfoliorisikos der Konten:
+- **API-Kommunikation**: Der API-Schluessel wird ueber die Umgebungsvariable `OPENROUTER_API_KEY` zur Laufzeit geladen. Als Endpunkt dient `https://openrouter.ai/api/v1/chat/completions`.
+- **Datenuebergabe**: Dem KI-Modell werden neben dem (falls vorhanden) benutzerspezifischen Prompt auch die Kontometriken (Balance, Equity, Floating P/L) und eine formatierte Liste aller offenen Trades uebermittelt.
+- **Speicherung**: Das zurueckgelieferte Markdown-Ergebnis wird in-memory im `Account` und in der Datenbank (`accounts`-Tabelle) persistiert.
+- **Alarmierung**: Das System fuehrt im Domain-Modell eine automatische Schlagwortpruefung des Ergebnisses durch (`Account.isLastPromptAnalysisAlarm()`). Ein Alarm wird ausgeloest, falls der Text das rote Ampelsymbol `🔴` oder einen der Texte `KRITISCHER ALARM`, `REISSLEINE ZIEHEN` oder `CRITICAL ALARM` enthaelt.
+- **Dashboard-Verbindung**: Das Dashboard liest dieses Alarm-Flag ueber die Map-Struktur im `AccountManager` (`lastPromptAnalysisAlarm` Property) aus. Bei einem aktiven Alarm wird die betroffene Account-Kachel mittels CSS-Klasse `warning-pulse` zum Blinken gebracht, und ein globales Warnbanner wird angezeigt.
+
 ---
 
 ## 3. Datenmodell
@@ -153,6 +161,12 @@ class Account {
     // Error
     String lastErrorMsg;
     LocalDateTime lastErrorTime;
+
+    // KI-gestuetzte Risiko-Analyse
+    boolean promptAnalysisEnabled;
+    String customPrompt;
+    String lastPromptAnalysisResult;
+    LocalDateTime lastPromptAnalysisTime;
 
     // Trades
     List<Trade> openTrades;

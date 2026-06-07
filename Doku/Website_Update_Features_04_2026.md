@@ -38,6 +38,12 @@ A completely new, comprehensive Security Audit Dashboard has been integrated to 
 * **Geo-Location IP Tracking:** Attacking IP addresses are automatically checked against a geographical API and mapped to specific coordinates, cities, and countries in the background.
 * **Tactical 3D Globe Visualization:** A highly impressive, rotatable, and interactive 3D Globe (powered by Three.js and Globe.gl) visualizes the origins of all attacks worldwide. It features a tactical design (grayscale continents, blue ocean ambient lighting, and polar ice caps) and uses smart clustering algorithms to bundle overlapping attacks into clean, readable city flags without cluttering the screen.
 
+## 8. KI-gestuetztes Alarmsystem & Portfolioanalyse
+Eine vollstaendig integrierte, intelligente Risikoanalyse fuer offene Trades ueber die OpenRouter-API:
+* **Benutzerdefinierte Analyse-Prompts:** Investoren koennen fuer jedes Konto einen individuellen Auswertungsprompt hinterlegen, um spezifische Strategieregeln oder Risikotoleranzen durch die KI bewerten zu lassen. Standardmaessig greift das System auf einen globalen System-Prompt zurueck.
+* **Automatische Keyword-Alarmierung (Risikoampel):** Der Server analysiert das generierte Markdown-Ergebnis der KI auf kritische Alarm-Schluesselwoerter (wie das rote Ampelsymbol 🔴, "KRITISCHER ALARM", "REISSLEINE ZIEHEN" oder "CRITICAL ALARM").
+* **Visuelle Warnsignale im UI:** Bei Erkennung eines KI-Alarms wird die zugehoerige Account-Kachel auf dem Dashboard durch ein abwechselndes rot-weisses Blinken hervorgehoben. Zudem wird ein auffaelliges rotes Warnbanner im Dashboard und in den Kontodetails eingeblendet.
+
 ---
 
 ### Instruction for external AIs (Web Designers / Copywriters):
