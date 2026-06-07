@@ -104,3 +104,25 @@ data class EquitySnapshot(
     val equity: Double,
     val balance: Double
 )
+
+data class SystemStatusResponse(
+    val isAdmin: Boolean
+)
+
+data class ServerHealth(
+    val osName: String?,
+    val cpuLoad: String?,
+    val totalMemory: String?,
+    val freeMemory: String?,
+    val usedMemory: String?,
+    val diskTotal: String?,
+    val diskFree: String?,
+    val diskUsed: String?,
+    val dbFileSize: String?,
+    val logFileSize: String?,
+    val systemTotalMemory: String?,
+    val systemFreeMemory: String?,
+    val systemUsedMemory: String?,
+    val aiTaskManagerWarSize: String?,
+    val rootWarSize: String?
+)

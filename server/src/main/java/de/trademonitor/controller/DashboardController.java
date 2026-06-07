@@ -79,6 +79,12 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.repository.LoginLogRepository loginLogRepository;
 
+    @Autowired
+    private de.trademonitor.service.LlmService llmService;
+
+    @Autowired
+    private de.trademonitor.repository.LlmAnalysisLogRepository llmAnalysisLogRepository;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -407,6 +413,77 @@ public class DashboardController {
             @RequestParam("metaTraderInfo") String metaTraderInfo) {
         accountManager.updateMetaTraderInfo(accountId, metaTraderInfo);
         return ResponseEntity.ok("Saved");
+    }
+
+    @PostMapping("/api/account/prompt-analysis-config")
+    @ResponseBody
+    public ResponseEntity<String> updatePromptAnalysisConfig(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam("accountId") Long accountId,
+            @RequestParam(value = "enabled", defaultValue = "false") boolean enabled,
+            @RequestParam("customPrompt") String customPrompt) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body("Access Denied");
+        }
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body("Only Admin is allowed to change prompt analysis configuration.");
+        }
+        accountManager.updatePromptAnalysisConfig(accountId, enabled, customPrompt);
+        return ResponseEntity.ok("Saved");
+    }
+
+    @PostMapping("/api/account/{accountId}/analyze-trades")
+    @ResponseBody
+    public ResponseEntity<?> analyzeTrades(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("accountId") Long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", "Access Denied"));
+        }
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", "Nur der Admin darf die Analyse anstossen."));
+        }
+        try {
+            String result = llmService.analyzeOpenTrades(accountId);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("success", true);
+            response.put("result", result);
+            response.put("timestamp", java.time.LocalDateTime.now().toString());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/api/account/{accountId}/analysis-logs")
+    @ResponseBody
+    public ResponseEntity<?> getAnalysisLogs(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("accountId") Long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", "Access Denied"));
+        }
+        try {
+            List<de.trademonitor.entity.LlmAnalysisLogEntity> logs = llmAnalysisLogRepository.findByAccountIdOrderByTimestampDesc(accountId);
+            List<Map<String, Object>> result = new ArrayList<>();
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+            for (de.trademonitor.entity.LlmAnalysisLogEntity log : logs) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("id", log.getId());
+                map.put("timestamp", log.getTimestamp().toString());
+                map.put("formattedTime", log.getTimestamp().format(formatter));
+                map.put("result", log.getResult());
+                result.add(map);
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
+        }
     }
 
     @PostMapping("/api/account/timelines")
@@ -751,6 +828,9 @@ public class DashboardController {
 
         List<de.trademonitor.entity.TimelineEntity> timelines = timelineRepository.findByAccountIdOrderByTimelineDateAsc(accountId);
         model.addAttribute("timelines", timelines);
+
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        model.addAttribute("isAdmin", isAdmin);
 
         LOG.info("[PERF] accountDetail(" + accountId + "): total=" + (System.currentTimeMillis() - t0) + "ms | magicProfits=" + (t2 - t1) + "ms | magicCurves=" + (t3 - t2) + "ms");
         return "account-detail";

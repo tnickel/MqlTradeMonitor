@@ -195,6 +195,21 @@ public class AdminController {
         model.addAttribute("adminNotifications", adminNotificationService.getUnacknowledgedNotifications());
         model.addAttribute("notificationCount", adminNotificationService.getUnacknowledgedCount());
 
+        // --- 8. LLM Config ---
+        model.addAttribute("llmModel", globalConfigService.getLlmModel());
+        model.addAttribute("llmSystemPrompt", globalConfigService.getLlmSystemPrompt());
+
+        String rawKey = globalConfigService.getOpenRouterApiKey();
+        String maskedKey = "";
+        if (rawKey != null && !rawKey.trim().isEmpty()) {
+            if (rawKey.length() > 10) {
+                maskedKey = rawKey.substring(0, 10) + "..." + rawKey.substring(rawKey.length() - 4);
+            } else {
+                maskedKey = "******";
+            }
+        }
+        model.addAttribute("openRouterApiKey", maskedKey);
+
         return "admin";
     }
 
@@ -367,6 +382,24 @@ public class AdminController {
         globalConfigService.setMaintenanceTimeoutMins(maintenanceTimeoutMins);
         globalConfigService.setNetworkOfflineThresholdMins(networkOfflineThresholdMins);
         redirectAttrs.addFlashAttribute("successMessage", "Network Monitor configuration saved.");
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/llm-config")
+    public String saveLlmConfig(
+            @RequestParam("llmModel") String llmModel,
+            @RequestParam("llmSystemPrompt") String llmSystemPrompt,
+            @RequestParam(value = "openRouterApiKey", required = false) String openRouterApiKey,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            globalConfigService.saveLlmConfig(llmModel, llmSystemPrompt);
+            if (openRouterApiKey != null && !openRouterApiKey.trim().isEmpty() && !openRouterApiKey.contains("...")) {
+                globalConfigService.setOpenRouterApiKey(openRouterApiKey.trim());
+            }
+            redirectAttrs.addFlashAttribute("successMessage", "LLM-Konfiguration gespeichert.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Speichern der LLM-Konfiguration: " + e.getMessage());
+        }
         return "redirect:/admin";
     }
 

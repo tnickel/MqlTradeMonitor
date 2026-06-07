@@ -589,6 +589,51 @@
             </div>
         </div>
 
+        <!-- LLM (OpenRouter) Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">🤖 LLM (OpenRouter) Konfiguration</h2>
+            <p style="color: #8b949e; margin-bottom: 1rem;">
+                Hier konfigurierst du den OpenRouter API-Schlüssel, das standardmäßige KI-Modell und den globalen System-Prompt.
+                Der Schlüssel wird aus Sicherheitsgründen nur flüchtig im Arbeitsspeicher gehalten (nicht in der DB oder auf Festplatte).
+            </p>
+            <form th:action="@{/admin/llm-config}" method="post"
+                style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label for="openRouterApiKey" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        OpenRouter API-Key
+                        <span title="Der API-Key wird nur im Arbeitsspeicher des Servers gehalten und nicht in der Datenbank oder Konfigurationsdateien gespeichert." style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="password" id="openRouterApiKey" name="openRouterApiKey" th:value="${openRouterApiKey}"
+                        placeholder="sk-or-v1-..."
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; box-sizing: border-box;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Wird sicher im Hauptspeicher gehalten, niemals auf Festplatte.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llmModel" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        OpenRouter Modell-ID
+                        <span title="Modell-ID von openrouter.ai, z.B. google/gemini-2.5-flash oder x-ai/grok-2" style="cursor: help;">ℹ️</span>
+                    </label>
+                    <input type="text" id="llmModel" name="llmModel" th:value="${llmModel}" required
+                        placeholder="z.B. google/gemini-2.5-flash"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; box-sizing: border-box;">
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">Empfehlungen: <code>google/gemini-2.5-flash</code> (Standard) oder <code>x-ai/grok-2</code>.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llmSystemPrompt" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Globaler System-Prompt (Rolle der KI)
+                    </label>
+                    <textarea id="llmSystemPrompt" name="llmSystemPrompt" rows="4" required
+                        placeholder="Du bist ein professioneller Forex- und Krypto-Trading-Analyst..."
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 10px; border-radius: 4px; box-sizing: border-box; resize: vertical; font-family: sans-serif;" th:text="${llmSystemPrompt}"></textarea>
+                </div>
+                <div class="form-group">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                </div>
+            </form>
+        </div>
+
         <!-- Sync Exemptions -->
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">

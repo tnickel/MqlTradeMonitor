@@ -21,6 +21,9 @@ public class GlobalConfigService {
     @Autowired
     private GlobalConfigRepository repository;
 
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
     public static final String KEY_TRADE_SYNC_INTERVAL = "TRADE_SYNC_INTERVAL_SECONDS";
 
     // Live Indicator Config Keys
@@ -91,8 +94,36 @@ public class GlobalConfigService {
     public static final String KEY_FAIL2BAN_WHITELIST_IPS = "FAIL2BAN_WHITELIST_IPS";
     private java.util.LinkedList<String> cachedFail2banWhitelistIps = new java.util.LinkedList<>();
 
+    // LLM Config Keys
+    public static final String KEY_LLM_MODEL = "LLM_MODEL";
+    public static final String KEY_LLM_SYSTEM_PROMPT = "LLM_SYSTEM_PROMPT";
+
+    private String cachedLlmModel = "google/gemini-2.5-flash";
+    private String cachedLlmSystemPrompt = "Du bist ein professioneller Risiko-Analyst für algorithmische Trading-Systeme (Expert Advisor) und Forex-Märkte mit Echtzeit-Internetzugriff. Deine Aufgabe ist es, den Zustand eines Handelskontos und dessen offene Positionen mathematisch, fundamental und markttechnisch zu bewerten.\n\n" +
+            "Suche aktiv im Internet nach aktuellen Nachrichten, Marktmeldungen und Event-Risiken für die betroffenen Symbole (Währungspaare, Rohstoffe, Krypto-Assets). Führe für jedes aktive Symbol eine Chartanalyse durch (ziehe dazu aktuelle technische Analysen, Unterstützungen, Widerstände und Trends aus dem Internet heran). Erkläre im Bericht präzise, warum der Kurs sich aktuell so verhält, ob es zu erwartende Umkehrpunkte gibt und ob damit gerechnet werden kann, dass die Positionen bald wieder im Profit schließen.\n\n" +
+            "Halte dich strikt an folgende Richtlinien:\n" +
+            "1. **Risikoampel**: Beginne deine Antwort IMMER mit einer der folgenden Zeilen:\n" +
+            "   - 🟢 ALLES OK (Geringer Drawdown < 5%, normale Grid-Stufen 1-3, Markt im normalen Schwankungskorridor)\n" +
+            "   - ⚠️ ERHÖHTES RISIKO / BEOBACHTEN (Drawdown 5-15%, Grid-Stufen 4-6, Markt nähert sich wichtigen Unterstützungen/Widerständen)\n" +
+            "   - 🔴 KRITISCHER ALARM / REISSLEINE ZIEHEN (Drawdown > 15%, Grid-Stufen >= 7, oder der Markt bewegt sich in einem starken, unkorrigierten Trend)\n" +
+            "2. **Klarheit & Fakten**: Antworte kurz, direkt, strukturiert und auf Deutsch. Nenne konkrete Zahlen (aktueller Drawdown in %, Anzahl der offenen Grid-Ebenen, Gesamtlots). Verwende außer den Risikoampel-Symbolen am Anfang keine Emojis in deinem Bericht.\n" +
+            "3. **Plug-Pull-Empfehlung (Reißleine)**: Nenne am Ende deiner Analyse immer eine unmissverständliche Preis- oder Drawdown-Marke, bei der alle Trades manuell geschlossen werden müssen, um das Konto vor dem Margin-Call zu schützen.";
+    
+    @org.springframework.beans.factory.annotation.Value("${openrouter.api.key:}")
+    private String configOpenRouterApiKey;
+
+    private String openRouterApiKey;
+
     @PostConstruct
     public void init() {
+        // Ensure conf_value column is altered to TEXT to support long values/prompts
+        try (java.sql.Connection conn = dataSource.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE global_config ALTER COLUMN conf_value TEXT");
+        } catch (Exception e) {
+            System.err.println("Could not alter global_config column: " + e.getMessage());
+        }
+
         // Load on startup
         // Magic max age loading removed — now per-account
 
@@ -256,6 +287,24 @@ public class GlobalConfigService {
                 }
             }
         });
+
+        // Load LLM Config
+        repository.findById(KEY_LLM_MODEL).ifPresent(entity -> cachedLlmModel = entity.getConfValue());
+        
+        repository.findById(KEY_LLM_SYSTEM_PROMPT).ifPresentOrElse(
+            entity -> {
+                String val = entity.getConfValue();
+                if (val == null || val.trim().isEmpty() || val.contains("Du bist ein professioneller Forex- und Krypto-Trading-Analyst. Bewerte die offenen Positionen basierend auf der Strategiebeschreibung und dem Marktkontext. Antworte kurz, prägnant und auf Deutsch.")) {
+                    entity.setConfValue(cachedLlmSystemPrompt);
+                    repository.save(entity);
+                } else {
+                    cachedLlmSystemPrompt = val;
+                }
+            },
+            () -> {
+                repository.save(new de.trademonitor.entity.GlobalConfigEntity(KEY_LLM_SYSTEM_PROMPT, cachedLlmSystemPrompt));
+            }
+        );
     }
 
     // --- Copier Verification Config ---
@@ -691,5 +740,34 @@ public class GlobalConfigService {
             String joined = String.join(",", cachedFail2banWhitelistIps);
             repository.save(new GlobalConfigEntity(KEY_FAIL2BAN_WHITELIST_IPS, joined));
         }
+    }
+
+    public String getLlmModel() {
+        return cachedLlmModel;
+    }
+
+    public String getLlmSystemPrompt() {
+        return cachedLlmSystemPrompt;
+    }
+
+    public void saveLlmConfig(String model, String systemPrompt) {
+        this.cachedLlmModel = model;
+        this.cachedLlmSystemPrompt = systemPrompt;
+        repository.save(new GlobalConfigEntity(KEY_LLM_MODEL, model));
+        repository.save(new GlobalConfigEntity(KEY_LLM_SYSTEM_PROMPT, systemPrompt));
+    }
+
+    public String getOpenRouterApiKey() {
+        if (openRouterApiKey != null && !openRouterApiKey.trim().isEmpty()) {
+            return openRouterApiKey;
+        }
+        if (configOpenRouterApiKey != null && !configOpenRouterApiKey.trim().isEmpty()) {
+            return configOpenRouterApiKey;
+        }
+        return System.getenv("OPENROUTER_API_KEY");
+    }
+
+    public void setOpenRouterApiKey(String openRouterApiKey) {
+        this.openRouterApiKey = openRouterApiKey;
     }
 }

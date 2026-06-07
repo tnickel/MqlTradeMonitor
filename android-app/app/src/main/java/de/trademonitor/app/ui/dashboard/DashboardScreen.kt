@@ -10,7 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +39,7 @@ import java.util.Locale
 fun DashboardScreen(
     onAccountClick: (Long) -> Unit,
     onViewDrawdowns: () -> Unit,
+    onViewHealth: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -45,6 +48,7 @@ fun DashboardScreen(
     var accounts by remember { mutableStateOf<List<Account>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isAdmin by remember { mutableStateOf(false) }
     
     val fetchAccounts = {
         isLoading = true
@@ -53,6 +57,12 @@ fun DashboardScreen(
             try {
                 val api = ApiClient.getService(context)
                 accounts = api.getAccounts()
+                try {
+                    val status = api.getSystemStatus()
+                    isAdmin = status.isAdmin
+                } catch (e: Exception) {
+                    isAdmin = false
+                }
             } catch (e: Exception) {
                 errorMessage = "Fehler beim Laden: ${e.localizedMessage}"
             } finally {
@@ -69,6 +79,12 @@ fun DashboardScreen(
             try {
                 val api = ApiClient.getService(context)
                 accounts = api.getAccounts()
+                try {
+                    val status = api.getSystemStatus()
+                    isAdmin = status.isAdmin
+                } catch (e: Exception) {
+                    // Ignore silent errors
+                }
             } catch (e: Exception) {
                 // Ignore silent errors during background refresh
             }
@@ -105,18 +121,65 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("TradeMonitor", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = onViewDrawdowns) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Drawdown Stats",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    var showMenu by remember { mutableStateOf(false) }
+
                     IconButton(onClick = { fetchAccounts() }) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh")
                     }
-                    IconButton(onClick = { performLogout() }) {
-                        Icon(imageVector = Icons.Default.ExitToApp, contentDescription = "Abmelden", tint = NeonRed)
+
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Menü öffnen")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Drawdown-Statistiken") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewDrawdowns()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            )
+                            if (isAdmin) {
+                                DropdownMenuItem(
+                                    text = { Text("Server Health") },
+                                    onClick = {
+                                        showMenu = false
+                                        onViewHealth()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Favorite,
+                                            contentDescription = null,
+                                            tint = NeonGreen
+                                        )
+                                    }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Abmelden") },
+                                onClick = {
+                                    showMenu = false
+                                    performLogout()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.ExitToApp,
+                                        contentDescription = null,
+                                        tint = NeonRed
+                                    )
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

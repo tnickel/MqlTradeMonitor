@@ -29,4 +29,10 @@ interface TradeMonitorApi {
 
     @GET("api/account/{accountId}/closed-trades")
     suspend fun getClosedTrades(@Path("accountId") accountId: Long): List<ClosedTrade>
+
+    @GET("api/stats/system-status")
+    suspend fun getSystemStatus(): SystemStatusResponse
+
+    @GET("admin/api/health/data")
+    suspend fun getServerHealth(): ServerHealth
 }

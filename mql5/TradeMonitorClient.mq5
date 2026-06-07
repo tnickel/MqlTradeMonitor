@@ -656,11 +656,17 @@ void CreateReconnectButton()
 //+------------------------------------------------------------------+
 bool RegisterWithServer()
 {
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   if(login == 0)
+   {
+      Print("Warning: ACCOUNT_LOGIN is 0. Terminal is not logged in yet. Registration skipped.");
+      return false;
+   }
    string url = cfg_ServerURL + "/api/register";
    
    // Build JSON payload
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(login) + ",";
    json += "\"broker\":\"" + AccountInfoString(ACCOUNT_COMPANY) + "\",";
    json += "\"currency\":\"" + AccountInfoString(ACCOUNT_CURRENCY) + "\",";
    json += "\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";

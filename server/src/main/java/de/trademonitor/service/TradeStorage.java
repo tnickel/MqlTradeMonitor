@@ -10,6 +10,8 @@ import de.trademonitor.repository.AccountRepository;
 import de.trademonitor.repository.ClosedTradeRepository;
 import de.trademonitor.repository.EquitySnapshotRepository;
 import de.trademonitor.repository.OpenTradeRepository;
+import de.trademonitor.repository.LlmAnalysisLogRepository;
+import de.trademonitor.entity.LlmAnalysisLogEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,9 @@ public class TradeStorage {
 
     @Autowired
     private EquitySnapshotRepository equitySnapshotRepository;
+
+    @Autowired
+    private LlmAnalysisLogRepository llmAnalysisLogRepository;
 
     /**
      * Timestamp format for equity snapshots (lexicographic ordering works
@@ -240,7 +245,13 @@ public class TradeStorage {
         
         if (trades != null) {
             List<OpenTradeEntity> entities = new ArrayList<>();
+            java.util.Set<Long> seenTickets = new java.util.HashSet<>();
             for (Trade trade : trades) {
+                if (trade == null) continue;
+                if (!seenTickets.add(trade.getTicket())) {
+                    System.out.println("Warning: Duplicate open trade ticket " + trade.getTicket() + " for account " + accountId + " skipped.");
+                    continue;
+                }
                 OpenTradeEntity entity = new OpenTradeEntity();
                 entity.setAccountId(accountId);
                 entity.setTicket(trade.getTicket());
@@ -410,5 +421,29 @@ public class TradeStorage {
 
         System.out.println("RESET Account " + accountId + ": Deleted " + openCount
                 + " open trades, " + closedCount + " closed trades, and equity snapshots.");
+    }
+
+    public void updatePromptAnalysisConfig(long accountId, boolean enabled, String customPrompt) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setPromptAnalysisEnabled(enabled);
+            entity.setCustomPrompt(customPrompt);
+            accountRepository.save(entity);
+        }
+    }
+
+    public void updatePromptAnalysisResult(long accountId, String result, java.time.LocalDateTime time) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setLastPromptAnalysisResult(result);
+            entity.setLastPromptAnalysisTime(time);
+            accountRepository.save(entity);
+        }
+        try {
+            LlmAnalysisLogEntity log = new LlmAnalysisLogEntity(accountId, result, time);
+            llmAnalysisLogRepository.save(log);
+        } catch (Exception e) {
+            System.err.println("Failed to save LLM analysis log: " + e.getMessage());
+        }
     }
 }

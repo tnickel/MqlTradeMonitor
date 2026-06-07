@@ -8,6 +8,17 @@
     <link rel="stylesheet" th:href="@{/css/mobile.css(v=1)}">
     <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); border-color: rgba(239, 68, 68, 1); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 0.5); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
+        }
+        .warning-pulse {
+            animation: pulse-red 1.5s infinite;
+            border: 2px solid #ef4444 !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -51,7 +62,8 @@
         <div th:each="section : ${sections}">
             <h2 class="section-title" th:text="${section.name}">Section Name</h2>
             
-            <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card" 
+            <div th:each="acc : ${accountsBySection[section.id]}" class="account-card" 
+                 th:classappend="${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''}"
                  th:onclick="'location.href=\'/account/' + ${acc.accountId} + '\''">
                 
                 <div class="card-top">
@@ -69,7 +81,7 @@
                             <span th:text="${acc.type}">REAL</span> • <span th:text="${acc.broker}">Broker</span>
                         </div>
                     </div>
-                    <div th:if="${acc.openProfitAlarmTriggered}" style="color: var(--danger); font-size: 1.25rem;">🚨</div>
+                    <div th:if="${acc.openProfitAlarmTriggered || acc.lastPromptAnalysisAlarm}" style="color: var(--danger); font-size: 1.25rem;">🚨</div>
                 </div>
 
                 <div class="metrics-grid">

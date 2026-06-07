@@ -24,6 +24,12 @@ public class AccountManager {
 
     private static final Logger LOG = Logger.getLogger(AccountManager.class.getName());
     private final Map<Long, Account> accounts = new ConcurrentHashMap<>();
+    private final Map<Long, Object> accountLocks = new ConcurrentHashMap<>();
+
+    private Object getAccountLock(long accountId) {
+        return accountLocks.computeIfAbsent(accountId, k -> new Object());
+    }
+
     /** Tracks which REAL accounts have already triggered an offline siren (to avoid repeated alerts). */
     private final Set<Long> offlineSirenLatch = ConcurrentHashMap.newKeySet();
 
@@ -96,6 +102,10 @@ public class AccountManager {
             account.setSection(ae.getSection()); // Legacy loading
             account.setSectionId(ae.getSectionId()); // New loading
             account.setMetaTraderInfo(ae.getMetaTraderInfo());
+            account.setPromptAnalysisEnabled(ae.getPromptAnalysisEnabled() != null ? ae.getPromptAnalysisEnabled() : false);
+            account.setCustomPrompt(ae.getCustomPrompt());
+            account.setLastPromptAnalysisResult(ae.getLastPromptAnalysisResult());
+            account.setLastPromptAnalysisTime(ae.getLastPromptAnalysisTime());
             account.setMagicNumberMaxAge(ae.getMagicNumberMaxAge() != null ? ae.getMagicNumberMaxAge() : 30);
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
@@ -324,9 +334,6 @@ public class AccountManager {
         }
     }
 
-    /**
-     * Update account trades and metrics.
-     */
     public void updateTrades(long accountId, List<Trade> trades, double equity, double balance) {
         Account account = accounts.get(accountId);
         if (account != null) {
@@ -335,9 +342,11 @@ public class AccountManager {
             account.setBalance(balance);
             account.setLastSeen(LocalDateTime.now());
 
-            // Persist to DB
-            tradeStorage.replaceOpenTrades(accountId, trades);
-            tradeStorage.updateAccountMetrics(accountId, equity, balance);
+            synchronized (getAccountLock(accountId)) {
+                // Persist to DB
+                tradeStorage.replaceOpenTrades(accountId, trades);
+                tradeStorage.updateAccountMetrics(accountId, equity, balance);
+            }
 
             // Save equity snapshot for chart (rate-limited to once per minute)
             tradeStorage.saveEquitySnapshot(accountId, equity, balance);
@@ -439,6 +448,7 @@ public class AccountManager {
             info.put("openProfitAlarmAbs", account.getOpenProfitAlarmAbs());
             info.put("openProfitAlarmPct", account.getOpenProfitAlarmPct());
             info.put("openProfitAlarmTriggered", account.isOpenProfitAlarmTriggered());
+            info.put("lastPromptAnalysisAlarm", account.isLastPromptAnalysisAlarm());
             info.put("copierError", account.getCopierError());
             info.put("copierErrorMessage", account.getCopierErrorMessage());
             info.put("worstCopierStage", account.getWorstCopierStage());
@@ -587,18 +597,17 @@ public class AccountManager {
         }
     }
 
-    /**
-     * Update closed trades history for an account with duplicate checking.
-     * Returns the number of newly inserted trades.
-     */
     public int updateHistory(long accountId, List<ClosedTrade> closedTrades) {
         Account account = accounts.get(accountId);
         if (account != null && closedTrades != null) {
-            // Save to DB with duplicate check
-            int inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
+            int inserted;
+            synchronized (getAccountLock(accountId)) {
+                // Save to DB with duplicate check
+                inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
 
-            // Reload from DB to keep in-memory cache consistent
-            account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
+                // Reload from DB to keep in-memory cache consistent
+                account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
+            }
             account.setLastSeen(LocalDateTime.now());
 
             // Invalidate caches for this account since trades changed
@@ -941,5 +950,23 @@ public class AccountManager {
     @Scheduled(fixedRate = 300000, initialDelay = 5000) // 5 min, first run after 5s
     public void scheduledCacheRefresh() {
         refreshAllCaches();
+    }
+
+    public void updatePromptAnalysisConfig(long accountId, boolean enabled, String customPrompt) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setPromptAnalysisEnabled(enabled);
+            account.setCustomPrompt(customPrompt);
+            tradeStorage.updatePromptAnalysisConfig(accountId, enabled, customPrompt);
+        }
+    }
+
+    public void updatePromptAnalysisResult(long accountId, String result, java.time.LocalDateTime time) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setLastPromptAnalysisResult(result);
+            account.setLastPromptAnalysisTime(time);
+            tradeStorage.updatePromptAnalysisResult(accountId, result, time);
+        }
     }
 }

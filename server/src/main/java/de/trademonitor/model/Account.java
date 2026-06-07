@@ -51,6 +51,11 @@ public class Account {
     private String copierErrorMessage;
     private int worstCopierStage = 0; // 0=none/offline, 1=stage1, 2=stage2, 3=stage3
 
+    private boolean promptAnalysisEnabled;
+    private String customPrompt;
+    private String lastPromptAnalysisResult;
+    private LocalDateTime lastPromptAnalysisTime;
+
     public boolean isSyncWarning() {
         return syncWarning;
     }
@@ -848,5 +853,43 @@ public class Account {
         metrics.put("closedTradesCount", closedTrades != null ? closedTrades.size() : 0);
 
         return metrics;
+    }
+
+    public boolean isPromptAnalysisEnabled() {
+        return promptAnalysisEnabled;
+    }
+
+    public void setPromptAnalysisEnabled(boolean promptAnalysisEnabled) {
+        this.promptAnalysisEnabled = promptAnalysisEnabled;
+    }
+
+    public String getCustomPrompt() {
+        return customPrompt;
+    }
+
+    public void setCustomPrompt(String customPrompt) {
+        this.customPrompt = customPrompt;
+    }
+
+    public String getLastPromptAnalysisResult() {
+        return lastPromptAnalysisResult;
+    }
+
+    public void setLastPromptAnalysisResult(String lastPromptAnalysisResult) {
+        this.lastPromptAnalysisResult = lastPromptAnalysisResult;
+    }
+
+    public LocalDateTime getLastPromptAnalysisTime() {
+        return lastPromptAnalysisTime;
+    }
+
+    public void setLastPromptAnalysisTime(LocalDateTime lastPromptAnalysisTime) {
+        this.lastPromptAnalysisTime = lastPromptAnalysisTime;
+    }
+
+    public boolean isLastPromptAnalysisAlarm() {
+        if (lastPromptAnalysisResult == null) return false;
+        String text = lastPromptAnalysisResult.toUpperCase();
+        return text.contains("🔴") || text.contains("KRITISCHER ALARM") || text.contains("REISSLEINE ZIEHEN") || text.contains("CRITICAL ALARM");
     }
 }

@@ -15,6 +15,7 @@ import androidx.navigation.navArgument
 import de.trademonitor.app.api.ApiClient
 import de.trademonitor.app.ui.dashboard.DashboardScreen
 import de.trademonitor.app.ui.detail.AccountDetailScreen
+import de.trademonitor.app.ui.health.ServerHealthScreen
 import de.trademonitor.app.ui.login.LoginScreen
 import de.trademonitor.app.ui.stats.DrawdownScreen
 import de.trademonitor.app.ui.theme.TradeMonitorTheme
@@ -62,6 +63,9 @@ fun AppNavigation() {
                 onViewDrawdowns = {
                     navController.navigate("drawdowns")
                 },
+                onViewHealth = {
+                    navController.navigate("health")
+                },
                 onLogout = {
                     navController.navigate("login") {
                         popUpTo("dashboard") { inclusive = true }
@@ -85,6 +89,14 @@ fun AppNavigation() {
         
         composable("drawdowns") {
             DrawdownScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable("health") {
+            ServerHealthScreen(
                 onBackClick = {
                     navController.popBackStack()
                 }

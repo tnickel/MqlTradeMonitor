@@ -4,12 +4,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import jakarta.persistence.Column;
+
 @Entity
 @Table(name = "global_config")
 public class GlobalConfigEntity {
 
     @Id
     private String confKey;
+
+    @Column(columnDefinition = "TEXT")
     private String confValue;
 
     public GlobalConfigEntity() {

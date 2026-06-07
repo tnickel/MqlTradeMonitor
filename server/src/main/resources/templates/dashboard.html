@@ -9,6 +9,13 @@
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @keyframes blink-text {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+    </style>
 </head>
 
 <body>
@@ -509,7 +516,7 @@
                 <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
                     <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card"
                         th:data-online="${acc.online}"
-                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''} + ${acc.copierError ? ' copier-error-shadow' : ''}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''} + ${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''} + ${acc.copierError ? ' copier-error-shadow' : ''}"
                         th:data-id="${acc.accountId}" th:data-type="${acc.type}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
@@ -540,6 +547,11 @@
                             </div>
 
                             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                <!-- KI Alarm Badge -->
+                                <span th:if="${acc.lastPromptAnalysisAlarm}" class="status-badge offline"
+                                    style="background-color: #ef4444; color: white; cursor: help; animation: blink-text 1.5s infinite; font-weight: bold;"
+                                    title="KI meldet kritisches Risiko (Reißleine ziehen!)">🚨 KI-ALARM</span>
+
                                 <!-- Error Badge -->
                                 <span th:if="${acc.errorState}" class="status-badge offline"
                                     th:title="${acc.lastErrorMsg}"

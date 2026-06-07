@@ -62,6 +62,18 @@ public class AccountEntity {
     @Column(name = "copier_error_message", length = 1000)
     private String copierErrorMessage;
 
+    @Column(name = "prompt_analysis_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean promptAnalysisEnabled = false;
+
+    @Column(name = "custom_prompt", columnDefinition = "TEXT")
+    private String customPrompt;
+
+    @Column(name = "last_prompt_analysis_result", columnDefinition = "TEXT")
+    private String lastPromptAnalysisResult;
+
+    @Column(name = "last_prompt_analysis_time")
+    private java.time.LocalDateTime lastPromptAnalysisTime;
+
     public AccountEntity() {
     }
 
@@ -263,5 +275,37 @@ public class AccountEntity {
 
     public void setMapPosY(Double mapPosY) {
         this.mapPosY = mapPosY;
+    }
+
+    public Boolean getPromptAnalysisEnabled() {
+        return promptAnalysisEnabled != null ? promptAnalysisEnabled : false;
+    }
+
+    public void setPromptAnalysisEnabled(Boolean promptAnalysisEnabled) {
+        this.promptAnalysisEnabled = promptAnalysisEnabled;
+    }
+
+    public String getCustomPrompt() {
+        return customPrompt;
+    }
+
+    public void setCustomPrompt(String customPrompt) {
+        this.customPrompt = customPrompt;
+    }
+
+    public String getLastPromptAnalysisResult() {
+        return lastPromptAnalysisResult;
+    }
+
+    public void setLastPromptAnalysisResult(String lastPromptAnalysisResult) {
+        this.lastPromptAnalysisResult = lastPromptAnalysisResult;
+    }
+
+    public java.time.LocalDateTime getLastPromptAnalysisTime() {
+        return lastPromptAnalysisTime;
+    }
+
+    public void setLastPromptAnalysisTime(java.time.LocalDateTime lastPromptAnalysisTime) {
+        this.lastPromptAnalysisTime = lastPromptAnalysisTime;
     }
 }

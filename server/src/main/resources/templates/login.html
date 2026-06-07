@@ -313,6 +313,11 @@
                 <button type="button" class="btn-submit" onclick="submitDemoLogin()" style="background: linear-gradient(135deg, #475569, #334155); margin-top: 0.75rem;">
                     Try Demo &nbsp;🚀
                 </button>
+                <a href="/trademonitor.apk" download style="text-decoration: none; display: block; width: 100%;">
+                    <button type="button" class="btn-submit" style="background: linear-gradient(135deg, #059669, #047857); margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; width: 100%;">
+                        Download Android App &nbsp;📱
+                    </button>
+                </a>
             </form>
 
             <form id="demoLoginForm" th:action="@{/demo-login}" method="post" style="display: none;"></form>
@@ -320,6 +325,224 @@
                 function submitDemoLogin() {
                     document.getElementById('demoLoginForm').submit();
                 }
+
+                // APK Progress Download Modal
+                document.addEventListener('DOMContentLoaded', () => {
+                    const downloadLink = document.querySelector('a[href*="trademonitor.apk"]');
+                    if (downloadLink) {
+                        downloadLink.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const url = downloadLink.getAttribute('href');
+                            startApkDownload(url);
+                        });
+                    }
+
+                    function startApkDownload(url) {
+                        const overlay = document.createElement('div');
+                        overlay.style.position = 'fixed';
+                        overlay.style.top = '0';
+                        overlay.style.left = '0';
+                        overlay.style.width = '100vw';
+                        overlay.style.height = '100vh';
+                        overlay.style.backgroundColor = 'rgba(2, 6, 23, 0.85)';
+                        overlay.style.backdropFilter = 'blur(10px)';
+                        overlay.style.webkitBackdropFilter = 'blur(10px)';
+                        overlay.style.display = 'flex';
+                        overlay.style.alignItems = 'center';
+                        overlay.style.justifyContent = 'center';
+                        overlay.style.zIndex = '9999999';
+                        overlay.style.opacity = '0';
+                        overlay.style.transition = 'opacity 0.3s ease';
+
+                        const modal = document.createElement('div');
+                        modal.style.background = 'rgba(15, 23, 42, 0.95)';
+                        modal.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+                        modal.style.borderRadius = '24px';
+                        modal.style.padding = '2.5rem';
+                        modal.style.width = '90%';
+                        modal.style.maxWidth = '400px';
+                        modal.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+                        modal.style.textAlign = 'center';
+                        modal.style.fontFamily = "'Inter', system-ui, sans-serif";
+                        modal.style.color = '#f8fafc';
+                        modal.style.transform = 'scale(0.9)';
+                        modal.style.transition = 'transform 0.3s ease';
+
+                        const icon = document.createElement('div');
+                        icon.style.marginBottom = '1.25rem';
+                        icon.innerHTML = `<div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); animation: download-pulse 2s infinite;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </div>`;
+                        
+                        if (!document.getElementById('download-pulse-style')) {
+                            const style = document.createElement('style');
+                            style.id = 'download-pulse-style';
+                            style.innerHTML = `
+                                @keyframes download-pulse {
+                                    0% { transform: scale(1); opacity: 1; }
+                                    50% { transform: scale(1.1); opacity: 0.8; }
+                                    100% { transform: scale(1); opacity: 1; }
+                                }
+                            `;
+                            document.head.appendChild(style);
+                        }
+
+                        const title = document.createElement('h3');
+                        title.innerText = 'App wird geladen...';
+                        title.style.margin = '0 0 0.5rem 0';
+                        title.style.fontSize = '1.35rem';
+                        title.style.fontWeight = '700';
+
+                        const sizeInfo = document.createElement('p');
+                        sizeInfo.innerText = 'Dateigröße: 8,6 MB';
+                        sizeInfo.style.margin = '0 0 1.5rem 0';
+                        sizeInfo.style.color = '#94a3b8';
+                        sizeInfo.style.fontSize = '0.9rem';
+
+                        const progressBg = document.createElement('div');
+                        progressBg.style.background = 'rgba(2, 6, 23, 0.4)';
+                        progressBg.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+                        progressBg.style.borderRadius = '10px';
+                        progressBg.style.height = '12px';
+                        progressBg.style.width = '100%';
+                        progressBg.style.overflow = 'hidden';
+                        progressBg.style.marginBottom = '0.6rem';
+
+                        const progressFill = document.createElement('div');
+                        progressFill.style.height = '100%';
+                        progressFill.style.width = '0%';
+                        progressFill.style.background = 'linear-gradient(90deg, #10b981 0%, #06b6d4 100%)';
+                        progressFill.style.transition = 'width 0.1s ease';
+
+                        const progressText = document.createElement('div');
+                        progressText.innerText = '0%';
+                        progressText.style.fontWeight = '700';
+                        progressText.style.fontSize = '1.1rem';
+                        progressText.style.color = '#10b981';
+                        progressText.style.marginBottom = '1.5rem';
+
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.innerText = 'Abbrechen';
+                        cancelBtn.style.width = '100%';
+                        cancelBtn.style.padding = '0.75rem';
+                        cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+                        cancelBtn.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                        cancelBtn.style.borderRadius = '12px';
+                        cancelBtn.style.color = '#94a3b8';
+                        cancelBtn.style.fontWeight = '600';
+                        cancelBtn.style.cursor = 'pointer';
+                        cancelBtn.style.transition = 'all 0.2s';
+                        
+                        cancelBtn.onmouseover = () => {
+                            cancelBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+                            cancelBtn.style.color = '#f87171';
+                            cancelBtn.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                        };
+                        cancelBtn.onmouseout = () => {
+                            cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+                            cancelBtn.style.color = '#94a3b8';
+                            cancelBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        };
+
+                        progressBg.appendChild(progressFill);
+                        modal.appendChild(icon);
+                        modal.appendChild(title);
+                        modal.appendChild(sizeInfo);
+                        modal.appendChild(progressBg);
+                        modal.appendChild(progressText);
+                        modal.appendChild(cancelBtn);
+                        overlay.appendChild(modal);
+                        document.body.appendChild(overlay);
+
+                        requestAnimationFrame(() => {
+                            overlay.style.opacity = '1';
+                            modal.style.transform = 'scale(1)';
+                        });
+
+                        const controller = new AbortController();
+                        const signal = controller.signal;
+
+                        cancelBtn.addEventListener('click', () => {
+                            controller.abort();
+                            closeModal();
+                        });
+
+                        function closeModal() {
+                            overlay.style.opacity = '0';
+                            modal.style.transform = 'scale(0.9)';
+                            setTimeout(() => {
+                                if (overlay.parentNode) {
+                                    overlay.parentNode.removeChild(overlay);
+                                }
+                            }, 300);
+                        }
+
+                        fetch(url, { signal })
+                            .then(response => {
+                                if (!response.ok) throw new Error('Netzwerk-Antwort war nicht OK');
+                                const contentLength = response.headers.get('content-length');
+                                const totalBytes = contentLength ? parseInt(contentLength, 10) : 9031679;
+                                const reader = response.body.getReader();
+                                let loadedBytes = 0;
+                                const chunks = [];
+
+                                function read() {
+                                    return reader.read().then(({ done, value }) => {
+                                        if (done) {
+                                            return new Blob(chunks, { type: 'application/vnd.android.package-archive' });
+                                        }
+                                        loadedBytes += value.length;
+                                        chunks.push(value);
+                                        const pct = Math.round((loadedBytes / totalBytes) * 100);
+                                        progressFill.style.width = `${pct}%`;
+                                        progressText.innerText = `${pct}%`;
+                                        return read();
+                                    });
+                                }
+                                return read();
+                            })
+                            .then(blob => {
+                                icon.innerHTML = `<div style="width: 60px; height: 60px; background: #10b981; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>`;
+                                title.innerText = 'Heruntergeladen!';
+                                progressText.innerText = 'Fertig';
+                                cancelBtn.style.display = 'none';
+
+                                const downloadLink = document.createElement('a');
+                                downloadLink.href = URL.createObjectURL(blob);
+                                downloadLink.download = 'trademonitor.apk';
+                                document.body.appendChild(downloadLink);
+                                downloadLink.click();
+                                document.body.removeChild(downloadLink);
+
+                                setTimeout(closeModal, 1500);
+                            })
+                            .catch(error => {
+                                if (error.name === 'AbortError') return;
+                                icon.innerHTML = `<div style="width: 60px; height: 60px; background: #ef4444; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </div>`;
+                                title.innerText = 'Fehler beim Download';
+                                sizeInfo.innerText = error.message || 'Verbindung fehlgeschlagen';
+                                progressBg.style.display = 'none';
+                                progressText.style.display = 'none';
+                                cancelBtn.innerText = 'Schließen';
+                                cancelBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                                cancelBtn.style.color = '#f87171';
+                                cancelBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                            });
+                    }
+                });
             </script>
 
             <div class="card-footer" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 0.75rem;">
