@@ -74,7 +74,7 @@ public class MagicProfitEntry {
 
     /** Net closed profit = closedProfit + swap + commission (what's actually realized) */
     public double getNetClosedProfit() {
-        return closedProfit + totalSwap + totalCommission;
+        return closedProfit + (totalSwap - openSwap) + totalCommission;
     }
 
     public double getTotalProfitPct() {
@@ -95,6 +95,10 @@ public class MagicProfitEntry {
 
     public double getOpenSwap() {
         return openSwap;
+    }
+
+    public double getClosedSwap() {
+        return totalSwap - openSwap;
     }
 
     public int getOpenTradeCount() {

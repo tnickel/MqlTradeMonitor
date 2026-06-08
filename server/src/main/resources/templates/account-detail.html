@@ -1082,7 +1082,7 @@
                                 <th>Real. P/L</th>
                                 <th>Swap</th>
                                 <th>Komm.</th>
-                                <th style="background: rgba(99,102,241,0.15); border-bottom: 2px solid rgba(99,102,241,0.4);">Gesamt</th>
+                                <th style="background: rgba(99,102,241,0.15); border-bottom: 2px solid rgba(99,102,241,0.4);" title="Ergebnis, wenn alle offenen Positionen jetzt geschlossen würden">Gesamt<span style="font-size: 0.7rem; font-weight: normal; display: block; opacity: 0.8; color: #a0a0c0; margin-top: 2px;">(bei Komplettschließung)</span></th>
                                 <th>Max Real. DD (€)</th>
                                 <th>Max Eq. DD (€)</th>
                                 <th>Max Eq. DD (%)</th>
@@ -1124,10 +1124,10 @@
                                     th:text="${#numbers.formatDecimal(mp.totalSwap, 1, 2)}">-10.00</td>
                                 <td class="mc-comm" th:style="${mp.totalCommission < 0 ? 'color: #ef4444;' : 'color: #a0a0c0;'}"
                                     th:text="${#numbers.formatDecimal(mp.totalCommission, 1, 2)}">-5.00</td>
-                                <td class="mc-gesamt-cell" style="background: rgba(99,102,241,0.08); font-weight: 800; font-size: 1.05rem;">
+                                <td class="mc-gesamt-cell" style="background: rgba(99,102,241,0.08); font-weight: 800; font-size: 1.05rem;" title="Ergebnis, wenn alle offenen Positionen jetzt geschlossen würden (Realisierte P/L + offener Float + offener Swap)">
                                     <div class="mc-gesamt-val" th:class="${mp.totalProfit >= 0 ? 'mc-gesamt-val profit-positive' : 'mc-gesamt-val profit-negative'}"
                                         th:text="(${mp.totalProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(mp.totalProfit, 1, 2)} + ' (' + (${mp.totalProfitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(mp.totalProfitPct, 1, 1)} + '%)'">+600.00</div>
-                                    <div class="mc-netto-line" th:style="'font-size: 0.78rem; margin-top: 4px; font-weight: 700; letter-spacing: 0.01em; color: ' + (${mp.netClosedProfit >= 0} ? '#10b981' : '#ef4444')">
+                                    <div class="mc-netto-line" th:style="'font-size: 0.78rem; margin-top: 4px; font-weight: 700; letter-spacing: 0.01em; color: ' + (${mp.netClosedProfit >= 0} ? '#10b981' : '#ef4444')" title="Tatsächlich realisierter Gewinn/Verlust (nur geschlossene Trades inklusive deren Swap und Kommission, ohne offene Trades)">
                                         <span style="opacity: 0.7;">Netto:</span>
                                         <span class="mc-netto-val" th:text="(${mp.netClosedProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(mp.netClosedProfit, 1, 2)} + ' (' + (${mp.netClosedProfitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(mp.netClosedProfitPct, 1, 1)} + '%)'">+500.00</span>
                                     </div>
@@ -1169,11 +1169,11 @@
                                 <td style="background: rgba(99,102,241,0.15); text-align: center; padding: 12px 8px; cursor: help;">
                                     <div th:with="totalSum=${#aggregates.sum(magicProfits.![totalProfit])},floatSum=${#aggregates.sum(magicProfits.![openProfit])},realSum=${#aggregates.sum(magicProfits.![closedProfit])},swapSum=${#aggregates.sum(magicProfits.![totalSwap])},commSum=${#aggregates.sum(magicProfits.![totalCommission])},totalPctSum=${#aggregates.sum(magicProfits.![totalProfitPct])}"
                                         th:style="'font-weight: 900; font-size: 1.3rem; color: ' + (${totalSum >= 0} ? '#10b981' : '#ef4444')"
-                                        th:title="'Gesamt = Float P/L + Real P/L + Swap + Komm' + '&#10;' + '= ' + ${#numbers.formatDecimal(floatSum, 1, 2)} + ' + ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(totalSum, 1, 2)}"
+                                        th:title="'Ergebnis bei Komplettschließung (alle Positionen schließen)' + '&#10;&#10;' + 'Gesamt = Float P/L + Real P/L + Swap + Komm' + '&#10;' + '= ' + ${#numbers.formatDecimal(floatSum, 1, 2)} + ' + ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(totalSum, 1, 2)}"
                                         th:text="(${totalSum > 0 ? '+' : ''}) + ${#numbers.formatDecimal(totalSum, 1, 2)} + ' (' + (${totalPctSum > 0 ? '+' : ''}) + ${#numbers.formatDecimal(totalPctSum, 1, 1)} + '%)'">0.00</div>
-                                    <div th:with="netSum=${#aggregates.sum(magicProfits.![netClosedProfit])},realSum=${#aggregates.sum(magicProfits.![closedProfit])},swapSum=${#aggregates.sum(magicProfits.![totalSwap])},commSum=${#aggregates.sum(magicProfits.![totalCommission])},netPctSum=${#aggregates.sum(magicProfits.![netClosedProfitPct])}"
+                                    <div th:with="netSum=${#aggregates.sum(magicProfits.![netClosedProfit])},realSum=${#aggregates.sum(magicProfits.![closedProfit])},swapSum=${#aggregates.sum(magicProfits.![closedSwap])},commSum=${#aggregates.sum(magicProfits.![totalCommission])},netPctSum=${#aggregates.sum(magicProfits.![netClosedProfitPct])}"
                                         th:style="'font-size: 0.82rem; margin-top: 4px; font-weight: 700; color: ' + (${netSum >= 0} ? '#10b981' : '#ef4444')"
-                                        th:title="'Netto = Real P/L + Swap + Komm (ohne Float)' + '&#10;' + '= ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(netSum, 1, 2)}">
+                                        th:title="'Netto = Real P/L + geschlossener Swap + Komm (ohne Float)' + '&#10;' + '= ' + ${#numbers.formatDecimal(realSum, 1, 2)} + ' + (' + ${#numbers.formatDecimal(swapSum, 1, 2)} + ') + (' + ${#numbers.formatDecimal(commSum, 1, 2)} + ')' + '&#10;' + '= ' + ${#numbers.formatDecimal(netSum, 1, 2)}">
                                         <span style="opacity: 0.7;">Netto:</span>
                                         <span th:text="(${netSum > 0 ? '+' : ''}) + ${#numbers.formatDecimal(netSum, 1, 2)} + ' (' + (${netPctSum > 0 ? '+' : ''}) + ${#numbers.formatDecimal(netPctSum, 1, 1)} + '%)'">0.00</span>
                                     </div>
@@ -1498,7 +1498,9 @@
                     minTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
                     break;
                 case '1week':
-                    minTime = now.getTime() - 7 * 24 * 3600 * 1000;
+                    var sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    sunday.setDate(sunday.getDate() - sunday.getDay());
+                    minTime = sunday.getTime();
                     break;
                 case '1month':
                     var m = new Date(now);
@@ -2250,7 +2252,10 @@
             function isTradeInTimeRange(tradeTs) {
                 switch (range) {
                     case 'today': return tradeTs >= todayStart;
-                    case '1week': return tradeTs >= (now.getTime() - 7 * 24 * 3600 * 1000);
+                    case '1week':
+                        var sun = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        sun.setDate(sun.getDate() - sun.getDay());
+                        return tradeTs >= sun.getTime();
                     case '1month':
                         var m = new Date(now); m.setMonth(now.getMonth() - 1); return tradeTs >= m.getTime();
                     case 'thismonth':
@@ -2268,7 +2273,11 @@
             var timeStartTs = 0;
             switch (range) {
                 case 'today': timeStartTs = todayStart; break;
-                case '1week': timeStartTs = now.getTime() - 7 * 24 * 3600 * 1000; break;
+                case '1week':
+                    var sun = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    sun.setDate(sun.getDate() - sun.getDay());
+                    timeStartTs = sun.getTime();
+                    break;
                 case '1month': var m = new Date(now); m.setMonth(now.getMonth() - 1); timeStartTs = m.getTime(); break;
                 case 'thismonth': timeStartTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime(); break;
                 case '6months': var m6 = new Date(now); m6.setMonth(now.getMonth() - 6); timeStartTs = m6.getTime(); break;
@@ -2425,7 +2434,10 @@
 
             switch (range) {
                 case 'today': startD = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate()); break;
-                case '1week': startD = new Date(nowD.getTime() - 7 * 24 * 3600 * 1000); break;
+                case '1week':
+                    startD = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate());
+                    startD.setDate(startD.getDate() - startD.getDay());
+                    break;
                 case '1month': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 1); break;
                 case 'thismonth': startD = new Date(nowD.getFullYear(), nowD.getMonth(), 1); break;
                 case '6months': startD = new Date(nowD); startD.setMonth(nowD.getMonth() - 6); break;
@@ -2676,7 +2688,7 @@
             var magicRows = document.querySelectorAll('.magic-breakdown tbody tr[data-magic]');
             // Track sums for footer
             var sumOpenCount = 0, sumOpenProfit = 0;
-            var sumClosedCount = 0, sumClosedProfit = 0, sumSwap = 0, sumComm = 0, sumGesamt = 0, sumNetto = 0;
+            var sumClosedCount = 0, sumClosedProfit = 0, sumSwap = 0, sumClosedSwap = 0, sumComm = 0, sumGesamt = 0, sumNetto = 0;
             var visibleRows = 0;
 
             var totalHistProfit = parseFloat(/*[[${account.totalHistoryProfit}]]*/ 0);
@@ -2744,7 +2756,7 @@
                 }
 
                 // Update Netto (closed profit + swap + commission, without float)
-                var netto = stats.closedProfit + totalSwap + totalComm;
+                var netto = stats.closedProfit + stats.closedSwap + totalComm;
                 var nettoPct = (netto / startBal) * 100.0;
                 var nSign = netto >= 0 ? '+' : '';
                 var nPctSign = nettoPct >= 0 ? '+' : '';
@@ -2756,6 +2768,7 @@
                 var nettoLine = row.querySelector('.mc-netto-line');
                 if (nettoLine) {
                     nettoLine.style.color = netto >= 0 ? '#10b981' : '#ef4444';
+                    nettoLine.title = 'Tatsächlich realisierter Gewinn/Verlust (nur geschlossene Trades inklusive deren Swap und Kommission, ohne offene Trades)';
                 }
 
                 // Accumulate footer sums
@@ -2764,6 +2777,7 @@
                 sumClosedCount += stats.closedCount;
                 sumClosedProfit += stats.closedProfit;
                 sumSwap += totalSwap;
+                sumClosedSwap += stats.closedSwap;
                 sumComm += totalComm;
                 sumGesamt += gesamt;
                 sumNetto += netto;
@@ -2805,7 +2819,7 @@
                     var nettoDiv = cells[7].querySelector('div:nth-child(2)');
                     if (nettoDiv) {
                         nettoDiv.style.color = sumNetto >= 0 ? '#10b981' : '#ef4444';
-                        nettoDiv.title = 'Netto = Real P/L + Swap + Komm (ohne Float)\n= ' + sumClosedProfit.toFixed(2) + ' + (' + sumSwap.toFixed(2) + ') + (' + sumComm.toFixed(2) + ')\n= ' + sumNetto.toFixed(2);
+                        nettoDiv.title = 'Netto = Real P/L + Swap + Komm (ohne Float)\n= ' + sumClosedProfit.toFixed(2) + ' + (' + sumClosedSwap.toFixed(2) + ') + (' + sumComm.toFixed(2) + ')\n= ' + sumNetto.toFixed(2);
                         var nettoSpan = nettoDiv.querySelector('.mc-netto-val, span:last-child');
                         if (nettoSpan) nettoSpan.textContent = snSign + sumNetto.toFixed(2) + ' (' + snPctSign + sumNettoPct.toFixed(1) + '%)';
                     }

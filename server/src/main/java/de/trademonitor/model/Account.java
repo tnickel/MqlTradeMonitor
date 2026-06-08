@@ -545,7 +545,7 @@ public class Account {
             }
             
             double magicTotalProfit = openProfit + closedProfit + totalSwap + totalCommission;
-            double magicNetClosedProfit = closedProfit + totalSwap + totalCommission;
+            double magicNetClosedProfit = closedProfit + closedSwap + totalCommission;
             double baseAmount = netDeposits > 0 ? netDeposits : (this.balance > 0 ? this.balance : 1.0);
             double totalProfitPct = (magicTotalProfit / baseAmount) * 100.0;
             double netClosedProfitPct = (magicNetClosedProfit / baseAmount) * 100.0;
