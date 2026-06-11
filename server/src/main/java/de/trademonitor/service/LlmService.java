@@ -40,6 +40,8 @@ public class LlmService {
             throw new IllegalArgumentException("Account mit ID " + accountId + " nicht gefunden.");
         }
 
+        LocalDateTime now = LocalDateTime.now();
+
         String apiKey = globalConfigService.getOpenRouterApiKey();
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalStateException("Die Umgebungsvariable 'OPENROUTER_API_KEY' ist auf dem Server nicht konfiguriert.");
@@ -50,6 +52,11 @@ public class LlmService {
 
         // 1. Construct user prompt containing custom strategy prompt and current trades
         StringBuilder userContent = new StringBuilder();
+        
+        // Inject current server time so the model has the correct date/time reference
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+        userContent.append("Aktuelles Datum und Uhrzeit der Analyse (Serverzeit): ").append(now.format(formatter)).append("\n\n");
+
         userContent.append("Hier ist der spezifische Beurteilungs-Prompt für dieses Trading-Konto:\n");
         userContent.append(account.getCustomPrompt() != null && !account.getCustomPrompt().trim().isEmpty() 
                 ? account.getCustomPrompt().trim() 
@@ -103,6 +110,11 @@ public class LlmService {
         userMsg.put("role", "user");
         userMsg.put("content", userContent.toString());
 
+        // Add tools array for OpenRouter web search tool
+        ArrayNode tools = requestBody.putArray("tools");
+        ObjectNode searchTool = tools.addObject();
+        searchTool.put("type", "openrouter:web_search");
+
         String jsonPayload = objectMapper.writeValueAsString(requestBody);
 
         LOG.info("Sending OpenRouter request using model: " + model + " for account " + accountId);
@@ -136,7 +148,6 @@ public class LlmService {
         }
 
         // 6. Save results to account (in-memory + database)
-        LocalDateTime now = LocalDateTime.now();
         accountManager.updatePromptAnalysisResult(accountId, textResult, now);
 
         LOG.info("LLM Trade Analysis completed for account " + accountId);

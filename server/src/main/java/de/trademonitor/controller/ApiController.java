@@ -43,6 +43,9 @@ public class ApiController {
     @Autowired
     private de.trademonitor.service.NetworkStatusService networkStatusService;
 
+    @Autowired
+    private de.trademonitor.service.ExchangeRateService exchangeRateService;
+
     private void logClientAction(Long accountId, String action, String message,
             jakarta.servlet.http.HttpServletRequest request) {
         try {
@@ -273,6 +276,26 @@ public class ApiController {
     @GetMapping("/accounts")
     public ResponseEntity<?> getAccounts() {
         return ResponseEntity.ok(accountManager.getAccountsWithStatus());
+    }
+
+    /**
+     * Get current exchange rate for a symbol.
+     */
+    @GetMapping("/market/rate")
+    public ResponseEntity<?> getMarketRate(@RequestParam("symbol") String symbol) {
+        de.trademonitor.service.ExchangeRateService.CachedRate rate = exchangeRateService.getRateDetails(symbol);
+        if (rate != null && rate.getPrice() > 0) {
+            return ResponseEntity.ok(Map.of(
+                "symbol", symbol.toUpperCase(),
+                "price", rate.getPrice(),
+                "timestamp", rate.getTimestamp().toString(),
+                "source", "Yahoo Finance",
+                "success", true
+            ));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("symbol", symbol.toUpperCase(), "success", false, "error", "Rate not found or external API error"));
+        }
     }
 
     /**

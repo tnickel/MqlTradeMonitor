@@ -1030,14 +1030,22 @@
                         </div>
                     </div>
 
-                    <!-- Output Box -->
-                    <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 100px; position: relative;">
-                        <div id="llm-loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(4px); border-radius: 12px; align-items: center; justify-content: center; flex-direction: column; gap: 15px; z-index: 10;">
-                            <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                            <span style="color: #fff; font-weight: 600; font-size: 0.95rem;">Analyse läuft (Grok bewertet Positionen...)</span>
+                    <!-- Output Box & Gauges Flex Row -->
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
+                        <!-- Left: analysis result text card -->
+                        <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px; position: relative;">
+                            <div id="llm-loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(4px); border-radius: 12px; align-items: center; justify-content: center; flex-direction: column; gap: 15px; z-index: 10;">
+                                <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                <span style="color: #fff; font-weight: 600; font-size: 0.95rem;">Analyse läuft (Grok bewertet Positionen...)</span>
+                            </div>
+                            
+                            <div id="llm-result-container" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Noch keine Analyse durchgeführt. Klicke auf den Button oben, um die offenen Trades zu bewerten.'}">Noch keine Analyse durchgeführt.</div>
                         </div>
                         
-                        <div id="llm-result-container" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Noch keine Analyse durchgeführt. Klicke auf den Button oben, um die offenen Trades zu bewerten.'}">Noch keine Analyse durchgeführt.</div>
+                        <!-- Right: Visual Risk Gauges Card -->
+                        <div id="llm-gauges-container" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
+                            <!-- Will be populated dynamically by updateRiskGauges() -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1059,9 +1067,17 @@
                 </div>
             </div>
 
-            <!-- Output Box -->
-            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <div id="llm-result-container-user" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Derzeit liegt kein Analysebericht für dieses Konto vor.'}">Kein Bericht vorrätig.</div>
+            <!-- Output Box & Gauges Flex Row -->
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
+                <!-- Left: analysis result text card -->
+                <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px;">
+                    <div id="llm-result-container-user" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Derzeit liegt kein Analysebericht für dieses Konto vor.'}">Kein Bericht vorrätig.</div>
+                </div>
+                
+                <!-- Right: Visual Risk Gauges Card -->
+                <div id="llm-gauges-container-user" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
+                    <!-- Will be populated dynamically by updateRiskGauges() -->
+                </div>
             </div>
         </section>
 
@@ -2008,6 +2024,7 @@
         var currentEquity = /*[[${account.equity}]]*/ 0.0;
         var accountCurrency = /*[[${account.currency}]]*/ 'EUR';
         var commissionFactor = /*[[${account.commissionFactor}]]*/ 1.0;
+        var defaultAlarmPct = /*[[${account.openProfitAlarmPct}]]*/ 5.0;
 
         var STORAGE_KEY_FILTER = 'tradeMonitor_filter_' + accountId;
 
@@ -3511,6 +3528,7 @@
                                         ('0' + date.getMinutes()).slice(-2) + ':' + 
                                         ('0' + date.getSeconds()).slice(-2);
                     timestampContainer.textContent = formattedDate;
+                    updateRiskGauges();
                 } else {
                     alert('Fehler bei der Analyse: ' + (data.error || 'Unbekannt'));
                 }
@@ -3600,6 +3618,409 @@
             if (event.key === 'Escape') {
                 closeLlmHistoryModal();
             }
+        });
+
+        // ============ VISUAL RISK GAUGES ============
+        function getBaseSymbol(symbol) {
+            if (!symbol) return "";
+            var clean = symbol.trim().toUpperCase();
+            if (clean.length > 6 && /^[A-Z]{6}/.test(clean)) {
+                return clean.substring(0, 6);
+            }
+            return clean;
+        }
+
+        function getTradeDetailsForSymbol(symbol) {
+            var rows = document.querySelectorAll('#open-trades-table tbody tr');
+            var sumOpenPrice = 0, sumSL = 0, totalVol = 0, slVol = 0;
+            var buyVol = 0, sellVol = 0;
+            
+            for (var i = 0; i < rows.length; i++) {
+                var strong = rows[i].querySelector('td strong');
+                if (strong && strong.textContent.trim() === symbol) {
+                    var cells = rows[i].querySelectorAll('td');
+                    if (cells.length > 6) {
+                        var typeSpan = cells[2].querySelector('span');
+                        var type = typeSpan ? typeSpan.textContent.trim().toUpperCase() : "BUY";
+                        var volume = parseFloat(cells[3].textContent.trim()) || 0.1;
+                        var openPrice = parseFloat(cells[4].textContent.trim());
+                        var stopLoss = parseFloat(cells[6].textContent.trim());
+                        
+                        if (!isNaN(openPrice)) {
+                            sumOpenPrice += openPrice * volume;
+                            totalVol += volume;
+                            if (type === "BUY") {
+                                buyVol += volume;
+                            } else {
+                                sellVol += volume;
+                            }
+                        }
+                        
+                        if (!isNaN(stopLoss) && stopLoss > 0) {
+                            sumSL += stopLoss * volume;
+                            slVol += volume;
+                        }
+                    }
+                }
+            }
+            
+            if (totalVol === 0) return null;
+            
+            return {
+                avgOpenPrice: sumOpenPrice / totalVol,
+                dominantType: (buyVol >= sellVol) ? "BUY" : "SELL",
+                avgSL: slVol > 0 ? (sumSL / slVol) : null
+            };
+        }
+
+        function updateRiskGauges() {
+            var containerAdmin = document.getElementById('llm-gauges-container');
+            var containerUser = document.getElementById('llm-gauges-container-user');
+            
+            // Get the text report
+            var text = "";
+            var resultAdmin = document.getElementById('llm-result-container');
+            var resultUser = document.getElementById('llm-result-container-user');
+            
+            if (resultAdmin && resultAdmin.style.display !== 'none') {
+                text = resultAdmin.textContent;
+            } else if (resultUser) {
+                text = resultUser.textContent;
+            }
+            
+            // Collect open symbols from DOM
+            var openSymbols = [];
+            var symbolRows = document.querySelectorAll('#open-trades-table tbody tr td strong');
+            symbolRows.forEach(function(el) {
+                var sym = el.textContent.trim();
+                if (sym && openSymbols.indexOf(sym) === -1) {
+                    openSymbols.push(sym);
+                }
+            });
+            
+            // Parse drawdown limit
+            var ddLimit = null;
+            if (text && text.indexOf('Noch keine Analyse') === -1 && text.indexOf('Derzeit liegt kein Analysebericht') === -1) {
+                var ddMatch = text.match(/Drawdown\s*(?:von\s*)?\**(\d+(?:[.,]\d+)?)\s*%\**/i);
+                if (ddMatch) {
+                    ddLimit = parseFloat(ddMatch[1].replace(',', '.'));
+                }
+            }
+            
+            var drawdownHtml = renderDrawdownGauge(ddLimit);
+            
+            var priceLimit = null;
+            var detectedSymbol = null;
+            var direction = "under"; // default
+            var priceLimitSource = "KI-Analyse";
+            
+            if (text && text.indexOf('Noch keine Analyse') === -1 && text.indexOf('Derzeit liegt kein Analysebericht') === -1) {
+                for (var i = 0; i < openSymbols.length; i++) {
+                    var sym = openSymbols[i];
+                    var baseSym = getBaseSymbol(sym);
+                    
+                    var match = null;
+                    var symsToTry = [sym];
+                    if (baseSym && baseSym !== sym) {
+                        symsToTry.push(baseSym);
+                    }
+                    
+                    for (var j = 0; j < symsToTry.length; j++) {
+                        var s = symsToTry[j];
+                        var escapedSym = s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                        var regex = new RegExp(escapedSym + '[\\s\\S]{0,120}?(?:Marke|Kurs|Preis|Limit|von)\\s*\\**(\\d+(?:[.,]\\d+)?)\\**', 'i');
+                        match = text.match(regex);
+                        if (match) {
+                            detectedSymbol = sym;
+                            priceLimit = parseFloat(match[1].replace(',', '.'));
+                            
+                            var matchIndex = match.index;
+                            var directionSegment = text.substring(Math.max(0, matchIndex - 50), matchIndex + 150);
+                            if (/überschreitet|steigt\s+über/i.test(directionSegment)) {
+                                direction = "over";
+                            }
+                            break;
+                        }
+                    }
+                    if (match) break;
+                }
+            }
+            
+            // Fallback for detectedSymbol and priceLimit if not extracted from LLM
+            if (!detectedSymbol && openSymbols.length > 0) {
+                // Prioritize any symbol mentioned in the text
+                if (text && text.indexOf('Noch keine Analyse') === -1 && text.indexOf('Derzeit liegt kein Analysebericht') === -1) {
+                    for (var i = 0; i < openSymbols.length; i++) {
+                        var sym = openSymbols[i];
+                        var baseSym = getBaseSymbol(sym);
+                        if (text.toLowerCase().indexOf(baseSym.toLowerCase()) !== -1) {
+                            detectedSymbol = sym;
+                            break;
+                        }
+                    }
+                }
+                // Default fallback to first open symbol
+                if (!detectedSymbol) {
+                    detectedSymbol = openSymbols[0];
+                }
+            }
+            
+            if (detectedSymbol && priceLimit === null) {
+                var details = getTradeDetailsForSymbol(detectedSymbol);
+                if (details) {
+                    direction = (details.dominantType === "BUY") ? "under" : "over";
+                    if (details.avgSL && details.avgSL > 0) {
+                        priceLimit = details.avgSL;
+                        priceLimitSource = "Stop Loss";
+                    } else {
+                        priceLimit = (details.dominantType === "BUY") ? details.avgOpenPrice * 0.95 : details.avgOpenPrice * 1.05;
+                        priceLimitSource = "Schätzung";
+                    }
+                }
+            }
+            
+            if (detectedSymbol && priceLimit !== null) {
+                // Fetch the current price from our proxy API
+                fetch('/api/market/rate?symbol=' + encodeURIComponent(detectedSymbol))
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var currentPrice = data.success ? data.price : null;
+                    var priceTimestamp = data.success ? data.timestamp : null;
+                    var priceSource = data.success ? data.source : null;
+                    
+                    var avgOpenPrice = getAvgOpenPriceForSymbol(detectedSymbol);
+                    if (!avgOpenPrice) {
+                        var details = getTradeDetailsForSymbol(detectedSymbol);
+                        avgOpenPrice = details ? details.avgOpenPrice : (priceLimit ? priceLimit * (direction === "under" ? 1.05 : 0.95) : 1.0);
+                    }
+                    
+                    var priceHtml = renderPriceGauge(detectedSymbol, priceLimit, currentPrice, avgOpenPrice, direction, priceTimestamp, priceSource, priceLimitSource);
+                    
+                    var combinedHtml = drawdownHtml + priceHtml;
+                    if (containerAdmin) containerAdmin.innerHTML = combinedHtml;
+                    if (containerUser) containerUser.innerHTML = combinedHtml;
+                    
+                    animateGauges();
+                })
+                .catch(function() {
+                    var avgOpenPrice = getAvgOpenPriceForSymbol(detectedSymbol);
+                    if (!avgOpenPrice) {
+                        var details = getTradeDetailsForSymbol(detectedSymbol);
+                        avgOpenPrice = details ? details.avgOpenPrice : (priceLimit ? priceLimit * (direction === "under" ? 1.05 : 0.95) : 1.0);
+                    }
+                    var priceHtml = renderPriceGauge(detectedSymbol, priceLimit, null, avgOpenPrice, direction, null, null, priceLimitSource);
+                    var combinedHtml = drawdownHtml + priceHtml;
+                    if (containerAdmin) containerAdmin.innerHTML = combinedHtml;
+                    if (containerUser) containerUser.innerHTML = combinedHtml;
+                    animateGauges();
+                });
+            } else {
+                if (containerAdmin) containerAdmin.innerHTML = drawdownHtml;
+                if (containerUser) containerUser.innerHTML = drawdownHtml;
+                animateGauges();
+            }
+        }
+        
+        function getAvgOpenPriceForSymbol(symbol) {
+            var rows = document.querySelectorAll('#open-trades-table tbody tr');
+            var sum = 0, count = 0;
+            for (var i = 0; i < rows.length; i++) {
+                var strong = rows[i].querySelector('td strong');
+                if (strong && strong.textContent.trim() === symbol) {
+                    var cells = rows[i].querySelectorAll('td');
+                    if (cells.length > 4) {
+                        var val = parseFloat(cells[4].textContent.trim());
+                        if (!isNaN(val)) {
+                            sum += val;
+                            count++;
+                        }
+                    }
+                }
+            }
+            return count > 0 ? (sum / count) : null;
+        }
+
+        function renderDrawdownGauge(limit) {
+            var actualLimit = limit || defaultAlarmPct || 5.0;
+            var currentDrawdown = Math.max(0, ((currentBalance - currentEquity) / Math.max(1, currentBalance)) * 100);
+            
+            var maxVal = Math.max(actualLimit * 1.2, currentDrawdown * 1.2, 10.0);
+            
+            var needlePercent = 0.0;
+            if (currentDrawdown <= actualLimit * 0.7) {
+                needlePercent = (currentDrawdown / (actualLimit * 0.7)) * 0.333;
+            } else if (currentDrawdown <= actualLimit) {
+                var range = actualLimit - (actualLimit * 0.7);
+                needlePercent = 0.333 + ((currentDrawdown - (actualLimit * 0.7)) / range) * 0.333;
+            } else {
+                var range = maxVal - actualLimit;
+                needlePercent = 0.666 + (Math.min(currentDrawdown - actualLimit, range) / range) * 0.333;
+            }
+            
+            var angle = (needlePercent * 180) - 90;
+            
+            var statusText = "SICHER";
+            var statusColor = "#10b981";
+            if (currentDrawdown > actualLimit * 0.7 && currentDrawdown <= actualLimit) {
+                statusText = "WARNUNG";
+                statusColor = "#f59e0b";
+            } else if (currentDrawdown > actualLimit) {
+                statusText = "REISSLEINE!";
+                statusColor = "#ef4444";
+            }
+            
+            var html = 
+                '<div style="text-align: center; width: 140px; font-family: \'Inter\', sans-serif;">' +
+                '  <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 4px;">Drawdown <span style="font-size: 0.85em; cursor: help; color: var(--accent-primary);" title="Aktueller Drawdown: Berechnet in Echtzeit als ((Balance - Equity) / Balance) * 100&#10;Drawdown-Limit: Wird aus der KI-Risikoanalyse ausgelesen. Falls dort nicht angegeben, wird das im Konto konfigurierte Limit verwendet.">ⓘ</span></div>' +
+                '  <svg viewBox="0 0 200 120" width="100%">' +
+                '    <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" stroke-linecap="round"/>' +
+                '    <path d="M20 100 A80 80 0 0 1 60 30.7" fill="none" stroke="#10b981" stroke-width="12"/>' +
+                '    <path d="M60 30.7 A80 80 0 0 1 140 30.7" fill="none" stroke="#f59e0b" stroke-width="12"/>' +
+                '    <path d="M140 30.7 A80 80 0 0 1 180 100" fill="none" stroke="#ef4444" stroke-width="12"/>' +
+                '    <circle cx="100" cy="100" r="7" fill="#fff"/>' +
+                '    <line x1="100" y1="100" x2="100" y2="35" stroke="#fff" stroke-width="3" stroke-linecap="round" class="risk-needle" data-angle="' + angle + '" style="transform-origin: 100px 100px; transform: rotate(-90deg); transition: transform 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);"/>' +
+                '  </svg>' +
+                '  <div style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-top: -10px;">' + currentDrawdown.toFixed(2) + '%</div>' +
+                '  <div style="font-size: 0.65rem; font-weight: 700; color: ' + statusColor + '; letter-spacing: 0.05em; margin-top: 2px;">' + statusText + ' (Limit: ' + actualLimit.toFixed(1) + '%)</div>' +
+                '</div>';
+                
+            return html;
+        }
+
+        function renderPriceGauge(symbol, limitPrice, currentPrice, avgOpenPrice, direction, timestamp, source, limitSource) {
+            var warningDelta = Math.abs(avgOpenPrice - limitPrice) * 0.4;
+            if (warningDelta === 0) warningDelta = limitPrice * 0.005;
+            
+            var minVal, maxVal, needlePercent;
+            var isUnder = (direction === "under");
+            var hasCurrentPrice = (currentPrice !== null && currentPrice !== undefined && !isNaN(currentPrice));
+            
+            if (hasCurrentPrice) {
+                if (isUnder) {
+                    minVal = limitPrice - warningDelta;
+                    maxVal = avgOpenPrice + warningDelta * 0.5;
+                    if (maxVal <= minVal) maxVal = minVal + warningDelta * 2;
+                    
+                    var warningBoundary = limitPrice + warningDelta;
+                    
+                    if (currentPrice <= limitPrice) {
+                        var range = limitPrice - minVal;
+                        needlePercent = range > 0 ? Math.max(0, (currentPrice - minVal) / range) * 0.333 : 0.15;
+                    } else if (currentPrice <= warningBoundary) {
+                        var range = warningBoundary - limitPrice;
+                        needlePercent = 0.333 + ((currentPrice - limitPrice) / range) * 0.333;
+                    } else {
+                        var range = maxVal - warningBoundary;
+                        needlePercent = 0.666 + Math.min(1.0, (currentPrice - warningBoundary) / range) * 0.333;
+                    }
+                } else {
+                    minVal = avgOpenPrice - warningDelta * 0.5;
+                    maxVal = limitPrice + warningDelta;
+                    if (minVal >= maxVal) minVal = maxVal - warningDelta * 2;
+                    
+                    var warningBoundary = limitPrice - warningDelta;
+                    
+                    if (currentPrice >= limitPrice) {
+                        var range = maxVal - limitPrice;
+                        needlePercent = range > 0 ? 0.666 + Math.min(1.0, (currentPrice - limitPrice) / range) * 0.333 : 0.85;
+                    } else if (currentPrice >= warningBoundary) {
+                        var range = limitPrice - warningBoundary;
+                        needlePercent = 0.333 + ((currentPrice - warningBoundary) / range) * 0.333;
+                    } else {
+                        var range = warningBoundary - minVal;
+                        needlePercent = range > 0 ? Math.max(0, (currentPrice - minVal) / range) * 0.333 : 0.15;
+                    }
+                }
+            } else {
+                needlePercent = 0.5;
+            }
+            
+            var angle = (needlePercent * 180) - 90;
+            
+            var leftColor = isUnder ? "#ef4444" : "#10b981";
+            var rightColor = isUnder ? "#10b981" : "#ef4444";
+            
+            var statusText = "SICHER";
+            var statusColor = "#10b981";
+            if (!hasCurrentPrice) {
+                statusText = "KEIN KURS";
+                statusColor = "#9ca3af";
+            } else if (isUnder) {
+                if (currentPrice <= limitPrice) {
+                    statusText = "REISSLEINE!";
+                    statusColor = "#ef4444";
+                } else if (currentPrice <= limitPrice + warningDelta) {
+                    statusText = "WARNUNG";
+                    statusColor = "#f59e0b";
+                }
+            } else {
+                if (currentPrice >= limitPrice) {
+                    statusText = "REISSLEINE!";
+                    statusColor = "#ef4444";
+                } else if (currentPrice >= limitPrice - warningDelta) {
+                    statusText = "WARNUNG";
+                    statusColor = "#f59e0b";
+                }
+            }
+            
+            var decimals = (limitPrice < 2) ? 5 : 2;
+            
+            var formattedDate = "";
+            if (timestamp) {
+                var d = new Date(timestamp);
+                if (!isNaN(d.getTime())) {
+                    formattedDate = ('0' + d.getDate()).slice(-2) + '.' + 
+                                    ('0' + (d.getMonth() + 1)).slice(-2) + '.' + 
+                                    d.getFullYear() + ' ' + 
+                                    ('0' + d.getHours()).slice(-2) + ':' + 
+                                    ('0' + d.getMinutes()).slice(-2);
+                }
+            }
+
+            var infoSectionHtml = '';
+            if (formattedDate && source) {
+                infoSectionHtml = 
+                    '  <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; line-height: 1.3;">' +
+                    '    Quelle: ' + source + '<br/>' +
+                    '    Stand: ' + formattedDate +
+                    '  </div>';
+            }
+            
+            var priceDisplay = hasCurrentPrice ? currentPrice.toFixed(decimals) : "-";
+            
+            var html = 
+                '<div style="text-align: center; width: 140px; font-family: \'Inter\', sans-serif;">' +
+                '  <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 4px;">' + symbol + ' Kurs <span style="font-size: 0.85em; cursor: help; color: var(--accent-primary);" title="Währungskurs: Zeigt den aktuellen Marktpreis aus externer Quelle (Yahoo Finance) im Vergleich zum berechneten Invalidation-Limit (Reißleine) aus der KI-Risikoanalyse.">ⓘ</span></div>' +
+                '  <svg viewBox="0 0 200 120" width="100%">' +
+                '    <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" stroke-linecap="round"/>' +
+                '    <path d="M20 100 A80 80 0 0 1 60 30.7" fill="none" stroke="' + leftColor + '" stroke-width="12"/>' +
+                '    <path d="M60 30.7 A80 80 0 0 1 140 30.7" fill="none" stroke="#f59e0b" stroke-width="12"/>' +
+                '    <path d="M140 30.7 A80 80 0 0 1 180 100" fill="none" stroke="' + rightColor + '" stroke-width="12"/>' +
+                '    <circle cx="100" cy="100" r="7" fill="#fff"/>' +
+                '    <line x1="100" y1="100" x2="100" y2="35" stroke="#fff" stroke-width="3" stroke-linecap="round" class="risk-needle" data-angle="' + angle + '" style="transform-origin: 100px 100px; transform: rotate(-90deg); transition: transform 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);"/>' +
+                '  </svg>' +
+                '  <div style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-top: -10px;">' + priceDisplay + '</div>' +
+                '  <div style="font-size: 0.65rem; font-weight: 700; color: ' + statusColor + '; letter-spacing: 0.05em; margin-top: 2px;">' + statusText + ' (Limit: ' + limitPrice.toFixed(decimals) + (limitSource ? ' - ' + limitSource : '') + ')</div>' +
+                   infoSectionHtml +
+                '</div>';
+                
+            return html;
+        }
+        
+        function animateGauges() {
+            setTimeout(function() {
+                var needles = document.querySelectorAll('.risk-needle');
+                needles.forEach(function(needle) {
+                    var angle = needle.getAttribute('data-angle');
+                    if (angle) {
+                        needle.style.transform = 'rotate(' + angle + 'deg)';
+                    }
+                });
+            }, 100);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateRiskGauges();
         });
     </script>
 

@@ -99,15 +99,19 @@ public class GlobalConfigService {
     public static final String KEY_LLM_SYSTEM_PROMPT = "LLM_SYSTEM_PROMPT";
 
     private String cachedLlmModel = "google/gemini-2.5-flash";
-    private String cachedLlmSystemPrompt = "Du bist ein professioneller Risiko-Analyst für algorithmische Trading-Systeme (Expert Advisor) und Forex-Märkte mit Echtzeit-Internetzugriff. Deine Aufgabe ist es, den Zustand eines Handelskontos und dessen offene Positionen mathematisch, fundamental und markttechnisch zu bewerten.\n\n" +
-            "Suche aktiv im Internet nach aktuellen Nachrichten, Marktmeldungen und Event-Risiken für die betroffenen Symbole (Währungspaare, Rohstoffe, Krypto-Assets). Führe für jedes aktive Symbol eine Chartanalyse durch (ziehe dazu aktuelle technische Analysen, Unterstützungen, Widerstände und Trends aus dem Internet heran). Erkläre im Bericht präzise, warum der Kurs sich aktuell so verhält, ob es zu erwartende Umkehrpunkte gibt und ob damit gerechnet werden kann, dass die Positionen bald wieder im Profit schließen.\n\n" +
+    private String cachedLlmSystemPrompt = "Du bist ein professioneller Risiko-Analyst für algorithmische Trading-Systeme (Expert Advisor) und Forex-Märkte mit Echtzeit-Internetzugriff über Suchwerkzeuge. Deine Aufgabe ist es, den Zustand eines Handelskontos und dessen offene Positionen mathematisch, fundamental und markttechnisch unter Berücksichtigung von Echtzeit-Marktdaten zu bewerten.\n\n" +
+            "Suche aktiv im Internet nach aktuellen Nachrichten, Marktmeldungen und Event-Risiken für die betroffenen Symbole (Währungspaare, Rohstoffe, Krypto-Assets). Nutze das Suchwerkzeug, um aktuelle Kurstrends, Nachrichten der letzten Stunden/Tage und relevante Wirtschaftsnachrichten (z. B. Zinsentscheidungen der Zentralbanken RBA/Fed, Wirtschaftsdaten) zu ermitteln.\n\n" +
+            "Erstelle eine saubere, strukturierte Analyse auf Deutsch, die folgende Fragen präzise beantwortet:\n" +
+            "1. **Markttechnische Analyse & Nachrichtenlage**: Warum ist der Kurs in letzter Zeit gestiegen oder gefallen? Was sind die Treiber (z. B. Zinsentscheidungen der Zentralbanken RBA/Fed, Wirtschaftsdaten)?\n" +
+            "2. **Ausblick & Prognose**: Wie weit könnte der Kurs noch gehen (wichtige Unterstützungs- und Widerstandszonen)? Gibt es Anzeichen für eine baldige Trendumkehr?\n" +
+            "3. **Folgen & Risiken**: Was bedeutet die aktuelle Marktlage für die offenen Positionen dieses Kontos (z. B. Drawdown-Entwicklung, Gefahr von Grid-Erhöhungen)? Worauf muss in den kommenden Tagen besonders geachtet werden (z. B. anstehende News-Events)?\n" +
+            "4. **Plug-Pull-Empfehlung (Reißleine)**: Nenne eine konkrete, mathematisch/markttechnisch begründete Preis- oder Drawdown-Marke, bei der alle Trades manuell geschlossen werden müssen (z. B. bei Bruch einer wichtigen Unterstützung oder Erreichen von X% Drawdown).\n\n" +
             "Halte dich strikt an folgende Richtlinien:\n" +
-            "1. **Risikoampel**: Beginne deine Antwort IMMER mit einer der folgenden Zeilen:\n" +
+            "1. **Risikoampel**: Beginne deine Antwort IMMER mit einer der folgenden Zeilen am Anfang (und keinem anderen Text davor):\n" +
             "   - 🟢 ALLES OK (Geringer Drawdown < 5%, normale Grid-Stufen 1-3, Markt im normalen Schwankungskorridor)\n" +
             "   - ⚠️ ERHÖHTES RISIKO / BEOBACHTEN (Drawdown 5-15%, Grid-Stufen 4-6, Markt nähert sich wichtigen Unterstützungen/Widerständen)\n" +
             "   - 🔴 KRITISCHER ALARM / REISSLEINE ZIEHEN (Drawdown > 15%, Grid-Stufen >= 7, oder der Markt bewegt sich in einem starken, unkorrigierten Trend)\n" +
-            "2. **Klarheit & Fakten**: Antworte kurz, direkt, strukturiert und auf Deutsch. Nenne konkrete Zahlen (aktueller Drawdown in %, Anzahl der offenen Grid-Ebenen, Gesamtlots). Verwende außer den Risikoampel-Symbolen am Anfang keine Emojis in deinem Bericht.\n" +
-            "3. **Plug-Pull-Empfehlung (Reißleine)**: Nenne am Ende deiner Analyse immer eine unmissverständliche Preis- oder Drawdown-Marke, bei der alle Trades manuell geschlossen werden müssen, um das Konto vor dem Margin-Call zu schützen.";
+            "2. **Klarheit & Fakten**: Antworte kurz, direkt, strukturiert und auf Deutsch. Nenne konkrete Zahlen (aktueller Drawdown in %, Anzahl der offenen Grid-Ebenen, Gesamtlots). Verwende außer den Risikoampel-Symbolen am Anfang keine Emojis in deinem Bericht.";
     
     @org.springframework.beans.factory.annotation.Value("${openrouter.api.key:}")
     private String configOpenRouterApiKey;
@@ -294,7 +298,8 @@ public class GlobalConfigService {
         repository.findById(KEY_LLM_SYSTEM_PROMPT).ifPresentOrElse(
             entity -> {
                 String val = entity.getConfValue();
-                if (val == null || val.trim().isEmpty() || val.contains("Du bist ein professioneller Forex- und Krypto-Trading-Analyst. Bewerte die offenen Positionen basierend auf der Strategiebeschreibung und dem Marktkontext. Antworte kurz, prägnant und auf Deutsch.")) {
+                if (val == null || val.trim().isEmpty() 
+                        || !val.contains("Erstelle eine saubere, strukturierte Analyse auf Deutsch, die folgende Fragen präzise beantwortet:")) {
                     entity.setConfValue(cachedLlmSystemPrompt);
                     repository.save(entity);
                 } else {
