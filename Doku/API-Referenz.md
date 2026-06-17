@@ -196,6 +196,53 @@ Sendet eine Test-E-Mail mit der aktuellen SMTP-Konfiguration.
 
 ---
 
+### POST `/api/ea-logs`
+
+Sendet neue Log-Zeilen vom MetaTrader EA inkrementell an den Server.
+
+**Request Body:**
+```json
+{
+  "accountId": 12345678,
+  "logEntries": [
+    "2026.06.11 15:00:00 - EA initialized",
+    "2026.06.11 15:05:00 - Order placed successfully"
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "stored": 2
+}
+```
+
+**Authentifizierung:** Keine erforderlich (öffentlich zugänglich für EAs).
+
+---
+
+### GET `/api/ea-logs/{accountId}`
+
+Ruft die letzten EA-Log-Einträge (bis zu 5000) für ein MetaTrader-Konto ab.
+
+**Response:**
+```json
+[
+  {
+    "id": 123,
+    "timestamp": "11.06.2026 15:00:00",
+    "logLine": "2026.06.11 15:00:00 - EA initialized"
+  }
+]
+```
+
+**Authentifizierung:** Session-basiert (`JSESSIONID`). Muss vorab über `/api/login` oder `/api/demo-login` bezogen werden.
+
+---
+
+
 ### REST API Auth Endpunkte (`/api/login`, `/api/demo-login`, `/api/logout`)
 
 Diese Endpunkte dienen explizit externen Headless-Clients (wie der Replit App), um sich per REST/JSON anzumelden, ohne HTML-Seiten für CSRF-Tokens parsen zu müssen. Sie geben das `JSESSIONID` Cookie im Set-Cookie Header zurück.

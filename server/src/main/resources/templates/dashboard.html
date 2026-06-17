@@ -65,6 +65,9 @@
                         style="font-size: 0.4em; color: #6b6b8f; vertical-align: middle; margin-left: 10px;">v0.12.0</span>
                 </h1>
                 <p class="subtitle">MetaTrader Account Übersicht</p>
+                <div id="filter-indicator" style="display: none; color: #fb923c; margin-top: 8px; font-size: 0.95rem; font-weight: 600;">
+                    🛡️ Real Focus Aktiv: Zeige nur REAL-Konten (Demo-Konten ausgeblendet)
+                </div>
             </div>
             <div th:if="${currentUser != null}" style="text-align: right; margin-top: 10px;">
                 <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Eingeloggt als</div>
@@ -224,6 +227,144 @@
                 </div>
                 <div class="view-details-btn"
                     style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top:auto;">Details & Demo →
+                </div>
+            </div>
+
+            <!-- News Tile (Heute) -->
+            <div id="news-monitor-card" class="account-card" onclick="openNewsDetailsModal()"
+                style="cursor: pointer; padding: 12px 16px; border: 1px solid #8b5cf6; background: linear-gradient(to bottom right, #2a2e39, rgba(139, 92, 246, 0.15)); flex: 0 1 auto; min-width: 300px; display: flex; flex-direction: column;">
+                <div class="account-header" style="flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="account-id" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">📰 News (Heute)</span>
+                    <span id="news-settings-btn" onclick="event.stopPropagation(); openNewsConfigModal();" style="cursor: pointer; font-size: 1.25rem; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">⚙️</span>
+                </div>
+                <!-- Card content -->
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 5px; flex: 1;">
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Open Trades</span>
+                        <span class="metric-value" id="news-open-count" style="font-size: 0.95rem; font-weight: bold;">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Closed (Heute)</span>
+                        <span class="metric-value" id="news-closed-count" style="font-size: 0.95rem; font-weight: bold;">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Open Profit</span>
+                        <span class="metric-value" id="news-open-profit" style="font-size: 0.95rem; font-weight: bold;">0.00 €</span>
+                    </div>
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Profit Heute</span>
+                        <span class="metric-value" id="news-closed-profit" style="font-size: 0.95rem; font-weight: bold;">0.00 €</span>
+                    </div>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top: auto; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">Details →
+                </div>
+            </div>
+
+            <!-- News Config Modal -->
+            <div id="newsConfigModal" class="modal">
+                <div class="modal-content" style="max-width: 550px; width: 90%;">
+                    <span class="close-modal" onclick="closeNewsConfigModal()">×</span>
+                    <h2 style="text-align: left; margin-bottom: 10px;">⚙️ News Accounts konfigurieren</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px; text-align: left;">Wähle die Accounts aus und weise ihnen bei Bedarf Farben für die Tagesübersicht zu.</p>
+                    <div class="form-group">
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); text-align: left;">
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-secondary); cursor: pointer;" onclick="document.getElementById('news-select-all').click()">
+                                <input type="checkbox" id="news-select-all" onclick="event.stopPropagation(); toggleSelectAllNewsAccounts(this)" style="width: auto !important; height: auto !important; margin: 0 !important; cursor: pointer; transform: scale(1.2); flex-shrink: 0;" />
+                                <label for="news-select-all" style="display: inline-block !important; width: auto !important; margin: 0 !important; cursor: pointer; font-weight: bold !important; text-align: left; color: var(--text-primary);">Alle auswählen / abwählen</label>
+                            </div>
+                            <div th:each="acc : ${accounts}" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px dashed var(--border-color); cursor: pointer; text-align: left;" th:attr="onclick='if(event.target.tagName !== \'INPUT\') { const cb = document.getElementById(\'news-acc-\' + ' + ${acc.accountId} + '); cb.checked = !cb.checked; }'">
+                                <div style="display: flex; align-items: center; gap: 12px; text-align: left; flex-grow: 1; min-width: 0;">
+                                    <input type="checkbox" class="news-account-checkbox" th:id="'news-acc-' + ${acc.accountId}" th:value="${acc.accountId}" style="width: auto !important; height: auto !important; margin: 0 !important; cursor: pointer; transform: scale(1.2); flex-shrink: 0;" onclick="event.stopPropagation();" />
+                                    <label th:for="'news-acc-' + ${acc.accountId}" style="display: inline-block !important; width: auto !important; margin: 0 !important; cursor: pointer; text-align: left; color: var(--text-primary); font-size: 0.95rem; font-weight: normal !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;" th:text="${(acc.name != null && !acc.name.isEmpty() ? acc.name : acc.accountId) + ' (' + acc.accountId + ')'}" onclick="event.stopPropagation();">Account Name</label>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 15px;" onclick="event.stopPropagation();">
+                                    <label th:for="'news-color-' + ${acc.accountId}" style="display: inline-block !important; width: auto !important; margin: 0 !important; font-size: 0.75rem; color: var(--text-secondary); font-weight: normal !important;">Farbe:</label>
+                                    <input type="color" class="news-account-color-input" th:id="'news-color-' + ${acc.accountId}" th:data-account-id="${acc.accountId}" value="#3b82f6" style="width: 30px !important; height: 30px !important; border: none !important; background: transparent !important; cursor: pointer; padding: 0 !important; border-radius: 4px; flex-shrink: 0;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="save-btn" onclick="saveNewsAccounts()" style="margin-top: 10px; background: var(--gradient-primary);">Einstellungen speichern</button>
+                </div>
+            </div>
+
+            <!-- News Details Modal -->
+            <div id="newsDetailsModal" class="modal">
+                <div class="modal-content" style="max-width: 1100px; width: 95%;">
+                    <span class="close-modal" onclick="closeNewsDetailsModal()">×</span>
+                    <h2>📰 News Details (Heute)</h2>
+                    
+                    <!-- Quick Stats Summary inside Modal -->
+                    <div style="display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 150px; background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Open Trades</span>
+                            <span id="modal-news-open-count" style="display: block; font-size: 1.25rem; font-weight: bold; margin-top: 5px;">0</span>
+                        </div>
+                        <div style="flex: 1; min-width: 150px; background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Open Profit</span>
+                            <span id="modal-news-open-profit" style="display: block; font-size: 1.25rem; font-weight: bold; margin-top: 5px;">0.00 €</span>
+                        </div>
+                        <div style="flex: 1; min-width: 150px; background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Closed Today</span>
+                            <span id="modal-news-closed-count" style="display: block; font-size: 1.25rem; font-weight: bold; margin-top: 5px;">0</span>
+                        </div>
+                        <div style="flex: 1; min-width: 150px; background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Profit Heute</span>
+                            <span id="modal-news-closed-profit" style="display: block; font-size: 1.25rem; font-weight: bold; margin-top: 5px;">0.00 €</span>
+                        </div>
+                    </div>
+
+                    <!-- Tabs/Navigation for Details -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <button id="tab-btn-news-open" class="view-toggle-btn active" onclick="switchNewsTab('open')">Offene Trades (<span id="modal-news-open-tab-count">0</span>)</button>
+                        <button id="tab-btn-news-closed" class="view-toggle-btn" onclick="switchNewsTab('closed')">Geschlossene Trades (<span id="modal-news-closed-tab-count">0</span>)</button>
+                    </div>
+
+                    <!-- Modal Body / Content Tables -->
+                    <div style="overflow-y: auto; max-height: 55vh; min-height: 250px;">
+                        <!-- Offene Trades Tab Content -->
+                        <div id="tab-content-news-open" style="display: block;">
+                            <table class="trades-table" style="width: 100%;">
+                                <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
+                                    <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444; font-size: 0.8rem;">
+                                        <th style="padding: 10px;">Account</th>
+                                        <th style="padding: 10px;">Open Time</th>
+                                        <th style="padding: 10px;">Symbol</th>
+                                        <th style="padding: 10px;">Typ</th>
+                                        <th style="padding: 10px; text-align: right;">Volumen</th>
+                                        <th style="padding: 10px; text-align: right;">Open Price</th>
+                                        <th style="padding: 10px;">Magic / Comment</th>
+                                        <th style="padding: 10px; text-align: right;">Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="news-open-trades-body">
+                                    <!-- Inserted by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Geschlossene Trades Tab Content -->
+                        <div id="tab-content-news-closed" style="display: none;">
+                            <table class="trades-table" style="width: 100%;">
+                                <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
+                                    <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444; font-size: 0.8rem;">
+                                        <th style="padding: 10px;">Account</th>
+                                        <th style="padding: 10px;">Close Time</th>
+                                        <th style="padding: 10px;">Symbol</th>
+                                        <th style="padding: 10px;">Typ</th>
+                                        <th style="padding: 10px; text-align: right;">Volumen</th>
+                                        <th style="padding: 10px;">Open Time</th>
+                                        <th style="padding: 10px;">Magic / Comment</th>
+                                        <th style="padding: 10px; text-align: right;">Net Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="news-closed-trades-body">
+                                    <!-- Inserted by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -388,6 +529,7 @@
             document.addEventListener('DOMContentLoaded', () => {
                 initCombinedChart();
                 initSystemStatusMonitor();
+                initNewsMonitor();
             });
 
             function openSystemStatusModal() {
@@ -978,6 +1120,10 @@
                 grid.style.display = 'block';
                 compact.style.display = 'none';
 
+                // Show filter indicator
+                const filterIndicator = document.getElementById('filter-indicator');
+                if (filterIndicator) filterIndicator.style.display = 'block';
+
                 // Filter Grid: Show ONLY REAL accounts
                 // Also hide Global Card and Sync Monitor (as user requested "only the two tiles")
 
@@ -1018,6 +1164,10 @@
                 // GRID (Standard)
                 grid.style.display = 'block';
                 compact.style.display = 'none';
+
+                // Hide filter indicator
+                const filterIndicator = document.getElementById('filter-indicator');
+                if (filterIndicator) filterIndicator.style.display = 'none';
 
                 // Show all cards
                 allCards.forEach(c => c.style.display = '');
@@ -1787,6 +1937,220 @@
                 console.error(err);
                 alert('Netzwerkfehler');
             }
+        }
+
+        // News Monitor Logic
+        function initNewsMonitor() {
+            fetchAndRenderNews();
+            setInterval(fetchAndRenderNews, 30000);
+        }
+
+        function openNewsConfigModal() {
+            document.getElementById('newsConfigModal').style.display = 'block';
+        }
+        
+        function closeNewsConfigModal() {
+            document.getElementById('newsConfigModal').style.display = 'none';
+        }
+
+        function openNewsDetailsModal() {
+            document.getElementById('newsDetailsModal').style.display = 'block';
+            fetchAndRenderNews();
+        }
+
+        function closeNewsDetailsModal() {
+            document.getElementById('newsDetailsModal').style.display = 'none';
+        }
+
+        function switchNewsTab(tab) {
+            if (tab === 'open') {
+                document.getElementById('tab-content-news-open').style.display = 'block';
+                document.getElementById('tab-content-news-closed').style.display = 'none';
+                document.getElementById('tab-btn-news-open').classList.add('active');
+                document.getElementById('tab-btn-news-closed').classList.remove('active');
+            } else {
+                document.getElementById('tab-content-news-open').style.display = 'none';
+                document.getElementById('tab-content-news-closed').style.display = 'block';
+                document.getElementById('tab-btn-news-open').classList.remove('active');
+                document.getElementById('tab-btn-news-closed').classList.add('active');
+            }
+        }
+
+        function toggleSelectAllNewsAccounts(cb) {
+            const checkboxes = document.querySelectorAll('.news-account-checkbox');
+            checkboxes.forEach(c => c.checked = cb.checked);
+        }
+
+        async function saveNewsAccounts() {
+            const checkboxes = document.querySelectorAll('.news-account-checkbox');
+            const selectedIds = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    selectedIds.push(cb.value);
+                }
+            });
+            const accountIdsStr = selectedIds.join(',');
+
+            const colorInputs = document.querySelectorAll('.news-account-color-input');
+            const colors = [];
+            colorInputs.forEach(input => {
+                const accId = input.getAttribute('data-account-id');
+                const val = input.value; // e.g. "#3b82f6"
+                colors.push(accId + ':' + val);
+            });
+            const colorsStr = colors.join(',');
+
+            try {
+                const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                
+                const response = await fetch('/api/user/news-accounts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        [header]: token
+                    },
+                    body: 'accountIds=' + encodeURIComponent(accountIdsStr) + '&colors=' + encodeURIComponent(colorsStr)
+                });
+                
+                if (response.ok) {
+                    closeNewsConfigModal();
+                    fetchAndRenderNews();
+                } else {
+                    alert('Fehler beim Speichern der Einstellungen: ' + response.statusText);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Netzwerkfehler beim Speichern');
+            }
+        }
+
+        function fetchAndRenderNews() {
+            fetch('/api/stats/news-today')
+                .then(r => r.json())
+                .then(data => {
+                    // Update News Tile metrics
+                    document.getElementById('news-open-count').textContent = data.openTradesCount;
+                    document.getElementById('news-closed-count').textContent = data.closedTradesTodayCount;
+                    
+                    const formatProfit = (val) => {
+                        const formatted = val.toFixed(2) + ' €';
+                        return val > 0 ? '+' + formatted : formatted;
+                    };
+                    
+                    const openProfitEl = document.getElementById('news-open-profit');
+                    openProfitEl.textContent = formatProfit(data.openProfit);
+                    openProfitEl.className = 'metric-value ' + (data.openProfit > 0 ? 'profit-positive' : (data.openProfit < 0 ? 'profit-negative' : ''));
+
+                    const closedProfitEl = document.getElementById('news-closed-profit');
+                    closedProfitEl.textContent = formatProfit(data.closedProfitToday);
+                    closedProfitEl.className = 'metric-value ' + (data.closedProfitToday > 0 ? 'profit-positive' : (data.closedProfitToday < 0 ? 'profit-negative' : ''));
+
+                    // Pre-fill checkboxes based on selectedAccountIds returned by the endpoint
+                    if (data.selectedAccountIds) {
+                        const selectedIds = new Set(data.selectedAccountIds);
+                        const checkboxes = document.querySelectorAll('.news-account-checkbox');
+                        let allChecked = true;
+                        checkboxes.forEach(cb => {
+                            const val = parseInt(cb.value);
+                            cb.checked = selectedIds.has(val);
+                            if (!cb.checked) allChecked = false;
+                        });
+                        const selectAllCb = document.getElementById('news-select-all');
+                        if (selectAllCb) selectAllCb.checked = checkboxes.length > 0 && allChecked;
+                    }
+
+                    // Pre-fill colors in config modal
+                    if (data.accountColors) {
+                        const colorInputs = document.querySelectorAll('.news-account-color-input');
+                        colorInputs.forEach(input => {
+                            const accId = input.getAttribute('data-account-id');
+                            if (data.accountColors[accId]) {
+                                input.value = data.accountColors[accId];
+                            }
+                        });
+                    }
+
+                    // Update modal elements
+                    const modalOpenCount = document.getElementById('modal-news-open-count');
+                    if (modalOpenCount) modalOpenCount.textContent = data.openTradesCount;
+                    const modalOpenTabCount = document.getElementById('modal-news-open-tab-count');
+                    if (modalOpenTabCount) modalOpenTabCount.textContent = data.openTradesCount;
+
+                    const modalOpenProfit = document.getElementById('modal-news-open-profit');
+                    if (modalOpenProfit) {
+                        modalOpenProfit.textContent = formatProfit(data.openProfit);
+                        modalOpenProfit.className = data.openProfit > 0 ? 'profit-positive' : (data.openProfit < 0 ? 'profit-negative' : '');
+                    }
+
+                    const modalClosedCount = document.getElementById('modal-news-closed-count');
+                    if (modalClosedCount) modalClosedCount.textContent = data.closedTradesTodayCount;
+                    const modalClosedTabCount = document.getElementById('modal-news-closed-tab-count');
+                    if (modalClosedTabCount) modalClosedTabCount.textContent = data.closedTradesTodayCount;
+
+                    const modalClosedProfit = document.getElementById('modal-news-closed-profit');
+                    if (modalClosedProfit) {
+                        modalClosedProfit.textContent = formatProfit(data.closedProfitToday);
+                        modalClosedProfit.className = data.closedProfitToday > 0 ? 'profit-positive' : (data.closedProfitToday < 0 ? 'profit-negative' : '');
+                    }
+
+                    // Open trades table rows
+                    const openBody = document.getElementById('news-open-trades-body');
+                    if (openBody) {
+                        if (data.openTrades && data.openTrades.length > 0) {
+                            openBody.innerHTML = data.openTrades.map(t => {
+                                const typeClass = t.type === 'BUY' ? 'trade-type buy' : 'trade-type sell';
+                                const profitClass = t.profit > 0 ? 'profit-positive' : (t.profit < 0 ? 'profit-negative' : '');
+                                const magicComment = t.comment || (t.magicNumber ? 'Magic: ' + t.magicNumber : '-');
+                                const rowBgColor = data.accountColors && data.accountColors[t.accountId] ? data.accountColors[t.accountId] : '';
+                                const rowStyle = rowBgColor ? `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}33;"` : `style="border-bottom: 1px solid #2a2e39;"`;
+                                return `
+                                    <tr ${rowStyle}>
+                                        <td style="padding: 8px 10px;"><strong>${t.accountName}</strong></td>
+                                        <td style="padding: 8px 10px;">${t.openTime}</td>
+                                        <td style="padding: 8px 10px; font-weight: 600;">${t.symbol}</td>
+                                        <td style="padding: 8px 10px;"><span class="${typeClass}">${t.type}</span></td>
+                                        <td style="padding: 8px 10px; text-align: right;">${t.volume.toFixed(2)}</td>
+                                        <td style="padding: 8px 10px; text-align: right;">${t.openPrice.toFixed(5)}</td>
+                                        <td style="padding: 8px 10px; color: var(--text-secondary); font-size: 0.85rem;">${magicComment}</td>
+                                        <td style="padding: 8px 10px; text-align: right; font-weight: bold;" class="${profitClass}">${formatProfit(t.profit)}</td>
+                                    </tr>
+                                `;
+                            }).join('');
+                        } else {
+                            openBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Keine offenen Trades für selektierte Accounts.</td></tr>';
+                        }
+                    }
+
+                    // Closed trades table rows
+                    const closedBody = document.getElementById('news-closed-trades-body');
+                    if (closedBody) {
+                        if (data.closedTradesToday && data.closedTradesToday.length > 0) {
+                            closedBody.innerHTML = data.closedTradesToday.map(t => {
+                                const typeClass = t.type === 'BUY' ? 'trade-type buy' : 'trade-type sell';
+                                const profitClass = t.netProfit > 0 ? 'profit-positive' : (t.netProfit < 0 ? 'profit-negative' : '');
+                                const magicComment = t.comment || (t.magicNumber ? 'Magic: ' + t.magicNumber : '-');
+                                const rowBgColor = data.accountColors && data.accountColors[t.accountId] ? data.accountColors[t.accountId] : '';
+                                const rowStyle = rowBgColor ? `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}33;"` : `style="border-bottom: 1px solid #2a2e39;"`;
+                                return `
+                                    <tr ${rowStyle}>
+                                        <td style="padding: 8px 10px;"><strong>${t.accountName}</strong></td>
+                                        <td style="padding: 8px 10px;">${t.closeTime}</td>
+                                        <td style="padding: 8px 10px; font-weight: 600;">${t.symbol}</td>
+                                        <td style="padding: 8px 10px;"><span class="${typeClass}">${t.type}</span></td>
+                                        <td style="padding: 8px 10px; text-align: right;">${t.volume.toFixed(2)}</td>
+                                        <td style="padding: 8px 10px;">${t.openTime}</td>
+                                        <td style="padding: 8px 10px; color: var(--text-secondary); font-size: 0.85rem;">${magicComment}</td>
+                                        <td style="padding: 8px 10px; text-align: right; font-weight: bold;" class="${profitClass}">${formatProfit(t.netProfit)}</td>
+                                    </tr>
+                                `;
+                            }).join('');
+                        } else {
+                            closedBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Keine geschlossenen Trades heute für selektierte Accounts.</td></tr>';
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching news stats', err));
         }
 
     </script>

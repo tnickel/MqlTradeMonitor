@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import de.trademonitor.security.CustomUserDetails;
+import de.trademonitor.entity.UserEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -31,6 +33,10 @@ public class DashboardController {
             return false;
         if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
             return true;
+        Account acc = accountManager.getAccount(accountId);
+        if (acc != null && "CSV".equalsIgnoreCase(acc.getType())) {
+            return true;
+        }
         return userDetails.getUserEntity().getAllowedAccountIds().contains(accountId);
     }
 
@@ -85,6 +91,12 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.repository.LlmAnalysisLogRepository llmAnalysisLogRepository;
 
+    @Autowired
+    private de.trademonitor.service.CsvImportService csvImportService;
+
+    @Autowired
+    private de.trademonitor.service.UserService userService;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -125,6 +137,9 @@ public class DashboardController {
                            Model model) {
         long t0 = System.currentTimeMillis();
         List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
+        allAccounts = allAccounts.stream()
+                .filter(acc -> !"CSV".equalsIgnoreCase((String) acc.get("type")))
+                .collect(Collectors.toList());
         long t1 = System.currentTimeMillis();
 
         boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
@@ -1193,6 +1208,9 @@ public class DashboardController {
             Model model, HttpServletRequest request) {
         long t0 = System.currentTimeMillis();
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        accounts = accounts.stream()
+                .filter(acc -> !"CSV".equalsIgnoreCase((String) acc.get("type")))
+                .collect(Collectors.toList());
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
@@ -1317,6 +1335,9 @@ public class DashboardController {
     public List<Map<String, Object>> getScaledCurves(@AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable String period) {
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        accounts = accounts.stream()
+                .filter(acc -> !"CSV".equalsIgnoreCase((String) acc.get("type")))
+                .collect(Collectors.toList());
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
@@ -1452,7 +1473,7 @@ public class DashboardController {
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
             allAccounts = allAccounts.stream()
-                    .filter(a -> allowed.contains(a.getAccountId()))
+                    .filter(a -> "CSV".equalsIgnoreCase(a.getType()) || allowed.contains(a.getAccountId()))
                     .collect(Collectors.toList());
         }
 
@@ -1488,6 +1509,9 @@ public class DashboardController {
         result.put("isAdmin", isAdmin);
         
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
+        accounts = accounts.stream()
+                .filter(acc -> !"CSV".equalsIgnoreCase((String) acc.get("type")))
+                .collect(Collectors.toList());
         if (!isAdmin && userDetails != null) {
             Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
             accounts = accounts.stream()
@@ -1835,6 +1859,180 @@ public class DashboardController {
 
         result.put("totalEndpoint_ms", System.currentTimeMillis() - t0);
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/api/trades/upload-csv")
+    @ResponseBody
+    public ResponseEntity<?> uploadCsvTradeList(
+            @RequestParam("name") String name,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "CSV-Datei ist leer."));
+            }
+            if (name == null || name.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Name darf nicht leer sein."));
+            }
+
+            // Parse trades
+            List<ClosedTrade> trades = csvImportService.parseTradesCsv(file);
+            if (trades.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Keine gültigen Trades in der CSV gefunden. Bitte Spalten prüfen."));
+            }
+
+            // Register account (or update existing one with same name)
+            Long existingId = accountManager.findCsvAccountIdByName(name.trim());
+            long accountId = (existingId != null) ? existingId : System.currentTimeMillis();
+            accountManager.addCsvAccount(accountId, name.trim(), trades);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "accountId", accountId,
+                "name", name.trim()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Fehler beim Import: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/user/news-accounts")
+    @ResponseBody
+    public ResponseEntity<String> saveUserNewsAccounts(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(value = "accountIds", required = false, defaultValue = "") String accountIdsStr,
+            @RequestParam(value = "colors", required = false, defaultValue = "") String colorsStr) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        Set<Long> accountIds = new HashSet<>();
+        if (!accountIdsStr.trim().isEmpty()) {
+            for (String part : accountIdsStr.split(",")) {
+                try {
+                    accountIds.add(Long.parseLong(part.trim()));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        Map<Long, String> colors = new HashMap<>();
+        if (!colorsStr.trim().isEmpty()) {
+            for (String part : colorsStr.split(",")) {
+                String[] split = part.split(":", 2);
+                if (split.length == 2) {
+                    try {
+                        Long accId = Long.parseLong(split[0].trim());
+                        String color = split[1].trim();
+                        colors.put(accId, color);
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        userService.updateNewsAccounts(userDetails.getUserEntity().getId(), accountIds, colors);
+        userDetails.getUserEntity().setNewsAccountIds(accountIds);
+        userDetails.getUserEntity().setNewsAccountColors(colors);
+        return ResponseEntity.ok("Saved");
+    }
+
+    @GetMapping("/api/stats/news-today")
+    @ResponseBody
+    public ResponseEntity<?> getNewsToday(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+
+        Set<Long> selectedIds = user.getNewsAccountIds();
+        boolean isAdmin = "ROLE_ADMIN".equals(user.getRole());
+        Set<Long> allowedIds = user.getAllowedAccountIds();
+
+        List<Long> targetAccountIds = new ArrayList<>();
+        for (Long id : selectedIds) {
+            if (isAdmin || allowedIds.contains(id)) {
+                targetAccountIds.add(id);
+            }
+        }
+
+        List<Map<String, Object>> openTrades = new ArrayList<>();
+        List<Map<String, Object>> closedTradesToday = new ArrayList<>();
+        double openProfit = 0.0;
+        double closedProfitToday = 0.0;
+
+        String todayStr = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+
+        Map<Long, String> magicMappings = magicMappingService.getAllMappings();
+
+        for (Long accId : targetAccountIds) {
+            Account acc = accountManager.getAccount(accId);
+            if (acc == null) continue;
+
+            String accName = acc.getName() != null && !acc.getName().isEmpty() ? acc.getName() : String.valueOf(accId);
+
+            // Open trades
+            for (de.trademonitor.model.Trade t : acc.getOpenTrades()) {
+                openProfit += t.getProfit();
+                
+                Map<String, Object> tMap = new LinkedHashMap<>();
+                tMap.put("accountId", accId);
+                tMap.put("accountName", accName);
+                tMap.put("ticket", t.getTicket());
+                tMap.put("symbol", t.getSymbol());
+                tMap.put("type", t.getType());
+                tMap.put("volume", t.getVolume());
+                tMap.put("openPrice", t.getOpenPrice());
+                tMap.put("openTime", t.getOpenTime());
+                tMap.put("profit", t.getProfit());
+                tMap.put("magicNumber", t.getMagicNumber());
+                tMap.put("comment", magicMappings.getOrDefault(t.getMagicNumber(), t.getComment()));
+                openTrades.add(tMap);
+            }
+
+            // Closed trades today
+            double commissionFactor = acc.getCommissionFactor();
+            for (ClosedTrade ct : acc.getClosedTrades()) {
+                if (ct.getCloseTime() != null && ct.getCloseTime().startsWith(todayStr)) {
+                    double tradeProfit = ct.getProfit() + ct.getSwap() + (ct.getCommission() * commissionFactor);
+                    closedProfitToday += tradeProfit;
+
+                    Map<String, Object> tMap = new LinkedHashMap<>();
+                    tMap.put("accountId", accId);
+                    tMap.put("accountName", accName);
+                    tMap.put("ticket", ct.getTicket());
+                    tMap.put("symbol", ct.getSymbol());
+                    tMap.put("type", ct.getType());
+                    tMap.put("volume", ct.getVolume());
+                    tMap.put("openPrice", ct.getOpenPrice());
+                    tMap.put("closePrice", ct.getClosePrice());
+                    tMap.put("openTime", ct.getOpenTime());
+                    tMap.put("closeTime", ct.getCloseTime());
+                    tMap.put("profit", ct.getProfit());
+                    tMap.put("swap", ct.getSwap());
+                    tMap.put("commission", ct.getCommission());
+                    tMap.put("netProfit", tradeProfit);
+                    tMap.put("magicNumber", ct.getMagicNumber());
+                    tMap.put("comment", magicMappings.getOrDefault(ct.getMagicNumber(), ct.getComment()));
+                    closedTradesToday.add(tMap);
+                }
+            }
+        }
+
+        openTrades.sort((a, b) -> Long.compare((Long) b.get("ticket"), (Long) a.get("ticket")));
+        closedTradesToday.sort((a, b) -> ((String) b.get("closeTime")).compareTo((String) a.get("closeTime")));
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("openTradesCount", openTrades.size());
+        response.put("closedTradesTodayCount", closedTradesToday.size());
+        response.put("openProfit", openProfit);
+        response.put("closedProfitToday", closedProfitToday);
+        response.put("openTrades", openTrades);
+        response.put("closedTradesToday", closedTradesToday);
+        response.put("selectedAccountIds", targetAccountIds);
+        response.put("accountColors", user.getNewsAccountColors());
+
+        return ResponseEntity.ok(response);
     }
 
     private static class ResultComparator {

@@ -45,9 +45,16 @@ public class MagicMappingService {
         Map<Long, String> existing = getAllMappings();
 
         for (Long magic : magicNumbers) {
-            if (!existing.containsKey(magic) && !repository.existsById(magic)) {
-                String defaultComment = defaultCommentProvider.apply(magic);
-                saveMapping(magic, defaultComment != null ? defaultComment : "");
+            if (!existing.containsKey(magic)) {
+                try {
+                    if (!repository.existsById(magic)) {
+                        String defaultComment = defaultCommentProvider.apply(magic);
+                        saveMapping(magic, defaultComment != null ? defaultComment : "");
+                    }
+                } catch (Exception e) {
+                    // Ignore duplicate key or concurrent write exceptions to prevent admin page load crashes
+                    System.err.println("WARN: Could not save default magic mapping for " + magic + ": " + e.getMessage());
+                }
             }
         }
     }

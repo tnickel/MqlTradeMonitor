@@ -95,4 +95,29 @@ public class AccountTradeComparisonDto {
     public void setCloseSlippageFormatted(String closeSlippageFormatted) {
         this.closeSlippageFormatted = closeSlippageFormatted;
     }
+
+    public Double getNormalizedNetProfitA() {
+        if (tradeA == null || tradeA.getVolume() <= 0) return null;
+        double net = tradeA.getProfit() + tradeA.getSwap() + tradeA.getCommission();
+        return (net / tradeA.getVolume()) * 0.01;
+    }
+
+    public String getNormalizedNetProfitAFormatted() {
+        Double val = getNormalizedNetProfitA();
+        if (val == null) return "-";
+        return String.format(java.util.Locale.US, "%.2f", val);
+    }
+
+    public Double getNormalizedNetProfitB() {
+        if (tradeB == null || tradeB.getVolume() <= 0) return null;
+        double net = tradeB.getProfit() + tradeB.getSwap() + tradeB.getCommission();
+        return (net / tradeB.getVolume()) * 0.01;
+    }
+
+    public String getNormalizedNetProfitBFormatted() {
+        Double val = getNormalizedNetProfitB();
+        if (val == null) return "-";
+        return String.format(java.util.Locale.US, "%.2f", val);
+    }
 }
+

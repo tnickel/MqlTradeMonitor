@@ -29,6 +29,11 @@ public class UserEntity {
     @Column(name = "account_id")
     private Set<Long> allowedAccountIds = new HashSet<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_news_accounts", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "account_id")
+    private Set<Long> newsAccountIds = new HashSet<>();
+
     public UserEntity() {
     }
 
@@ -78,11 +83,33 @@ public class UserEntity {
         this.allowedAccountIds = allowedAccountIds;
     }
 
+    public Set<Long> getNewsAccountIds() {
+        return newsAccountIds;
+    }
+
+    public void setNewsAccountIds(Set<Long> newsAccountIds) {
+        this.newsAccountIds = newsAccountIds;
+    }
+
     public String getApiKey() {
         return apiKey;
     }
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
+    }
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_news_colors", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "account_id")
+    @Column(name = "color_hex")
+    private java.util.Map<Long, String> newsAccountColors = new java.util.HashMap<>();
+
+    public java.util.Map<Long, String> getNewsAccountColors() {
+        return newsAccountColors;
+    }
+
+    public void setNewsAccountColors(java.util.Map<Long, String> newsAccountColors) {
+        this.newsAccountColors = newsAccountColors;
     }
 }

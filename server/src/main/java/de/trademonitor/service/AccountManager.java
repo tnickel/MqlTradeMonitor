@@ -969,4 +969,59 @@ public class AccountManager {
             tradeStorage.updatePromptAnalysisResult(accountId, result, time);
         }
     }
+
+    public Long findCsvAccountIdByName(String name) {
+        if (name == null) return null;
+        String normName = name.trim();
+        for (Account a : accounts.values()) {
+            if ("CSV".equalsIgnoreCase(a.getType()) && normName.equalsIgnoreCase(a.getName())) {
+                return a.getAccountId();
+            }
+        }
+        return null;
+    }
+
+    public void addCsvAccount(long accountId, String name, List<ClosedTrade> trades) {
+        Account account = accounts.get(accountId);
+        if (account == null) {
+            account = new Account(accountId, "CSV Import", "EUR", 0.0);
+            account.setName(name);
+            account.setType("CSV");
+            
+            // Assign to first section by default
+            if (!sectionsCache.isEmpty()) {
+                Long defaultSecId = sectionsCache.keySet().iterator().next();
+                Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                        .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+                if (first.isPresent()) {
+                    defaultSecId = first.get().getId();
+                }
+                account.setSectionId(defaultSecId);
+                tradeStorage.updateAccountLayout(accountId, null, 0, defaultSecId);
+            }
+            // Add to in-memory map
+            accounts.put(accountId, account);
+        } else {
+            account.setName(name);
+        }
+        
+        account.setLastSeen(LocalDateTime.now());
+        
+        // Save/Update in DB via tradeStorage
+        tradeStorage.saveAccount(accountId, "CSV Import", "EUR", 0.0);
+        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null);
+        
+        // Save closed trades to DB (retains older trades by checking tickets)
+        tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, trades);
+        
+        // Reload all closed trades from database (union of old and newly uploaded trades)
+        List<ClosedTrade> allTrades = tradeStorage.loadClosedTrades(accountId);
+        account.setClosedTrades(allTrades);
+
+        // Initialize/update caches
+        cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+        cachedMaxDrawdownPct.put(accountId, 0.0);
+        refreshDailyProfitForAccount(accountId);
+    }
 }
+

@@ -78,6 +78,16 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    public UserEntity updateNewsAccounts(Long id, Set<Long> newsAccountIds, java.util.Map<Long, String> colors) {
+        UserEntity user = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setNewsAccountIds(newsAccountIds);
+        user.getNewsAccountColors().clear();
+        if (colors != null) {
+            user.getNewsAccountColors().putAll(colors);
+        }
+        return userRepository.save(user);
+    }
+
     public void changePassword(Long id, String newRawPassword) {
         UserEntity user = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setPassword(passwordEncoder.encode(newRawPassword));
