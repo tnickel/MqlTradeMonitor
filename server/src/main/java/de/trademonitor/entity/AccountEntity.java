@@ -65,6 +65,9 @@ public class AccountEntity {
     @Column(name = "prompt_analysis_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean promptAnalysisEnabled = false;
 
+    @Column(name = "monitored", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean monitored = true;
+
     @Column(name = "custom_prompt", columnDefinition = "TEXT")
     private String customPrompt;
 
@@ -307,5 +310,13 @@ public class AccountEntity {
 
     public void setLastPromptAnalysisTime(java.time.LocalDateTime lastPromptAnalysisTime) {
         this.lastPromptAnalysisTime = lastPromptAnalysisTime;
+    }
+
+    public Boolean getMonitored() {
+        return monitored != null ? monitored : true;
+    }
+
+    public void setMonitored(Boolean monitored) {
+        this.monitored = monitored;
     }
 }

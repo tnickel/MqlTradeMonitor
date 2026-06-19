@@ -33,6 +33,13 @@ public class OpenProfitAlarmService {
     @Scheduled(fixedRate = 5000)
     public void checkOpenProfitAlarms() {
         for (Account account : accountManager.getAllAccounts()) {
+            if (!account.isMonitored()) {
+                account.setOpenProfitAlarmTriggered(false);
+                alarmFiredMap.remove(account.getAccountId());
+                homeyService.setAlarmState("PROFIT_" + account.getAccountId(), false);
+                continue;
+            }
+
             if (!account.isOpenProfitAlarmEnabled()) {
                 account.setOpenProfitAlarmTriggered(false);
                 alarmFiredMap.remove(account.getAccountId());

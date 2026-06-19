@@ -707,6 +707,18 @@ public class AdminController {
         return gatherServerHealthInfo(null);
     }
 
+    @GetMapping("/api/security-audit/data")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public de.trademonitor.dto.SecurityAuditDto getSecurityAuditData() {
+        return securityAuditService.getLatestAudit();
+    }
+
+    @PostMapping("/api/security-audit/run")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public de.trademonitor.dto.SecurityAuditDto runSecurityAuditApi() {
+        return securityAuditService.runManualAudit();
+    }
+
     @GetMapping("/api/network-timeline")
     @org.springframework.web.bind.annotation.ResponseBody
     public java.util.Map<String, Object> networkTimeline(

@@ -114,6 +114,7 @@ public class AccountManager {
             account.setOpenProfitAlarmEnabled(ae.isOpenProfitAlarmEnabled());
             account.setOpenProfitAlarmAbs(ae.getOpenProfitAlarmAbs());
             account.setOpenProfitAlarmPct(ae.getOpenProfitAlarmPct());
+            account.setMonitored(ae.getMonitored() != null ? ae.getMonitored() : true);
 
             // Load copier state & time offset to prevent false alarms on restart
             account.setCopierError(ae.getCopierError() != null ? ae.getCopierError() : false);
@@ -256,7 +257,7 @@ public class AccountManager {
      * Update account details (Method for Dashboard).
      */
     public void updateAccountDetails(long accountId, String name, String type,
-            boolean alarmEnabled, Double alarmAbs, Double alarmPct) {
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored) {
         Account account = accounts.get(accountId);
         if (account != null) {
             account.setName(name);
@@ -264,8 +265,18 @@ public class AccountManager {
             account.setOpenProfitAlarmEnabled(alarmEnabled);
             account.setOpenProfitAlarmAbs(alarmAbs);
             account.setOpenProfitAlarmPct(alarmPct);
+            account.setMonitored(monitored);
             // Persist
-            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
+            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
+            
+            // If monitoring was disabled, clear immediate alarm indicators
+            if (!monitored) {
+                account.setOpenProfitAlarmTriggered(false);
+                if (offlineSirenLatch.remove(accountId)) {
+                    homeyService.setAlarmState("OFFLINE_" + accountId, false);
+                }
+                homeyService.setAlarmState("PROFIT_" + accountId, false);
+            }
         }
     }
 
@@ -452,6 +463,34 @@ public class AccountManager {
             info.put("copierError", account.getCopierError());
             info.put("copierErrorMessage", account.getCopierErrorMessage());
             info.put("worstCopierStage", account.getWorstCopierStage());
+            info.put("monitored", account.isMonitored());
+
+            double dailyProfitVal = getCachedDailyProfit(account.getAccountId());
+            info.put("dailyProfit", dailyProfitVal);
+
+            double weeklyProfit = 0.0;
+            double monthlyProfit = 0.0;
+            java.time.LocalDate todayLoc = java.time.LocalDate.now();
+            java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(java.util.Locale.getDefault()).dayOfWeek();
+            String startOfWeekStr = todayLoc.with(fieldISO, 1).toString().replace("-", ".") + " 00:00:00";
+            String startOfMonthStr = todayLoc.withDayOfMonth(1).toString().replace("-", ".") + " 00:00:00";
+
+            if (account.getClosedTrades() != null) {
+                for (de.trademonitor.model.ClosedTrade ct : account.getClosedTrades()) {
+                    if (ct.getCloseTime() != null) {
+                        double netTrade = ct.getProfit() + ct.getSwap() + (ct.getCommission() * account.getCommissionFactor());
+                        if (ct.getCloseTime().compareTo(startOfWeekStr) >= 0) {
+                            weeklyProfit += netTrade;
+                        }
+                        if (ct.getCloseTime().compareTo(startOfMonthStr) >= 0) {
+                            monthlyProfit += netTrade;
+                        }
+                    }
+                }
+            }
+            info.put("weeklyProfit", weeklyProfit);
+            info.put("monthlyProfit", monthlyProfit);
+
 
             // Use CACHED performance metrics instead of recalculating every time
             Map<String, Object> perfMetrics = cachedPerformanceMetrics.get(account.getAccountId());
@@ -573,6 +612,13 @@ public class AccountManager {
         for (Account account : accounts.values()) {
             if (!"REAL".equalsIgnoreCase(account.getType())) {
                 continue; // Only monitor REAL accounts
+            }
+
+            if (!account.isMonitored()) {
+                if (offlineSirenLatch.remove(account.getAccountId())) {
+                    homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), false);
+                }
+                continue;
             }
 
             boolean isOnline = account.isOnline(timeoutSeconds);
@@ -758,6 +804,9 @@ public class AccountManager {
         List<de.trademonitor.dto.MagicDrawdownItem> result = new ArrayList<>();
 
         for (Account account : accounts.values()) {
+            if (!account.isMonitored()) {
+                continue;
+            }
             // Use Current Balance as the reference for "Current Drawdown"
             // Calculating "Balance High" from history is unreliable without full
             // deposit/withdrawal logs
@@ -1009,7 +1058,7 @@ public class AccountManager {
         
         // Save/Update in DB via tradeStorage
         tradeStorage.saveAccount(accountId, "CSV Import", "EUR", 0.0);
-        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null);
+        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null, true);
         
         // Save closed trades to DB (retains older trades by checking tickets)
         tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, trades);

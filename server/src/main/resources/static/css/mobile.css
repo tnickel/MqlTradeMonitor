@@ -192,3 +192,32 @@ body {
     font-size: 1.25rem;
     margin-bottom: 0.25rem;
 }
+
+/* Unmonitored Account Style (Mobile) */
+.account-card.unmonitored {
+    background: rgba(30, 41, 59, 0.4) !important;
+    border-color: var(--border) !important;
+    opacity: 0.55;
+    position: relative;
+}
+
+.account-card.unmonitored::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    width: 90%;
+    height: 2px;
+    background: var(--danger);
+    transform: rotate(-8deg);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.7;
+}
+
+.account-card.unmonitored .acc-name,
+.account-card.unmonitored .acc-meta,
+.account-card.unmonitored .metrics-grid,
+.account-card.unmonitored .card-footer {
+    opacity: 0.5;
+}

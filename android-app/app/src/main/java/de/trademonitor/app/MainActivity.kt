@@ -17,6 +17,7 @@ import de.trademonitor.app.ui.dashboard.DashboardScreen
 import de.trademonitor.app.ui.detail.AccountDetailScreen
 import de.trademonitor.app.ui.health.ServerHealthScreen
 import de.trademonitor.app.ui.login.LoginScreen
+import de.trademonitor.app.ui.security.SecurityAuditScreen
 import de.trademonitor.app.ui.stats.DrawdownScreen
 import de.trademonitor.app.ui.theme.TradeMonitorTheme
 
@@ -66,6 +67,9 @@ fun AppNavigation() {
                 onViewHealth = {
                     navController.navigate("health")
                 },
+                onViewSecurityAudit = {
+                    navController.navigate("security_audit")
+                },
                 onLogout = {
                     navController.navigate("login") {
                         popUpTo("dashboard") { inclusive = true }
@@ -97,6 +101,14 @@ fun AppNavigation() {
 
         composable("health") {
             ServerHealthScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable("security_audit") {
+            SecurityAuditScreen(
                 onBackClick = {
                     navController.popBackStack()
                 }

@@ -30,9 +30,18 @@ public class CopierMapApiController {
 
     @GetMapping("/data")
     public ResponseEntity<?> getMapData() {
-        List<AccountEntity> nodes = accountRepository.findAll();
+        List<AccountEntity> nodes = accountRepository.findAll().stream()
+                .filter(acc -> !"CSV".equalsIgnoreCase(acc.getType()))
+                .filter(acc -> acc.getMonitored() == null || acc.getMonitored())
+                .collect(java.util.stream.Collectors.toList());
         List<CopierLinkEntity> edges = copierLinkRepository.findAll();
-        return ResponseEntity.ok(Map.of("nodes", nodes, "edges", edges));
+        java.util.Set<Long> nodeIds = nodes.stream()
+                .map(AccountEntity::getAccountId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<CopierLinkEntity> filteredEdges = edges.stream()
+                .filter(edge -> nodeIds.contains(edge.getSourceAccountId()) && nodeIds.contains(edge.getTargetAccountId()))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(Map.of("nodes", nodes, "edges", filteredEdges));
     }
 
     @GetMapping("/verify/{accountId}")
@@ -73,6 +82,26 @@ public class CopierMapApiController {
 
     @PostMapping("/link")
     public ResponseEntity<?> createLink(@RequestBody CopierLinkEntity link) {
+        Optional<AccountEntity> srcOpt = accountRepository.findById(link.getSourceAccountId());
+        Optional<AccountEntity> tgtOpt = accountRepository.findById(link.getTargetAccountId());
+        if (srcOpt.isPresent()) {
+            AccountEntity src = srcOpt.get();
+            if ("CSV".equalsIgnoreCase(src.getType())) {
+                return ResponseEntity.badRequest().body("CSV accounts cannot be linked in copier map");
+            }
+            if (Boolean.FALSE.equals(src.getMonitored())) {
+                return ResponseEntity.badRequest().body("Unmonitored accounts cannot be linked in copier map");
+            }
+        }
+        if (tgtOpt.isPresent()) {
+            AccountEntity tgt = tgtOpt.get();
+            if ("CSV".equalsIgnoreCase(tgt.getType())) {
+                return ResponseEntity.badRequest().body("CSV accounts cannot be linked in copier map");
+            }
+            if (Boolean.FALSE.equals(tgt.getMonitored())) {
+                return ResponseEntity.badRequest().body("Unmonitored accounts cannot be linked in copier map");
+            }
+        }
         CopierLinkEntity saved = copierLinkRepository.save(link);
         return ResponseEntity.ok(saved);
     }

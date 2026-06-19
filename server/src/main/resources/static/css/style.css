@@ -1240,3 +1240,45 @@ body.edit-mode-active .account-grid {
     border-color: var(--accent-secondary);
     color: var(--text-primary);
 }
+
+/* Unmonitored Account Style */
+.account-card.unmonitored {
+    border-color: rgba(255, 255, 255, 0.04) !important;
+    background: rgba(15, 23, 42, 0.3) !important;
+    box-shadow: none !important;
+}
+
+.account-card.unmonitored:hover {
+    transform: none !important;
+    background: rgba(15, 23, 42, 0.35) !important;
+}
+
+.account-card.unmonitored::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    width: 90%;
+    height: 2px;
+    background: var(--danger);
+    transform: rotate(-12deg);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.7;
+}
+
+.account-card.unmonitored .account-name,
+.account-card.unmonitored .account-id,
+.account-card.unmonitored .account-broker,
+.account-card.unmonitored .account-metrics,
+.account-card.unmonitored .view-details-btn,
+.account-card.unmonitored .account-broker + span {
+    opacity: 0.45;
+}
+
+.account-card.unmonitored .edit-icon {
+    font-size: 1.25rem;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 6;
+}

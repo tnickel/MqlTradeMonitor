@@ -45,7 +45,11 @@ data class Account(
     val maxDrawdownPct: Double,
     val openTradesCount: Int,
     val closedTradesCount: Int,
-    val totalHistoryProfit: Double
+    val totalHistoryProfit: Double,
+    val monitored: Boolean = true,
+    val dailyProfit: Double = 0.0,
+    val weeklyProfit: Double = 0.0,
+    val monthlyProfit: Double = 0.0
 )
 
 data class Trade(
@@ -126,3 +130,28 @@ data class ServerHealth(
     val aiTaskManagerWarSize: String?,
     val rootWarSize: String?
 )
+
+data class SecurityAudit(
+    val checkTime: String?,
+    val overallStatus: String?, // "GREEN", "YELLOW", "RED"
+    val statusMessage: String?,
+    val failedSshCount: Int,
+    val topAttackerIps: List<IpCount>?,
+    val fail2banBannedCount: Int,
+    val fail2banBannedIps: List<String>?,
+    val fail2banTotalBans: Int,
+    val suspiciousRequestCount: Int,
+    val suspiciousRequests: List<String>?,
+    val topRequestIps: List<IpCount>?,
+    val openPorts: List<String>?,
+    val unexpectedPorts: List<String>?,
+    val ufwActive: Boolean,
+    val ufwRules: String?,
+    val recentLogins: List<String>?
+)
+
+data class IpCount(
+    val ip: String?,
+    val count: Int
+)
+

@@ -416,8 +416,9 @@ public class DashboardController {
             @RequestParam("type") String type,
             @RequestParam(value = "alarmEnabled", defaultValue = "false") boolean alarmEnabled,
             @RequestParam(value = "alarmAbs", required = false) Double alarmAbs,
-            @RequestParam(value = "alarmPct", required = false) Double alarmPct) {
-        accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct);
+            @RequestParam(value = "alarmPct", required = false) Double alarmPct,
+            @RequestParam(value = "monitored", defaultValue = "true") boolean monitored) {
+        accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
         return ResponseEntity.ok("Saved");
     }
 
@@ -1949,9 +1950,17 @@ public class DashboardController {
         Set<Long> allowedIds = user.getAllowedAccountIds();
 
         List<Long> targetAccountIds = new ArrayList<>();
-        for (Long id : selectedIds) {
-            if (isAdmin || allowedIds.contains(id)) {
-                targetAccountIds.add(id);
+        if (selectedIds == null || selectedIds.isEmpty()) {
+            for (de.trademonitor.model.Account acc : accountManager.getAllAccounts()) {
+                if (acc.isMonitored() && (isAdmin || allowedIds.contains(acc.getAccountId()))) {
+                    targetAccountIds.add(acc.getAccountId());
+                }
+            }
+        } else {
+            for (Long id : selectedIds) {
+                if (isAdmin || allowedIds.contains(id)) {
+                    targetAccountIds.add(id);
+                }
             }
         }
 

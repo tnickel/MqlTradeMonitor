@@ -55,6 +55,7 @@ public class Account {
     private String customPrompt;
     private String lastPromptAnalysisResult;
     private LocalDateTime lastPromptAnalysisTime;
+    private boolean monitored = true;
 
     public boolean isSyncWarning() {
         return syncWarning;
@@ -888,8 +889,17 @@ public class Account {
     }
 
     public boolean isLastPromptAnalysisAlarm() {
+        if (!monitored) return false;
         if (lastPromptAnalysisResult == null) return false;
         String text = lastPromptAnalysisResult.toUpperCase();
         return text.contains("🔴") || text.contains("KRITISCHER ALARM") || text.contains("REISSLEINE ZIEHEN") || text.contains("CRITICAL ALARM");
+    }
+
+    public boolean isMonitored() {
+        return monitored;
+    }
+
+    public void setMonitored(boolean monitored) {
+        this.monitored = monitored;
     }
 }

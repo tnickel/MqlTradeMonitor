@@ -35,4 +35,11 @@ interface TradeMonitorApi {
 
     @GET("admin/api/health/data")
     suspend fun getServerHealth(): ServerHealth
+
+    @GET("admin/api/security-audit/data")
+    suspend fun getSecurityAudit(): SecurityAudit
+
+    @POST("admin/api/security-audit/run")
+    suspend fun runSecurityAudit(): SecurityAudit
+
 }

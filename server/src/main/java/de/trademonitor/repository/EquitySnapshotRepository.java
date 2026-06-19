@@ -16,14 +16,26 @@ public interface EquitySnapshotRepository extends JpaRepository<EquitySnapshotEn
 
     List<EquitySnapshotEntity> findByAccountIdAndTimestampBetweenOrderByTimestampAsc(long accountId, String from, String to);
 
-    /**
-     * Delete snapshots older than the given timestamp string (ISO format comparison
-     * works lexicographically).
-     */
     @Modifying
     @Transactional
     @Query("DELETE FROM EquitySnapshotEntity e WHERE e.accountId = :accountId AND e.timestamp < :cutoff")
     void deleteOlderThan(long accountId, String cutoff);
+
+    @Query("SELECT e FROM EquitySnapshotEntity e WHERE e.accountId = :accountId AND (" +
+           "  e.timestamp >= :recentCutoff OR SUBSTRING(e.timestamp, 15, 2) = '00'" +
+           ") ORDER BY e.timestamp ASC")
+    List<EquitySnapshotEntity> findByAccountIdAndTimestampGreaterThanOrMinuteIsZero(
+            @org.springframework.data.repository.query.Param("accountId") long accountId, 
+            @org.springframework.data.repository.query.Param("recentCutoff") String recentCutoff);
+
+    @Query("SELECT e FROM EquitySnapshotEntity e WHERE e.accountId = :accountId AND e.timestamp BETWEEN :from AND :to AND (" +
+           "  e.timestamp >= :recentCutoff OR SUBSTRING(e.timestamp, 15, 2) = '00'" +
+           ") ORDER BY e.timestamp ASC")
+    List<EquitySnapshotEntity> findByAccountIdAndTimestampBetweenAndRecentOrMinuteIsZero(
+            @org.springframework.data.repository.query.Param("accountId") long accountId,
+            @org.springframework.data.repository.query.Param("from") String from,
+            @org.springframework.data.repository.query.Param("to") String to,
+            @org.springframework.data.repository.query.Param("recentCutoff") String recentCutoff);
 
     /** Count snapshots for an account. */
     long countByAccountId(long accountId);

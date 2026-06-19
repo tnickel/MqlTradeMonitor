@@ -77,7 +77,7 @@ public class TradeStorage {
      * Update account name, type, and alarm config.
      */
     public void updateAccountDetails(long accountId, String name, String type,
-            boolean alarmEnabled, Double alarmAbs, Double alarmPct) {
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored) {
         AccountEntity entity = accountRepository.findById(accountId).orElse(null);
         if (entity != null) {
             entity.setName(name);
@@ -85,6 +85,7 @@ public class TradeStorage {
             entity.setOpenProfitAlarmEnabled(alarmEnabled);
             entity.setOpenProfitAlarmAbs(alarmAbs);
             entity.setOpenProfitAlarmPct(alarmPct);
+            entity.setMonitored(monitored);
             accountRepository.save(entity);
         }
     }
@@ -393,14 +394,16 @@ public class TradeStorage {
      * Load all equity snapshots for an account, ordered by timestamp ascending.
      */
     public List<EquitySnapshotEntity> loadEquitySnapshots(long accountId) {
-        return equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
+        String cutoff = LocalDateTime.now().minusHours(2).format(SNAPSHOT_FMT);
+        return equitySnapshotRepository.findByAccountIdAndTimestampGreaterThanOrMinuteIsZero(accountId, cutoff);
     }
 
     /**
      * Load equity snapshots for an account within a specific time range.
      */
     public List<EquitySnapshotEntity> loadEquitySnapshotsBetween(long accountId, String from, String to) {
-        return equitySnapshotRepository.findByAccountIdAndTimestampBetweenOrderByTimestampAsc(accountId, from, to);
+        String cutoff = LocalDateTime.now().minusHours(2).format(SNAPSHOT_FMT);
+        return equitySnapshotRepository.findByAccountIdAndTimestampBetweenAndRecentOrMinuteIsZero(accountId, from, to, cutoff);
     }
 
     /**

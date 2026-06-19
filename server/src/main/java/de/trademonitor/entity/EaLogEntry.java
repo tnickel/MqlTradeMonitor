@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(indexes = {
-    @Index(name = "idx_ealog_account_ts", columnList = "accountId, timestamp")
+    @Index(name = "idx_ealog_account_ts", columnList = "accountId, timestamp"),
+    @Index(name = "idx_ealog_ts", columnList = "timestamp")
 })
 public class EaLogEntry {
 

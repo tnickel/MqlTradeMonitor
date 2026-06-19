@@ -658,7 +658,7 @@
                 <div th:id="'grid-' + ${section.id}" class="account-grid drop-zone" th:data-section-id="${section.id}">
                     <div th:each="acc : ${accountsBySection.get(section.id)}" class="account-card"
                         th:data-online="${acc.online}"
-                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''} + ${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''} + ${acc.copierError ? ' copier-error-shadow' : ''}"
+                        th:classappend="${acc.syncWarning ? ' warning-pulse' : ''} + ${acc.openProfitAlarmTriggered == true ? ' warning-pulse' : ''} + ${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''} + ${acc.copierError ? ' copier-error-shadow' : ''} + ${acc.monitored == false ? ' unmonitored' : ''}"
                         th:data-id="${acc.accountId}" th:data-type="${acc.type}"
                         th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
 
@@ -683,8 +683,9 @@
                                         th:data-type="${acc.type}" th:data-alarm-enabled="${acc.openProfitAlarmEnabled}"
                                         th:data-alarm-abs="${acc.openProfitAlarmAbs}"
                                         th:data-alarm-pct="${acc.openProfitAlarmPct}"
+                                        th:data-monitored="${acc.monitored}"
                                         onclick="event.stopPropagation(); openEditModal(this)"
-                                        title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">✏️</span>
+                                        title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">⚙️</span>
                                 </div>
                             </div>
 
@@ -1049,6 +1050,11 @@
                     <option value="DEMO">Demo Account</option>
                     <option value="REAL">Real Account</option>
                 </select>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <input type="checkbox" id="editAccountMonitored" style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="editAccountMonitored" style="margin: 0; cursor: pointer; font-weight: bold;">Überwachung aktiv (Alarme & Status)</label>
             </div>
 
             <hr style="border-color: #333; margin: 15px 0;">
@@ -1608,6 +1614,10 @@
             var alarmPct = el.getAttribute('data-alarm-pct');
             document.getElementById('editAlarmPct').value = (alarmPct && alarmPct !== 'null') ? alarmPct : '';
 
+            // Monitored status
+            var monitored = el.getAttribute('data-monitored') !== 'false';
+            document.getElementById('editAccountMonitored').checked = monitored;
+
             document.getElementById('editAccountModal').style.display = 'block';
         }
 
@@ -1622,6 +1632,7 @@
             const alarmEnabled = document.getElementById('editAlarmEnabled').checked;
             const alarmAbs = document.getElementById('editAlarmAbs').value;
             const alarmPct = document.getElementById('editAlarmPct').value;
+            const monitored = document.getElementById('editAccountMonitored').checked;
 
             const formData = new FormData();
             formData.append('accountId', accountId);
@@ -1630,6 +1641,7 @@
             formData.append('alarmEnabled', alarmEnabled);
             if (alarmAbs) formData.append('alarmAbs', alarmAbs);
             if (alarmPct) formData.append('alarmPct', alarmPct);
+            formData.append('monitored', monitored);
 
             fetch('/api/account/update', {
                 method: 'POST',
@@ -2026,6 +2038,16 @@
         }
 
         function fetchAndRenderNews() {
+            const defaultColors = [
+                '#3b82f6', // blue
+                '#10b981', // green
+                '#8b5cf6', // purple
+                '#f59e0b', // orange
+                '#ec4899', // pink
+                '#06b6d4', // cyan
+                '#f43f5e'  // rose
+            ];
+
             fetch('/api/stats/news-today')
                 .then(r => r.json())
                 .then(data => {
@@ -2061,15 +2083,15 @@
                     }
 
                     // Pre-fill colors in config modal
-                    if (data.accountColors) {
-                        const colorInputs = document.querySelectorAll('.news-account-color-input');
-                        colorInputs.forEach(input => {
-                            const accId = input.getAttribute('data-account-id');
-                            if (data.accountColors[accId]) {
-                                input.value = data.accountColors[accId];
-                            }
-                        });
-                    }
+                    const colorInputs = document.querySelectorAll('.news-account-color-input');
+                    colorInputs.forEach((input, index) => {
+                        const accId = input.getAttribute('data-account-id');
+                        if (data.accountColors && data.accountColors[accId]) {
+                            input.value = data.accountColors[accId];
+                        } else {
+                            input.value = defaultColors[index % defaultColors.length];
+                        }
+                    });
 
                     // Update modal elements
                     const modalOpenCount = document.getElementById('modal-news-open-count');
@@ -2098,12 +2120,15 @@
                     const openBody = document.getElementById('news-open-trades-body');
                     if (openBody) {
                         if (data.openTrades && data.openTrades.length > 0) {
+                            const uniqueAccIds = [...new Set(data.openTrades.map(t => t.accountId))];
                             openBody.innerHTML = data.openTrades.map(t => {
                                 const typeClass = t.type === 'BUY' ? 'trade-type buy' : 'trade-type sell';
                                 const profitClass = t.profit > 0 ? 'profit-positive' : (t.profit < 0 ? 'profit-negative' : '');
                                 const magicComment = t.comment || (t.magicNumber ? 'Magic: ' + t.magicNumber : '-');
-                                const rowBgColor = data.accountColors && data.accountColors[t.accountId] ? data.accountColors[t.accountId] : '';
-                                const rowStyle = rowBgColor ? `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}33;"` : `style="border-bottom: 1px solid #2a2e39;"`;
+                                
+                                const accIndex = uniqueAccIds.indexOf(t.accountId);
+                                const rowBgColor = (data.accountColors && data.accountColors[t.accountId]) || defaultColors[accIndex % defaultColors.length];
+                                const rowStyle = `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}1a;"`;
                                 return `
                                     <tr ${rowStyle}>
                                         <td style="padding: 8px 10px;"><strong>${t.accountName}</strong></td>
@@ -2126,12 +2151,15 @@
                     const closedBody = document.getElementById('news-closed-trades-body');
                     if (closedBody) {
                         if (data.closedTradesToday && data.closedTradesToday.length > 0) {
+                            const uniqueAccIds = [...new Set(data.closedTradesToday.map(t => t.accountId))];
                             closedBody.innerHTML = data.closedTradesToday.map(t => {
                                 const typeClass = t.type === 'BUY' ? 'trade-type buy' : 'trade-type sell';
                                 const profitClass = t.netProfit > 0 ? 'profit-positive' : (t.netProfit < 0 ? 'profit-negative' : '');
                                 const magicComment = t.comment || (t.magicNumber ? 'Magic: ' + t.magicNumber : '-');
-                                const rowBgColor = data.accountColors && data.accountColors[t.accountId] ? data.accountColors[t.accountId] : '';
-                                const rowStyle = rowBgColor ? `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}33;"` : `style="border-bottom: 1px solid #2a2e39;"`;
+                                
+                                const accIndex = uniqueAccIds.indexOf(t.accountId);
+                                const rowBgColor = (data.accountColors && data.accountColors[t.accountId]) || defaultColors[accIndex % defaultColors.length];
+                                const rowStyle = `style="border-bottom: 1px solid #2a2e39; background-color: ${rowBgColor}1a;"`;
                                 return `
                                     <tr ${rowStyle}>
                                         <td style="padding: 8px 10px;"><strong>${t.accountName}</strong></td>

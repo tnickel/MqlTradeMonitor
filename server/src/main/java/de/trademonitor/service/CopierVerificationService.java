@@ -86,6 +86,14 @@ public class CopierVerificationService {
         List<CopierLinkEntity> links = copierLinkRepository.findAll();
         java.util.Set<Long> targetIdsToVerify = new java.util.HashSet<>();
         for (CopierLinkEntity link : links) {
+            Account targetAcc = accountManager.getAccount(link.getTargetAccountId());
+            Account sourceAcc = accountManager.getAccount(link.getSourceAccountId());
+            if (targetAcc != null && ("CSV".equalsIgnoreCase(targetAcc.getType()) || !targetAcc.isMonitored())) {
+                continue;
+            }
+            if (sourceAcc != null && ("CSV".equalsIgnoreCase(sourceAcc.getType()) || !sourceAcc.isMonitored())) {
+                continue;
+            }
             targetIdsToVerify.add(link.getTargetAccountId());
         }
 
@@ -93,13 +101,19 @@ public class CopierVerificationService {
         int totalCheckedTrades = 0;
 
         for (Long targetId : targetIdsToVerify) {
+            Account targetAcc = accountManager.getAccount(targetId);
+            if (targetAcc != null && !targetAcc.isMonitored()) {
+                accountManager.updateCopierError(targetId, false, null);
+                accountManager.updateCopierWorstStage(targetId, 0);
+                continue;
+            }
+
             de.trademonitor.dto.CopierVerificationReportDto report = generateReport(targetId);
             if (report == null || report.getTargetTrades() == null) continue;
 
             int worstStage = 0;
             boolean hasError = false;
             
-            Account targetAcc = accountManager.getAccount(targetId);
             if (targetAcc != null && "REAL".equalsIgnoreCase(targetAcc.getType())) {
                 totalCheckedTrades += targetAcc.getOpenTrades().size();
             }
@@ -181,15 +195,25 @@ public class CopierVerificationService {
 
     public de.trademonitor.dto.CopierVerificationReportDto generateReport(long targetAccountId) {
         Account target = accountManager.getAccount(targetAccountId);
-        if (target == null) return null;
+        if (target == null || "CSV".equalsIgnoreCase(target.getType()) || !target.isMonitored()) return null;
 
         de.trademonitor.dto.CopierVerificationReportDto report = new de.trademonitor.dto.CopierVerificationReportDto();
         report.setTargetAccountId(targetAccountId);
         report.setTargetAccountName(target.getName() != null ? target.getName() : String.valueOf(targetAccountId));
         report.setTargetGmtOffsetSeconds(target.getServerTimeOffsetSeconds() != null ? target.getServerTimeOffsetSeconds() : 0L);
         
-        List<CopierLinkEntity> incomingLinks = copierLinkRepository.findByTargetAccountId(targetAccountId);
-        List<CopierLinkEntity> outgoingLinks = copierLinkRepository.findBySourceAccountId(targetAccountId);
+        List<CopierLinkEntity> incomingLinks = copierLinkRepository.findByTargetAccountId(targetAccountId).stream()
+                .filter(link -> {
+                    Account src = accountManager.getAccount(link.getSourceAccountId());
+                    return src != null && !"CSV".equalsIgnoreCase(src.getType()) && src.isMonitored();
+                })
+                .collect(java.util.stream.Collectors.toList());
+        List<CopierLinkEntity> outgoingLinks = copierLinkRepository.findBySourceAccountId(targetAccountId).stream()
+                .filter(link -> {
+                    Account tgt = accountManager.getAccount(link.getTargetAccountId());
+                    return tgt != null && !"CSV".equalsIgnoreCase(tgt.getType()) && tgt.isMonitored();
+                })
+                .collect(java.util.stream.Collectors.toList());
         
         if (incomingLinks.isEmpty() && outgoingLinks.isEmpty()) {
             return null; // Not part of map

@@ -63,7 +63,7 @@
             <h2 class="section-title" th:text="${section.name}">Section Name</h2>
             
             <div th:each="acc : ${accountsBySection[section.id]}" class="account-card" 
-                 th:classappend="${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''}"
+                 th:classappend="${acc.lastPromptAnalysisAlarm ? ' warning-pulse' : ''} + ${acc.monitored == false ? ' unmonitored' : ''}"
                  th:onclick="'location.href=\'/account/' + ${acc.accountId} + '\''">
                 
                 <div class="card-top">

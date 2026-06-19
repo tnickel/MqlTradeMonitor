@@ -313,7 +313,7 @@
                 <button type="button" class="btn-submit" onclick="submitDemoLogin()" style="background: linear-gradient(135deg, #475569, #334155); margin-top: 0.75rem;">
                     Try Demo &nbsp;🚀
                 </button>
-                <a href="/trademonitor.apk" download style="text-decoration: none; display: block; width: 100%;">
+                <a href="/trademonitor_v1.1.apk" download style="text-decoration: none; display: block; width: 100%;">
                     <button type="button" class="btn-submit" style="background: linear-gradient(135deg, #059669, #047857); margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; width: 100%;">
                         Download Android App &nbsp;📱
                     </button>
@@ -328,7 +328,7 @@
 
                 // APK Progress Download Modal
                 document.addEventListener('DOMContentLoaded', () => {
-                    const downloadLink = document.querySelector('a[href*="trademonitor.apk"]');
+                    const downloadLink = document.querySelector('a[href*="trademonitor_v1.1.apk"]');
                     if (downloadLink) {
                         downloadLink.addEventListener('click', (e) => {
                             e.preventDefault();
@@ -398,7 +398,7 @@
                         title.style.fontWeight = '700';
 
                         const sizeInfo = document.createElement('p');
-                        sizeInfo.innerText = 'Dateigröße: 8,6 MB';
+                        sizeInfo.innerText = 'Dateigröße: 8,7 MB';
                         sizeInfo.style.margin = '0 0 1.5rem 0';
                         sizeInfo.style.color = '#94a3b8';
                         sizeInfo.style.fontSize = '0.9rem';
@@ -485,7 +485,7 @@
                             .then(response => {
                                 if (!response.ok) throw new Error('Netzwerk-Antwort war nicht OK');
                                 const contentLength = response.headers.get('content-length');
-                                const totalBytes = contentLength ? parseInt(contentLength, 10) : 9031679;
+                                const totalBytes = contentLength ? parseInt(contentLength, 10) : 9117676;
                                 const reader = response.body.getReader();
                                 let loadedBytes = 0;
                                 const chunks = [];
@@ -517,7 +517,7 @@
 
                                 const downloadLink = document.createElement('a');
                                 downloadLink.href = URL.createObjectURL(blob);
-                                downloadLink.download = 'trademonitor.apk';
+                                downloadLink.download = 'trademonitor_v1.1.apk';
                                 document.body.appendChild(downloadLink);
                                 downloadLink.click();
                                 document.body.removeChild(downloadLink);

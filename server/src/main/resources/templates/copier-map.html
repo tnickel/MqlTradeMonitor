@@ -126,6 +126,52 @@
             opacity: 1;
             z-index: 100;
         }
+
+        /* Custom context menu styles */
+        .custom-context-menu {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+            padding: 5px 0;
+            z-index: 9999;
+            min-width: 170px;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* Selected path style */
+        .link-path.selected {
+            stroke-width: 4.5 !important;
+            stroke-dasharray: 6, 6;
+            animation: linkDash 20s linear infinite;
+            filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.8));
+            opacity: 1 !important;
+        }
+        
+        @keyframes linkDash {
+            to {
+                stroke-dashoffset: -1000;
+            }
+        }
     </style>
 </head>
 
@@ -310,12 +356,20 @@
         </div>
     </div>
 
+    <!-- Context Menu for links deletion -->
+    <div id="context-menu" class="custom-context-menu">
+        <div class="context-menu-item" onclick="handleDeleteFromContextMenu()">
+            <span>🗑️</span> Verbindung löschen
+        </div>
+    </div>
+
     <script>
         const csrfToken = document.querySelector('meta[name="_csrf"]').content;
         const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
         let accounts = [];
         let links = [];
+        let selectedLinkId = null;
 
         const canvas = document.getElementById('copier-canvas');
         const svgLayer = document.getElementById('links-layer');
@@ -575,11 +629,34 @@
                 // Add Marker end
                 path.setAttribute('marker-end', `url(#${markerId})`);
                 
-                // Delete on click
-                path.addEventListener('click', async (e) => {
+                // Handle Left-click: Select link
+                path.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (confirm('Verknüpfung löschen?')) {
-                        await deleteLink(link.id);
+                    
+                    // Clear previous selection
+                    clearLinkSelection();
+                    
+                    // Select this link
+                    selectedLinkId = link.id;
+                    path.classList.add('selected');
+                    
+                    // Hide context menu
+                    const menu = document.getElementById('context-menu');
+                    if (menu) menu.style.display = 'none';
+                });
+
+                // Handle Right-click: Show custom context menu ONLY if link is selected
+                path.addEventListener('contextmenu', (e) => {
+                    if (selectedLinkId === link.id) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const menu = document.getElementById('context-menu');
+                        if (menu) {
+                            menu.style.left = e.pageX + 'px';
+                            menu.style.top = e.pageY + 'px';
+                            menu.style.display = 'block';
+                        }
                     }
                 });
 
@@ -1035,6 +1112,46 @@
             });
 
             rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Hide context menu and clear selection on background click
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('context-menu');
+            if (menu) {
+                menu.style.display = 'none';
+            }
+            if (!e.target.classList.contains('link-path')) {
+                clearLinkSelection();
+            }
+        });
+
+        // Hide context menu on scroll or window resize
+        window.addEventListener('scroll', () => {
+            const menu = document.getElementById('context-menu');
+            if (menu) menu.style.display = 'none';
+        });
+
+        function clearLinkSelection() {
+            if (selectedLinkId !== null) {
+                const prevSelected = document.getElementById('link-' + selectedLinkId);
+                if (prevSelected) {
+                    prevSelected.classList.remove('selected');
+                }
+                selectedLinkId = null;
+            }
+        }
+
+        async function handleDeleteFromContextMenu() {
+            if (selectedLinkId !== null) {
+                const idToDelete = selectedLinkId;
+                clearLinkSelection();
+                const menu = document.getElementById('context-menu');
+                if (menu) menu.style.display = 'none';
+                
+                if (confirm('Verknüpfung löschen?')) {
+                    await deleteLink(idToDelete);
+                }
+            }
         }
 
         // INIT

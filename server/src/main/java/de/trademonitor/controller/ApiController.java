@@ -361,6 +361,32 @@ public class ApiController {
             java.util.List<de.trademonitor.entity.EaLogEntry> entities = new java.util.ArrayList<>();
             for (String line : logEntries) {
                 if (line != null && !line.trim().isEmpty()) {
+                    // Filter out connection spam/errors and EA debug noise to avoid DB bloat
+                    String lowerLine = line.toLowerCase();
+                    if (lowerLine.contains("monitor.ki-software-schmiede.de") ||
+                        lowerLine.contains("reconnect failed") ||
+                        lowerLine.contains("reconnect attempt") ||
+                        lowerLine.contains("404 - not found") ||
+                        lowerLine.contains("server response: <html") ||
+                        lowerLine.contains("signal ist neutral") ||
+                        lowerLine.contains("starte konfliktprüfung") ||
+                        lowerLine.contains("lese signaldatei") ||
+                        lowerLine.contains("signal gelesen:") ||
+                        lowerLine.contains("prüfe symbol:") ||
+                        lowerLine.contains("header übersprungen:") ||
+                        lowerLine.contains("dateialter:") ||
+                        lowerLine.contains("aktuelle zeit:") ||
+                        lowerLine.contains("datei-änderungszeit:") ||
+                        lowerLine.contains("========") ||
+                        lowerLine.contains("csv debug ende") ||
+                        lowerLine.contains("csv-laden abgeschlossen") ||
+                        lowerLine.contains("[no changes]") ||
+                        lowerLine.contains("tp-check skipped") ||
+                        lowerLine.contains("tp-check für") ||
+                        lowerLine.contains("basket tp für") ||
+                        lowerLine.contains("ist ok mit signal")) {
+                        continue; // Skip saving this log line
+                    }
                     entities.add(new de.trademonitor.entity.EaLogEntry(accountId, line));
                     stored++;
                 }
