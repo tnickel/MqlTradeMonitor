@@ -74,23 +74,33 @@ android-app/
 - **Demo-Zugang:** Ermöglicht den schnellen Zugriff als Demo-User ohne Zugangsdaten.
 
 ### 3.2 Dashboard (`DashboardScreen`)
-- **Gesamtstatistik-Karte:** Zeigt die summierten Werte über alle freigegebenen Konten (Gesamt-Balance, Gesamt-Equity, offener Gewinn/Verlust, Anzahl offener Trades).
-- **Kontenliste:** Listet alle Handelskonten einzeln auf mit:
+- **Real & Demo Kontogruppen (Swipe-Navigation):** Die Konten werden in zwei logische Gruppen ("REAL" und "DEMO") unterteilt. Der Benutzer kann bequem durch horizontales Wischen (Left/Right Swipe) oder Tippen auf die Tabs am oberen Bildschirmrand zwischen den beiden Ansichten wechseln. Unter "REAL" werden alle ausgewählten Realkonten geführt, unter "DEMO" die entsprechenden Demokonten.
+- **Gesamtstatistik-Karte:** Zeigt die summierten Werte der aktuell aktiven Gruppe an:
+  - Gesamt-Balance und Gesamt-Equity.
+  - **Summe des offenen Gewinns/Verlusts (Open Profit):** Wird gut sichtbar als aggregierter Betrag dargestellt (z. B. `-500 EUR` oder `+120 EUR`), farbkodiert in **Rot bei Verlust (negativ)** und **Grün bei Gewinn (positiv)**.
+  - Anzahl offener Trades.
+- **Kontenliste:** Listet alle Handelskonten der ausgewählten Gruppe einzeln auf mit:
   - Broker-Name und Kontonummer.
-  - Aktueller Kontotyp-Kennzeichnung (z. B. `REAL` in Orange).
+  - Aktueller Kontotyp-Kennzeichnung (z. B. `REAL` in Orange oder `DEMO` in Blau).
   - Online-Status (Grüner/Roter Punkt basierend auf dem Heartbeat).
   - Balance, Equity und offener Profit (farbkodiert: Grün für Profit, Rot für Verlust).
   - Aktueller Drawdown in % und Anzahl offener Trades.
 - **Aktualisierung:** Unterstützt Pull-to-Refresh und aktualisiert sich im Hintergrund alle 30 Sekunden automatisch.
 
-### 3.3 Konto-Details (`AccountDetailScreen`)
+### 3.3 App-Downloads & Dateiversionierung
+Um Caching-Probleme durch Browser und Reverse-Proxys (z.B. Nginx/Caddy) zu umgehen, wird die APK-Datei unter einem versionierten Dateinamen bereitgestellt (z. B. `trademonitor_v1.1.apk` für Version 1.1).
+- Der Server fängt Anfragen über das Wildcard-Muster `/trademonitor*.apk` in der Spring Security-Konfiguration ab und stellt die Datei öffentlich ohne Authentifizierungszwang bereit.
+- Auf der Login-Seite des Web-Interfaces sowie der Homepage (Landingpage) sind die Download-Links entsprechend auf den aktuellen Dateinamen angepasst.
+- Ein dynamisches Download-Skript sorgt dafür, dass die Datei beim Herunterladen immer mit ihrem echten versionierten Dateinamen auf dem Endgerät gespeichert wird.
+
+### 3.4 Konto-Details (`AccountDetailScreen`)
 - **Interactive Canvas-Chart:** Zeichnet die Equity-Kurve als blaue Linie mit einem transparenten Farbverlauf darunter sowie die Balance-Kurve als graue Linie.
 - **Tabs (Reiter) für tiefere Analysen:**
   1. **Offen:** Zeigt alle aktuell laufenden Positionen (Typ, Volumen, Symbol, offener Profit, Einstiegspreis, SL/TP, Kommentar und den EA-Synchronisationsstatus).
   2. **Historie:** Zeigt die Liste der geschlossenen Trades (Profit, Swap, Kommission, Schließungszeitpunkt).
   3. **Info:** Listet detaillierte Kontoparameter und Alarmgrenzen (Drawdown-Alarme) auf.
 
-### 3.4 Magic Drawdowns (`DrawdownScreen`)
+### 3.5 Magic Drawdowns (`DrawdownScreen`)
 - Zeigt eine aggregierte Live-Übersicht aller Strategien (Magic Numbers), die sich aktuell im Drawdown befinden, sortiert nach der Höhe des Drawdowns in %.
 
 ---
