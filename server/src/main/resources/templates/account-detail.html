@@ -356,6 +356,14 @@
             flex-wrap: wrap;
         ">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Sticky Account Badge -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-right: 8px; padding-right: 16px; border-right: 1px solid var(--border-color);">
+                    <img th:if="${account.iconBase64 != null && !account.iconBase64.isEmpty()}" th:src="${account.iconBase64}" style="max-width: 20px; max-height: 20px; border-radius: 4px; object-fit: contain; border: 1px solid rgba(255, 255, 255, 0.1);" />
+                    <span style="font-weight: 800; font-size: 1.1rem; color: #fff;" th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}">FXSSI9</span>
+                    <span style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--text-secondary);" th:text="'#' + ${account.accountId}">#6171861</span>
+                    <span th:if="${account.type == 'REAL'}" class="badge-mini real" style="font-size: 0.65rem; padding: 1px 4px; margin-left: 4px; vertical-align: middle;">REAL</span>
+                </div>
+                
                 <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">Zeitraum:</span>
                 <div class="filter-bar" id="history-filter-bar" style="margin: 0; padding: 0; background: transparent; border: none; display: flex; gap: 6px; flex-wrap: wrap;">
                     <button class="filter-btn" data-range="today">Heute</button>
