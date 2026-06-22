@@ -261,6 +261,39 @@ fun DashboardScreen(
                                     )
                                 }
                             )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            val versionName = remember {
+                                try {
+                                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                                    packageInfo.versionName ?: "1.1"
+                                } catch (e: Exception) {
+                                    "1.1"
+                                }
+                            }
+                            if (de.trademonitor.app.api.UpdateManager.isUpdateAvailable.value) {
+                                DropdownMenuItem(
+                                    text = { Text("Update auf v${de.trademonitor.app.api.UpdateManager.latestVersionName}") },
+                                    onClick = {
+                                        showMenu = false
+                                        de.trademonitor.app.api.UpdateManager.showUpdateDialog.value = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = NeonGreen
+                                        )
+                                    }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Version $versionName") },
+                                onClick = { showMenu = false },
+                                enabled = false,
+                                colors = MenuDefaults.itemColors(
+                                    disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                            )
                         }
                     }
                 },

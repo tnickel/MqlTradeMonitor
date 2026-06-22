@@ -42,4 +42,7 @@ interface TradeMonitorApi {
     @POST("admin/api/security-audit/run")
     suspend fun runSecurityAudit(): SecurityAudit
 
+    @GET("api/latest-version")
+    suspend fun getLatestVersion(): VersionResponse
+
 }

@@ -68,13 +68,14 @@
                 
                 <div class="card-top">
                     <div class="acc-info">
-                        <div class="acc-name">
+                        <div class="acc-name" style="display: flex; align-items: center; gap: 6px;">
                             <span class="status-indicator" 
                                   th:style="'background-color: ' + 
                                     (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
                                     (${acc.lastSeenMins} &lt;= ${liveGreenMins} ? ${liveColorGreen} : 
                                     (${acc.lastSeenMins} &lt;= ${liveYellowMins} ? ${liveColorYellow} : 
                                     (${acc.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"></span>
+                            <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 16px; max-height: 16px; border-radius: 2px; object-fit: contain;" />
                             <span th:text="${acc.name != null && !acc.name.isEmpty() ? acc.name : acc.accountId}">Account Name</span>
                         </div>
                         <div class="acc-meta">

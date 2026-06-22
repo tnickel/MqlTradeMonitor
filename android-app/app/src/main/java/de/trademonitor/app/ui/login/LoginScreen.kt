@@ -185,5 +185,21 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 Text("Demo-Zugang nutzen", color = MaterialTheme.colorScheme.secondary)
             }
         }
+
+        val versionName = remember {
+            try {
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                packageInfo.versionName ?: "1.1"
+            } catch (e: Exception) {
+                "1.1"
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "v$versionName",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+        )
     }
 }

@@ -667,7 +667,8 @@
                             style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="display: flex; flex-direction: column;">
                                 <!-- Name First (Larger) -->
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                    <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 24px; max-height: 24px; border-radius: 4px; object-fit: contain;" class="account-tile-icon" />
                                     <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
                                         th:text="${acc.name}"
                                         style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">(Name)</span>
@@ -684,6 +685,7 @@
                                         th:data-alarm-abs="${acc.openProfitAlarmAbs}"
                                         th:data-alarm-pct="${acc.openProfitAlarmPct}"
                                         th:data-monitored="${acc.monitored}"
+                                        th:data-icon-base64="${acc.iconBase64}"
                                         onclick="event.stopPropagation(); openEditModal(this)"
                                         title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">⚙️</span>
                                 </div>
@@ -829,6 +831,7 @@
                             <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px;">
+                                    <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 16px; max-height: 16px; border-radius: 2px; object-fit: contain;" />
                                     <span th:text="${acc.name}">Name</span>
                                     <span th:if="${acc.lastSeenMins != null}"
                                         th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
@@ -1050,6 +1053,18 @@
                     <option value="DEMO">Demo Account</option>
                     <option value="REAL">Real Account</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label for="editAccountIcon">Kachel Icon (Bild hochladen):</label>
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 5px;">
+                    <input type="file" id="editAccountIcon" accept="image/*" onchange="previewIcon(this)" style="display: none;">
+                    <button type="button" class="view-toggle-btn" onclick="document.getElementById('editAccountIcon').click()" style="margin: 0; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        📁 Bild wählen
+                    </button>
+                    <img id="editAccountIconPreview" src="" style="max-width: 32px; max-height: 32px; display: none; border-radius: 4px; object-fit: contain; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); padding: 2px;" />
+                    <button type="button" id="removeAccountIconBtn" class="view-toggle-btn" style="display: none; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); margin: 0; padding: 0.5rem 1rem; border-radius: 6px;" onclick="removeIcon()">🗑️ Entfernen</button>
+                </div>
             </div>
 
             <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
@@ -1618,7 +1633,48 @@
             var monitored = el.getAttribute('data-monitored') !== 'false';
             document.getElementById('editAccountMonitored').checked = monitored;
 
+            // Icon handling
+            var iconBase64 = el.getAttribute('data-icon-base64');
+            var imgPreview = document.getElementById('editAccountIconPreview');
+            var removeBtn = document.getElementById('removeAccountIconBtn');
+            var fileInput = document.getElementById('editAccountIcon');
+            fileInput.value = ''; // Reset file selection
+            window.removeIconClicked = false;
+
+            if (iconBase64 && iconBase64 !== 'null' && iconBase64 !== '') {
+                imgPreview.src = iconBase64;
+                imgPreview.style.display = 'block';
+                removeBtn.style.display = 'inline-block';
+            } else {
+                imgPreview.src = '';
+                imgPreview.style.display = 'none';
+                removeBtn.style.display = 'none';
+            }
+
             document.getElementById('editAccountModal').style.display = 'block';
+        }
+
+        function previewIcon(input) {
+            const preview = document.getElementById('editAccountIconPreview');
+            const removeBtn = document.getElementById('removeAccountIconBtn');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    removeBtn.style.display = 'inline-block';
+                    window.removeIconClicked = false;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function removeIcon() {
+            document.getElementById('editAccountIconPreview').src = '';
+            document.getElementById('editAccountIconPreview').style.display = 'none';
+            document.getElementById('removeAccountIconBtn').style.display = 'none';
+            document.getElementById('editAccountIcon').value = '';
+            window.removeIconClicked = true;
         }
 
         function closeEditModal() {
@@ -1633,6 +1689,8 @@
             const alarmAbs = document.getElementById('editAlarmAbs').value;
             const alarmPct = document.getElementById('editAlarmPct').value;
             const monitored = document.getElementById('editAccountMonitored').checked;
+            const removeIcon = window.removeIconClicked || false;
+            const iconInput = document.getElementById('editAccountIcon');
 
             const formData = new FormData();
             formData.append('accountId', accountId);
@@ -1642,6 +1700,10 @@
             if (alarmAbs) formData.append('alarmAbs', alarmAbs);
             if (alarmPct) formData.append('alarmPct', alarmPct);
             formData.append('monitored', monitored);
+            formData.append('removeIcon', removeIcon);
+            if (iconInput.files && iconInput.files[0]) {
+                formData.append('icon', iconInput.files[0]);
+            }
 
             fetch('/api/account/update', {
                 method: 'POST',

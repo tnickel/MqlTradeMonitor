@@ -71,6 +71,9 @@ public class AccountEntity {
     @Column(name = "custom_prompt", columnDefinition = "TEXT")
     private String customPrompt;
 
+    @Column(name = "icon_base64", columnDefinition = "TEXT")
+    private String iconBase64;
+
     @Column(name = "last_prompt_analysis_result", columnDefinition = "TEXT")
     private String lastPromptAnalysisResult;
 
@@ -318,5 +321,13 @@ public class AccountEntity {
 
     public void setMonitored(Boolean monitored) {
         this.monitored = monitored;
+    }
+
+    public String getIconBase64() {
+        return iconBase64;
+    }
+
+    public void setIconBase64(String iconBase64) {
+        this.iconBase64 = iconBase64;
     }
 }

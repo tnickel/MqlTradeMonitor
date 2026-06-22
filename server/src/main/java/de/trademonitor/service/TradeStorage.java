@@ -91,6 +91,17 @@ public class TradeStorage {
     }
 
     /**
+     * Update account icon (Base64 data URL).
+     */
+    public void updateAccountIcon(long accountId, String iconBase64) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setIconBase64(iconBase64);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
      * Update MetaTrader Info text.
      */
     public void updateMetaTraderInfo(long accountId, String metaTraderInfo) {

@@ -407,4 +407,16 @@ public class ApiController {
                     "message", e.getMessage()));
         }
     }
+
+    /**
+     * Get the latest available version of the Android application.
+     */
+    @GetMapping("/latest-version")
+    public ResponseEntity<?> getLatestVersion() {
+        return ResponseEntity.ok(Map.of(
+                "versionCode", 4,
+                "versionName", "1.3",
+                "downloadUrl", "https://monitor.tnickel-ki.de/trademonitor_v1.3.apk"
+        ));
+    }
 }

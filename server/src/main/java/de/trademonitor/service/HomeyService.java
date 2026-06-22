@@ -64,9 +64,42 @@ public class HomeyService {
     }
 
     /**
+     * Checks if we are in the siren mute period (Saturday 00:00 until Sunday 23:00).
+     */
+    public boolean isSirenMutedPeriod() {
+        return isSirenMutedPeriod(java.time.LocalDateTime.now());
+    }
+
+    /**
+     * Checks if the given time is in the siren mute period (Saturday 00:00 until Sunday 23:00).
+     */
+    public boolean isSirenMutedPeriod(java.time.LocalDateTime now) {
+        java.time.DayOfWeek day = now.getDayOfWeek();
+        if (day == java.time.DayOfWeek.SATURDAY) {
+            return true;
+        }
+        if (day == java.time.DayOfWeek.SUNDAY) {
+            return now.getHour() < 23;
+        }
+        return false;
+    }
+
+    /**
      * Triggers the siren immediately.
      */
     public void triggerSiren() {
+        triggerSiren(false);
+    }
+
+    /**
+     * Triggers the siren, optionally bypassing the weekend quiet hours limit.
+     */
+    public void triggerSiren(boolean force) {
+        if (!force && isSirenMutedPeriod()) {
+            logger.info("[HomeyService] Siren trigger request ignored because it is during the weekend quiet hours (Saturday until Sunday 23:00).");
+            return;
+        }
+
         String homeyId = globalConfigService.getHomeyId();
         String eventName = globalConfigService.getHomeyEvent();
         int repeatCount = globalConfigService.getHomeyRepeatCount();

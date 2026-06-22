@@ -107,7 +107,7 @@ public class DashboardController {
     @PostMapping("/api/test-siren")
     @ResponseBody
     public String testSiren() {
-        homeyService.triggerSiren();
+        homeyService.triggerSiren(true);
         return "Siren trigger sent";
     }
 
@@ -417,9 +417,25 @@ public class DashboardController {
             @RequestParam(value = "alarmEnabled", defaultValue = "false") boolean alarmEnabled,
             @RequestParam(value = "alarmAbs", required = false) Double alarmAbs,
             @RequestParam(value = "alarmPct", required = false) Double alarmPct,
-            @RequestParam(value = "monitored", defaultValue = "true") boolean monitored) {
-        accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
-        return ResponseEntity.ok("Saved");
+            @RequestParam(value = "monitored", defaultValue = "true") boolean monitored,
+            @RequestParam(value = "icon", required = false) MultipartFile icon,
+            @RequestParam(value = "removeIcon", defaultValue = "false") boolean removeIcon) {
+        try {
+            accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
+            if (removeIcon) {
+                accountManager.updateAccountIcon(accountId, null);
+            } else if (icon != null && !icon.isEmpty()) {
+                byte[] bytes = icon.getBytes();
+                String contentType = icon.getContentType();
+                String base64 = Base64.getEncoder().encodeToString(bytes);
+                String dataUrl = "data:" + contentType + ";base64," + base64;
+                accountManager.updateAccountIcon(accountId, dataUrl);
+            }
+            return ResponseEntity.ok("Saved");
+        } catch (Exception e) {
+            LOG.severe("Failed to update account details or icon: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
     }
 
     @PostMapping("/api/account/meta-trader-info")

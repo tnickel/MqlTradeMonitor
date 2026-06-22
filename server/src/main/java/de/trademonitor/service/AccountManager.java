@@ -109,6 +109,7 @@ public class AccountManager {
             account.setMagicNumberMaxAge(ae.getMagicNumberMaxAge() != null ? ae.getMagicNumberMaxAge() : 30);
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
+            account.setIconBase64(ae.getIconBase64());
 
             // Load alarm config
             account.setOpenProfitAlarmEnabled(ae.isOpenProfitAlarmEnabled());
@@ -277,6 +278,18 @@ public class AccountManager {
                 }
                 homeyService.setAlarmState("PROFIT_" + accountId, false);
             }
+        }
+    }
+
+    /**
+     * Update account icon (Base64 data URL).
+     */
+    public void updateAccountIcon(long accountId, String iconBase64) {
+        Account account = accounts.get(accountId);
+        if (account != null) {
+            account.setIconBase64(iconBase64);
+            // Persist
+            tradeStorage.updateAccountIcon(accountId, iconBase64);
         }
     }
 
@@ -464,6 +477,7 @@ public class AccountManager {
             info.put("copierErrorMessage", account.getCopierErrorMessage());
             info.put("worstCopierStage", account.getWorstCopierStage());
             info.put("monitored", account.isMonitored());
+            info.put("iconBase64", account.getIconBase64());
 
             double dailyProfitVal = getCachedDailyProfit(account.getAccountId());
             info.put("dailyProfit", dailyProfitVal);

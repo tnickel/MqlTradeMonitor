@@ -56,6 +56,7 @@ public class Account {
     private String lastPromptAnalysisResult;
     private LocalDateTime lastPromptAnalysisTime;
     private boolean monitored = true;
+    private String iconBase64;
 
     public boolean isSyncWarning() {
         return syncWarning;
@@ -901,5 +902,13 @@ public class Account {
 
     public void setMonitored(boolean monitored) {
         this.monitored = monitored;
+    }
+
+    public String getIconBase64() {
+        return iconBase64;
+    }
+
+    public void setIconBase64(String iconBase64) {
+        this.iconBase64 = iconBase64;
     }
 }

@@ -97,6 +97,119 @@
             50% { opacity: 1; }
             100% { opacity: 0.3; }
         }
+
+        /* Dashboard Tabs Styling */
+        .dashboard-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            border-radius: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 0.55rem 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-1px);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeInTab 0.4s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeInTab {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Collapsible Filter Panel CSS */
+        .filter-panel {
+            background: var(--bg-secondary);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .filter-panel-header {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.01);
+            transition: background 0.2s;
+        }
+
+        .filter-panel-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .filter-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .filter-panel-arrow {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+
+        .filter-panel.collapsed .filter-panel-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .filter-panel-content {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .filter-panel.collapsed .filter-panel-content {
+            display: none;
+        }
     </style>
 </head>
 
@@ -238,161 +351,287 @@
             margin: 0 -2rem 1rem -2rem;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 16px;
             flex-wrap: wrap;
         ">
-            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">Zeitraum:</span>
-            <div class="filter-bar" id="history-filter-bar" style="margin: 0; padding: 0; background: transparent; border: none; display: flex; gap: 6px; flex-wrap: wrap;">
-                <button class="filter-btn" data-range="today">Heute</button>
-                <button class="filter-btn" data-range="1week">1 Woche</button>
-                <button class="filter-btn" data-range="1month">1 Monat</button>
-                <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
-                <button class="filter-btn" data-range="6months">6 Monate</button>
-                <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
-                <button class="filter-btn" data-range="1year">1 Jahr</button>
-                <button class="filter-btn" data-range="all">Alles</button>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">Zeitraum:</span>
+                <div class="filter-bar" id="history-filter-bar" style="margin: 0; padding: 0; background: transparent; border: none; display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button class="filter-btn" data-range="today">Heute</button>
+                    <button class="filter-btn" data-range="1week">1 Woche</button>
+                    <button class="filter-btn" data-range="1month">1 Monat</button>
+                    <button class="filter-btn" data-range="thismonth">Aktueller Monat</button>
+                    <button class="filter-btn" data-range="6months">6 Monate</button>
+                    <button class="filter-btn active" data-range="thisyear">Dieses Jahr</button>
+                    <button class="filter-btn" data-range="1year">1 Jahr</button>
+                    <button class="filter-btn" data-range="all">Alles</button>
+                </div>
+                <span id="sticky-date-range" style="font-size: 0.8rem; color: var(--accent-primary, #6366f1); font-weight: 600; white-space: nowrap; padding: 4px 12px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px;"></span>
             </div>
-            <span id="sticky-date-range" style="font-size: 0.8rem; color: var(--accent-primary, #6366f1); font-weight: 600; white-space: nowrap; padding: 4px 12px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px;"></span>
+
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" data-tab="tab-overview" onclick="switchTab('tab-overview')">📊 Übersicht</button>
+                <button class="tab-btn" data-tab="tab-strategies" onclick="switchTab('tab-strategies')">🤖 Strategien</button>
+                <button class="tab-btn" data-tab="tab-drawdown" onclick="switchTab('tab-drawdown')">📉 Drawdown</button>
+                <button class="tab-btn" data-tab="tab-trades" onclick="switchTab('tab-trades')">💼 Positionen</button>
+            </div>
         </div>
 
-        <!-- ======= ZENTRALER AUSWAHLFILTER (Thresholds) ======= -->
-        <section class="trades-section central-filter-section"
-            style="border: 1px solid var(--accent-primary); padding: 2rem; border-radius: 20px; margin-bottom: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); box-shadow: var(--shadow);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-                <h3 style="margin: 0; color: #fff; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">🎛️ Zentraler Auswahlfilter
-                </h3>
-                <span class="pulse-indicator"
-                    style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-color); font-weight: 500;">
-                    Eingaben filtern Daten sofort
-                </span>
-            </div>
-
-            <div style="display: flex; gap: 2.5rem; align-items: flex-end; flex-wrap: wrap;">
-                <div>
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
-                        1. Mindest-Trades im Zeitraum
-                        <span
-                            title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet."
-                            style="cursor: help;">ℹ️</span>
+        <!-- ======= COLLAPSIBLE FILTER PANEL ======= -->
+        <div id="filter-panel" class="filter-panel collapsed">
+            <div id="filter-panel-header" class="filter-panel-header" onclick="toggleFilterPanel()">
+                <div class="filter-panel-title">
+                    <span>🎛️ Filter & Einstellungen</span>
+                    <span id="filter-summary-badge" style="font-size: 0.75rem; font-weight: normal; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border-color);">
+                        Lade Status...
                     </span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0"
-                            max="9999"
-                            style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
-                        <span id="minTradesFeedback"
-                            style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
+                </div>
+                <div class="filter-panel-arrow">▼</div>
+            </div>
+            <div id="filter-panel-content" class="filter-panel-content">
+                <!-- Zentraler Auswahlfilter (Thresholds) -->
+                <div style="background: rgba(0, 0, 0, 0.15); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <h4 style="margin: 0; color: #fff; font-size: 0.9rem; font-weight: 700; letter-spacing: -0.01em;">Mindestwerte & Alter</h4>
+                    </div>
+                    <div style="display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap;">
+                        <div>
+                            <span style="display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                                1. Mindest-Trades im Zeitraum
+                                <span title="Magic Numbers mit weniger als dieser Anzahl Trades (Offen + Geschlossen) im gewählten Zeitraum werden ausgeblendet." style="cursor: help;">ℹ️</span>
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="filter-min-trades" th:value="${account.magicMinTrades}" min="0" max="9999" style="width: 80px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.9rem; font-weight: 600; outline: none;">
+                                <span id="minTradesFeedback" style="font-size: 0.8rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span style="display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                                2. Max. Alter (Tage, ohne offene Trades)
+                                <span title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet." style="cursor: help;">ℹ️</span>
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0" max="9999" style="width: 80px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 0.9rem; font-weight: 600; outline: none;">
+                                <span id="maxAgeFeedback" style="font-size: 0.8rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
-                        2. Max. Alter (Tage, ohne offene Trades)
+                <!-- Magic Number Filter Bar -->
+                <div id="magic-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}" style="display: flex; flex-direction: column; gap: 8px; padding: 1.25rem; background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <span style="color: #fff; font-size: 0.9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">🎯 Magic Filter:</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" id="magic-select-all" onclick="toggleAllMagics(true)" style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Alle</button>
+                            <button type="button" id="magic-select-none" onclick="toggleAllMagics(false)" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Keine</button>
+                        </div>
+                    </div>
+                    <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+                </div>
+
+                <!-- Symbol Filter Bar -->
+                <div id="symbol-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}" style="display: flex; flex-direction: column; gap: 8px; padding: 1.25rem; background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <span style="color: #fff; font-size: 0.9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">💱 Symbol Filter:</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" id="symbol-select-all" onclick="toggleAllSymbols(true)" style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Alle</button>
+                            <button type="button" id="symbol-select-none" onclick="toggleAllSymbols(false)" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Keine</button>
+                        </div>
+                    </div>
+                    <div id="symbol-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: OVERVIEW ==================== -->
+        <div id="tab-overview" class="tab-content active">
+            <!-- ======= MONTHLY PERFORMANCE ======= -->
+            <section class="trades-section monthly-performance-section"
+                style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+                <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📅 Monatliche Performance</h2>
+                
+                <div class="chart-container"
+                    style="position: relative; height: 350px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
+                    <canvas id="monthly-performance-chart"></canvas>
+                </div>
+            </section>
+
+            <!-- ======= DASHBOARD (Chart + Stats) ======= -->
+            <section class="trades-section dashboard-section"
+                style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+                <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📜 Trade Historie / Dashboard</h2>
+
+                <div class="chart-container"
+                    style="position: relative; height: 350px; margin-bottom: 2.5rem; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
+                    <canvas id="balance-history-chart"></canvas>
+                    <!-- Equity overlay: shown prominently on right side of chart -->
+                    <div id="equity-overlay" style="
+                        position: absolute;
+                        top: 20px;
+                        right: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-end;
+                        gap: 4px;
+                        pointer-events: none;
+                    ">
                         <span
-                            title="Magic Numbers ohne offene Trades, deren letzter Trade VOR dem gewählten Zeitraum plus diese Anzahl Tage absitzt, werden ausgeblendet."
-                            style="cursor: help;">ℹ️</span>
-                    </span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="number" id="filter-max-age" th:value="${account.magicNumberMaxAge}" min="0"
-                            max="9999"
-                            style="width: 90px; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-size: 1rem; font-weight: 600; outline: none; transition: border-color 0.2s;">
-                        <span id="maxAgeFeedback"
-                            style="font-size: 0.85rem; color: var(--success); display: none; opacity: 0; transition: opacity 0.3s; font-weight: 700;">✓</span>
+                            style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Open
+                            Equity</span>
+                        <span id="equity-overlay-value"
+                            style="font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);">-</span>
+                        <span id="equity-overlay-balance" style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;"></span>
+                    </div>
+                    <!-- Max Equity Drawdown overlay: bottom-right of chart -->
+                    <div id="drawdown-overlay" style="
+                        position: absolute;
+                        bottom: 20px;
+                        right: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-end;
+                        gap: 2px;
+                        pointer-events: none;
+                    ">
+                        <span
+                            style="font-size: 0.6875rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Max
+                            Equity DD (Zeitraum)</span>
+                        <span id="drawdown-overlay-value"
+                            style="font-size: 1.5rem; font-weight: 800; color: #ef4444; line-height: 1;">-</span>
+                        <span id="drawdown-overlay-percent" style="font-size: 0.9375rem; color: #ef4444; font-weight: 600;"></span>
                     </div>
                 </div>
-            </div>
-        </section>
 
-        <!-- ======= MONTHLY PERFORMANCE ======= -->
-        <section class="trades-section monthly-performance-section"
-            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
-            <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📅 Monatliche Performance</h2>
-            
-            <div class="chart-container"
-                style="position: relative; height: 350px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
-                <canvas id="monthly-performance-chart"></canvas>
-            </div>
-        </section>
+                <!-- Statistics Grid -->
+                <div class="stats-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 1rem;">
+                    <div class="stat-card"
+                        style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
+                        <span
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Gesamtgewinn</span>
+                        <span id="stat-total-profit" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
+                    </div>
+                    <div class="stat-card"
+                        style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
+                        <span
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Profit
+                            Faktor</span>
+                        <span id="stat-profit-factor" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
+                    </div>
+                    <div class="stat-card"
+                        style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
+                        <span
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trefferquote</span>
+                        <span id="stat-win-rate" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0%</span>
+                    </div>
+                    <div class="stat-card"
+                        style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
+                        <span
+                            style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trades
+                            (Zeitraum)</span>
+                        <span id="stat-total-trades" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0</span>
+                    </div>
+                </div>
+            </section>
 
-        <!-- ======= DASHBOARD (Chart + Stats) ======= -->
-        <section class="trades-section dashboard-section"
-            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
-            <h2 style="color: #fff; margin-bottom: 2rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">📜 Trade Historie / Dashboard</h2>
+            <!-- ======= PROMPT ANALYSE ======= -->
+            <!-- Admin-Ansicht: Konfiguration + Trigger-Button -->
+            <section th:if="${isAdmin}" class="trades-section prompt-analysis-section"
+                style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+                    <h2 style="color: #fff; margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">🤖 KI-Prompt-Marktanalyse (Admin)</h2>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="llm-analysis-enabled" th:checked="${account.promptAnalysisEnabled}" style="accent-color: var(--accent-primary); width: 18px; height: 18px;">
+                            Analyse für diesen Account aktivieren
+                        </label>
+                    </div>
+                </div>
 
-            <div class="chart-container"
-                style="position: relative; height: 350px; margin-bottom: 2.5rem; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
-                <canvas id="balance-history-chart"></canvas>
-                <!-- Equity overlay: shown prominently on right side of chart -->
-                <div id="equity-overlay" style="
-                    position: absolute;
-                    top: 20px;
-                    right: 24px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 4px;
-                    pointer-events: none;
-                ">
-                    <span
-                        style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Open
-                        Equity</span>
-                    <span id="equity-overlay-value"
-                        style="font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);">-</span>
-                    <span id="equity-overlay-balance" style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;"></span>
-                </div>
-                <!-- Max Equity Drawdown overlay: bottom-right of chart -->
-                <div id="drawdown-overlay" style="
-                    position: absolute;
-                    bottom: 20px;
-                    right: 24px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 2px;
-                    pointer-events: none;
-                ">
-                    <span
-                        style="font-size: 0.6875rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Max
-                        Equity DD (Zeitraum)</span>
-                    <span id="drawdown-overlay-value"
-                        style="font-size: 1.5rem; font-weight: 800; color: #ef4444; line-height: 1;">-</span>
-                    <span id="drawdown-overlay-percent" style="font-size: 0.9375rem; color: #ef4444; font-weight: 600;"></span>
-                </div>
-            </div>
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                    <!-- Configuration panel -->
+                    <div style="background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1.25rem;">
+                        <label for="llm-account-prompt" style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">Individueller Prompt / Strategiebeschreibung für dieses Konto</label>
+                        <textarea id="llm-account-prompt" rows="5" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 8px; resize: vertical; font-family: 'Inter', sans-serif; font-size: 0.9rem; line-height: 1.5; box-sizing: border-box;" placeholder="Beschreibe hier die Handelsstrategie dieses Kontos (z. B. Dervi Scalper details, Buy offene Paare, etc.). Das LLM nutzt diese Beschreibung zur Bewertung..." th:text="${account.customPrompt}"></textarea>
+                        
+                        <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
+                            <button type="button" onclick="saveLlmAccountConfig()" style="background: var(--accent-primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 600; transition: background 0.2s;" onmouseover="this.style.background='var(--accent-primary-hover)'" onmouseout="this.style.background='var(--accent-primary)'">💾 Einstellungen speichern</button>
+                            <span id="llmConfigFeedback" style="font-size: 0.85rem; font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
 
-            <!-- Statistics Grid -->
-            <div class="stats-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 1rem;">
-                <div class="stat-card"
-                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Gesamtgewinn</span>
-                    <span id="stat-total-profit" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
-                </div>
-                <div class="stat-card"
-                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Profit
-                        Faktor</span>
-                    <span id="stat-profit-factor" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0.00</span>
-                </div>
-                <div class="stat-card"
-                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trefferquote</span>
-                    <span id="stat-win-rate" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0%</span>
-                </div>
-                <div class="stat-card"
-                    style="background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.2s;">
-                    <span
-                        style="display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Trades
-                        (Zeitraum)</span>
-                    <span id="stat-total-trades" style="font-size: 1.5rem; font-weight: 700; color: #fff;">0</span>
-                </div>
-            </div>
-        </section>
+                    <!-- Analysis Trigger & Results -->
+                    <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <button type="button" id="trigger-llm-btn" onclick="runLlmAnalysis()" style="background: #10b981; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.2)'">
+                                    🔍 Offene Trades bewerten
+                                </button>
+                                <button type="button" id="view-llm-history-btn" onclick="openLlmHistoryModal()" style="background: #3b82f6; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.2)'">
+                                    📜 Verlauf einsehen
+                                </button>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Letzte Analyse</span>
+                                <div id="llm-timestamp" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin-top: 2px;" th:text="${account.lastPromptAnalysisTime != null ? #temporals.format(account.lastPromptAnalysisTime, 'dd.MM.yyyy HH:mm:ss') : '-'}">-</div>
+                            </div>
+                        </div>
 
+                        <!-- Output Box & Gauges Flex Row -->
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
+                            <!-- Left: analysis result text card -->
+                            <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px; position: relative;">
+                                <div id="llm-loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(4px); border-radius: 12px; align-items: center; justify-content: center; flex-direction: column; gap: 15px; z-index: 10;">
+                                    <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                    <span style="color: #fff; font-weight: 600; font-size: 0.95rem;">Analyse läuft (Grok bewertet Positionen...)</span>
+                                </div>
+                                
+                                <div id="llm-result-container" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Noch keine Analyse durchgeführt. Klicke auf den Button oben, um die offenen Trades zu bewerten.'}">Noch keine Analyse durchgeführt.</div>
+                            </div>
+                            
+                            <!-- Right: Visual Risk Gauges Card -->
+                            <div id="llm-gauges-container" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
+                                <!-- Will be populated dynamically by updateRiskGauges() -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- User-Ansicht (Nicht-Admin): Nur Ergebnisse anzeigen, wenn aktiviert -->
+            <section th:if="${!isAdmin and account.promptAnalysisEnabled}" class="trades-section prompt-analysis-section"
+                style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+                    <h2 style="color: #fff; margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">🤖 KI-Positionsanalyse</h2>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button type="button" id="view-llm-history-btn-user" onclick="openLlmHistoryModal()" style="background: #3b82f6; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.2)'">
+                            📜 Verlauf
+                        </button>
+                        <div style="text-align: right;">
+                            <span style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Analysiert am</span>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin-top: 2px;" th:text="${account.lastPromptAnalysisTime != null ? #temporals.format(account.lastPromptAnalysisTime, 'dd.MM.yyyy HH:mm:ss') : '-'}">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Box & Gauges Flex Row -->
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
+                    <!-- Left: analysis result text card -->
+                    <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px;">
+                        <div id="llm-result-container-user" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Derzeit liegt kein Analysebericht für dieses Konto vor.'}">Kein Bericht vorrätig.</div>
+                    </div>
+                    
+                    <!-- Right: Visual Risk Gauges Card -->
+                    <div id="llm-gauges-container-user" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
+                        <!-- Will be populated dynamically by updateRiskGauges() -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="tab-drawdown" class="tab-content">
         <!-- ======= DRAWDOWN ANALYZER DASHBOARD ======= -->
         <section class="trades-section drawdown-section"
             style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
@@ -529,34 +768,35 @@
 
 
             <div class="dd-summary" id="dd-summary" style="display: none;">
-                <div class="dd-stat"><span class="dd-stat-label" title="Anzahl identifizierter Drawdown-Perioden (Peak → Recovery)">Drawdowns</span><span class="dd-stat-value" id="dd-count">—</span></div>
-                <div class="dd-stat"><span class="dd-stat-label" title="Tiefster Peak-to-Trough Verlust in EUR">Max DD €</span><span class="dd-stat-value dd-bad" id="dd-max-depth">—</span></div>
-                <div class="dd-stat"><span class="dd-stat-label" title="Tiefster Peak-to-Trough Verlust als % des Equity Peaks">Max DD %</span><span class="dd-stat-value dd-bad" id="dd-max-pct">—</span></div>
-                <div class="dd-stat"><span class="dd-stat-label" title="Durchschnittliche Drawdown-Tiefe über alle Perioden">Avg DD %</span><span class="dd-stat-value" id="dd-avg-pct">—</span></div>
-                <div class="dd-stat"><span class="dd-stat-label" title="Durchschnittliche Tage von Tief zurück über den Peak (nur abgeschlossene DDs)">Avg Recovery</span><span class="dd-stat-value" id="dd-avg-recovery">—</span></div>
-                <div class="dd-stat"><span class="dd-stat-label" title="Längste Zeitspanne unter einem vorherigen Equity-Peak (inkl. laufende)">Longest Underwater</span><span class="dd-stat-value dd-warn" id="dd-longest-uw">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Drawdowns</span><span class="dd-stat-value" id="dd-stat-count">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Max DD €</span><span class="dd-stat-value dd-bad" id="dd-stat-max-abs">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Max DD %</span><span class="dd-stat-value dd-bad" id="dd-stat-max-pct">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Avg DD %</span><span class="dd-stat-value dd-warn" id="dd-stat-avg-pct">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Avg Recovery</span><span class="dd-stat-value" id="dd-stat-avg-rec">—</span></div>
+                <div class="dd-stat"><span class="dd-stat-label">Longest UW</span><span class="dd-stat-value dd-bad" id="dd-stat-longest-uw">—</span></div>
             </div>
 
             <div class="dd-chart-wrap" id="dd-chart-wrap">
+                <div class="dd-empty-state" id="dd-empty-state"><div class="dd-empty-icon">⏳</div><span>Berechne Drawdowns...</span></div>
                 <canvas id="dd-canvas"></canvas>
-                <div class="dd-empty-state" id="dd-empty-state"><span class="dd-empty-icon">📊</span><span>Lade Equity-Daten für Drawdown-Analyse...</span></div>
                 <div class="dd-crosshair" id="dd-crosshair" style="display: none;"></div>
                 <div class="dd-tooltip" id="dd-tooltip" style="display: none;">
-                    <div class="dd-tt-title" id="dd-tt-title"></div>
-                    <div class="dd-tt-row"><span class="dd-tt-label">Underwater</span><span class="dd-tt-value" id="dd-tt-uw"></span></div>
-                    <div class="dd-tt-row"><span class="dd-tt-label">Equity</span><span class="dd-tt-value" id="dd-tt-eq"></span></div>
-                    <div class="dd-tt-row" id="dd-tt-peak-row"><span class="dd-tt-label">Peak</span><span class="dd-tt-value" id="dd-tt-peak"></span></div>
+                    <div class="dd-tt-title" id="dd-tt-title">Snapshot</div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Underwater:</span><span class="dd-tt-value dd-bad" id="dd-tt-uw">—</span></div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Equity:</span><span class="dd-tt-value" id="dd-tt-eq">—</span></div>
+                    <div class="dd-tt-row" id="dd-tt-peak-row"><span class="dd-tt-label">Peak:</span><span class="dd-tt-value" id="dd-tt-peak">—</span></div>
                 </div>
             </div>
 
             <div class="dd-table-section" id="dd-table-section" style="display: none;">
-                <div class="dd-table-header"><h3 id="dd-table-title">Alle Drawdowns</h3></div>
+                <div class="dd-table-header">
+                    <h3 id="dd-table-title">Identifizierte Drawdown-Perioden (Klicken für Details)</h3>
+                </div>
                 <div class="dd-table-scroll">
                     <table class="dd-table">
                         <thead><tr>
-                            <th>#</th>
-                            <th class="dd-sortable" data-sort="depth" onclick="ddSetSort('depth')">Depth €</th>
-                            <th class="dd-sortable" data-sort="depthPct" onclick="ddSetSort('depthPct')">Depth %</th>
+                            <th class="dd-sortable dd-sort-active dd-desc" data-sort="depth" onclick="ddSetSort('depth')">Tiefe %</th>
+                            <th class="dd-sortable" data-sort="depthAbs" onclick="ddSetSort('depthAbs')">Tiefe €</th>
                             <th class="dd-sortable" data-sort="peakTime" onclick="ddSetSort('peakTime')">Peak Datum</th>
                             <th class="dd-sortable" data-sort="troughTime" onclick="ddSetSort('troughTime')">Trough Datum</th>
                             <th class="dd-sortable" data-sort="declineDays" onclick="ddSetSort('declineDays')">Decline (d)</th>
@@ -584,11 +824,13 @@
             var ddSnapshots = [], ddAllSnapshots = [], ddEquityCurve = [], ddUnderwaterSeries = [], ddDrawdownPeriods = [];
             var ddXMode = 'time', ddSortKey = 'depth', ddSortDir = 'desc', ddSelectedDD = null, ddHover = null, ddLayout = null;
             var ddSelectedTimeStartTs = 0, ddSelectedTimeEndTs = 0, ddSelectedTimeFilterTs = null;
-            var ddCanvas = document.getElementById('dd-canvas');
+
             var ddChartWrap = document.getElementById('dd-chart-wrap');
+            var ddCanvas = document.getElementById('dd-canvas');
             var ddEmptyState = document.getElementById('dd-empty-state');
             var ddCrosshair = document.getElementById('dd-crosshair');
             var ddTooltip = document.getElementById('dd-tooltip');
+            var ddCtx = ddCanvas.getContext('2d');
 
             function ddLoadData() {
                 fetch('/api/equity-history/' + ACCOUNT_ID)
@@ -679,12 +921,20 @@
                     if (p[i].underwaterDays > lwUW) lwUW = p[i].underwaterDays;
                 }
                 for (var i = 0; i < closed.length; i++) sumR += closed[i].recoveryDays;
-                document.getElementById('dd-count').innerHTML = p.length + (oc > 0 ? ' <span style="font-size:0.8rem;color:var(--warning)">(' + oc + ' laufend)</span>' : '');
-                document.getElementById('dd-max-depth').textContent = '-' + ddFmtMoney(maxD) + ' ' + ACCOUNT_CURRENCY;
-                document.getElementById('dd-max-pct').textContent = maxP.toFixed(2) + '%';
-                document.getElementById('dd-avg-pct').textContent = (sumP / p.length).toFixed(2) + '%';
-                document.getElementById('dd-avg-recovery').textContent = closed.length ? (sumR / closed.length).toFixed(0) + ' d' : '—';
-                document.getElementById('dd-longest-uw').textContent = lwUW.toFixed(0) + ' d';
+
+                var elCount = document.getElementById('dd-stat-count');
+                var elMaxDepth = document.getElementById('dd-stat-max-abs');
+                var elMaxPct = document.getElementById('dd-stat-max-pct');
+                var elAvgPct = document.getElementById('dd-stat-avg-pct');
+                var elAvgRecovery = document.getElementById('dd-stat-avg-rec');
+                var elLongestUw = document.getElementById('dd-stat-longest-uw');
+
+                if (elCount) elCount.innerHTML = p.length + (oc > 0 ? ' <span style="font-size:0.8rem;color:var(--warning)">(' + oc + ' laufend)</span>' : '');
+                if (elMaxDepth) elMaxDepth.textContent = '-' + ddFmtMoney(maxD) + ' ' + ACCOUNT_CURRENCY;
+                if (elMaxPct) elMaxPct.textContent = maxP.toFixed(2) + '%';
+                if (elAvgPct) elAvgPct.textContent = (sumP / p.length).toFixed(2) + '%';
+                if (elAvgRecovery) elAvgRecovery.textContent = closed.length ? (sumR / closed.length).toFixed(0) + ' d' : '—';
+                if (elLongestUw) elLongestUw.textContent = lwUW.toFixed(0) + ' d';
             }
 
             function ddRenderAll() { ddDraw(); ddRenderTable(); }
@@ -880,209 +1130,191 @@
             ddLoadData();
         })();
         </script>
+        </div>
 
-        <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
-                <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
-                    style="background-color: transparent; border: 1px solid #b91c1c; color: #b91c1c; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;"
-                    onmouseover="this.style.backgroundColor='#b91c1c'; this.style.color='white';"
-                    onmouseout="this.style.backgroundColor='transparent'; this.style.color='#b91c1c';"
-                    title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
-                    🗑️ Reset Trades Database
-                </button>
-            </div>
-        </section>
-
-
-        <!-- ======= OPEN TRADES ======= -->
-        <section class="trades-section">
-            <h2>📈 Offene Positionen</h2>
-
-            <div th:if="${#lists.size(account.openTrades) == 0}" class="no-trades">
-                <p>Keine offenen Positionen</p>
-            </div>
-
-            <div th:if="${#lists.size(account.openTrades) > 0}">
-                <table class="trades-table" id="open-trades-table">
-                    <thead>
-                        <tr>
-                            <th>Ticket</th>
-                            <th>Symbol</th>
-                            <th>Typ</th>
-                            <th>Volume</th>
-                            <th>Open Price</th>
-                            <th>Time</th>
-                            <th>S/L</th>
-                            <th>T/P</th>
-                            <th>Swap</th>
-                            <th>Profit</th>
-                            <th>Drawdown</th>
-                            <th>Magic</th>
-                            <th>Status.</th>
-                            <th>Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <th:block th:each="groupEntry : ${groupedTrades}">
-                            <th:block th:with="groupSummary=${groupSummaries.get(groupEntry.key)}">
-                                <!-- Group Header Row -->
-                                <tr style="background: rgba(255, 255, 255, 0.05); font-weight: bold; border-left: 4px solid var(--accent-primary);">
-                                    <td colspan="3" style="color: var(--accent-primary);">
-                                        <span th:text="${groupSummary.name}">Algo Name</span>
-                                        <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 10px;" th:text="'(Magic: ' + ${groupEntry.key} + ')'">(Magic: 12345)</span>
-                                    </td>
-                                    <td th:text="${#numbers.formatDecimal(groupSummary.sumLots, 1, 2)}">1.00</td>
-                                    <td colspan="5"></td>
-                                    <td th:class="${groupSummary.sumProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                        th:text="${#numbers.formatDecimal(groupSummary.sumProfit, 1, 2)}">+100.00</td>
-                                    <td th:class="${groupSummary.sumDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                        th:text="${#numbers.formatDecimal(groupSummary.sumDrawdownPct, 1, 2)} + '%'">-1.5%</td>
-                                    <td colspan="3"></td>
-                                </tr>
-                                <!-- Individual Trades in Group -->
-                                <tr th:each="trade : ${groupEntry.value}">
-                                    <td th:text="${trade.ticket}">123456789</td>
-                                    <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
-                                    <td>
-                                        <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
-                                            th:text="${trade.type}">BUY</span>
-                                    </td>
-                                    <td th:text="${trade.volume}">0.10</td>
-                                    <td th:text="${trade.openPrice}">1.08500</td>
-                                    <td th:text="${trade.openTime}">2026-02-13 12:00</td>
-                                    <td th:text="${trade.stopLoss}">1.08000</td>
-                                    <td th:text="${trade.takeProfit}">1.09000</td>
-                                    <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
-                                    <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                        th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
-                                    <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
-                                        th:text="${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'" 
-                                        style="font-style: italic; opacity: 0.8;">
-                                        -1.00%</td>
-                                    <td th:text="${trade.magicNumber}">12345</td>
-                                    <td>
-                                        <span th:if="${account.type == 'REAL'}">
-                                            <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
-                                                title="Matched with Demo">✅</span>
-                                            <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
-                                                title="No matching Demo trade!">⚠️</span>
-                                            <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
-                                                style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
-                                        </span>
-                                    </td>
-                                    <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
-                                </tr>
-                            </th:block>
-                        </th:block>
-                    </tbody>
-                </table>
-
-            </div>
-        </section>
-
-        <style>
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-
-        <!-- ======= PROMPT ANALYSE ======= -->
-        <!-- Admin-Ansicht: Konfiguration + Trigger-Button -->
-        <section th:if="${isAdmin}" class="trades-section prompt-analysis-section"
-            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
-                <h2 style="color: #fff; margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">🤖 KI-Prompt-Marktanalyse (Admin)</h2>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="llm-analysis-enabled" th:checked="${account.promptAnalysisEnabled}" style="accent-color: var(--accent-primary); width: 18px; height: 18px;">
-                        Analyse für diesen Account aktivieren
-                    </label>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
-                <!-- Configuration panel -->
-                <div style="background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1.25rem;">
-                    <label for="llm-account-prompt" style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">Individueller Prompt / Strategiebeschreibung für dieses Konto</label>
-                    <textarea id="llm-account-prompt" rows="5" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 8px; resize: vertical; font-family: 'Inter', sans-serif; font-size: 0.9rem; line-height: 1.5; box-sizing: border-box;" placeholder="Beschreibe hier die Handelsstrategie dieses Kontos (z. B. Dervi Scalper details, Buy offene Paare, etc.). Das LLM nutzt diese Beschreibung zur Bewertung..." th:text="${account.customPrompt}"></textarea>
-                    
-                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
-                        <button type="button" onclick="saveLlmAccountConfig()" style="background: var(--accent-primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 600; transition: background 0.2s;" onmouseover="this.style.background='var(--accent-primary-hover)'" onmouseout="this.style.background='var(--accent-primary)'">💾 Einstellungen speichern</button>
-                        <span id="llmConfigFeedback" style="font-size: 0.85rem; font-weight: 600; display: none;"></span>
-                    </div>
-                </div>
-
-                <!-- Analysis Trigger & Results -->
-                <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <button type="button" id="trigger-llm-btn" onclick="runLlmAnalysis()" style="background: #10b981; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.2)'">
-                                🔍 Offene Trades bewerten
-                            </button>
-                            <button type="button" id="view-llm-history-btn" onclick="openLlmHistoryModal()" style="background: #3b82f6; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.2)'">
-                                📜 Verlauf einsehen
-                            </button>
-                        </div>
-                        <div style="text-align: right;">
-                            <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Letzte Analyse</span>
-                            <div id="llm-timestamp" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin-top: 2px;" th:text="${account.lastPromptAnalysisTime != null ? #temporals.format(account.lastPromptAnalysisTime, 'dd.MM.yyyy HH:mm:ss') : '-'}">-</div>
-                        </div>
-                    </div>
-
-                    <!-- Output Box & Gauges Flex Row -->
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
-                        <!-- Left: analysis result text card -->
-                        <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px; position: relative;">
-                            <div id="llm-loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(4px); border-radius: 12px; align-items: center; justify-content: center; flex-direction: column; gap: 15px; z-index: 10;">
-                                <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                                <span style="color: #fff; font-weight: 600; font-size: 0.95rem;">Analyse läuft (Grok bewertet Positionen...)</span>
-                            </div>
-                            
-                            <div id="llm-result-container" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Noch keine Analyse durchgeführt. Klicke auf den Button oben, um die offenen Trades zu bewerten.'}">Noch keine Analyse durchgeführt.</div>
-                        </div>
-                        
-                        <!-- Right: Visual Risk Gauges Card -->
-                        <div id="llm-gauges-container" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
-                            <!-- Will be populated dynamically by updateRiskGauges() -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- User-Ansicht (Nicht-Admin): Nur Ergebnisse anzeigen, wenn aktiviert -->
-        <section th:if="${!isAdmin and account.promptAnalysisEnabled}" class="trades-section prompt-analysis-section"
-            style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
-                <h2 style="color: #fff; margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em;">🤖 KI-Positionsanalyse</h2>
+        <!-- ==================== TAB: TRADES ==================== -->
+        <div id="tab-trades" class="tab-content">
+            <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button type="button" id="view-llm-history-btn-user" onclick="openLlmHistoryModal()" style="background: #3b82f6; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.2)'">
-                        📜 Verlauf
+                    <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
+                    <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
+                        style="background-color: transparent; border: 1px solid #b91c1c; color: #b91c1c; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;"
+                        onmouseover="this.style.backgroundColor='#b91c1c'; this.style.color='white';"
+                        onmouseout="this.style.backgroundColor='transparent'; this.style.color='#b91c1c';"
+                        title="Löscht alle offenen/geschlossenen Trades und Equity-Snapshots für diesen Account aus der Datenbank. Danach im MetaTrader 'Reconnect Server' drücken!">
+                        🗑️ Reset Trades Database
                     </button>
-                    <div style="text-align: right;">
-                        <span style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Analysiert am</span>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin-top: 2px;" th:text="${account.lastPromptAnalysisTime != null ? #temporals.format(account.lastPromptAnalysisTime, 'dd.MM.yyyy HH:mm:ss') : '-'}">-</div>
+                </div>
+            </section>
+
+            <!-- ======= OPEN TRADES ======= -->
+            <section class="trades-section">
+                <h2>📈 Offene Positionen</h2>
+
+                <div th:if="${#lists.size(account.openTrades) == 0}" class="no-trades">
+                    <p>Keine offenen Positionen</p>
+                </div>
+
+                <div th:if="${#lists.size(account.openTrades) > 0}">
+                    <table class="trades-table" id="open-trades-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Symbol</th>
+                                <th>Typ</th>
+                                <th>Volume</th>
+                                <th>Open Price</th>
+                                <th>Time</th>
+                                <th>S/L</th>
+                                <th>T/P</th>
+                                <th>Swap</th>
+                                <th>Profit</th>
+                                <th>Drawdown</th>
+                                <th>Magic</th>
+                                <th>Status.</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <th:block th:each="groupEntry : ${groupedTrades}">
+                                <th:block th:with="groupSummary=${groupSummaries.get(groupEntry.key)}">
+                                    <!-- Group Header Row -->
+                                    <tr style="background: rgba(255, 255, 255, 0.05); font-weight: bold; border-left: 4px solid var(--accent-primary);">
+                                        <td colspan="3" style="color: var(--accent-primary);">
+                                            <span th:text="${groupSummary.name}">Algo Name</span>
+                                            <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 10px;" th:text="'(Magic: ' + ${groupEntry.key} + ')'">(Magic: 12345)</span>
+                                        </td>
+                                        <td th:text="${#numbers.formatDecimal(groupSummary.sumLots, 1, 2)}">1.00</td>
+                                        <td colspan="5"></td>
+                                        <td th:class="${groupSummary.sumProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                            th:text="${#numbers.formatDecimal(groupSummary.sumProfit, 1, 2)}">+100.00</td>
+                                        <td th:class="${groupSummary.sumDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                            th:text="${#numbers.formatDecimal(groupSummary.sumDrawdownPct, 1, 2)} + '%'">-1.5%</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                    <!-- Individual Trades in Group -->
+                                    <tr th:each="trade : ${groupEntry.value}">
+                                        <td th:text="${trade.ticket}">123456789</td>
+                                        <td><strong th:text="${trade.symbol}">EURUSD</strong></td>
+                                        <td>
+                                            <span th:class="${trade.type == 'BUY' ? 'trade-type buy' : 'trade-type sell'}"
+                                                th:text="${trade.type}">BUY</span>
+                                        </td>
+                                        <td th:text="${trade.volume}">0.10</td>
+                                        <td th:text="${trade.openPrice}">1.08500</td>
+                                        <td th:text="${trade.openTime}">2026-02-13 12:00</td>
+                                        <td th:text="${trade.stopLoss}">1.08000</td>
+                                        <td th:text="${trade.takeProfit}">1.09000</td>
+                                        <td th:text="${#numbers.formatDecimal(trade.swap, 1, 2)}">-1.20</td>
+                                        <td th:class="${trade.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                            th:text="${#numbers.formatDecimal(trade.profit, 1, 2)}">+45.50</td>
+                                        <td th:class="${trade.maxDrawdown >= 0 ? 'profit-positive' : 'profit-negative'}"
+                                            th:text="${#numbers.formatDecimal((trade.maxDrawdown / account.balance) * 100, 1, 2)} + '%'" 
+                                            style="font-style: italic; opacity: 0.8;">
+                                            -1.00%</td>
+                                        <td th:text="${trade.magicNumber}">12345</td>
+                                        <td>
+                                            <span th:if="${account.type == 'REAL'}">
+                                                <span th:if="${trade.syncStatus == 'MATCHED'}" class="check-icon"
+                                                    title="Matched with Demo">✅</span>
+                                                <span th:if="${trade.syncStatus == 'WARNING'}" class="warning-icon"
+                                                    title="No matching Demo trade!">⚠️</span>
+                                                <span th:if="${trade.syncStatus == 'EXEMPTED'}" title="Von Synccheck ausgenommen"
+                                                    style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
+                                            </span>
+                                        </td>
+                                        <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                                    </tr>
+                                </th:block>
+                            </th:block>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
+            <section class="trades-section history-section">
+                <h2>📜 Geschlossene Trades Liste <span id="history-list-period"
+                        style="font-size: 0.9rem; color: #a0a0c0; font-weight: normal; margin-left: 10px;"></span></h2>
+
+                <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
+                    <p>Keine geschlossenen Trades vorhanden</p>
+                </div>
+
+                <div class="history-summary" id="history-summary" th:if="${#lists.size(account.closedTrades) > 0}">
+                    <span>Angezeigt: <strong id="visible-trades-count">0</strong> Trades</span>
+                    <span id="visible-profit-label" class="profit-positive">
+                        Profit: <strong id="visible-profit-amount">0.00</strong> <span
+                            th:text="${account.currency}">EUR</span>
+                    </span>
+                </div>
+
+                <div th:if="${#lists.size(account.closedTrades) > 0}" class="paginated-table-wrapper"
+                    id="closed-trades-wrapper">
+                    <table class="trades-table" id="closed-trades-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Symbol</th>
+                                <th>Typ</th>
+                                <th>Volume</th>
+                                <th>Open Time</th>
+                                <th>Close Time</th>
+                                <th>Duration</th>
+                                <th>Close Price</th>
+                                <th>Swap</th>
+                                <th>Commission</th>
+                                <th>Profit</th>
+                                <th>Magic</th>
+                            </tr>
+                        </thead>
+                        <tbody id="closed-trades-tbody">
+                            <tr>
+                                <td colspan="12" style="text-align: center; padding: 2rem; color: #a0a0c0;">
+                                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                        <div style="width: 20px; height: 20px; border: 3px solid rgba(99,102,241,0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                        Lade historische Trades...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="pagination-bar" id="closed-trades-pagination"></div>
+                    
+                    <div style="text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                        <div style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.8;">
+                            <span th:if="${accountTradeCount > 0}">
+                                Bereit zum Export: <strong th:text="${accountTradeCount}">0</strong> Trades 
+                                <span th:if="${accountTradeStart != null && accountTradeEnd != null}" 
+                                      th:text="'(' + ${accountTradeStart} + ' bis ' + ${accountTradeEnd} + ')'"></span>
+                            </span>
+                            <span th:if="${accountTradeCount == 0}">Keine Trades für diesen Account vorhanden.</span>
+                        </div>
+                        <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px;">
+                            <span>📥</span> Export all Trades (CSV)
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Output Box & Gauges Flex Row -->
-            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 15px;">
-                <!-- Left: analysis result text card -->
-                <div style="flex: 3 1 600px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; min-height: 120px;">
-                    <div id="llm-result-container-user" style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; font-family: 'Inter', sans-serif;" th:text="${account.lastPromptAnalysisResult != null && !account.lastPromptAnalysisResult.isEmpty() ? account.lastPromptAnalysisResult : 'Derzeit liegt kein Analysebericht für dieses Konto vor.'}">Kein Bericht vorrätig.</div>
+                <!-- ======= MONTHLY TRADE COUNT ======= -->
+                <div th:if="${#lists.size(account.closedTrades) > 0}" style="margin-top: 3rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 2rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Anzahl Trades pro Monat</h3>
+                    <div class="chart-container"
+                        style="position: relative; height: 300px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
+                        <canvas id="monthly-trade-count-chart"></canvas>
+                    </div>
                 </div>
-                
-                <!-- Right: Visual Risk Gauges Card -->
-                <div id="llm-gauges-container-user" style="flex: 1 1 320px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap;">
-                    <!-- Will be populated dynamically by updateRiskGauges() -->
-                </div>
-            </div>
-        </section>
+            </section>
+        </div>
 
-        <!-- ======= MAGIC NUMBER PROFIT BREAKDOWN ======= -->
+
+
+        <!-- ==================== TAB: STRATEGIES ==================== -->
+        <div id="tab-strategies" class="tab-content">
+            <!-- Combined Portfolio Chart (Summenkonto) right at the top of the tab -->
+            <div id="combined-portfolio-chart-container" style="margin-top: 1rem;"></div>
+
+            <!-- ======= MAGIC NUMBER PROFIT BREAKDOWN ======= -->
         <section class="trades-section magic-breakdown" th:if="${#lists.size(magicProfits) > 0}">
             <h2>📊 Gewinn pro Magic Number <span id="magic-breakdown-period"
                     style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
@@ -1224,6 +1456,7 @@
                     style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;"></span></h2>
             <div id="magic-charts-container"></div>
         </section>
+        </div>
 
         <!-- Fullscreen chart modal -->
         <div id="chart-modal" class="chart-modal">
@@ -1344,94 +1577,7 @@
             </div>
         </div>
 
-        <!-- ======= CLOSED TRADES HISTORY (filtered & paginated) ======= -->
-        <section class="trades-section history-section">
-            <h2>📜 Geschlossene Trades Liste <span id="history-list-period"
-                    style="font-size: 0.9rem; color: #a0a0c0; font-weight: normal; margin-left: 10px;"></span></h2>
 
-
-            <!-- Magic Number Filter Bar -->
-            <div id="magic-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}"
-                style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 1rem; padding: 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
-                <span style="color: var(--text-secondary); font-size: 0.85rem; margin-right: 8px; font-weight: bold;">🎯
-                    Magic Filter:</span>
-                <button type="button" id="magic-select-all" onclick="toggleAllMagics(true)"
-                    style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Alle</button>
-                <button type="button" id="magic-select-none" onclick="toggleAllMagics(false)"
-                    style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Keine</button>
-                <span style="width: 1px; height: 20px; background: var(--border-color); margin: 0 4px;"></span>
-                <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
-            </div>
-
-            <div th:if="${#lists.size(account.closedTrades) == 0}" class="no-trades">
-                <p>Keine geschlossenen Trades vorhanden</p>
-            </div>
-
-            <div class="history-summary" id="history-summary" th:if="${#lists.size(account.closedTrades) > 0}">
-                <span>Angezeigt: <strong id="visible-trades-count">0</strong> Trades</span>
-                <span id="visible-profit-label" class="profit-positive">
-                    Profit: <strong id="visible-profit-amount">0.00</strong> <span
-                        th:text="${account.currency}">EUR</span>
-                </span>
-            </div>
-
-            <div th:if="${#lists.size(account.closedTrades) > 0}" class="paginated-table-wrapper"
-                id="closed-trades-wrapper">
-                <table class="trades-table" id="closed-trades-table">
-                    <thead>
-                        <tr>
-                            <th>Ticket</th>
-                            <th>Symbol</th>
-                            <th>Typ</th>
-                            <th>Volume</th>
-                            <th>Open Time</th>
-                            <th>Close Time</th>
-                            <th>Duration</th>
-                            <th>Close Price</th>
-                            <th>Swap</th>
-                            <th>Commission</th>
-                            <th>Profit</th>
-                            <th>Magic</th>
-                        </tr>
-                    </thead>
-                    <tbody id="closed-trades-tbody">
-                        <tr>
-                            <td colspan="12" style="text-align: center; padding: 2rem; color: #a0a0c0;">
-                                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                                    <div style="width: 20px; height: 20px; border: 3px solid rgba(99,102,241,0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                                    Lade historische Trades...
-                                </div>
-                                <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="pagination-bar" id="closed-trades-pagination"></div>
-                
-                <div style="text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.8;">
-                        <span th:if="${accountTradeCount > 0}">
-                            Bereit zum Export: <strong th:text="${accountTradeCount}">0</strong> Trades 
-                            <span th:if="${accountTradeStart != null && accountTradeEnd != null}" 
-                                  th:text="'(' + ${accountTradeStart} + ' bis ' + ${accountTradeEnd} + ')'"></span>
-                        </span>
-                        <span th:if="${accountTradeCount == 0}">Keine Trades für diesen Account vorhanden.</span>
-                    </div>
-                    <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px;">
-                        <span>📥</span> Export all Trades (CSV)
-                    </button>
-                </div>
-            </div>
-
-            <!-- ======= MONTHLY TRADE COUNT ======= -->
-            <div th:if="${#lists.size(account.closedTrades) > 0}" style="margin-top: 3rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
-                <h3 style="color: #fff; margin-bottom: 2rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Anzahl Trades pro Monat</h3>
-                <div class="chart-container"
-                    style="position: relative; height: 300px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem;">
-                    <canvas id="monthly-trade-count-chart"></canvas>
-                </div>
-            </div>
-        </section>
 
         <footer>
             <p>Letzte Aktualisierung: <span th:text="${account.lastSeen}">2026-02-09
@@ -1440,6 +1586,63 @@
     </div>
 
     <script th:inline="javascript">
+
+        // ============ DASHBOARD TABS & COLLAPSIBLE FILTERS ============
+        function switchTab(tabId) {
+            localStorage.setItem('active_dashboard_tab', tabId);
+            document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                if (btn.getAttribute('data-tab') === tabId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                if (content.id === tabId) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+            // Force redraw/recalculation of Chart.js charts inside tabs
+            setTimeout(function() {
+                window.dispatchEvent(new Event('resize'));
+            }, 50);
+        }
+
+        function toggleFilterPanel() {
+            var panel = document.getElementById('filter-panel');
+            if (!panel) return;
+            var isCollapsed = panel.classList.toggle('collapsed');
+            localStorage.setItem('filter_panel_collapsed', isCollapsed ? 'true' : 'false');
+        }
+
+        function updateFilterSummary() {
+            var badge = document.getElementById('filter-summary-badge');
+            if (!badge) return;
+            var totalMagics = document.querySelectorAll('.magic-checkbox').length;
+            var activeMagicsCount = document.querySelectorAll('.magic-checkbox:checked').length;
+            var totalSymbols = document.querySelectorAll('.symbol-checkbox').length;
+            var activeSymbolsCount = document.querySelectorAll('.symbol-checkbox:checked').length;
+            badge.textContent = activeMagicsCount + ' von ' + totalMagics + ' Magics, ' + activeSymbolsCount + ' von ' + totalSymbols + ' Symbolen aktiv';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore active tab
+            var savedTab = localStorage.getItem('active_dashboard_tab') || 'tab-overview';
+            switchTab(savedTab);
+
+            // Restore filter panel state
+            var panel = document.getElementById('filter-panel');
+            if (panel) {
+                var collapsed = localStorage.getItem('filter_panel_collapsed');
+                if (collapsed === 'false') {
+                    panel.classList.remove('collapsed');
+                } else {
+                    panel.classList.add('collapsed');
+                }
+            }
+        });
 
         // ============ PER-ACCOUNT MAGIC MAX AGE SAVE ============
         var currentAccountId = /*[[${accountId}]]*/ 0;
@@ -1596,7 +1799,7 @@
             var data = [];
             trades.forEach(trade => {
                 var timeStr = trade.closeTime;
-                var profit = parseFloat(trade.profit || 0);
+                var profit = parseFloat(trade.profit || 0) + parseFloat(trade.swap || 0) + (parseFloat(trade.commission || 0) * commissionFactor);
 
                 if (timeStr) {
                     var t = timeStr.split(/[- :.]/);
@@ -1662,7 +1865,7 @@
             var visibleTrades = [];
             if (historyMgr && historyMgr.filteredRows) {
                 historyMgr.filteredRows.forEach(trade => {
-                    var profit = parseFloat(trade.profit || 0);
+                    var profit = parseFloat(trade.profit || 0) + parseFloat(trade.swap || 0) + (parseFloat(trade.commission || 0) * commissionFactor);
                     var timeStr = trade.closeTime;
                     if (timeStr) {
                         var t = timeStr.split(/[- :.]/);
@@ -1735,8 +1938,125 @@
             // Filter equity snapshots by time range
             equityDisplay = equityDisplay.filter(function (p) { return p.x >= minTime; });
 
-            // Always add current live equity as last point
-            equityDisplay.push({ x: now.getTime(), y: currentEquity });
+            // Check if filtering is active
+            var uncheckedMagics = document.querySelectorAll('.magic-checkbox:not(:checked)').length;
+            var uncheckedSymbols = document.querySelectorAll('.symbol-checkbox:not(:checked)').length;
+            var isFiltered = (uncheckedMagics > 0) || (uncheckedSymbols > 0);
+
+            if (isFiltered) {
+                // Reconstruct filtered equity curve
+                var filteredEquityDisplay = [];
+
+                // 1. Gather visible closed trades with open/close times
+                var visibleClosedTrades = [];
+                if (historyMgr && historyMgr.filteredRows) {
+                    historyMgr.filteredRows.forEach(trade => {
+                        var profit = parseFloat(trade.profit || 0) + parseFloat(trade.swap || 0) + parseFloat(trade.commission || 0) * commissionFactor;
+                        var openTimeStr = trade.openTime;
+                        var closeTimeStr = trade.closeTime;
+                        if (openTimeStr && closeTimeStr) {
+                            var o = openTimeStr.split(/[- :.]/);
+                            var oDate = new Date(o[0], o[1] - 1, o[2], o[3] || 0, o[4] || 0, o[5] || 0);
+                            var c = closeTimeStr.split(/[- :.]/);
+                            var cDate = new Date(c[0], c[1] - 1, c[2], c[3] || 0, c[4] || 0, c[5] || 0);
+                            visibleClosedTrades.push({
+                                openTime: oDate.getTime(),
+                                closeTime: cDate.getTime(),
+                                profit: profit
+                            });
+                        }
+                    });
+                }
+
+                // 2. Gather visible open trades and calculate total open profit
+                var visibleOpenTrades = [];
+                var openRows = document.querySelectorAll('#open-trades-table tbody tr');
+                var currentMagics = getActiveMagics();
+                var filteredOpenProfit = 0;
+
+                openRows.forEach(function (row) {
+                    if (row.cells.length < 12) return;
+                    var magic = row.cells[11] ? row.cells[11].textContent.trim() : '';
+                    var symbol = row.cells[1] ? row.cells[1].textContent.trim().toUpperCase() : '';
+
+                    if (magic && currentMagics.size > 0 && !currentMagics.has(magic)) return;
+                    if (symbol && activeSymbols.size > 0 && !activeSymbols.has(symbol)) return;
+
+                    var profit = parseFloat(row.cells[9] ? row.cells[9].textContent.trim() : 0);
+                    var swap = parseFloat(row.cells[8] ? row.cells[8].textContent.trim() : 0);
+                    var netProfit = profit + swap;
+                    filteredOpenProfit += netProfit;
+
+                    var openTimeStr = row.cells[5] ? row.cells[5].textContent.trim() : '';
+                    if (openTimeStr) {
+                        var t = openTimeStr.replace('T', ' ').split(/[- :.]/);
+                        var oDate = new Date(t[0], t[1] - 1, t[2], t[3] || 0, t[4] || 0, t[5] || 0);
+                        visibleOpenTrades.push({
+                            openTime: oDate.getTime(),
+                            profit: netProfit
+                        });
+                    }
+                });
+
+                // Helper to get filtered balance at time t
+                var self = this;
+                function getFilteredBalanceAt(t) {
+                    var val = fullBalanceHistory.length > 0 ? fullBalanceHistory[0].y : self.currentBalance;
+                    for (var i = 0; i < fullBalanceHistory.length; i++) {
+                        if (fullBalanceHistory[i].x <= t) {
+                            val = fullBalanceHistory[i].y;
+                        } else {
+                            break;
+                        }
+                    }
+                    return val;
+                }
+
+                // 3. For each snapshot point, calculate the filtered equity
+                var nowTs = now.getTime();
+                equityDisplay.forEach(function (pt) {
+                    var t = pt.x;
+                    var balAtT = getFilteredBalanceAt(t);
+                    var floatingAtT = 0;
+
+                    // Estimate floating profit/loss for closed trades at time t
+                    visibleClosedTrades.forEach(function (trade) {
+                        if (trade.openTime <= t && trade.closeTime >= t) {
+                            var duration = trade.closeTime - trade.openTime;
+                            if (duration > 0) {
+                                var elapsed = t - trade.openTime;
+                                floatingAtT += trade.profit * (elapsed / duration);
+                            } else {
+                                floatingAtT += trade.profit;
+                            }
+                        }
+                    });
+
+                    // Estimate floating profit/loss for open trades at time t
+                    visibleOpenTrades.forEach(function (trade) {
+                        if (trade.openTime <= t) {
+                            var duration = nowTs - trade.openTime;
+                            if (duration > 0) {
+                                var elapsed = t - trade.openTime;
+                                floatingAtT += trade.profit * (elapsed / duration);
+                            } else {
+                                floatingAtT += trade.profit;
+                            }
+                        }
+                    });
+
+                    filteredEquityDisplay.push({ x: t, y: balAtT + floatingAtT });
+                });
+
+                // Add filtered live equity point at now
+                var filteredLiveEquity = this.currentBalance + filteredOpenProfit;
+                filteredEquityDisplay.push({ x: nowTs, y: filteredLiveEquity });
+
+                equityDisplay = filteredEquityDisplay;
+            } else {
+                // Always add current live equity as last point
+                equityDisplay.push({ x: now.getTime(), y: currentEquity });
+            }
 
             // 5. Calculate Max Equity Drawdown for this time range
             if (equityDisplay.length > 1) {
@@ -2165,7 +2485,7 @@
                             historyChartMgr.equitySnapshots = snapshots;
                             updateEquityOverlay(currentEquity, currentBalance);
 
-                            magicChartMgr = new MagicChartManager('magic-charts-container');
+                            magicChartMgr = new MagicChartManager('magic-charts-container', 'combined-portfolio-chart-container');
                             window.globalPieChart = null;
 
                             var savedFilter = localStorage.getItem(STORAGE_KEY_FILTER) || 'thismonth';
@@ -2188,6 +2508,7 @@
                             });
 
                             initMagicFilter(trades);
+                            initSymbolFilter(trades);
                             applyHistoryFilter(savedFilter);
                         });
                 });
@@ -2282,6 +2603,7 @@
                         label.style.borderColor = 'rgba(255,255,255,0.1)';
                     }
                     reapplyHistoryFilter();
+                    updateFilterSummary();
                 });
 
                 label.appendChild(checkbox);
@@ -2296,6 +2618,7 @@
 
                 container.appendChild(label);
             });
+            updateFilterSummary();
         }
 
         function toggleAllMagics(selectAll) {
@@ -2318,6 +2641,95 @@
                 }
             });
             reapplyHistoryFilter();
+            updateFilterSummary();
+        }
+
+        // ============ SYMBOL FILTER ============
+        var activeSymbols = new Set();
+
+        function initSymbolFilter(trades) {
+            var container = document.getElementById('symbol-checkboxes');
+            if (!container) return;
+            container.innerHTML = '';
+
+            var symbolSet = new Set();
+            trades.forEach(function (trade) {
+                var s = String(trade.symbol || '').toUpperCase();
+                if (s) symbolSet.add(s);
+            });
+
+            var symbolArray = Array.from(symbolSet).sort();
+            activeSymbols = new Set(symbolArray);
+
+            symbolArray.forEach(function (symbol) {
+                var isChecked = activeSymbols.has(symbol);
+
+                var label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; transition: all 0.15s; user-select: none;';
+
+                if (isChecked) {
+                    label.style.background = 'rgba(99,102,241,0.12)';
+                    label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    label.style.border = '1px solid rgba(99,102,241,0.25)';
+                    label.style.color = '#c9d1d9';
+                } else {
+                    label.style.background = 'rgba(255,255,255,0.03)';
+                    label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    label.style.border = '1px solid rgba(255,255,255,0.1)';
+                    label.style.color = '#8b949e';
+                }
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = isChecked;
+                checkbox.value = symbol;
+                checkbox.className = 'symbol-checkbox';
+                checkbox.style.cssText = 'cursor: pointer; accent-color: #6366f1;';
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        activeSymbols.add(symbol);
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    } else {
+                        activeSymbols.delete(symbol);
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                    reapplyHistoryFilter();
+                    updateFilterSummary();
+                });
+
+                label.appendChild(checkbox);
+                var span = document.createElement('span');
+                span.textContent = symbol;
+                label.appendChild(span);
+
+                container.appendChild(label);
+            });
+            updateFilterSummary();
+        }
+
+        function toggleAllSymbols(selectAll) {
+            var checkboxes = document.querySelectorAll('.symbol-checkbox');
+            checkboxes.forEach(function (chk) {
+                chk.checked = selectAll;
+                var label = chk.closest('label');
+                if (selectAll) {
+                    activeSymbols.add(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(99,102,241,0.12)';
+                        label.style.borderColor = 'rgba(99,102,241,0.25)';
+                    }
+                } else {
+                    activeSymbols.delete(chk.value);
+                    if (label) {
+                        label.style.background = 'rgba(255,255,255,0.03)';
+                        label.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                }
+            });
+            reapplyHistoryFilter();
+            updateFilterSummary();
         }
 
         function getActiveMagics() {
@@ -2510,6 +2922,10 @@
                     var rowMagic = String(trade.magicNumber) || '';
                     if (currentMagics.size === 0) return false;
                     if (!currentMagics.has(rowMagic)) return false;
+
+                    var rowSymbol = String(trade.symbol || '').toUpperCase();
+                    if (activeSymbols.size === 0) return false;
+                    if (!activeSymbols.has(rowSymbol)) return false;
 
                     var closeTimeStr = trade.closeTime;
                     if (!closeTimeStr) return false;
@@ -2960,8 +3376,9 @@
 
 
         // ============ MAGIC CHART MANAGER ============
-        function MagicChartManager(containerId) {
+        function MagicChartManager(containerId, combinedContainerId) {
             this.container = document.getElementById(containerId);
+            this.combinedContainer = document.getElementById(combinedContainerId);
             this.charts = {}; // { magic: ChartInstance }
             this.chartData = {}; // { magic: { lineColor, bgColor, label, labels, data } }
             this.colors = [
@@ -2980,21 +3397,31 @@
             if (!this.container) return;
             this.chartData = {};
 
-            // 1. Group trades by Magic
-            var magicData = {}; // { magic: [ { time, profit } ] }
+            // 1. Group trades by Magic (including openTime)
+            var magicData = {}; // { magic: [ { time, openTime, profit, dateObj, symbol } ] }
 
             rows.forEach(trade => {
                 var magic = String(trade.magicNumber);
                 if (magic && magic !== 'undefined' && magic !== '0') {
-                    var profit = parseFloat(trade.profit || 0);
+                    var profit = parseFloat(trade.profit || 0) + parseFloat(trade.swap || 0) + (parseFloat(trade.commission || 0) * commissionFactor);
                     var timeStr = trade.closeTime;
+                    var openTimeStr = trade.openTime;
 
-                    if (timeStr) {
+                    if (timeStr && openTimeStr) {
                         var t = timeStr.split(/[- :.]/);
                         var date = new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5]);
 
+                        var o = openTimeStr.split(/[- :.]/);
+                        var openDate = new Date(o[0], o[1] - 1, o[2], o[3] || 0, o[4] || 0, o[5] || 0);
+
                         if (!magicData[magic]) magicData[magic] = [];
-                        magicData[magic].push({ time: date.getTime(), profit: profit, dateObj: date, symbol: trade.symbol });
+                        magicData[magic].push({
+                            time: date.getTime(),
+                            openTime: openDate.getTime(),
+                            profit: profit,
+                            dateObj: date,
+                            symbol: trade.symbol
+                        });
                     }
                 }
             });
@@ -3002,17 +3429,273 @@
             // 2. Identify active magics and existing charts
             var activeMagics = Object.keys(magicData);
 
-            // Remove charts for magics that are no longer present in filtered data
-            // Actually, maybe we just hide them? Or destroy them.
-            // Let's destroy to keep it clean, or keep them if we want to preserve state?
-            // Re-rendering is safer for now.
-
             this.container.innerHTML = ''; // Clear container
+            if (this.combinedContainer) this.combinedContainer.innerHTML = '';
             this.charts = {}; // Reset charts
 
             if (activeMagics.length === 0) {
                 this.container.innerHTML = '<p style="text-align:center; color: var(--text-secondary); padding: 1rem;">Keine Daten für diesen Zeitraum</p>';
                 return;
+            }
+
+            // ============ COMBINED PORTFOLIO CHART (SUMMENKONTO) ============
+            var combinedTrades = [];
+            activeMagics.forEach(magic => {
+                combinedTrades = combinedTrades.concat(magicData[magic]);
+            });
+
+            // Sort by close time ascending
+            combinedTrades.sort((a, b) => a.time - b.time);
+
+            // Calculate Cumulative Balance Points
+            var combinedBalancePoints = [];
+            var runCombinedProfit = 0;
+            if (combinedTrades.length > 0) {
+                combinedBalancePoints.push({ x: combinedTrades[0].time - 60000, y: 0 });
+            }
+            combinedTrades.forEach(t => {
+                runCombinedProfit += t.profit;
+                combinedBalancePoints.push({ x: t.time, y: runCombinedProfit });
+            });
+
+            // Gather visible open trades for active magics and active symbols
+            var visibleOpenTrades = [];
+            var openRows = document.querySelectorAll('#open-trades-table tbody tr');
+            var currentMagics = getActiveMagics();
+            var totalOpenProfit = 0;
+
+            openRows.forEach(function (row) {
+                if (row.cells.length < 12) return;
+                var magic = row.cells[11] ? row.cells[11].textContent.trim() : '';
+                var symbol = row.cells[1] ? row.cells[1].textContent.trim().toUpperCase() : '';
+
+                if (magic && currentMagics.size > 0 && !currentMagics.has(magic)) return;
+                if (symbol && activeSymbols.size > 0 && !activeSymbols.has(symbol)) return;
+
+                var profit = parseFloat(row.cells[9] ? row.cells[9].textContent.trim() : 0);
+                var swap = parseFloat(row.cells[8] ? row.cells[8].textContent.trim() : 0);
+                var netProfit = profit + swap;
+                totalOpenProfit += netProfit;
+
+                var openTimeStr = row.cells[5] ? row.cells[5].textContent.trim() : '';
+                if (openTimeStr) {
+                    var t = openTimeStr.replace('T', ' ').split(/[- :.]/);
+                    var oDate = new Date(t[0], t[1] - 1, t[2], t[3] || 0, t[4] || 0, t[5] || 0);
+                    visibleOpenTrades.push({
+                        openTime: oDate.getTime(),
+                        profit: netProfit
+                    });
+                }
+            });
+
+            // Estimate combined equity points at each trade close timestamp
+            var combinedEquityPoints = [];
+            var nowTs = Date.now();
+            combinedBalancePoints.forEach(function (pt) {
+                var t = pt.x;
+                var balAtT = pt.y;
+                var floatingAtT = 0;
+
+                // Estimate floating profit/loss for closed trades at time t
+                combinedTrades.forEach(function (trade) {
+                    if (trade.openTime <= t && trade.time >= t) {
+                        var duration = trade.time - trade.openTime;
+                        if (duration > 0) {
+                            var elapsed = t - trade.openTime;
+                            floatingAtT += trade.profit * (elapsed / duration);
+                        } else {
+                            floatingAtT += trade.profit;
+                        }
+                    }
+                });
+
+                // Estimate floating profit/loss for open trades at time t
+                visibleOpenTrades.forEach(function (trade) {
+                    if (trade.openTime <= t) {
+                        var duration = nowTs - trade.openTime;
+                        if (duration > 0) {
+                            var elapsed = t - trade.openTime;
+                            floatingAtT += trade.profit * (elapsed / duration);
+                        } else {
+                            floatingAtT += trade.profit;
+                        }
+                    }
+                });
+
+                combinedEquityPoints.push({ x: t, y: balAtT + floatingAtT });
+            });
+
+            // Add the final live points at nowTs
+            if (combinedBalancePoints.length > 0) {
+                var lastBal = combinedBalancePoints[combinedBalancePoints.length - 1].y;
+                combinedEquityPoints.push({ x: nowTs, y: lastBal + totalOpenProfit });
+                combinedBalancePoints.push({ x: nowTs, y: lastBal });
+            }
+
+            // Render Combined Portfolio Chart Card
+            if (combinedTrades.length > 0 || visibleOpenTrades.length > 0) {
+                var combWrapper = document.createElement('div');
+                combWrapper.className = 'chart-card';
+                combWrapper.style.gridColumn = '1 / -1'; // Span full width of grid
+                combWrapper.style.padding = '1.5rem';
+                combWrapper.style.backgroundColor = 'var(--bg-card)';
+                combWrapper.style.border = '1px solid var(--border-color)';
+                combWrapper.style.borderRadius = '12px';
+                combWrapper.style.marginBottom = '1.5rem';
+                combWrapper.style.boxShadow = 'var(--shadow)';
+
+                var combTitle = document.createElement('h3');
+                combTitle.className = 'chart-title';
+                combTitle.style.display = 'flex';
+                combTitle.style.alignItems = 'center';
+                combTitle.style.justifyContent = 'space-between';
+                combTitle.style.margin = '0 0 1rem 0';
+                combTitle.style.fontSize = '1.25rem';
+                combTitle.style.fontWeight = 'bold';
+
+                var titleTextSpan = document.createElement('span');
+                titleTextSpan.textContent = '📊 Portfolio Gesamt-Performance (Aktivierte Strategien)';
+                combTitle.appendChild(titleTextSpan);
+
+                var badgeSpan = document.createElement('span');
+                badgeSpan.style.fontSize = '0.8rem';
+                badgeSpan.style.background = 'rgba(99, 102, 241, 0.15)';
+                badgeSpan.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+                badgeSpan.style.padding = '3px 8px';
+                badgeSpan.style.borderRadius = '6px';
+                badgeSpan.style.color = '#a5b4fc';
+                badgeSpan.style.fontWeight = 'normal';
+                badgeSpan.textContent = 'Summenkonto';
+                combTitle.appendChild(badgeSpan);
+
+                combWrapper.appendChild(combTitle);
+
+                var combCanvasWrap = document.createElement('div');
+                combCanvasWrap.className = 'chart-container';
+                combCanvasWrap.style.position = 'relative';
+                combCanvasWrap.style.height = '300px';
+                combCanvasWrap.style.width = '100%';
+
+                var combCanvas = document.createElement('canvas');
+                combCanvasWrap.appendChild(combCanvas);
+                combWrapper.appendChild(combCanvasWrap);
+
+                var combSummaryRow = document.createElement('div');
+                combSummaryRow.style.display = 'flex';
+                combSummaryRow.style.justifyContent = 'space-around';
+                combSummaryRow.style.flexWrap = 'wrap';
+                combSummaryRow.style.gap = '1.5rem';
+                combSummaryRow.style.marginTop = '1.5rem';
+                combSummaryRow.style.paddingTop = '1.5rem';
+                combSummaryRow.style.borderTop = '1px solid var(--border-color)';
+
+                var closedProfitSum = runCombinedProfit;
+                var openProfitSum = totalOpenProfit;
+
+                var closedSumBox = document.createElement('div');
+                closedSumBox.style.textAlign = 'center';
+                closedSumBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamtsumme (Geschlossen)</span>' +
+                    '<span style="font-size: 1.5rem; font-weight: bold; color: ' + (closedProfitSum >= 0 ? '#10b981' : '#ef4444') + '">' +
+                    closedProfitSum.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+                var openSumBox = document.createElement('div');
+                openSumBox.style.textAlign = 'center';
+                openSumBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamt Offene Trades Equity</span>' +
+                    '<span style="font-size: 1.5rem; font-weight: bold; color: ' + (openProfitSum >= 0 ? '#10b981' : '#ef4444') + '">' +
+                    openProfitSum.toFixed(2) + ' ' + accountCurrency + '</span>';
+
+                combSummaryRow.appendChild(closedSumBox);
+                combSummaryRow.appendChild(openSumBox);
+                combWrapper.appendChild(combSummaryRow);
+
+                if (this.combinedContainer) {
+                    this.combinedContainer.innerHTML = '';
+                    this.combinedContainer.appendChild(combWrapper);
+                } else {
+                    this.container.appendChild(combWrapper);
+                }
+
+                var combCtx = combCanvas.getContext('2d');
+                var combBalGradient = combCtx.createLinearGradient(0, 0, 0, 250);
+                combBalGradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+                combBalGradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+                var combEqGradient = combCtx.createLinearGradient(0, 0, 0, 250);
+                combEqGradient.addColorStop(0, 'rgba(255, 200, 0, 0.2)');
+                combEqGradient.addColorStop(1, 'rgba(255, 200, 0, 0.0)');
+
+                var combLabels = combinedBalancePoints.map(d => new Date(d.x).toLocaleString());
+
+                new Chart(combCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: combLabels,
+                        datasets: [
+                            {
+                                label: 'Balance (Geschlossen)',
+                                data: combinedBalancePoints.map(d => d.y),
+                                borderColor: '#6366f1',
+                                backgroundColor: combBalGradient,
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.2,
+                                pointRadius: combinedBalancePoints.length > 100 ? 0 : 2,
+                                pointHoverRadius: 5
+                            },
+                            {
+                                label: 'Equity (Offene)',
+                                data: combinedEquityPoints.map(d => d.y),
+                                borderColor: '#ffc800',
+                                backgroundColor: combEqGradient,
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.2,
+                                pointRadius: combinedEquityPoints.length > 100 ? 0 : 2,
+                                pointHoverRadius: 5
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: { color: '#d1d5db', font: { size: 12 } }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ' + accountCurrency;
+                                    }
+                                },
+                                backgroundColor: '#252542',
+                                titleColor: '#ffffff',
+                                bodyColor: '#a0a0c0',
+                                borderColor: '#3f3f5f',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                ticks: {
+                                    color: '#d1d5db',
+                                    maxRotation: 0,
+                                    maxTicksLimit: 8,
+                                    font: { size: 11 },
+                                    autoSkip: true
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                ticks: { color: '#d1d5db', font: { size: 11 } },
+                                grid: { color: 'rgba(63,63,95,0.3)' }
+                            }
+                        }
+                    }
+                });
             }
 
             // 3. Render Charts
@@ -3227,35 +3910,7 @@
                 totalAllOpenProfit += openProfit;
             });
 
-            // Add summary below the charts
-            var summaryDiv = document.createElement('div');
-            summaryDiv.style.width = '100%';
-            summaryDiv.style.marginTop = '1rem';
-            summaryDiv.style.padding = '1rem';
-            summaryDiv.style.backgroundColor = 'var(--bg-card)';
-            summaryDiv.style.border = '1px solid var(--border-color)';
-            summaryDiv.style.borderRadius = '8px';
-            summaryDiv.style.display = 'flex';
-            summaryDiv.style.justifyContent = 'space-around';
-            summaryDiv.style.flexWrap = 'wrap';
-            summaryDiv.style.gap = '1rem';
 
-            var closedSummary = document.createElement('div');
-            closedSummary.style.textAlign = 'center';
-            closedSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamtsumme (Geschlossen)</span>' +
-                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllClosedProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
-                totalAllClosedProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
-
-            var openSummary = document.createElement('div');
-            openSummary.style.textAlign = 'center';
-            openSummary.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Gesamt Offene Trades Equity</span>' +
-                '<span style="font-size: 1.25rem; font-weight: bold; color: ' + (totalAllOpenProfit >= 0 ? '#10b981' : '#ef4444') + '">' +
-                totalAllOpenProfit.toFixed(2) + ' ' + accountCurrency + '</span>';
-
-            summaryDiv.appendChild(closedSummary);
-            summaryDiv.appendChild(openSummary);
-
-            this.container.appendChild(summaryDiv);
         };
 
         MagicChartManager.prototype.openModalFor = function (magic) {
@@ -3278,7 +3933,7 @@
                         var runProfit = 0;
                         dataPoints.push({ x: new Date(trades[0].closeTime.replace(/\./g, '-')).getTime() - 60000, y: 0 });
                         trades.forEach(t => {
-                            var profit = parseFloat(t.profit || 0);
+                            var profit = parseFloat(t.profit || 0) + parseFloat(t.swap || 0) + (parseFloat(t.commission || 0) * commissionFactor);
                             runProfit += profit;
                             var tParts = t.closeTime.split(/[- :.]/);
                             var date = new Date(tParts[0], tParts[1] - 1, tParts[2], tParts[3] || 0, tParts[4] || 0, tParts[5] || 0);
