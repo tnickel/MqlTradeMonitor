@@ -115,6 +115,7 @@
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 12px; margin: 5px 0 0 0;">
+                    <img th:if="${account.iconBase64 != null && !account.iconBase64.isEmpty()}" th:src="${account.iconBase64}" style="max-width: 40px; max-height: 40px; border-radius: 6px; object-fit: contain; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); padding: 2px;" class="account-detail-icon" />
                     <h1 th:text="${account.name != null && !account.name.isEmpty() ? account.name : 'Account ' + account.accountId}"
                         th:style="${account.name == 'FXSSI10_KI'} ? 'margin: 0; font-size: 2.5rem; color: #ffd700;' : 'margin: 0; font-size: 2.5rem;'">
                         Currency Pair / Strategy Name</h1>
@@ -1113,7 +1114,7 @@
                                 th:data-open-swap="${mp.openSwap}"
                                 th:data-symbols="${mp.tradedSymbols != null ? #strings.listJoin(mp.tradedSymbols.keySet(), ', ') : ''}">
                                 <td>
-                                    <strong>
+                                    <strong style="display: inline-flex; align-items: center; gap: 6px;">
                                         <a th:href="@{/account/{id}(id=${accountId}, magic=${mp.magicNumber})}"
                                             target="_blank" class="magic-link"
                                             title="Klicken, um Trades für diese Magic Number in neuem Tab zu öffnen"
@@ -1123,6 +1124,11 @@
                                             th:text="${mp.magicNumber}">
                                             12345
                                         </a>
+                                        <a href="#" th:onclick="'if(window.magicChartMgr) { window.magicChartMgr.openModalFor(\'' + ${mp.magicNumber} + '\'); } return false;'"
+                                           title="Equity & advanced statistics anzeigen" 
+                                           style="color: var(--accent-secondary, #6366f1); text-decoration: none; font-size: 1rem; opacity: 0.7; transition: opacity 0.2s;"
+                                           onmouseover="this.style.opacity='1'"
+                                           onmouseout="this.style.opacity='0.7'">📈</a>
                                     </strong>
                                     <div th:if="${mp.magicName != null && !mp.magicName.isEmpty()}"
                                         style="font-size: 0.85rem; color: #a0a0c0; margin-top: 2px;"
@@ -1224,8 +1230,116 @@
             <div class="chart-modal-content">
                 <button class="chart-modal-close" id="chart-modal-close">✕</button>
                 <h2 id="chart-modal-title" class="chart-modal-title"></h2>
-                <div class="chart-modal-canvas-wrap">
-                    <canvas id="chart-modal-canvas"></canvas>
+                
+                <div class="chart-modal-body" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; gap: 20px; padding-right: 5px;">
+                    <div class="chart-modal-canvas-wrap" style="position: relative; height: 380px; min-height: 320px; flex-shrink: 0;">
+                        <canvas id="chart-modal-canvas"></canvas>
+                    </div>
+                    
+                    <div class="chart-modal-stats-section" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; flex-shrink: 0;">
+                        <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--accent-secondary, #6366f1); font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">📊 Advanced Statistics</h3>
+                        <div class="myfxbook-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px;">
+                            <!-- Column 1: Trade Metrics -->
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Trades:</span>
+                                    <strong id="mstat-trades" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Profitability:</span>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span id="mstat-profitability-pct" style="color: #fff; font-weight: bold;">-%</span>
+                                        <div style="display: flex; height: 10px; width: 80px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,0.1);">
+                                            <div id="mstat-profitability-win" style="background: #10b981; width: 0%;"></div>
+                                            <div id="mstat-profitability-loss" style="background: #ef4444; width: 0%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Pips:</span>
+                                    <strong id="mstat-pips" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Average Win:</span>
+                                    <strong id="mstat-avg-win" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Average Loss:</span>
+                                    <strong id="mstat-avg-loss" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Lots:</span>
+                                    <strong id="mstat-lots" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Commissions:</span>
+                                    <strong id="mstat-commissions" style="color: #fff;">-</strong>
+                                </div>
+                            </div>
+                            <!-- Column 2: Streaks & Types -->
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Longs Won:</span>
+                                    <strong id="mstat-longs" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Shorts Won:</span>
+                                    <strong id="mstat-shorts" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Best Trade (€):</span>
+                                    <strong id="mstat-best-money" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Worst Trade (€):</span>
+                                    <strong id="mstat-worst-money" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Best Trade (Pips):</span>
+                                    <strong id="mstat-best-pips" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Worst Trade (Pips):</span>
+                                    <strong id="mstat-worst-pips" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Avg. Trade Length:</span>
+                                    <strong id="mstat-length" style="color: #fff;">-</strong>
+                                </div>
+                            </div>
+                            <!-- Column 3: Risk & Ratios -->
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Profit Factor:</span>
+                                    <strong id="mstat-profit-factor" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Standard Deviation:</span>
+                                    <strong id="mstat-stddev" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Sharpe Ratio:</span>
+                                    <strong id="mstat-sharpe" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Z-Score (Probability):</span>
+                                    <strong id="mstat-zscore" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">Expectancy:</span>
+                                    <strong id="mstat-expectancy" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">AHPR:</span>
+                                    <strong id="mstat-ahpr" style="color: #fff;">-</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px; font-size: 0.85rem;">
+                                    <span style="color: var(--text-secondary);">GHPR:</span>
+                                    <strong id="mstat-ghpr" style="color: #fff;">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2849,6 +2963,7 @@
         function MagicChartManager(containerId) {
             this.container = document.getElementById(containerId);
             this.charts = {}; // { magic: ChartInstance }
+            this.chartData = {}; // { magic: { lineColor, bgColor, label, labels, data } }
             this.colors = [
                 { line: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
                 { line: '#10b981', bg: 'rgba(16,185,129,0.15)' },
@@ -2863,6 +2978,7 @@
 
         MagicChartManager.prototype.update = function (rows) {
             if (!this.container) return;
+            this.chartData = {};
 
             // 1. Group trades by Magic
             var magicData = {}; // { magic: [ { time, profit } ] }
@@ -3093,6 +3209,15 @@
                     }
                 });
 
+                // Save chart details for external calls
+                this.chartData[magic] = {
+                    lineColor: colorSet.line,
+                    bgColor: colorSet.bg,
+                    label: chartLabel,
+                    labels: labels,
+                    data: values
+                };
+
                 // Click handler
                 wrapper.onclick = function () {
                     openChartModal(magic, colorSet.line, colorSet.bg, chartLabel, labels, values);
@@ -3133,6 +3258,53 @@
             this.container.appendChild(summaryDiv);
         };
 
+        MagicChartManager.prototype.openModalFor = function (magic) {
+            var magicStr = String(magic);
+            var d = this.chartData[magicStr];
+            if (d) {
+                openChartModal(magicStr, d.lineColor, d.bgColor, d.label, d.labels, d.data);
+            } else {
+                // Fallback: if not in filtered data, calculate from allRows
+                if (window.historyMgr && window.historyMgr.allRows) {
+                    var trades = window.historyMgr.allRows.filter(t => String(t.magicNumber) === magicStr);
+                    if (trades.length > 0) {
+                        // Sort ascending by closeTime
+                        trades.sort((a, b) => {
+                            var tA = a.closeTime ? new Date(a.closeTime.replace(/\./g, '-')).getTime() : 0;
+                            var tB = b.closeTime ? new Date(b.closeTime.replace(/\./g, '-')).getTime() : 0;
+                            return tA - tB;
+                        });
+                        var dataPoints = [];
+                        var runProfit = 0;
+                        dataPoints.push({ x: new Date(trades[0].closeTime.replace(/\./g, '-')).getTime() - 60000, y: 0 });
+                        trades.forEach(t => {
+                            var profit = parseFloat(t.profit || 0);
+                            runProfit += profit;
+                            var tParts = t.closeTime.split(/[- :.]/);
+                            var date = new Date(tParts[0], tParts[1] - 1, tParts[2], tParts[3] || 0, tParts[4] || 0, tParts[5] || 0);
+                            dataPoints.push({ x: date.getTime(), y: runProfit });
+                        });
+                        var labels = dataPoints.map(d => new Date(d.x).toLocaleString());
+                        var values = dataPoints.map(d => d.y);
+                        
+                        var commentText = '';
+                        var magicRow = document.querySelector('.magic-breakdown tbody tr[data-magic="' + magicStr + '"]');
+                        if (magicRow) {
+                            var nameDiv = magicRow.querySelector('div');
+                            if (nameDiv) commentText = nameDiv.textContent.trim();
+                        }
+                        var chartLabel = 'Magic ' + magicStr + (commentText ? ' — ' + commentText : '');
+                        
+                        openChartModal(magicStr, '#6366f1', 'rgba(99,102,241,0.15)', chartLabel, labels, values);
+                    } else {
+                        alert('Keine Trades für Magic ' + magicStr + ' gefunden.');
+                    }
+                } else {
+                    alert('Keine historischen Trades geladen.');
+                }
+            }
+        };
+
         // ============ FULLSCREEN CHART MODAL ============
         // ============ FULLSCREEN CHART MODAL ============
         var modalChart = null;
@@ -3141,6 +3313,343 @@
         function openChartModal(magic, lineColor, bgColor, label, labels, data) {
             currentMagic = magic;
             var modal = document.getElementById('chart-modal');
+            
+            // Advanced Statistics Calculation
+            var magicStr = String(magic);
+            var magicTrades = [];
+            if (window.historyMgr && window.historyMgr.allRows) {
+                magicTrades = window.historyMgr.allRows.filter(t => String(t.magicNumber) === magicStr);
+            }
+            
+            // Sort chronologically (earliest first)
+            magicTrades.sort((a, b) => {
+                var tA = a.closeTime ? new Date(a.closeTime.replace(/\./g, '-')).getTime() : 0;
+                var tB = b.closeTime ? new Date(b.closeTime.replace(/\./g, '-')).getTime() : 0;
+                return tA - tB;
+            });
+
+            // Pip size calculator helper
+            function calculatePips(trade) {
+                var openPrice = parseFloat(trade.openPrice || 0);
+                var closePrice = parseFloat(trade.closePrice || 0);
+                var symbol = (trade.symbol || "").toUpperCase();
+                var type = (trade.type || "").toUpperCase();
+                if (openPrice === 0 || closePrice === 0) return 0;
+                
+                var diff = type === 'BUY' ? (closePrice - openPrice) : (openPrice - closePrice);
+                
+                var pipSize = 0.0001; // default
+                if (symbol.indexOf('JPY') >= 0) {
+                    pipSize = 0.01;
+                } else if (symbol.indexOf('XAU') >= 0 || symbol.indexOf('GOLD') >= 0) {
+                    pipSize = 0.1;
+                } else if (symbol.indexOf('XAG') >= 0 || symbol.indexOf('SILVER') >= 0) {
+                    pipSize = 0.01;
+                } else if (symbol.indexOf('BTC') >= 0 || symbol.indexOf('ETH') >= 0) {
+                    pipSize = 1.0;
+                } else if (symbol.indexOf('DE30') >= 0 || symbol.indexOf('DE40') >= 0 || symbol.indexOf('US30') >= 0 || symbol.indexOf('US100') >= 0 || symbol.indexOf('SPX') >= 0) {
+                    pipSize = 1.0;
+                } else {
+                    var priceStr = String(openPrice);
+                    var dotIdx = priceStr.indexOf('.');
+                    if (dotIdx >= 0) {
+                        var decimals = priceStr.length - dotIdx - 1;
+                        if (decimals <= 3) {
+                            pipSize = 0.01;
+                        }
+                    }
+                }
+                return diff / pipSize;
+            }
+
+            // Statistical helpers
+            function calcStdDev(values, mean) {
+                if (values.length <= 1) return 0;
+                var sumSq = 0;
+                values.forEach(v => {
+                    sumSq += Math.pow(v - mean, 2);
+                });
+                return Math.sqrt(sumSq / (values.length - 1));
+            }
+
+            function normCDF(z) {
+                var t = 1 / (1 + 0.2316419 * Math.abs(z));
+                var d = 0.3989423 * Math.exp(-z * z / 2);
+                var p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+                if (z > 0) return 1 - p;
+                return p;
+            }
+
+            // format length helper
+            function formatLength(ms) {
+                if (ms < 0 || isNaN(ms)) return '—';
+                var diffSec = Math.floor(ms / 1000);
+                var minutes = Math.floor(diffSec / 60) % 60;
+                var hours = Math.floor(diffSec / 3600) % 24;
+                var days = Math.floor(diffSec / 86400);
+                
+                var parts = [];
+                if (days > 0) parts.push(days + 'd');
+                if (hours > 0 || days > 0) parts.push(hours + 'h');
+                if (minutes > 0 || hours > 0 || days > 0) parts.push(minutes + 'm');
+                if (days === 0 && hours === 0) parts.push((diffSec % 60) + 's');
+                return parts.join(' ') || '0s';
+            }
+
+            // Month names formatter helper
+            var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            function formatTradeDate(dateStr) {
+                if (!dateStr) return '';
+                var parts = dateStr.split(/[- :.]/);
+                if (parts.length >= 2) {
+                    var mIdx = parseInt(parts[1]) - 1;
+                    return monthNames[mIdx] + ' ' + parts[2];
+                }
+                return '';
+            }
+
+            // Reconstruct running account balance and map ticket -> balance before trade
+            var balanceMap = {};
+            var initialAccountBalance = 10000;
+            if (window.historyMgr && window.historyMgr.allRows) {
+                var totalHistoricalNetProfit = 0;
+                window.historyMgr.allRows.forEach(t => {
+                    var profit = parseFloat(t.profit || 0);
+                    var swap = parseFloat(t.swap || 0);
+                    var commission = parseFloat(t.commission || 0) * commissionFactor;
+                    totalHistoricalNetProfit += (profit + swap + commission);
+                });
+                initialAccountBalance = currentBalance - totalHistoricalNetProfit;
+                if (initialAccountBalance <= 0) initialAccountBalance = 10000;
+
+                var chronTrades = [...window.historyMgr.allRows].sort((a, b) => {
+                    var timeA = a.closeTime ? new Date(a.closeTime.replace(/\./g, '-')).getTime() : 0;
+                    var timeB = b.closeTime ? new Date(b.closeTime.replace(/\./g, '-')).getTime() : 0;
+                    return timeA - timeB;
+                });
+                
+                var currentRunningBalance = initialAccountBalance;
+                chronTrades.forEach(t => {
+                    balanceMap[t.ticket] = currentRunningBalance;
+                    var profit = parseFloat(t.profit || 0);
+                    var swap = parseFloat(t.swap || 0);
+                    var commission = parseFloat(t.commission || 0) * commissionFactor;
+                    currentRunningBalance += (profit + swap + commission);
+                });
+            }
+
+            // Calculations for selected magic
+            var totalTrades = magicTrades.length;
+            var netProfits = [];
+            var wins = [];
+            var losses = [];
+            var longs = [];
+            var shorts = [];
+            var totalPips = 0;
+            var totalLots = 0;
+            var totalCommissions = 0;
+            var totalNetProfit = 0;
+            
+            var bestTradeMoney = null;
+            var worstTradeMoney = null;
+            var bestTradePips = null;
+            var worstTradePips = null;
+            var totalDurationMs = 0;
+
+            magicTrades.forEach(t => {
+                var profit = parseFloat(t.profit || 0);
+                var swap = parseFloat(t.swap || 0);
+                var comm = parseFloat(t.commission || 0) * commissionFactor;
+                var netP = profit + swap + comm;
+                
+                netProfits.push(netP);
+                totalNetProfit += netP;
+                totalLots += parseFloat(t.volume || 0);
+                totalCommissions += comm;
+                
+                var pips = calculatePips(t);
+                totalPips += pips;
+
+                var dtObj = {
+                    ticket: t.ticket,
+                    symbol: t.symbol,
+                    netProfit: netP,
+                    pips: pips,
+                    type: (t.type || "").toUpperCase(),
+                    closeTime: t.closeTime,
+                    openTime: t.openTime
+                };
+
+                if (netP > 0) {
+                    wins.push(dtObj);
+                } else if (netP < 0) {
+                    losses.push(dtObj);
+                } else {
+                    // neutral/flat
+                }
+
+                if (dtObj.type === 'BUY') {
+                    longs.push(dtObj);
+                } else if (dtObj.type === 'SELL') {
+                    shorts.push(dtObj);
+                }
+
+                if (bestTradeMoney === null || netP > bestTradeMoney.netProfit) bestTradeMoney = dtObj;
+                if (worstTradeMoney === null || netP < worstTradeMoney.netProfit) worstTradeMoney = dtObj;
+                if (bestTradePips === null || pips > bestTradePips.pips) bestTradePips = dtObj;
+                if (worstTradePips === null || pips < worstTradePips.pips) worstTradePips = dtObj;
+
+                if (t.openTime && t.closeTime) {
+                    var oDate = parseTradeDate(t.openTime);
+                    var cDate = parseTradeDate(t.closeTime);
+                    if (oDate && cDate) {
+                        totalDurationMs += (cDate.getTime() - oDate.getTime());
+                    }
+                }
+            });
+
+            // Arithmetic & Geometric Average Return (AHPR / GHPR)
+            var sumHPR = 0;
+            var prodHPR = 1;
+            var validHPRCount = 0;
+            magicTrades.forEach(t => {
+                var balBefore = balanceMap[t.ticket] || initialAccountBalance;
+                if (balBefore <= 0) balBefore = 10000;
+                var profit = parseFloat(t.profit || 0);
+                var swap = parseFloat(t.swap || 0);
+                var comm = parseFloat(t.commission || 0) * commissionFactor;
+                var netP = profit + swap + comm;
+                var r = netP / balBefore;
+                var hpr = 1 + r;
+                sumHPR += hpr;
+                if (hpr > 0) {
+                    prodHPR *= hpr;
+                    validHPRCount++;
+                }
+            });
+            var ahpr = totalTrades > 0 ? (sumHPR / totalTrades) - 1 : 0;
+            var ghpr = validHPRCount > 0 ? Math.pow(prodHPR, 1 / validHPRCount) - 1 : 0;
+
+            // Longs/Shorts stats
+            var longWins = longs.filter(t => t.netProfit > 0);
+            var shortWins = shorts.filter(t => t.netProfit > 0);
+
+            // Averages
+            var winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
+            var lossRate = totalTrades > 0 ? ((totalTrades - wins.length) / totalTrades) * 100 : 0;
+
+            var sumWinsMoney = wins.reduce((sum, t) => sum + t.netProfit, 0);
+            var sumWinsPips = wins.reduce((sum, t) => sum + t.pips, 0);
+            var sumLossesMoney = losses.reduce((sum, t) => sum + t.netProfit, 0);
+            var sumLossesPips = losses.reduce((sum, t) => sum + t.pips, 0);
+
+            var avgWinMoney = wins.length > 0 ? sumWinsMoney / wins.length : 0;
+            var avgWinPips = wins.length > 0 ? sumWinsPips / wins.length : 0;
+            var avgLossMoney = losses.length > 0 ? sumLossesMoney / losses.length : 0;
+            var avgLossPips = losses.length > 0 ? sumLossesPips / losses.length : 0;
+
+            var avgTradeLengthMs = totalTrades > 0 ? totalDurationMs / totalTrades : 0;
+            
+            // Profit Factor
+            var grossProfit = sumWinsMoney;
+            var grossLoss = Math.abs(sumLossesMoney);
+            var profitFactor = grossLoss === 0 ? (grossProfit > 0 ? 99.99 : 0) : grossProfit / grossLoss;
+
+            // Standard Deviation
+            var meanProfit = totalTrades > 0 ? totalNetProfit / totalTrades : 0;
+            var stdDev = calcStdDev(netProfits, meanProfit);
+
+            // Sharpe Ratio
+            var sharpe = stdDev === 0 ? 0 : meanProfit / stdDev;
+
+            // Expectancy
+            var expectancyMoney = totalTrades > 0 ? totalNetProfit / totalTrades : 0;
+            var expectancyPips = totalTrades > 0 ? totalPips / totalTrades : 0;
+
+            // Z-Score calculation
+            var zScoreVal = 0;
+            var zScoreProb = 0;
+            if (totalTrades > 2) {
+                var runs = 0;
+                var prevSign = 0;
+                magicTrades.forEach(t => {
+                    var profit = parseFloat(t.profit || 0);
+                    var swap = parseFloat(t.swap || 0);
+                    var comm = parseFloat(t.commission || 0) * commissionFactor;
+                    var netP = profit + swap + comm;
+                    var sign = netP >= 0 ? 1 : -1;
+                    if (sign !== prevSign) {
+                        runs++;
+                        prevSign = sign;
+                    }
+                });
+
+                var W = wins.length;
+                var L = totalTrades - W;
+                var P = 2 * W * L;
+                if (P > 0 && totalTrades > 1) {
+                    var denominator = Math.sqrt((P * (P - totalTrades)) / (totalTrades - 1));
+                    if (denominator > 0) {
+                        zScoreVal = (totalTrades * (runs - 0.5) - P) / denominator;
+                        zScoreProb = (2 * normCDF(Math.abs(zScoreVal)) - 1) * 100;
+                    }
+                }
+            }
+
+            // Populate UI Elements
+            setTimeout(() => {
+                var elTrades = document.getElementById('mstat-trades');
+                if (elTrades) elTrades.textContent = totalTrades;
+                var elPct = document.getElementById('mstat-profitability-pct');
+                if (elPct) elPct.textContent = winRate.toFixed(0) + '%';
+                var elWin = document.getElementById('mstat-profitability-win');
+                if (elWin) elWin.style.width = winRate.toFixed(1) + '%';
+                var elLoss = document.getElementById('mstat-profitability-loss');
+                if (elLoss) elLoss.style.width = (totalTrades > 0 ? 100 - winRate : 0).toFixed(1) + '%';
+                
+                var elPips = document.getElementById('mstat-pips');
+                if (elPips) elPips.textContent = (totalPips >= 0 ? '+' : '') + totalPips.toFixed(1);
+                var elAvgWin = document.getElementById('mstat-avg-win');
+                if (elAvgWin) elAvgWin.textContent = avgWinPips.toFixed(1) + ' pips / ' + (avgWinMoney >= 0 ? '+' : '') + avgWinMoney.toFixed(2) + ' ' + accountCurrency;
+                var elAvgLoss = document.getElementById('mstat-avg-loss');
+                if (elAvgLoss) elAvgLoss.textContent = avgLossPips.toFixed(1) + ' pips / ' + avgLossMoney.toFixed(2) + ' ' + accountCurrency;
+                var elLots = document.getElementById('mstat-lots');
+                if (elLots) elLots.textContent = totalLots.toFixed(2);
+                var elComms = document.getElementById('mstat-commissions');
+                if (elComms) elComms.textContent = (totalCommissions !== 0 ? '-' : '') + Math.abs(totalCommissions).toFixed(2) + ' ' + accountCurrency;
+                
+                var elLongs = document.getElementById('mstat-longs');
+                if (elLongs) elLongs.textContent = '(' + longWins.length + '/' + longs.length + ') ' + (longs.length > 0 ? (longWins.length / longs.length * 100).toFixed(0) : 0) + '%';
+                var elShorts = document.getElementById('mstat-shorts');
+                if (elShorts) elShorts.textContent = '(' + shortWins.length + '/' + shorts.length + ') ' + (shorts.length > 0 ? (shortWins.length / shorts.length * 100).toFixed(0) : 0) + '%';
+                
+                var elBBest = document.getElementById('mstat-best-money');
+                if (elBBest) elBBest.textContent = bestTradeMoney ? formatTradeDate(bestTradeMoney.closeTime) + ' ' + (bestTradeMoney.netProfit >= 0 ? '+' : '') + bestTradeMoney.netProfit.toFixed(2) : '-';
+                var elBWorst = document.getElementById('mstat-worst-money');
+                if (elBWorst) elBWorst.textContent = worstTradeMoney ? formatTradeDate(worstTradeMoney.closeTime) + ' ' + worstTradeMoney.netProfit.toFixed(2) : '-';
+                var elBPBest = document.getElementById('mstat-best-pips');
+                if (elBPBest) elBPBest.textContent = bestTradePips ? formatTradeDate(bestTradePips.closeTime) + ' ' + (bestTradePips.pips >= 0 ? '+' : '') + bestTradePips.pips.toFixed(1) : '-';
+                var elBPWorst = document.getElementById('mstat-worst-pips');
+                if (elBPWorst) elBPWorst.textContent = worstTradePips ? formatTradeDate(worstTradePips.closeTime) + ' ' + worstTradePips.pips.toFixed(1) : '-';
+                var elLength = document.getElementById('mstat-length');
+                if (elLength) elLength.textContent = formatLength(avgTradeLengthMs);
+                
+                var elPF = document.getElementById('mstat-profit-factor');
+                if (elPF) elPF.textContent = profitFactor.toFixed(2);
+                var elSD = document.getElementById('mstat-stddev');
+                if (elSD) elSD.textContent = (stdDev >= 0 ? '' : '-') + Math.abs(stdDev).toFixed(2) + ' ' + accountCurrency;
+                var elSharpe = document.getElementById('mstat-sharpe');
+                if (elSharpe) elSharpe.textContent = sharpe.toFixed(2);
+                var elZ = document.getElementById('mstat-zscore');
+                if (elZ) elZ.textContent = zScoreVal.toFixed(2) + ' (' + zScoreProb.toFixed(2) + '%)';
+                var elExp = document.getElementById('mstat-expectancy');
+                if (elExp) elExp.textContent = expectancyPips.toFixed(1) + ' Pips / ' + (expectancyMoney >= 0 ? '' : '-') + Math.abs(expectancyMoney).toFixed(2) + ' ' + accountCurrency;
+                var elAHPR = document.getElementById('mstat-ahpr');
+                if (elAHPR) elAHPR.textContent = (ahpr * 100).toFixed(2) + '%';
+                var elGHPR = document.getElementById('mstat-ghpr');
+                if (elGHPR) elGHPR.textContent = (ghpr * 100).toFixed(2) + '%';
+            }, 50);
+
             var titleEl = document.getElementById('chart-modal-title');
             var canvas = document.getElementById('chart-modal-canvas');
 
