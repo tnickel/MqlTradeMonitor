@@ -34,21 +34,29 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Brute-force check for login endpoint
-        if (request.getRequestURI().equals("/login") && "POST".equalsIgnoreCase(request.getMethod())) {
+        // Brute-force check for login endpoints (Web and API)
+        String uri = request.getRequestURI();
+        if (("POST".equalsIgnoreCase(request.getMethod()) && (uri.equals("/login") || uri.equals("/api/login")))) {
             String ip = getClientIP(request);
             if (bruteForceService.isBlocked(ip)) {
                 long remaining = bruteForceService.getRemainingLockoutSeconds(ip);
                 response.setStatus(429);
-                response.setContentType("text/html;charset=UTF-8");
-                response.getWriter().write(
-                        "<html><body style='background:#0d1117;color:#c9d1d9;font-family:sans-serif;text-align:center;padding:50px;'>"
-                                +
-                                "<h1 style='color:#ef4444;'>&#x1F6AB; Zugang gesperrt</h1>" +
-                                "<p>Zu viele fehlgeschlagene Login-Versuche von Ihrer IP-Adresse.</p>" +
-                                "<p>Bitte versuchen Sie es in <strong>" + (remaining / 60 + 1)
-                                + " Minuten</strong> erneut.</p>" +
-                                "</body></html>");
+                if (uri.equals("/api/login")) {
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write(
+                            "{\"error\":\"Zu viele fehlgeschlagene Login-Versuche. Bitte versuchen Sie es in " 
+                            + (remaining / 60 + 1) + " Minuten erneut.\"}");
+                } else {
+                    response.setContentType("text/html;charset=UTF-8");
+                    response.getWriter().write(
+                            "<html><body style='background:#0d1117;color:#c9d1d9;font-family:sans-serif;text-align:center;padding:50px;'>"
+                                    +
+                                    "<h1 style='color:#ef4444;'>&#x1F6AB; Zugang gesperrt</h1>" +
+                                    "<p>Zu viele fehlgeschlagene Login-Versuche von Ihrer IP-Adresse.</p>" +
+                                    "<p>Bitte versuchen Sie es in <strong>" + (remaining / 60 + 1)
+                                    + " Minuten</strong> erneut.</p>" +
+                                    "</body></html>");
+                }
                 return;
             }
         }

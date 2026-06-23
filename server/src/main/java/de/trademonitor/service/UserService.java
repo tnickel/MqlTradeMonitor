@@ -32,14 +32,38 @@ public class UserService {
 
     @PostConstruct
     public void initDefaultAdmin() {
+        // Rotate/invalidate the leaked API key if any user has it
+        Optional<UserEntity> leakedApiKeyUser = userRepository.findByApiKey("jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4");
+        if (leakedApiKeyUser.isPresent()) {
+            UserEntity user = leakedApiKeyUser.get();
+            user.setApiKey(generateApiKey());
+            userRepository.save(user);
+            System.out.println("CRITICAL: Rotated leaked hardcoded API key for user: " + user.getUsername());
+        }
+
         Optional<UserEntity> existingAdminOpt = userRepository.findByUsername(defaultAdminUsername);
 
         if (existingAdminOpt.isEmpty()) {
-            UserEntity admin = new UserEntity(defaultAdminUsername, passwordEncoder.encode(defaultAdminPassword),
+            String passwordToUse = defaultAdminPassword;
+            boolean generated = false;
+            if ("password".equals(defaultAdminPassword) || defaultAdminPassword == null || defaultAdminPassword.trim().isEmpty()) {
+                passwordToUse = generateRandomPassword();
+                generated = true;
+            }
+            UserEntity admin = new UserEntity(defaultAdminUsername, passwordEncoder.encode(passwordToUse),
                     "ROLE_ADMIN");
             admin.setApiKey(generateApiKey());
             userRepository.save(admin);
             System.out.println("Initialized default admin user from properties: " + defaultAdminUsername);
+            if (generated) {
+                System.out.println("=========================================================================");
+                System.out.println(" WARNING: Insecure admin password detected or not specified!");
+                System.out.println(" A random secure admin password has been generated for you:");
+                System.out.println(" Username: " + defaultAdminUsername);
+                System.out.println(" Password: " + passwordToUse);
+                System.out.println(" Please save this password! It will only be displayed once during initial setup.");
+                System.out.println("=========================================================================");
+            }
         } else {
             UserEntity existingAdmin = existingAdminOpt.get();
             if (existingAdmin.getApiKey() == null || existingAdmin.getApiKey().isEmpty()) {
@@ -47,6 +71,13 @@ public class UserService {
                 userRepository.save(existingAdmin);
             }
         }
+    }
+
+    private String generateRandomPassword() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] token = new byte[16];
+        secureRandom.nextBytes(token);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 
     public List<UserEntity> getAllUsers() {

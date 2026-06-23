@@ -21,13 +21,41 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     
     val sharedPrefs = remember { context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE) }
+    val encryptedPrefs = remember {
+        val masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC)
+        val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+            "TradeMonitorPrefsSecure",
+            masterKeyAlias,
+            context,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+        
+        // Migrate old plaintext credentials if they exist
+        if (sharedPrefs.contains("username") || sharedPrefs.contains("password")) {
+            val oldUser = sharedPrefs.getString("username", "") ?: ""
+            val oldPass = sharedPrefs.getString("password", "") ?: ""
+            
+            securePrefs.edit()
+                .putString("username", oldUser)
+                .putString("password", oldPass)
+                .apply()
+                
+            sharedPrefs.edit()
+                .remove("username")
+                .remove("password")
+                .apply()
+        }
+        
+        securePrefs
+    }
     
     var serverUrl by remember {
         val saved = sharedPrefs.getString("server_url", "") ?: ""
         mutableStateOf(if (saved.isEmpty()) "https://monitor.tnickel-ki.de" else saved)
     }
-    var username by remember { mutableStateOf(sharedPrefs.getString("username", "") ?: "") }
-    var password by remember { mutableStateOf(sharedPrefs.getString("password", "") ?: "") }
+    var username by remember { mutableStateOf(encryptedPrefs.getString("username", "") ?: "") }
+    var password by remember { mutableStateOf(encryptedPrefs.getString("password", "") ?: "") }
     
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -67,8 +95,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val api = ApiClient.getService(context)
                     val response = api.login(LoginRequest(username, password))
                     if (response.isSuccessful) {
-                        // Save credentials for auto-login
-                        sharedPrefs.edit()
+                        // Save credentials securely for auto-login
+                        encryptedPrefs.edit()
                             .putString("username", username)
                             .putString("password", password)
                             .apply()

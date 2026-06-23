@@ -41,9 +41,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Skip API endpoints (MetaTrader EA communication)
+        // Skip API endpoints (MetaTrader EA communication) except /api/login
         String uri = request.getRequestURI();
-        if (uri.startsWith("/api/")) {
+        if (uri.startsWith("/api/") && !uri.equals("/api/login")) {
             filterChain.doFilter(request, response);
             return;
         }

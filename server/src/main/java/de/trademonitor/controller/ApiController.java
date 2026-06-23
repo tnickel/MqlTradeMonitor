@@ -278,8 +278,23 @@ public class ApiController {
      * Get all accounts as JSON (for AJAX updates).
      */
     @GetMapping("/accounts")
-    public ResponseEntity<?> getAccounts() {
-        return ResponseEntity.ok(accountManager.getAccountsWithStatus());
+    public ResponseEntity<?> getAccounts(@org.springframework.security.core.annotation.AuthenticationPrincipal de.trademonitor.security.CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+        UserEntity user = userDetails.getUserEntity();
+        if ("ROLE_ADMIN".equals(user.getRole())) {
+            return ResponseEntity.ok(accountManager.getAccountsWithStatus());
+        } else {
+            java.util.Set<Long> allowedIds = user.getAllowedAccountIds();
+            java.util.List<java.util.Map<String, Object>> filtered = accountManager.getAccountsWithStatus().stream()
+                .filter(acc -> {
+                    Long accountId = (Long) acc.get("accountId");
+                    return allowedIds != null && allowedIds.contains(accountId);
+                })
+                .collect(java.util.stream.Collectors.toList());
+            return ResponseEntity.ok(filtered);
+        }
     }
 
     /**
@@ -344,7 +359,9 @@ public class ApiController {
      * The EA sends new log lines incrementally.
      */
     @PostMapping("/ea-logs")
-    public ResponseEntity<?> receiveEaLogs(@RequestBody Map<String, Object> request,
+    public ResponseEntity<?> receiveEaLogs(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody Map<String, Object> request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         Long accountId = null;
         try {
@@ -354,6 +371,12 @@ public class ApiController {
             }
             if (accountId == null) {
                 return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Missing accountId"));
+            }
+
+            if (!isAuthorized(userKey, accountId)) {
+                logClientAction(accountId, "AUTH_FAILED", "Invalid or missing User Key during log upload", httpRequest);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("status", "error", "message", "Unauthorized"));
             }
 
             @SuppressWarnings("unchecked")
