@@ -993,7 +993,7 @@ public class DashboardController {
         java.time.LocalDate endDt = today;
         switch (period.toLowerCase()) {
             case "weekly":
-                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.ISO.dayOfWeek();
                 startDt = today.with(fieldISO, 1);
                 endDt = today.with(fieldISO, 7);
                 break;
@@ -1066,6 +1066,8 @@ public class DashboardController {
             allRelevantTrades = closedTradeRepository.findByAccountIdsAndDateRange(accIds, startCloseTime, endCloseTime);
         }
 
+        Map<Long, Double> commFactors = new HashMap<>();
+
         // 2. Aggregate based on period
         if ("daily".equalsIgnoreCase(period)) {
             // Hourly aggregation (00-23)
@@ -1080,7 +1082,12 @@ public class DashboardController {
                 try {
                     java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
                     int hour = dt.getHour();
-                    hourlyProfit[hour] += trade.getProfit();
+                    double commissionFactor = commFactors.computeIfAbsent(trade.getAccountId(), id -> {
+                        de.trademonitor.model.Account accountModel = accountManager.getAccount(id);
+                        return accountModel != null ? accountModel.getCommissionFactor() : 1.0;
+                    });
+                    double netProfit = trade.getProfit() + trade.getSwap() + (trade.getCommission() * commissionFactor);
+                    hourlyProfit[hour] += netProfit;
                 } catch (Exception e) {
                 }
             }
@@ -1096,7 +1103,12 @@ public class DashboardController {
                 try {
                     java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
                     int dayIndex = dt.getDayOfWeek().getValue() - 1; // 1 (Mon) -> 0
-                    dailyProfit[dayIndex] += trade.getProfit();
+                    double commissionFactor = commFactors.computeIfAbsent(trade.getAccountId(), id -> {
+                        de.trademonitor.model.Account accountModel = accountManager.getAccount(id);
+                        return accountModel != null ? accountModel.getCommissionFactor() : 1.0;
+                    });
+                    double netProfit = trade.getProfit() + trade.getSwap() + (trade.getCommission() * commissionFactor);
+                    dailyProfit[dayIndex] += netProfit;
                 } catch (Exception e) {
                 }
             }
@@ -1117,7 +1129,12 @@ public class DashboardController {
                     java.time.LocalDateTime dt = java.time.LocalDateTime.parse(trade.getCloseTime(), fullFormatter);
                     int day = dt.getDayOfMonth();
                     if (day >= 1 && day <= daysInMonth) {
-                        dailyProfit[day - 1] += trade.getProfit();
+                        double commissionFactor = commFactors.computeIfAbsent(trade.getAccountId(), id -> {
+                            de.trademonitor.model.Account accountModel = accountManager.getAccount(id);
+                            return accountModel != null ? accountModel.getCommissionFactor() : 1.0;
+                        });
+                        double netProfit = trade.getProfit() + trade.getSwap() + (trade.getCommission() * commissionFactor);
+                        dailyProfit[day - 1] += netProfit;
                     }
                 } catch (Exception e) {
                 }
@@ -1178,7 +1195,7 @@ public class DashboardController {
                 String monthStr = today.format(monthFormatter);
                 return date -> date.startsWith(monthStr);
             case "weekly":
-                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
+                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
                 int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
                 int currentYear = today.getYear();
                 return date -> {
@@ -1206,7 +1223,7 @@ public class DashboardController {
                 endDt = today;
                 break;
             case "weekly":
-                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.ISO.dayOfWeek();
                 startDt = today.with(fieldISO, 1);
                 endDt = today.with(fieldISO, 7);
                 break;
@@ -1256,7 +1273,7 @@ public class DashboardController {
                 endDt = today;
                 break;
             case "weekly":
-                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.ISO.dayOfWeek();
                 startDt = today.with(fieldISO, 1);
                 endDt = today.with(fieldISO, 7);
                 periodTitle = "Wochenreport";
@@ -1277,27 +1294,20 @@ public class DashboardController {
         String startCloseTime = startDt.format(tradeDateFormatter) + " 00:00:00";
         String endCloseTime = endDt.format(tradeDateFormatter) + " 23:59:59";
 
-        // Batch-aggregate closed trades (much faster than loading all trades)
-        Map<Long, long[]> batchAggregation = new HashMap<>(); // [count, sumProfit*100]
-        List<Long> accIds = accounts.stream().map(acc -> (Long) acc.get("accountId")).filter(Objects::nonNull).collect(Collectors.toList());
-        if (!accIds.isEmpty()) {
-            List<Object[]> rows = closedTradeRepository.aggregateByAccountIdsAndDateRange(accIds, startCloseTime, endCloseTime);
-            for (Object[] row : rows) {
-                Long accId = ((Number) row[0]).longValue();
-                long count = ((Number) row[1]).longValue();
-                double sum = ((Number) row[2]).doubleValue();
-                batchAggregation.put(accId, new long[]{count, Math.round(sum * 100)});
-            }
-        }
-
         java.util.function.Predicate<String> dateFilter = getDateFilter(period);
 
         for (Map<String, Object> acc : accounts) {
             Long accountId = (Long) acc.get("accountId");
 
-            long[] agg = batchAggregation.getOrDefault(accountId, new long[]{0, 0});
-            long closedCount = agg[0];
-            double closedProfit = agg[1] / 100.0;
+            double closedProfit = 0.0;
+            long closedCount = 0;
+            de.trademonitor.model.Account accountModel = accountManager.getAccount(accountId);
+            double commissionFactor = accountModel != null ? accountModel.getCommissionFactor() : 1.0;
+            List<de.trademonitor.entity.ClosedTradeEntity> trades = closedTradeRepository.findByAccountIdAndDateRange(accountId, startCloseTime, endCloseTime);
+            for (de.trademonitor.entity.ClosedTradeEntity ct : trades) {
+                closedCount++;
+                closedProfit += ct.getProfit() + ct.getSwap() + (ct.getCommission() * commissionFactor);
+            }
 
             // Get equity snapshots for the period (still needed for sparkline)
             String[] isoRange = getIsoRange(period);
@@ -1312,7 +1322,7 @@ public class DashboardController {
 
             Map<String, Object> row = new HashMap<>(acc);
             row.put("closedCount", closedCount);
-            row.put("closedProfit", closedProfit);
+            row.put("closedProfit", Math.round(closedProfit * 100.0) / 100.0);
             row.put("equityHistory", equityH);
             row.put("balanceHistory", balanceH);
             reportData.add(row);

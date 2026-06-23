@@ -34,8 +34,9 @@ public class AuthenticationEvents implements ApplicationListener<AbstractAuthent
             if (ipAddress == null || ipAddress.trim().isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
                 ipAddress = request.getRemoteAddr();
             } else {
-                // X-Forwarded-For can be a comma-separated list, the first one is the client.
-                ipAddress = ipAddress.split(",")[0].trim();
+                // X-Forwarded-For can be a comma-separated list, the last one is appended by the proxy.
+                String[] parts = ipAddress.split(",");
+                ipAddress = parts[parts.length - 1].trim();
             }
         } else {
             // Fallback to Spring Security Details if not in a request context
