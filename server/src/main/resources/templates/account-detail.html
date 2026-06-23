@@ -383,6 +383,7 @@
                 <button class="tab-btn" data-tab="tab-strategies" onclick="switchTab('tab-strategies')">🤖 Strategien</button>
                 <button class="tab-btn" data-tab="tab-drawdown" onclick="switchTab('tab-drawdown')">📉 Drawdown</button>
                 <button class="tab-btn" data-tab="tab-trades" onclick="switchTab('tab-trades')">💼 Positionen</button>
+                <button class="tab-btn" data-tab="tab-analysis" onclick="switchTab('tab-analysis')">📈 Analysis</button>
             </div>
         </div>
 
@@ -1466,6 +1467,65 @@
         </section>
         </div>
 
+        <!-- ==================== TAB: ANALYSIS ==================== -->
+        <div id="tab-analysis" class="tab-content">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-top: 1rem;">
+                
+                <!-- Chart 1: Duration vs Profit Scatter Plot -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📈 Duration vs Profit</h3>
+                    <div class="chart-container" style="position: relative; height: 320px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
+                        <canvas id="duration-profit-scatter-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Holding Duration Histogram -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Haltedauer Histogramm</h3>
+                    <div class="chart-container" style="position: relative; height: 320px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
+                        <canvas id="duration-histogram-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Duration Statistics Grid -->
+            <div style="margin-top: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">⏱️ Haltedauer Statistik</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
+                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Alle)</div>
+                        <div id="stats-duration-avg-all" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                    </div>
+                    <div style="background: rgba(16, 185, 129, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2); text-align: center;">
+                        <div style="color: #10b981; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Gewinner)</div>
+                        <div id="stats-duration-avg-win" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                    </div>
+                    <div style="background: rgba(239, 68, 68, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.2); text-align: center;">
+                        <div style="color: #ef4444; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Verlierer)</div>
+                        <div id="stats-duration-avg-loss" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                    </div>
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
+                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Längster Trade</div>
+                        <div id="stats-duration-max" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                    </div>
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
+                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Kürzester Trade</div>
+                        <div id="stats-duration-min" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Open Trades per Symbol Scrollable Bar Chart -->
+            <div style="margin-top: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
+                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Offene Trades pro Währungspaar</h3>
+                <div style="overflow-x: auto; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; position: relative;">
+                    <div id="open-trades-scroll-container" style="height: 300px; min-width: 800px; width: 100%;">
+                        <canvas id="open-trades-pair-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Fullscreen chart modal -->
         <div id="chart-modal" class="chart-modal">
             <div class="chart-modal-content">
@@ -1615,6 +1675,11 @@
             // Force redraw/recalculation of Chart.js charts inside tabs
             setTimeout(function() {
                 window.dispatchEvent(new Event('resize'));
+                if (tabId === 'tab-analysis') {
+                    if (typeof renderAnalysisCharts === 'function' && historyMgr && historyMgr.filteredRows) {
+                        renderAnalysisCharts(historyMgr.filteredRows);
+                    }
+                }
             }, 50);
         }
 
@@ -2482,6 +2547,9 @@
                 .catch(function () { return []; })
                 .then(function(trades) {
                     historyMgr.setData(trades);
+                    if (typeof renderAnalysisCharts === 'function') {
+                        renderAnalysisCharts(trades);
+                    }
                     
                     historyChartMgr = new HistoryChartManager('balance-history-chart', currentBalance, trades);
 
@@ -2957,6 +3025,9 @@
             // Update Monthly Charts
             if (historyMgr && historyMgr.filteredRows) {
                 renderMonthlyCharts(historyMgr.filteredRows);
+                if (typeof renderAnalysisCharts === 'function') {
+                    renderAnalysisCharts(historyMgr.filteredRows);
+                }
             }
 
             // Update Magic Table
@@ -5189,6 +5260,305 @@
                     }
                 });
             }, 100);
+        }
+
+        // ============ ANALYSIS TAB CHARTS & STATISTICS ============
+        var durationScatterChart = null;
+        var durationHistogramChart = null;
+        var openTradesPairChart = null;
+
+        function formatDuration(hours) {
+            if (hours === null || isNaN(hours) || hours < 0) return '-';
+            if (hours < 1) {
+                var mins = Math.round(hours * 60);
+                return mins + 'm';
+            }
+            var days = Math.floor(hours / 24);
+            var remainingHours = Math.floor(hours % 24);
+            var remainingMins = Math.round((hours % 1) * 60);
+            
+            var parts = [];
+            if (days > 0) parts.push(days + 'd');
+            if (remainingHours > 0 || (days > 0 && remainingMins > 0)) parts.push(remainingHours + 'h');
+            if (remainingMins > 0 && days === 0) parts.push(remainingMins + 'm');
+            return parts.join(' ') || '0m';
+        }
+
+        function renderAnalysisCharts(trades) {
+            if (!trades) return;
+
+            var winners = [];
+            var losers = [];
+            var allDurations = [];
+            var winDurations = [];
+            var lossDurations = [];
+            
+            var histBuckets = {
+                '< 1h': 0,
+                '1-4h': 0,
+                '4-12h': 0,
+                '12-24h': 0,
+                '1-2d': 0,
+                '2-5d': 0,
+                '5-10d': 0,
+                '> 10d': 0
+            };
+
+            trades.forEach(function(t) {
+                if (!t.openTime || !t.closeTime) return;
+                
+                var o = t.openTime.split(/[- :.]/);
+                var oDate = new Date(o[0], o[1] - 1, o[2], o[3] || 0, o[4] || 0, o[5] || 0);
+                var c = t.closeTime.split(/[- :.]/);
+                var cDate = new Date(c[0], c[1] - 1, c[2], c[3] || 0, c[4] || 0, c[5] || 0);
+                
+                var durationMs = cDate.getTime() - oDate.getTime();
+                if (durationMs < 0) return;
+                var durationHours = durationMs / (1000 * 60 * 60);
+                
+                var netProfit = parseFloat(t.profit || 0) + parseFloat(t.swap || 0) + (parseFloat(t.commission || 0) * commissionFactor);
+                
+                var pt = { x: durationHours, y: netProfit, ticket: t.ticket, symbol: t.symbol };
+                allDurations.push(durationHours);
+
+                if (netProfit >= 0) {
+                    winners.push(pt);
+                    winDurations.push(durationHours);
+                } else {
+                    losers.push(pt);
+                    lossDurations.push(durationHours);
+                }
+
+                if (durationHours < 1) {
+                    histBuckets['< 1h']++;
+                } else if (durationHours < 4) {
+                    histBuckets['1-4h']++;
+                } else if (durationHours < 12) {
+                    histBuckets['4-12h']++;
+                } else if (durationHours < 24) {
+                    histBuckets['12-24h']++;
+                } else if (durationHours < 48) {
+                    histBuckets['1-2d']++;
+                } else if (durationHours < 120) {
+                    histBuckets['2-5d']++;
+                } else if (durationHours < 240) {
+                    histBuckets['5-10d']++;
+                } else {
+                    histBuckets['> 10d']++;
+                }
+            });
+
+            var avgAll = allDurations.length > 0 ? (allDurations.reduce((a,b) => a+b, 0) / allDurations.length) : null;
+            var avgWin = winDurations.length > 0 ? (winDurations.reduce((a,b) => a+b, 0) / winDurations.length) : null;
+            var avgLoss = lossDurations.length > 0 ? (lossDurations.reduce((a,b) => a+b, 0) / lossDurations.length) : null;
+            var maxDur = allDurations.length > 0 ? Math.max(...allDurations) : null;
+            var minDur = allDurations.length > 0 ? Math.min(...allDurations) : null;
+
+            var avgAllEl = document.getElementById('stats-duration-avg-all');
+            var avgWinEl = document.getElementById('stats-duration-avg-win');
+            var avgLossEl = document.getElementById('stats-duration-avg-loss');
+            var maxDurEl = document.getElementById('stats-duration-max');
+            var minDurEl = document.getElementById('stats-duration-min');
+
+            if (avgAllEl) avgAllEl.textContent = formatDuration(avgAll);
+            if (avgWinEl) avgWinEl.textContent = formatDuration(avgWin);
+            if (avgLossEl) avgLossEl.textContent = formatDuration(avgLoss);
+            if (maxDurEl) maxDurEl.textContent = formatDuration(maxDur);
+            if (minDurEl) minDurEl.textContent = formatDuration(minDur);
+
+            var ctxScatter = document.getElementById('duration-profit-scatter-chart');
+            if (ctxScatter) {
+                var existingScatter = Chart.getChart(ctxScatter);
+                if (existingScatter) existingScatter.destroy();
+
+                durationScatterChart = new Chart(ctxScatter, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Winners',
+                                data: winners,
+                                backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                                borderColor: '#10b981',
+                                pointRadius: 5,
+                                hoverRadius: 8
+                            },
+                            {
+                                label: 'Losers',
+                                data: losers,
+                                backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                                borderColor: '#ef4444',
+                                pointRadius: 5,
+                                hoverRadius: 8
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#a0a0c0' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        var pt = context.raw;
+                                        return pt.symbol + ' (Ticket ' + pt.ticket + '): ' + pt.y.toFixed(2) + ' ' + accountCurrency + ' / Haltedauer: ' + formatDuration(pt.x);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Haltedauer (Stunden)', color: '#a0a0c0' },
+                                ticks: { color: '#a0a0c0' },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            },
+                            y: {
+                                title: { display: true, text: 'Profit (' + accountCurrency + ')', color: '#a0a0c0' },
+                                ticks: { color: '#a0a0c0' },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            var ctxHist = document.getElementById('duration-histogram-chart');
+            if (ctxHist) {
+                var existingHist = Chart.getChart(ctxHist);
+                if (existingHist) existingHist.destroy();
+
+                durationHistogramChart = new Chart(ctxHist, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(histBuckets),
+                        datasets: [{
+                            label: 'Trades Anzahl',
+                            data: Object.values(histBuckets),
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderColor: '#6366f1',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Haltedauer-Klassen', color: '#a0a0c0' },
+                                ticks: { color: '#a0a0c0' },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl Trades', color: '#a0a0c0' },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderOpenTradesChart();
+        }
+
+        function renderOpenTradesChart() {
+            var ctxOpen = document.getElementById('open-trades-pair-chart');
+            if (!ctxOpen) return;
+
+            var openRows = document.querySelectorAll('#open-trades-table tbody tr');
+            var currentMagics = getActiveMagics();
+            var activeSymbolsSet = new Set();
+            document.querySelectorAll('.symbol-checkbox:checked').forEach(function(cb) {
+                activeSymbolsSet.add(cb.value.toUpperCase());
+            });
+
+            var pairCounts = {};
+
+            openRows.forEach(function (row) {
+                var symbolCell = row.querySelector('td strong');
+                if (!symbolCell) return;
+                
+                var symbol = symbolCell.textContent.trim().toUpperCase();
+                
+                var magic = '';
+                if (row.cells && row.cells.length > 11) {
+                    magic = row.cells[11].textContent.trim();
+                }
+                
+                if (magic && currentMagics.size > 0 && !currentMagics.has(magic)) return;
+                if (symbol && activeSymbolsSet.size > 0 && !activeSymbolsSet.has(symbol)) return;
+
+                pairCounts[symbol] = (pairCounts[symbol] || 0) + 1;
+            });
+
+            var labels = Object.keys(pairCounts).sort();
+            var data = labels.map(function(k) { return pairCounts[k]; });
+
+            var minWidth = Math.max(800, labels.length * 60);
+            var scrollContainer = document.getElementById('open-trades-scroll-container');
+            if (scrollContainer) {
+                scrollContainer.style.width = minWidth + 'px';
+            }
+
+            var existingOpen = Chart.getChart(ctxOpen);
+            if (existingOpen) existingOpen.destroy();
+
+            if (labels.length > 0) {
+                openTradesPairChart = new Chart(ctxOpen, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Offene Trades',
+                            data: data,
+                            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                            borderColor: '#3b82f6',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' offene Trades';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Währungspaar (Symbol)', color: '#a0a0c0' },
+                                ticks: { color: '#a0a0c0' },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl offene Trades', color: '#a0a0c0' },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.2)' }
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
