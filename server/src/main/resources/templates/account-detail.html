@@ -1469,48 +1469,49 @@
 
         <!-- ==================== TAB: ANALYSIS ==================== -->
         <div id="tab-analysis" class="tab-content">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-top: 1rem;">
-                
-                <!-- Chart 1: Duration vs Profit Scatter Plot -->
-                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
-                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📈 Duration vs Profit</h3>
-                    <div class="chart-container" style="position: relative; height: 320px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
-                        <canvas id="duration-profit-scatter-chart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Chart 2: Holding Duration Histogram -->
-                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
-                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Haltedauer Histogramm</h3>
-                    <div class="chart-container" style="position: relative; height: 320px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
-                        <canvas id="duration-histogram-chart"></canvas>
-                    </div>
+            <!-- Row 1: Duration vs Profit Scatter Plot (Full Width, Large) -->
+            <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-top: 1rem;">
+                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📈 Duration vs Profit</h3>
+                <div class="chart-container" style="position: relative; height: 500px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
+                    <canvas id="duration-profit-scatter-chart"></canvas>
                 </div>
             </div>
 
-            <!-- Section 3: Duration Statistics Grid -->
-            <div style="margin-top: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
-                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">⏱️ Haltedauer Statistik</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Alle)</div>
-                        <div id="stats-duration-avg-all" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+            <!-- Row 2: Grid for Histogram (Left) and Stats (Right) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-top: 2rem;">
+                
+                <!-- Chart 2: Holding Duration Histogram -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Haltedauer Histogramm</h3>
+                    <div class="chart-container" style="position: relative; height: 350px; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1rem;">
+                        <canvas id="duration-histogram-chart"></canvas>
                     </div>
-                    <div style="background: rgba(16, 185, 129, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2); text-align: center;">
-                        <div style="color: #10b981; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Gewinner)</div>
-                        <div id="stats-duration-avg-win" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
-                    </div>
-                    <div style="background: rgba(239, 68, 68, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.2); text-align: center;">
-                        <div style="color: #ef4444; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Verlierer)</div>
-                        <div id="stats-duration-avg-loss" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
-                    </div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Längster Trade</div>
-                        <div id="stats-duration-max" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
-                    </div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Kürzester Trade</div>
-                        <div id="stats-duration-min" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                </div>
+
+                <!-- Section 3: Duration Statistics Grid -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">⏱️ Haltedauer Statistik</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; flex: 1;">
+                        <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Alle)</div>
+                            <div id="stats-duration-avg-all" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
+                        <div style="background: rgba(16, 185, 129, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: #10b981; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Gewinner)</div>
+                            <div id="stats-duration-avg-win" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
+                        <div style="background: rgba(239, 68, 68, 0.1); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.2); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: #ef4444; font-size: 0.85rem; margin-bottom: 0.5rem;">Ø Haltedauer (Verlierer)</div>
+                            <div id="stats-duration-avg-loss" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Längster Trade</div>
+                            <div id="stats-duration-max" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Kürzester Trade</div>
+                            <div id="stats-duration-min" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
