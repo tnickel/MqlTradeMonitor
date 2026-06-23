@@ -1512,6 +1512,10 @@
                             <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Kürzester Trade</div>
                             <div id="stats-duration-min" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
                         </div>
+                        <div style="background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Median Haltedauer (Alle)</div>
+                            <div id="stats-duration-median-all" style="color: #fff; font-size: 1.4rem; font-weight: 700;">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -5355,17 +5359,30 @@
             var maxDur = allDurations.length > 0 ? Math.max(...allDurations) : null;
             var minDur = allDurations.length > 0 ? Math.min(...allDurations) : null;
 
+            var medianAll = null;
+            if (allDurations.length > 0) {
+                var sorted = allDurations.slice().sort(function(a, b) { return a - b; });
+                var mid = Math.floor(sorted.length / 2);
+                if (sorted.length % 2 !== 0) {
+                    medianAll = sorted[mid];
+                } else {
+                    medianAll = (sorted[mid - 1] + sorted[mid]) / 2.0;
+                }
+            }
+
             var avgAllEl = document.getElementById('stats-duration-avg-all');
             var avgWinEl = document.getElementById('stats-duration-avg-win');
             var avgLossEl = document.getElementById('stats-duration-avg-loss');
             var maxDurEl = document.getElementById('stats-duration-max');
             var minDurEl = document.getElementById('stats-duration-min');
+            var medianAllEl = document.getElementById('stats-duration-median-all');
 
             if (avgAllEl) avgAllEl.textContent = formatDuration(avgAll);
             if (avgWinEl) avgWinEl.textContent = formatDuration(avgWin);
             if (avgLossEl) avgLossEl.textContent = formatDuration(avgLoss);
             if (maxDurEl) maxDurEl.textContent = formatDuration(maxDur);
             if (minDurEl) minDurEl.textContent = formatDuration(minDur);
+            if (medianAllEl) medianAllEl.textContent = formatDuration(medianAll);
 
             var ctxScatter = document.getElementById('duration-profit-scatter-chart');
             if (ctxScatter) {
