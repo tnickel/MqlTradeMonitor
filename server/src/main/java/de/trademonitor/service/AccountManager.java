@@ -464,7 +464,6 @@ public class AccountManager {
             info.put("section", account.getSection());
             info.put("sectionId", account.getSectionId());
             info.put("displayOrder", account.getDisplayOrder());
-            info.put("displayOrder", account.getDisplayOrder());
             info.put("syncWarning", account.isSyncWarning());
             info.put("errorState", account.isErrorState());
             info.put("lastErrorMsg", account.getLastErrorMsg());
@@ -485,7 +484,7 @@ public class AccountManager {
             double weeklyProfit = 0.0;
             double monthlyProfit = 0.0;
             java.time.LocalDate todayLoc = java.time.LocalDate.now();
-            java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(java.util.Locale.getDefault()).dayOfWeek();
+            java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.ISO.dayOfWeek();
             String startOfWeekStr = todayLoc.with(fieldISO, 1).toString().replace("-", ".") + " 00:00:00";
             String startOfMonthStr = todayLoc.withDayOfMonth(1).toString().replace("-", ".") + " 00:00:00";
 

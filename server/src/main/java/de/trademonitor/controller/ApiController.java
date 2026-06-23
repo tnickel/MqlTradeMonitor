@@ -98,9 +98,10 @@ public class ApiController {
             emailService.sendTestEmail();
             return ResponseEntity.ok(Map.of("status", "ok", "message", "Test email sent successfully"));
         } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 
@@ -131,10 +132,11 @@ public class ApiController {
                     "status", "ok",
                     "message", "Account registered successfully"));
         } catch (Exception e) {
-            logClientAction(request.getAccountId(), "REGISTER_ERROR", e.getMessage(), httpRequest);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            logClientAction(request.getAccountId(), "REGISTER_ERROR", msg, httpRequest);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 
@@ -220,11 +222,12 @@ public class ApiController {
                     "status", "ok",
                     "tradesReceived", count));
         } catch (Exception e) {
-            logClientAction(request.getAccountId(), "UPDATE_ERROR", e.getMessage(), httpRequest);
-            accountManager.reportError(request.getAccountId(), "Update Error: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            logClientAction(request.getAccountId(), "UPDATE_ERROR", msg, httpRequest);
+            accountManager.reportError(request.getAccountId(), "Update Error: " + msg);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 
@@ -262,11 +265,12 @@ public class ApiController {
 
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (Exception e) {
-            logClientAction(request.getAccountId(), "HEARTBEAT_ERROR", e.getMessage(), httpRequest);
-            accountManager.reportError(request.getAccountId(), "Heartbeat Error: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            logClientAction(request.getAccountId(), "HEARTBEAT_ERROR", msg, httpRequest);
+            accountManager.reportError(request.getAccountId(), "Heartbeat Error: " + msg);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 
@@ -326,11 +330,12 @@ public class ApiController {
                     "historyReceived", count,
                     "newTradesInserted", newInserted));
         } catch (Exception e) {
-            logClientAction(request.getAccountId(), "HISTORY_ERROR", e.getMessage(), httpRequest);
-            accountManager.reportError(request.getAccountId(), "History Error: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            logClientAction(request.getAccountId(), "HISTORY_ERROR", msg, httpRequest);
+            accountManager.reportError(request.getAccountId(), "History Error: " + msg);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 
@@ -399,12 +404,13 @@ public class ApiController {
 
             return ResponseEntity.ok(Map.of("status", "ok", "stored", stored));
         } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             if (accountId != null) {
-                logClientAction(accountId, "EA_LOG_ERROR", e.getMessage(), httpRequest);
+                logClientAction(accountId, "EA_LOG_ERROR", msg, httpRequest);
             }
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
-                    "message", e.getMessage()));
+                    "message", msg));
         }
     }
 

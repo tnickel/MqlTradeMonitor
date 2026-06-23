@@ -462,7 +462,10 @@ public class GlobalConfigService {
     }
 
     public int getMailPort() {
-        return repository.findById(KEY_MAIL_PORT).map(e -> Integer.parseInt(e.getConfValue())).orElse(587);
+        return repository.findById(KEY_MAIL_PORT).map(e -> {
+            try { return Integer.parseInt(e.getConfValue()); }
+            catch (NumberFormatException ex) { return 587; }
+        }).orElse(587);
     }
 
     public String getMailUser() {
@@ -483,7 +486,10 @@ public class GlobalConfigService {
     }
 
     public int getMailMaxPerDay() {
-        return repository.findById(KEY_MAIL_MAX_PER_DAY).map(e -> Integer.parseInt(e.getConfValue())).orElse(10);
+        return repository.findById(KEY_MAIL_MAX_PER_DAY).map(e -> {
+            try { return Integer.parseInt(e.getConfValue()); }
+            catch (NumberFormatException ex) { return 10; }
+        }).orElse(10);
     }
 
     public void saveMailConfig(String host, int port, String user, String password, String from, String to,
@@ -527,11 +533,17 @@ public class GlobalConfigService {
     }
 
     public int getHomeyRepeatCount() {
-        return repository.findById(KEY_HOMEY_REPEAT_COUNT).map(e -> Integer.parseInt(e.getConfValue())).orElse(1);
+        return repository.findById(KEY_HOMEY_REPEAT_COUNT).map(e -> {
+            try { return Integer.parseInt(e.getConfValue()); }
+            catch (NumberFormatException ex) { return 1; }
+        }).orElse(1);
     }
 
     public int getHomeyRepeatIntervalMins() {
-        return repository.findById(KEY_HOMEY_REPEAT_INTERVAL_MINS).map(e -> Integer.parseInt(e.getConfValue())).orElse(15);
+        return repository.findById(KEY_HOMEY_REPEAT_INTERVAL_MINS).map(e -> {
+            try { return Integer.parseInt(e.getConfValue()); }
+            catch (NumberFormatException ex) { return 15; }
+        }).orElse(15);
     }
 
     public boolean isHomeyTriggerSync() {

@@ -514,7 +514,8 @@ public class DashboardController {
             }
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            return ResponseEntity.status(500).body(Map.of("success", false, "error", msg));
         }
     }
 
