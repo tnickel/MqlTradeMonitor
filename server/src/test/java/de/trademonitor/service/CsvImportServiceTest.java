@@ -55,4 +55,53 @@ class CsvImportServiceTest {
         assertEquals(-1.61, t3.getSwap(), 0.00001);
         assertEquals(3.71, t3.getProfit());
     }
+
+    @Test
+    void testParseTradesCsvWithThousandsSeparators() throws Exception {
+        String csvContent = "Time;Type;Volume;Symbol;Price;Volume;Time;Price;Commission;Swap;Profit\n" +
+                "2026.06.16 21:19:52;Sell;0.01;XAUUSD;4.339,93;0.01;2026.06.16 21:42:04;4.339,04;-0,08;;1.234,89 €\n";
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "trades.csv",
+                "text/csv",
+                csvContent.getBytes()
+        );
+
+        List<ClosedTrade> trades = csvImportService.parseTradesCsv(file);
+
+        assertEquals(1, trades.size());
+        ClosedTrade t1 = trades.get(0);
+        assertEquals(4339.93, t1.getOpenPrice());
+        assertEquals(4339.04, t1.getClosePrice());
+        assertEquals(-0.08, t1.getCommission());
+        assertEquals(1234.89, t1.getProfit());
+    }
+
+    @Test
+    void testDeterministicTicketsForTicketlessCsv() throws Exception {
+        String csvContent = "Time;Type;Volume;Symbol;Price;Volume;Time;Price;Commission;Swap;Profit\n" +
+                "2026.06.16 21:19:52;Sell;0.01;XAUUSD;4339.93;0.01;2026.06.16 21:42:04;4339.04;-0.08;;0.89\n" +
+                "2026.06.16 21:19:52;Sell;0.01;XAUUSD;4339.93;0.01;2026.06.16 21:42:04;4339.04;-0.08;;0.89\n";
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "trades.csv",
+                "text/csv",
+                csvContent.getBytes()
+        );
+
+        List<ClosedTrade> trades1 = csvImportService.parseTradesCsv(file);
+        List<ClosedTrade> trades2 = csvImportService.parseTradesCsv(file);
+
+        assertEquals(2, trades1.size());
+        assertEquals(2, trades2.size());
+
+        // Check tickets are deterministic (same on re-import)
+        assertEquals(trades1.get(0).getTicket(), trades2.get(0).getTicket());
+        assertEquals(trades1.get(1).getTicket(), trades2.get(1).getTicket());
+
+        // Check tickets are distinct for different rows in same file
+        assertNotEquals(trades1.get(0).getTicket(), trades1.get(1).getTicket());
+    }
 }

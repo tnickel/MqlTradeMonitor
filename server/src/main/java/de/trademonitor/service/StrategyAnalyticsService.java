@@ -254,7 +254,7 @@ public class StrategyAnalyticsService {
 
         // Build daily return series for each account
         List<String> accountNames = new ArrayList<>();
-        List<List<Double>> allReturns = new ArrayList<>();
+        List<Map<String, Double>> allReturns = new ArrayList<>();
 
         java.util.function.Predicate<String> dateFilter = getSnapshotPeriodFilter(period);
 
@@ -273,13 +273,17 @@ public class StrategyAnalyticsService {
             if (dailyEquity.size() < 5) continue; // Need minimum data points
 
             // Calculate daily returns
-            List<Double> returns = new ArrayList<>();
-            double prev = -1;
-            for (double eq : dailyEquity.values()) {
+            Map<String, Double> returns = new LinkedHashMap<>();
+            List<String> sortedDays = new ArrayList<>(dailyEquity.keySet());
+            Collections.sort(sortedDays);
+            for (int k = 1; k < sortedDays.size(); k++) {
+                String day = sortedDays.get(k);
+                String prevDay = sortedDays.get(k - 1);
+                double eq = dailyEquity.get(day);
+                double prev = dailyEquity.get(prevDay);
                 if (prev > 0) {
-                    returns.add((eq - prev) / prev);
+                    returns.put(day, (eq - prev) / prev);
                 }
-                prev = eq;
             }
 
             if (returns.size() >= 4) {
@@ -294,8 +298,22 @@ public class StrategyAnalyticsService {
         // Compute pairwise Pearson correlation
         for (int i = 0; i < n; i++) {
             matrix[i][i] = 1.0;
+            Map<String, Double> returnsI = allReturns.get(i);
             for (int j = i + 1; j < n; j++) {
-                double corr = pearsonCorrelation(allReturns.get(i), allReturns.get(j));
+                Map<String, Double> returnsJ = allReturns.get(j);
+                
+                // Align returns by date
+                List<Double> alignedI = new ArrayList<>();
+                List<Double> alignedJ = new ArrayList<>();
+                for (Map.Entry<String, Double> entry : returnsI.entrySet()) {
+                    String date = entry.getKey();
+                    if (returnsJ.containsKey(date)) {
+                        alignedI.add(entry.getValue());
+                        alignedJ.add(returnsJ.get(date));
+                    }
+                }
+                
+                double corr = pearsonCorrelation(alignedI, alignedJ);
                 corr = Math.round(corr * 100.0) / 100.0;
                 matrix[i][j] = corr;
                 matrix[j][i] = corr;

@@ -21,6 +21,7 @@ public class CsvImportService {
             String line;
             String separator = null;
             String[] headers = null;
+            boolean hasTicketColumn = false;
 
             int lineNum = 0;
             while ((line = br.readLine()) != null) {
@@ -38,6 +39,9 @@ public class CsvImportService {
                     headers = splitCsvLine(line, separator);
                     for (int i = 0; i < headers.length; i++) {
                         headers[i] = headers[i].trim().toLowerCase().replaceAll("[^a-z0-9/ _-]", "");
+                        if (isHeaderFor(headers[i], "ticket", "position", "id", "order", "deal")) {
+                            hasTicketColumn = true;
+                        }
                     }
                     continue;
                 }
@@ -131,6 +135,10 @@ public class CsvImportService {
                     trade.setCloseTime(trade.getOpenTime());
                 }
 
+                if (!hasTicketColumn) {
+                    trade.setTicket(generateDeterministicTicket(trade, trades.size()));
+                }
+
                 trades.add(trade);
             }
         }
@@ -173,10 +181,55 @@ public class CsvImportService {
             return defaultValue;
         }
         try {
-            String clean = val.replace(",", ".").replaceAll("[^0-9.-]", "").trim();
+            String clean = val.trim();
+            int lastComma = clean.lastIndexOf(',');
+            int lastDot = clean.lastIndexOf('.');
+            
+            char decimalSeparator = 0;
+            if (lastComma >= 0 && lastDot >= 0) {
+                decimalSeparator = lastComma > lastDot ? ',' : '.';
+            } else if (lastComma >= 0) {
+                decimalSeparator = ',';
+            } else if (lastDot >= 0) {
+                decimalSeparator = '.';
+            }
+            
+            if (decimalSeparator == ',') {
+                clean = clean.replace(".", "").replaceAll("[\\s]", "");
+                clean = clean.replace(",", ".");
+            } else if (decimalSeparator == '.') {
+                clean = clean.replace(",", "").replaceAll("[\\s]", "");
+            } else {
+                clean = clean.replaceAll("[\\s]", "");
+            }
+            
+            clean = clean.replaceAll("[^0-9.-]", "");
             return Double.parseDouble(clean);
         } catch (Exception e) {
             return defaultValue;
+        }
+    }
+
+    private long generateDeterministicTicket(ClosedTrade trade, int index) {
+        String key = (trade.getSymbol() != null ? trade.getSymbol() : "") + "_" 
+                   + (trade.getOpenTime() != null ? trade.getOpenTime() : "") + "_" 
+                   + (trade.getCloseTime() != null ? trade.getCloseTime() : "") + "_" 
+                   + trade.getVolume() + "_" 
+                   + trade.getProfit() + "_" 
+                   + (trade.getType() != null ? trade.getType() : "") + "_" 
+                   + trade.getSwap() + "_" 
+                   + trade.getCommission() + "_"
+                   + index;
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(key.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            long result = 0;
+            for (int i = 0; i < 8; i++) {
+                result = (result << 8) | (hash[i] & 0xff);
+            }
+            return Math.abs(result);
+        } catch (Exception e) {
+            return Math.abs((long) key.hashCode());
         }
     }
 

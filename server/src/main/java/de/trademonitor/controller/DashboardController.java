@@ -1047,7 +1047,7 @@ public class DashboardController {
         java.time.LocalDate endDt = today;
         switch (period.toLowerCase()) {
             case "weekly":
-                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek();
+                java.time.temporal.TemporalField fieldISO = java.time.temporal.WeekFields.ISO.dayOfWeek();
                 startDt = today.with(fieldISO, 1);
                 endDt = today.with(fieldISO, 7);
                 break;
@@ -1144,7 +1144,7 @@ public class DashboardController {
                 String monthStr = today.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
                 return s -> s.getTimestamp() != null && s.getTimestamp().startsWith(monthStr);
             case "weekly":
-                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(Locale.getDefault());
+                java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
                 int currentWeek = today.get(weekFields.weekOfWeekBasedYear());
                 int currentYear = today.getYear();
                 return s -> {
