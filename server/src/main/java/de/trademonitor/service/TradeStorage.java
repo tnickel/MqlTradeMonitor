@@ -21,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Persists trade data to H2 database.
@@ -28,6 +29,8 @@ import java.util.Map;
  */
 @Service
 public class TradeStorage {
+
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(TradeStorage.class.getName());
 
     @Autowired
     private AccountRepository accountRepository;
@@ -55,6 +58,11 @@ public class TradeStorage {
      * 60s is enough)
      */
     private final java.util.concurrent.ConcurrentHashMap<Long, LocalDateTime> lastSnapshotTime = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Cache for open trades' maximum drawdown (MAE) values to preserve them across deletion cycles
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Double> ticketMaxDrawdownCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Save or update account in DB.
@@ -198,17 +206,14 @@ public class TradeStorage {
             return 0;
         }
 
-        // Load all existing tickets for this account in ONE query (fast)
-        List<ClosedTradeEntity> existing = closedTradeRepository.findByAccountId(accountId);
-        java.util.Set<Long> existingTickets = new java.util.HashSet<>();
-        for (ClosedTradeEntity e : existing) {
-            existingTickets.add(e.getTicket());
-        }
+        // Load only the existing tickets for this account in ONE query (fast)
+        List<Long> existingTickets = closedTradeRepository.findTicketsByAccountId(accountId);
+        java.util.Set<Long> existingTicketsSet = new java.util.HashSet<>(existingTickets);
 
         // Collect new trades (skip duplicates via HashSet lookup)
         List<ClosedTradeEntity> toInsert = new ArrayList<>();
         for (ClosedTrade trade : closedTrades) {
-            if (!existingTickets.contains(trade.getTicket())) {
+            if (!existingTicketsSet.contains(trade.getTicket())) {
                 ClosedTradeEntity entity = new ClosedTradeEntity();
                 entity.setAccountId(accountId);
                 entity.setTicket(trade.getTicket());
@@ -232,9 +237,13 @@ public class TradeStorage {
         // Batch save all new trades at once
         if (!toInsert.isEmpty()) {
             closedTradeRepository.saveAll(toInsert);
+            // Prune maximum drawdown memory cache for closed trades
+            for (ClosedTradeEntity e : toInsert) {
+                ticketMaxDrawdownCache.remove(accountId + "_" + e.getTicket());
+            }
         }
 
-        System.out.println("Account " + accountId + ": " + toInsert.size() + " new closed trades inserted, "
+        LOG.info("Account " + accountId + ": " + toInsert.size() + " new closed trades inserted, "
                 + (closedTrades.size() - toInsert.size()) + " duplicates skipped (from " + closedTrades.size()
                 + " received)");
         return toInsert.size();
@@ -261,7 +270,7 @@ public class TradeStorage {
             for (Trade trade : trades) {
                 if (trade == null) continue;
                 if (!seenTickets.add(trade.getTicket())) {
-                    System.out.println("Warning: Duplicate open trade ticket " + trade.getTicket() + " for account " + accountId + " skipped.");
+                    LOG.warning("Duplicate open trade ticket " + trade.getTicket() + " for account " + accountId + " skipped.");
                     continue;
                 }
                 OpenTradeEntity entity = new OpenTradeEntity();
@@ -281,14 +290,16 @@ public class TradeStorage {
                 
                 // Track max drawdown (MAE)
                 double currentProfit = trade.getProfit();
-                double prevMaxDD = existingDrawdowns.getOrDefault(trade.getTicket(), 0.0);
-                // If it's the first time we see this trade, current profit is our baseline
-                // Drawdown is stored as a negative value (worst profit)
-                if (!existingDrawdowns.containsKey(trade.getTicket())) {
-                    entity.setMaxDrawdown(currentProfit);
-                } else {
-                    entity.setMaxDrawdown(Math.min(prevMaxDD, currentProfit));
+                String cacheKey = accountId + "_" + trade.getTicket();
+                double prevMaxDD = ticketMaxDrawdownCache.getOrDefault(cacheKey, currentProfit);
+                
+                if (existingDrawdowns.containsKey(trade.getTicket())) {
+                    prevMaxDD = Math.min(prevMaxDD, existingDrawdowns.get(trade.getTicket()));
                 }
+                
+                double newMaxDD = Math.min(prevMaxDD, currentProfit);
+                ticketMaxDrawdownCache.put(cacheKey, newMaxDD);
+                entity.setMaxDrawdown(newMaxDD);
                 
                 // Propagate to in-memory model for immediate UI update
                 trade.setMaxDrawdown(entity.getMaxDrawdown());
@@ -382,16 +393,22 @@ public class TradeStorage {
         LocalDateTime nowTime = LocalDateTime.now();
 
         // Rate-limit: require at least 60 real seconds since the last snapshot.
-        // (Comparing only the minute string previously allowed two snapshots ~1s apart
-        // across a minute boundary, e.g. 12:00:59 and 12:01:00.)
-        LocalDateTime last = lastSnapshotTime.get(accountId);
-        if (last != null && java.time.temporal.ChronoUnit.SECONDS.between(last, nowTime) < 60) {
+        // (Uses atomic compute block to ensure thread safety under concurrent writes.)
+        AtomicBoolean shouldSave = new AtomicBoolean(false);
+        lastSnapshotTime.compute(accountId, (k, prev) -> {
+            if (prev == null || java.time.temporal.ChronoUnit.SECONDS.between(prev, nowTime) >= 60) {
+                shouldSave.set(true);
+                return nowTime;
+            }
+            return prev;
+        });
+
+        if (!shouldSave.get()) {
             return;
         }
 
         String now = nowTime.format(SNAPSHOT_FMT);
         equitySnapshotRepository.save(new EquitySnapshotEntity(accountId, now, equity, balance));
-        lastSnapshotTime.put(accountId, nowTime);
 
         // Cleanup: delete snapshots older than 90 days
         String cutoff = LocalDateTime.now().minusDays(90).format(SNAPSHOT_FMT);
@@ -423,15 +440,11 @@ public class TradeStorage {
      */
     @Transactional
     public void resetAccountTrades(long accountId) {
-        int openCount = openTradeRepository.findByAccountId(accountId).size();
-        long closedCount = closedTradeRepository.countByAccountId(accountId);
-
+        LOG.info("RESET Account " + accountId + ": Deleting all open trades, closed trades, and equity snapshots.");
         openTradeRepository.deleteByAccountId(accountId);
         closedTradeRepository.deleteByAccountId(accountId);
         equitySnapshotRepository.deleteByAccountId(accountId);
-
-        System.out.println("RESET Account " + accountId + ": Deleted " + openCount
-                + " open trades, " + closedCount + " closed trades, and equity snapshots.");
+        ticketMaxDrawdownCache.entrySet().removeIf(e -> e.getKey().startsWith(accountId + "_"));
     }
 
     public void updatePromptAnalysisConfig(long accountId, boolean enabled, String customPrompt) {
@@ -443,6 +456,7 @@ public class TradeStorage {
         }
     }
 
+    @Transactional
     public void updatePromptAnalysisResult(long accountId, String result, java.time.LocalDateTime time) {
         AccountEntity entity = accountRepository.findById(accountId).orElse(null);
         if (entity != null) {
@@ -454,7 +468,7 @@ public class TradeStorage {
             LlmAnalysisLogEntity log = new LlmAnalysisLogEntity(accountId, result, time);
             llmAnalysisLogRepository.save(log);
         } catch (Exception e) {
-            System.err.println("Failed to save LLM analysis log: " + e.getMessage());
+            LOG.severe("Failed to save LLM analysis log: " + e.getMessage());
         }
     }
 }

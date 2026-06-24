@@ -22,14 +22,14 @@ public interface EquitySnapshotRepository extends JpaRepository<EquitySnapshotEn
     void deleteOlderThan(long accountId, String cutoff);
 
     @Query("SELECT e FROM EquitySnapshotEntity e WHERE e.accountId = :accountId AND (" +
-           "  e.timestamp >= :recentCutoff OR SUBSTRING(e.timestamp, 15, 2) = '00'" +
+           "  e.timestamp >= :recentCutoff OR e.timestamp LIKE '____-__-__T__:00:%'" +
            ") ORDER BY e.timestamp ASC")
     List<EquitySnapshotEntity> findByAccountIdAndTimestampGreaterThanOrMinuteIsZero(
             @org.springframework.data.repository.query.Param("accountId") long accountId, 
             @org.springframework.data.repository.query.Param("recentCutoff") String recentCutoff);
 
     @Query("SELECT e FROM EquitySnapshotEntity e WHERE e.accountId = :accountId AND e.timestamp BETWEEN :from AND :to AND (" +
-           "  e.timestamp >= :recentCutoff OR SUBSTRING(e.timestamp, 15, 2) = '00'" +
+           "  e.timestamp >= :recentCutoff OR e.timestamp LIKE '____-__-__T__:00:%'" +
            ") ORDER BY e.timestamp ASC")
     List<EquitySnapshotEntity> findByAccountIdAndTimestampBetweenAndRecentOrMinuteIsZero(
             @org.springframework.data.repository.query.Param("accountId") long accountId,

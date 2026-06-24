@@ -66,6 +66,8 @@ int g_reconnectAttempts = 0;             // Number of reconnect attempts
 bool g_extendedRetryMode = false;        // Whether we are in the 15-minute extended retry phase
 datetime g_nextRetryTime = 0;            // Timestamp for next retry attempt
 int g_lastError = 0;                     // Last web request error
+bool g_authFailed = false;               // Flag when API key is invalid/unauthorized (HTTP 401/403)
+bool g_invalidConfig = false;            // Flag when ServerURL or config is invalid
 
 //--- Constants
 #define LONG_RETRY_INTERVAL 900          // 15 minutes (900 seconds) for long retry mode
@@ -96,6 +98,8 @@ void UpdateStatusLabel(string text, color col);
 void LoadLastSyncTime();
 void SaveLastSyncTime(string closeTime);
 void SendEaLogs();
+void FlushRemainingLogs(string srcPath);
+bool SendLogLinesChunk(string &lines[], int startIdx, int count);
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -134,6 +138,8 @@ bool LoadConfig()
       StringTrimLeft(value);
       StringTrimRight(value);
       
+      if(key == "") continue;
+      
       if(key == "ServerURL")                 cfg_ServerURL = value;
       else if(key == "UserKey")              cfg_UserKey = value;
       else if(key == "UpdateIntervalSeconds")     cfg_UpdateIntervalSeconds = (int)StringToInteger(value);
@@ -167,11 +173,11 @@ void SaveConfig()
    FileWriteString(handle, "ServerURL=" + cfg_ServerURL + "\r\n");
    FileWriteString(handle, "UserKey=" + cfg_UserKey + "\r\n");
    FileWriteString(handle, "UpdateIntervalSeconds=" + IntegerToString(cfg_UpdateIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "HeartbeatIntervalSeconds = " + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "ReconnectIntervalSeconds = " + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "MaxReconnectAttempts = " + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
-   FileWriteString(handle, "LogUploadIntervalSeconds = " + IntegerToString(cfg_LogUploadIntervalSeconds) + "\r\n");
-   FileWriteString(handle, "DebugMode = " + IntegerToString(cfg_DebugMode) + "\r\n");
+   FileWriteString(handle, "HeartbeatIntervalSeconds=" + IntegerToString(cfg_HeartbeatIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "ReconnectIntervalSeconds=" + IntegerToString(cfg_ReconnectIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "MaxReconnectAttempts=" + IntegerToString(cfg_MaxReconnectAttempts) + "\r\n");
+   FileWriteString(handle, "LogUploadIntervalSeconds=" + IntegerToString(cfg_LogUploadIntervalSeconds) + "\r\n");
+   FileWriteString(handle, "DebugMode=" + IntegerToString(cfg_DebugMode) + "\r\n");
    
    FileClose(handle);
    Print("Default configuration saved to ", CONFIG_FILE);
@@ -186,35 +192,37 @@ void InitConfig()
    {
       Print("Loaded configuration from ", CONFIG_FILE);
       
-      bool uiChanged = false;
+      bool uiChanged = (UninitializeReason() == REASON_PARAMETERS);
       
-       if(ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de" && ServerURL != cfg_ServerURL) uiChanged = true;
-       if(InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4" && InpUserKey != cfg_UserKey) uiChanged = true;
-       if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) uiChanged = true;
-      if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) uiChanged = true;
-      if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) uiChanged = true;
-      if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) uiChanged = true;
-      if(LogUploadIntervalSeconds != 300 && LogUploadIntervalSeconds != cfg_LogUploadIntervalSeconds) uiChanged = true;
-      if(DebugMode != 0 && DebugMode != cfg_DebugMode) uiChanged = true;
-      
-      if(cfg_LogUploadIntervalSeconds == 0 && LogUploadIntervalSeconds == 300)
+      if(!uiChanged)
       {
-         cfg_LogUploadIntervalSeconds = 300;
-         uiChanged = true;
+         // If starting fresh (reason 0), compare inputs with loaded config.
+         // Only overwrite if UI input is NOT the default value and is different from config.
+         if(ServerURL != "https://monitor.tnickel-ki.de" && ServerURL != cfg_ServerURL) { cfg_ServerURL = ServerURL; uiChanged = true; }
+         if(InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4" && InpUserKey != cfg_UserKey) { cfg_UserKey = InpUserKey; uiChanged = true; }
+         if(UpdateIntervalSeconds != 15 && UpdateIntervalSeconds != cfg_UpdateIntervalSeconds) { cfg_UpdateIntervalSeconds = UpdateIntervalSeconds; uiChanged = true; }
+         if(HeartbeatIntervalSeconds != 30 && HeartbeatIntervalSeconds != cfg_HeartbeatIntervalSeconds) { cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds; uiChanged = true; }
+         if(ReconnectIntervalSeconds != 30 && ReconnectIntervalSeconds != cfg_ReconnectIntervalSeconds) { cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds; uiChanged = true; }
+         if(MaxReconnectAttempts != 10 && MaxReconnectAttempts != cfg_MaxReconnectAttempts) { cfg_MaxReconnectAttempts = MaxReconnectAttempts; uiChanged = true; }
+         if(LogUploadIntervalSeconds != 300 && LogUploadIntervalSeconds != cfg_LogUploadIntervalSeconds) { cfg_LogUploadIntervalSeconds = LogUploadIntervalSeconds; uiChanged = true; }
+         if(DebugMode != 0 && DebugMode != cfg_DebugMode) { cfg_DebugMode = DebugMode; uiChanged = true; }
+      }
+      else
+      {
+         // Parameter changed on running EA: copy all values directly
+         cfg_ServerURL = ServerURL;
+         cfg_UserKey = InpUserKey;
+         cfg_UpdateIntervalSeconds = UpdateIntervalSeconds;
+         cfg_HeartbeatIntervalSeconds = HeartbeatIntervalSeconds;
+         cfg_ReconnectIntervalSeconds = ReconnectIntervalSeconds;
+         cfg_MaxReconnectAttempts = MaxReconnectAttempts;
+         cfg_LogUploadIntervalSeconds = LogUploadIntervalSeconds;
+         cfg_DebugMode = DebugMode;
       }
       
       if(uiChanged)
       {
-         Print("UI inputs differ from config file. Updating config file with new UI values.");
-          cfg_ServerURL = (ServerURL != "" && ServerURL != "https://monitor.tnickel-ki.de") ? ServerURL : cfg_ServerURL;
-          cfg_UserKey = (InpUserKey != "" && InpUserKey != "jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4") ? InpUserKey : cfg_UserKey;
-          cfg_UpdateIntervalSeconds = (UpdateIntervalSeconds != 15) ? UpdateIntervalSeconds : cfg_UpdateIntervalSeconds;
-         cfg_HeartbeatIntervalSeconds = (HeartbeatIntervalSeconds != 30) ? HeartbeatIntervalSeconds : cfg_HeartbeatIntervalSeconds;
-         cfg_ReconnectIntervalSeconds = (ReconnectIntervalSeconds != 30) ? ReconnectIntervalSeconds : cfg_ReconnectIntervalSeconds;
-         cfg_MaxReconnectAttempts = (MaxReconnectAttempts != 10) ? MaxReconnectAttempts : cfg_MaxReconnectAttempts;
-         cfg_LogUploadIntervalSeconds = (LogUploadIntervalSeconds != 300) ? LogUploadIntervalSeconds : cfg_LogUploadIntervalSeconds;
-         cfg_DebugMode = (DebugMode != 0) ? DebugMode : cfg_DebugMode;
-         
+         Print("UI inputs differ from configuration or parameters changed. Updating config file.");
          SaveConfig();
       }
    }
@@ -242,6 +250,12 @@ void InitConfig()
    if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)
       cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
    
+   if(StringLen(cfg_ServerURL) < 8 || StringFind(cfg_ServerURL, "http") != 0)
+   {
+      Print("CRITICAL ERROR: ServerURL '", cfg_ServerURL, "' is invalid. It must start with http:// or https://.");
+      g_invalidConfig = true;
+   }
+   
     Print("Active config: ServerURL=", cfg_ServerURL,
           " UpdateInterval=", cfg_UpdateIntervalSeconds,
           " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
@@ -250,22 +264,18 @@ void InitConfig()
           " MaxReconnectAttempts=", cfg_MaxReconnectAttempts,
           " DebugMode=", cfg_DebugMode);
 
-    // Enforce minimum intervals
-    if(cfg_UpdateIntervalSeconds < 15)
-    {
-       Print("Warning: UpdateIntervalSeconds cannot be less than 15. Enforcing 15s.");
-       cfg_UpdateIntervalSeconds = 15;
-    }
-    if(cfg_HeartbeatIntervalSeconds < 30)
-    {
-       Print("Warning: HeartbeatIntervalSeconds cannot be less than 30. Enforcing 30s.");
-       cfg_HeartbeatIntervalSeconds = 30;
-    }
-    if(cfg_ReconnectIntervalSeconds < 30)
-    {
-       Print("Warning: ReconnectIntervalSeconds cannot be less than 30. Enforcing 30s.");
-       cfg_ReconnectIntervalSeconds = 30;
-    }
+    // Enforce interval clamps
+    if(cfg_UpdateIntervalSeconds < 15) cfg_UpdateIntervalSeconds = 15;
+    if(cfg_UpdateIntervalSeconds > 3600) cfg_UpdateIntervalSeconds = 3600;
+    
+    if(cfg_HeartbeatIntervalSeconds < 30) cfg_HeartbeatIntervalSeconds = 30;
+    if(cfg_HeartbeatIntervalSeconds > 3600) cfg_HeartbeatIntervalSeconds = 3600;
+    
+    if(cfg_ReconnectIntervalSeconds < 30) cfg_ReconnectIntervalSeconds = 30;
+    if(cfg_ReconnectIntervalSeconds > 3600) cfg_ReconnectIntervalSeconds = 3600;
+    
+    if(cfg_LogUploadIntervalSeconds > 0 && cfg_LogUploadIntervalSeconds < 30) cfg_LogUploadIntervalSeconds = 30;
+    if(cfg_LogUploadIntervalSeconds > 86400) cfg_LogUploadIntervalSeconds = 86400;
 }
 
 //+------------------------------------------------------------------+
@@ -275,6 +285,8 @@ int OnInit()
 {
    Print("TradeMonitorClient EA v" + EA_VERSION + " initialized");
    
+   g_authFailed = false;
+   g_invalidConfig = false;
    InitConfig();
    
    // Build unique GlobalVariable names per account
@@ -366,6 +378,18 @@ void OnTimer()
 {
    uint currentTick = GetTickCount();
    datetime now = TimeCurrent();
+   
+   if(g_invalidConfig)
+   {
+      UpdateStatusLabel("CRITICAL: Invalid Server URL\nUpdates stopped", clrRed);
+      return;
+   }
+   
+   if(g_authFailed)
+   {
+      UpdateStatusLabel("CRITICAL: API Key Invalid (401/403)\nUpdates stopped", clrRed);
+      return;
+   }
    
    // Check if the terminal is actually connected to the broker
    if(!IsConnected())
@@ -577,6 +601,8 @@ void OnChartEvent(const int id,
          Print("=== Manual Reconnect triggered by user ===");
          
          // Reset all reconnect state
+         g_authFailed = false;
+         g_invalidConfig = false;
          g_reconnectAttempts = 0;
          g_extendedRetryMode = false;
          g_nextRetryTime = 0;
@@ -588,9 +614,7 @@ void OnChartEvent(const int id,
          g_lastSyncedCloseTime = "";
          isRegistered = false;
          lastReconnectAttemptTick = 0;
-         lastLogUploadTick = 0; // Force immediate log upload on reconnect
-         g_lastLogLinesSent = 0; // Reset log line counter to re-send all lines
-         GlobalVariableSet(GV_LAST_LOG_LINES, 0); // Persist the reset
+         lastLogUploadTick = 0; // Force immediate log upload on reconnect (incremental)
          GlobalVariableSet(GV_TRADELIST_SENT, 0);  // Clear persisted status
          SaveLastSyncTime("");                     // Clear sync bookmark
          
@@ -782,6 +806,11 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    outLatestCloseTime = "";
    
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
+   datetime sinceTimeVal = 0;
+   if(isIncremental)
+   {
+      sinceTimeVal = StringToTime(sinceCloseTime) - 7200; // 2 hours safety window
+   }
    if(!isIncremental && cfg_DebugMode > 0)
       Print("Processing full history: ", totalOrders, " orders found...");
    
@@ -799,17 +828,14 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
              // In MQL4 history, OrderCloseTime() > 0 usually indicates closed
              if(closeTimeVal > 0)
              {
-                 string closeTime = TimeToString(closeTimeVal, TIME_DATE|TIME_SECONDS);
-                 
-                 // Skip trades already synced (incremental mode).
-                 // Use '<' (not '<=') so trades that closed in the same second as the
-                 // last synced trade are not permanently skipped. Re-sent duplicates
-                 // are deduplicated server-side by (accountId + ticket).
-                 if(isIncremental && closeTime < sinceCloseTime)
-                 {
-                    skippedCount++;
-                    continue;
-                 }
+                  string closeTime = TimeToString(closeTimeVal, TIME_DATE|TIME_SECONDS);
+                  
+                  // Skip trades already synced (incremental mode) using the 2-hour safety window
+                  if(isIncremental && closeTimeVal < sinceTimeVal)
+                  {
+                     skippedCount++;
+                     continue;
+                  }
                  
                  if(!firstDeal) historyJson += ",";
                  firstDeal = false;
@@ -1023,6 +1049,12 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
           Print("HTTP request returned status: ", res, " URL: ", url);
           if(cfg_DebugMode > 0)
              Print("Server response: ", responseBody);
+          
+          if(res == 401 || res == 403)
+          {
+             Print("CRITICAL ERROR: API Key is invalid or unauthorized (HTTP ", res, "). Sync stopped.");
+             g_authFailed = true;
+          }
        }
        return false;
     }
@@ -1066,13 +1098,59 @@ void LoadLastSyncTime()
 //+------------------------------------------------------------------+
 string EscapeJson(string text)
 {
-   string result = text;
-   StringReplace(result, "\\", "\\\\");
-   StringReplace(result, "\"", "\\\"");
-   StringReplace(result, "\n", "\\n");
-   StringReplace(result, "\r", "\\r");
-   StringReplace(result, "\t", "\\t");
+   string result = "";
+   int len = StringLen(text);
+   for(int i = 0; i < len; i++)
+   {
+      ushort c = StringGetCharacter(text, i);
+      if(c == '\\')      result += "\\\\";
+      else if(c == '"')  result += "\\\"";
+      else if(c == '\n') result += "\\n";
+      else if(c == '\r') result += "\\r";
+      else if(c == '\t') result += "\\t";
+      else if(c == '\b') result += "\\b";
+      else if(c == '\f') result += "\\f";
+      else if(c < 32)
+      {
+         // Escape control chars < 32 as \u00xx
+         string hex = "0123456789abcdef";
+         ushort h1 = (c >> 12) & 0x0F;
+         ushort h2 = (c >> 8) & 0x0F;
+         ushort h3 = (c >> 4) & 0x0F;
+         ushort h4 = c & 0x0F;
+         result += "\\u" + StringSubstr(hex, h1, 1) + StringSubstr(hex, h2, 1) + StringSubstr(hex, h3, 1) + StringSubstr(hex, h4, 1);
+      }
+      else
+      {
+         result += ShortToString(c);
+      }
+   }
    return result;
+}
+
+//+------------------------------------------------------------------+
+//| Send a chunk of log lines to server                              |
+//+------------------------------------------------------------------+
+bool SendLogLinesChunk(string &lines[], int startIdx, int count)
+{
+   if(count <= 0) return true;
+   
+   string logsJson = "[";
+   for(int i = 0; i < count; i++)
+   {
+      if(i > 0) logsJson += ",";
+      logsJson += "\"" + EscapeJson(lines[startIdx + i]) + "\"";
+   }
+   logsJson += "]";
+   
+   string json = "{";
+   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"logEntries\":" + logsJson + ",";
+   json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
+   json += "}";
+   
+   string url = cfg_ServerURL + "/api/ea-logs";
+   return SendHttpPost(url, json);
 }
 
 //+------------------------------------------------------------------+
@@ -1084,12 +1162,21 @@ void SendEaLogs()
    StringReplace(logDate, ".", "");
    double currentDateNumeric = StringToDouble(logDate);
    
-   // Check if the day rolled over. If so, reset the line counter.
+   // Check if the day rolled over. If so, flush the old file before resetting.
    if(GlobalVariableCheck(GV_LAST_LOG_DATE))
    {
       double lastDate = GlobalVariableGet(GV_LAST_LOG_DATE);
       if(lastDate > 0 && lastDate != currentDateNumeric)
       {
+         // Flush remaining logs of the old day
+         string oldLogDateStr = IntegerToString((long)lastDate);
+         if(StringLen(oldLogDateStr) == 8)
+         {
+            string oldLogFileDate = StringSubstr(oldLogDateStr, 0, 4) + "." + StringSubstr(oldLogDateStr, 4, 2) + "." + StringSubstr(oldLogDateStr, 6, 2);
+            string oldSrcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\logs\\" + oldLogFileDate + ".log";
+            FlushRemainingLogs(oldSrcPath);
+         }
+         
          // Day has changed! Reset line count.
          g_lastLogLinesSent = 0;
          GlobalVariableSet(GV_LAST_LOG_LINES, 0);
@@ -1142,24 +1229,7 @@ void SendEaLogs()
       return;
    
    int maxLines = MathMin(newLines, 500);
-   
-   string logsJson = "[";
-   for(int i = 0; i < maxLines; i++)
-   {
-      if(i > 0) logsJson += ",";
-      logsJson += "\"" + EscapeJson(lines[i]) + "\"";
-   }
-   logsJson += "]";
-   
-   string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
-   json += "\"logEntries\":" + logsJson + ",";
-   json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
-   json += "}";
-   
-   string url = cfg_ServerURL + "/api/ea-logs";
-   
-   if(SendHttpPost(url, json))
+   if(SendLogLinesChunk(lines, 0, maxLines))
    {
       g_lastLogLinesSent += maxLines;
       GlobalVariableSet(GV_LAST_LOG_LINES, (double)g_lastLogLinesSent);
@@ -1169,10 +1239,56 @@ void SendEaLogs()
 }
 
 //+------------------------------------------------------------------+
-//| Tick function - not used but required                              |
+//| Flush remaining logs of the old day before rollover             |
 //+------------------------------------------------------------------+
-void OnTick()
+void FlushRemainingLogs(string srcPath)
 {
-   // We use timer instead of tick for consistency
+   string destFile = "ea_log_copy.txt";
+   string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL4\\Files\\" + destFile;
+   
+   if(!CopyFileW(srcPath, destPath, false))
+   {
+      Print("Warning: Could not copy old log file: ", srcPath);
+      return;
+   }
+   
+   int handle = FileOpen(destFile, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
+   if(handle == INVALID_HANDLE)
+   {
+      return;
+   }
+   
+   string lines[];
+   int lineCount = 0;
+   while(!FileIsEnding(handle))
+   {
+      string line = FileReadString(handle);
+      if(StringLen(line) > 0)
+      {
+         lineCount++;
+         if(lineCount > g_lastLogLinesSent)
+         {
+            int newIdx = ArraySize(lines);
+            ArrayResize(lines, newIdx + 1);
+            lines[newIdx] = line;
+         }
+      }
+   }
+   FileClose(handle);
+   
+   int totalNewLines = ArraySize(lines);
+   int sentIdx = 0;
+   while(sentIdx < totalNewLines)
+   {
+      int maxLines = MathMin(totalNewLines - sentIdx, 500);
+      if(SendLogLinesChunk(lines, sentIdx, maxLines))
+      {
+         g_lastLogLinesSent += maxLines;
+         sentIdx += maxLines;
+      }
+      else
+      {
+         break;
+      }
+   }
 }
-//+------------------------------------------------------------------+

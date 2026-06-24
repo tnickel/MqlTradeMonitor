@@ -5,6 +5,7 @@ import de.trademonitor.dto.HistoryUpdateRequest;
 import de.trademonitor.dto.RegisterRequest;
 import de.trademonitor.dto.TradeInitRequest;
 import de.trademonitor.dto.TradeUpdateRequest;
+import de.trademonitor.dto.EaLogRequest;
 import de.trademonitor.service.AccountManager;
 import de.trademonitor.entity.UserEntity;
 import de.trademonitor.repository.UserRepository;
@@ -21,6 +22,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class ApiController {
+
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(ApiController.class.getName());
 
     @Autowired
     private AccountManager accountManager;
@@ -70,7 +73,7 @@ public class ApiController {
                         new de.trademonitor.entity.ClientErrorLog(accountId, action, ip, message));
             }
         } catch (Exception e) {
-            System.err.println("Failed to save client log: " + e.getMessage());
+            LOG.log(java.util.logging.Level.SEVERE, "Failed to save client log: " + e.getMessage(), e);
         }
     }
 
@@ -121,6 +124,10 @@ public class ApiController {
             @RequestBody RegisterRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
 
+        if (request == null || request.getAccountId() <= 0 || !Double.isFinite(request.getBalance())) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid accountId or balance"));
+        }
+
         if (!isAuthorized(userKey, request.getAccountId())) {
             logClientAction(request.getAccountId(), "AUTH_FAILED", "Invalid or missing User Key during register",
                     httpRequest);
@@ -158,6 +165,10 @@ public class ApiController {
             @RequestBody TradeInitRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
 
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
+        }
+
         if (!isAuthorized(userKey, request.getAccountId())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("status", "error", "message", "Unauthorized"));
@@ -166,6 +177,11 @@ public class ApiController {
         try {
             int openCount = request.getTrades() != null ? request.getTrades().size() : 0;
             int closedCount = request.getClosedTrades() != null ? request.getClosedTrades().size() : 0;
+            
+            if (openCount > 5000 || closedCount > 100000) {
+                return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Payload size limit exceeded"));
+            }
+
             logClientAction(request.getAccountId(), "INIT_TRADES", "Open: " + openCount + ", Closed: " + closedCount,
                     httpRequest);
 
@@ -189,8 +205,7 @@ public class ApiController {
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             logClientAction(request.getAccountId(), "INIT_ERROR", msg, httpRequest);
-            System.err.println("ERROR in /api/trades-init: " + msg);
-            e.printStackTrace();
+            LOG.log(java.util.logging.Level.SEVERE, "ERROR in /api/trades-init: " + msg, e);
             accountManager.reportError(request.getAccountId(), "Init Error: " + msg);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
@@ -266,7 +281,7 @@ public class ApiController {
                     long offsetSeconds = java.time.temporal.ChronoUnit.SECONDS.between(brokerTime, serverTime);
                     accountManager.updateServerTimeOffset(request.getAccountId(), offsetSeconds);
                 } catch (Exception e) {
-                    System.err.println("Could not parse heartbeat timestamp: " + request.getTimestamp() + " for account " + request.getAccountId());
+                    LOG.log(java.util.logging.Level.WARNING, "Could not parse heartbeat timestamp: " + request.getTimestamp() + " for account " + request.getAccountId(), e);
                 }
             }
 
@@ -309,6 +324,9 @@ public class ApiController {
      */
     @GetMapping("/market/rate")
     public ResponseEntity<?> getMarketRate(@RequestParam("symbol") String symbol) {
+        if (symbol == null || symbol.length() > 20 || !symbol.matches("^[a-zA-Z0-9/-]+$")) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Invalid symbol parameter"));
+        }
         de.trademonitor.service.ExchangeRateService.CachedRate rate = exchangeRateService.getRateDetails(symbol);
         if (rate != null && rate.getPrice() > 0) {
             return ResponseEntity.ok(Map.of(
@@ -368,28 +386,30 @@ public class ApiController {
     @PostMapping("/ea-logs")
     public ResponseEntity<?> receiveEaLogs(
             @RequestHeader(value = "X-User-Key", required = false) String userKey,
-            @RequestBody Map<String, Object> request,
+            @RequestBody EaLogRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
-        Long accountId = null;
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request body"));
+        }
+        long accountId = request.getAccountId();
+        if (accountId <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid or missing accountId"));
+        }
+
+        if (!isAuthorized(userKey, accountId)) {
+            logClientAction(accountId, "AUTH_FAILED", "Invalid or missing User Key during log upload", httpRequest);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+
         try {
-            Object idObj = request.get("accountId");
-            if (idObj instanceof Number) {
-                accountId = ((Number) idObj).longValue();
-            }
-            if (accountId == null) {
-                return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Missing accountId"));
-            }
-
-            if (!isAuthorized(userKey, accountId)) {
-                logClientAction(accountId, "AUTH_FAILED", "Invalid or missing User Key during log upload", httpRequest);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("status", "error", "message", "Unauthorized"));
-            }
-
-            @SuppressWarnings("unchecked")
-            java.util.List<String> logEntries = (java.util.List<String>) request.get("logEntries");
+            java.util.List<String> logEntries = request.getLogEntries();
             if (logEntries == null || logEntries.isEmpty()) {
                 return ResponseEntity.ok(Map.of("status", "ok", "stored", 0));
+            }
+
+            if (logEntries.size() > 1000) {
+                return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Payload size limit exceeded"));
             }
 
             int stored = 0;
@@ -435,9 +455,7 @@ public class ApiController {
             return ResponseEntity.ok(Map.of("status", "ok", "stored", stored));
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-            if (accountId != null) {
-                logClientAction(accountId, "EA_LOG_ERROR", msg, httpRequest);
-            }
+            logClientAction(accountId, "EA_LOG_ERROR", msg, httpRequest);
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "error",
                     "message", msg));

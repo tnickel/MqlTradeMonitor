@@ -209,35 +209,36 @@ public class AccountManager {
      * Register or update an account.
      */
     public void registerAccount(long accountId, String broker, String currency, double balance) {
-        Account account = accounts.get(accountId);
-        if (account == null) {
-            account = new Account(accountId, broker, currency, balance);
-            // Assign to first section by default
-            if (!sectionsCache.isEmpty()) {
-                Long defaultSecId = sectionsCache.keySet().iterator().next();
-                // Try to find the one with order 0
-                Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
-                        .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
-                if (first.isPresent())
-                    defaultSecId = first.get().getId();
+        synchronized (getAccountLock(accountId)) {
+            Account account = accounts.get(accountId);
+            if (account == null) {
+                account = new Account(accountId, broker, currency, balance);
+                // Assign to first section by default
+                if (!sectionsCache.isEmpty()) {
+                    Long defaultSecId = sectionsCache.keySet().iterator().next();
+                    // Try to find the one with order 0
+                    Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                            .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+                    if (first.isPresent())
+                        defaultSecId = first.get().getId();
 
-                account.setSectionId(defaultSecId);
+                    account.setSectionId(defaultSecId);
+                }
+
+                accounts.put(accountId, account);
+                LOG.info("New account registered: " + accountId + " (" + broker + ")");
+            } else {
+                account.setBroker(broker);
+                account.setCurrency(currency);
+                account.setBalance(balance);
+                account.setLastSeen(LocalDateTime.now());
             }
-
-            accounts.put(accountId, account);
-            LOG.info("New account registered: " + accountId + " (" + broker + ")");
-        } else {
-            account.setBroker(broker);
-            account.setCurrency(currency);
-            account.setBalance(balance);
-            account.setLastSeen(LocalDateTime.now());
-        }
-        // Persist to DB
-        tradeStorage.saveAccount(accountId, broker, currency, balance);
-        // Also persist section if it was new? saveAccount doesn't do sectionId yet...
-        // We need to update TradeStorage to save sectionID too.
-        if (account.getSectionId() != null) {
-            tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+            // Persist to DB
+            tradeStorage.saveAccount(accountId, broker, currency, balance);
+            // Also persist section if it was new
+            if (account.getSectionId() != null) {
+                tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+            }
         }
     }
 
@@ -347,8 +348,9 @@ public class AccountManager {
      * Save layout preference for an account.
      */
     // Deprecated signature
+    @Deprecated
     public void saveLayout(long accountId, String section, int displayOrder) {
-        // no-op or forward?
+        throw new UnsupportedOperationException("saveLayout(long, String, int) is deprecated and should not be called");
     }
 
     public void saveAccountSection(long accountId, Long sectionId, int displayOrder) {
@@ -363,12 +365,12 @@ public class AccountManager {
     public void updateTrades(long accountId, List<Trade> trades, double equity, double balance) {
         Account account = accounts.get(accountId);
         if (account != null) {
-            account.setOpenTrades(trades != null ? trades : new ArrayList<>());
-            account.setEquity(equity);
-            account.setBalance(balance);
-            account.setLastSeen(LocalDateTime.now());
-
             synchronized (getAccountLock(accountId)) {
+                account.setOpenTrades(trades != null ? trades : new ArrayList<>());
+                account.setEquity(equity);
+                account.setBalance(balance);
+                account.setLastSeen(LocalDateTime.now());
+
                 // Persist to DB
                 tradeStorage.replaceOpenTrades(accountId, trades);
                 tradeStorage.updateAccountMetrics(accountId, equity, balance);
@@ -608,8 +610,13 @@ public class AccountManager {
         return timeoutSeconds;
     }
 
-    private boolean isWeekend() {
-        java.time.DayOfWeek day = java.time.LocalDateTime.now().getDayOfWeek();
+    private boolean isWeekendForAccount(Account account) {
+        Long offset = account.getServerTimeOffsetSeconds();
+        LocalDateTime localTime = LocalDateTime.now();
+        if (offset != null) {
+            localTime = localTime.plusSeconds(offset);
+        }
+        java.time.DayOfWeek day = localTime.getDayOfWeek();
         return day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY;
     }
 
@@ -644,7 +651,7 @@ public class AccountManager {
                     LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
                             + ") went OFFLINE.");
-                    if (!isWeekend()) {
+                    if (!isWeekendForAccount(account)) {
                         LOG.info("Triggering Homey siren for offline account.");
                         homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
                     }
@@ -855,6 +862,8 @@ public class AccountManager {
                     ddEur = Math.abs(openPL);
                     if (referenceBalance > 0) {
                         ddPct = (ddEur / referenceBalance) * 100.0;
+                    } else {
+                        ddPct = 100.0; // Blown account / negative balance gets 100% drawdown
                     }
                 }
 
@@ -966,6 +975,17 @@ public class AccountManager {
         }
     }
 
+    private final Object dailyProfitLock = new Object();
+
+    private void checkDailyProfitDateRollover(String todayStr) {
+        synchronized (dailyProfitLock) {
+            if (!todayStr.equals(cachedDailyProfitDate)) {
+                cachedDailyProfit.clear();
+                cachedDailyProfitDate = todayStr;
+            }
+        }
+    }
+
     /**
      * Refresh daily profit cache for a single account.
      */
@@ -973,11 +993,7 @@ public class AccountManager {
         String todayStr = java.time.LocalDateTime.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
 
-        // Reset all caches if the date changed
-        if (!todayStr.equals(cachedDailyProfitDate)) {
-            cachedDailyProfit.clear();
-            cachedDailyProfitDate = todayStr;
-        }
+        checkDailyProfitDateRollover(todayStr);
 
         Account account = accounts.get(accountId);
         if (account != null && account.getClosedTrades() != null) {
@@ -997,12 +1013,8 @@ public class AccountManager {
     public double getCachedDailyProfit(long accountId) {
         String todayStr = java.time.LocalDateTime.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
-        if (!todayStr.equals(cachedDailyProfitDate)) {
-            // Date changed, force refresh
-            cachedDailyProfit.clear();
-            cachedDailyProfitDate = todayStr;
-            refreshDailyProfitForAccount(accountId);
-        }
+        checkDailyProfitDateRollover(todayStr);
+        refreshDailyProfitForAccount(accountId);
         return cachedDailyProfit.getOrDefault(accountId, 0.0);
     }
 
@@ -1045,6 +1057,7 @@ public class AccountManager {
         return null;
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void addCsvAccount(long accountId, String name, List<ClosedTrade> trades) {
         Account account = accounts.get(accountId);
         if (account == null) {

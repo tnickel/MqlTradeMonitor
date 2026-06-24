@@ -387,21 +387,24 @@ public class Account {
      */
     public List<MagicProfitEntry> getMagicProfitEntries(int maxAgeDays, int minTrades,
             java.util.function.Function<Long, String> nameResolver) {
+        List<ClosedTrade> localClosedTrades = this.closedTrades;
+        List<Trade> localOpenTrades = this.openTrades;
+
         // Collect all magic numbers from both open and closed trades
         Set<Long> allMagics = new TreeSet<>();
-        openTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
-        closedTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
+        localOpenTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
+        localClosedTrades.forEach(t -> allMagics.add(t.getMagicNumber()));
 
         List<MagicProfitEntry> entries = new ArrayList<>();
         LocalDateTime cutoffDate = maxAgeDays > 0 ? LocalDateTime.now().minusDays(maxAgeDays) : null;
 
         for (Long magic : allMagics) {
             // Check if magic should be visible
-            boolean hasOpenTrades = openTrades.stream().anyMatch(t -> t.getMagicNumber() == magic);
+            boolean hasOpenTrades = localOpenTrades.stream().anyMatch(t -> t.getMagicNumber() == magic);
 
             if (!hasOpenTrades && cutoffDate != null) {
                 // Check age of most recent closed trade
-                Optional<String> maxCloseTime = closedTrades.stream()
+                Optional<String> maxCloseTime = localClosedTrades.stream()
                         .filter(t -> t.getMagicNumber() == magic)
                         .map(ClosedTrade::getCloseTime)
                         .filter(Objects::nonNull)
@@ -423,30 +426,30 @@ public class Account {
                 }
             }
 
-            double openProfit = openTrades.stream()
+            double openProfit = localOpenTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(Trade::getProfit)
                     .sum();
-            double openSwap = openTrades.stream()
+            double openSwap = localOpenTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(Trade::getSwap)
                     .sum();
-            int openCount = (int) openTrades.stream()
+            int openCount = (int) localOpenTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
-            double closedProfit = closedTrades.stream()
+            double closedProfit = localClosedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(ClosedTrade::getProfit)
                     .sum();
-            double closedSwap = closedTrades.stream()
+            double closedSwap = localClosedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(ClosedTrade::getSwap)
                     .sum();
-            double closedCommission = closedTrades.stream()
+            double closedCommission = localClosedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .mapToDouble(ClosedTrade::getCommission)
                     .sum() * commissionFactor;
-            int closedCount = (int) closedTrades.stream()
+            int closedCount = (int) localClosedTrades.stream()
                     .filter(t -> t.getMagicNumber() == magic)
                     .count();
 
@@ -461,7 +464,7 @@ public class Account {
             String magicName = nameResolver != null ? nameResolver.apply(magic) : "";
             if (magicName == null || magicName.isEmpty()) {
                 // Fallback: Try to find a comment from open trades
-                magicName = openTrades.stream()
+                magicName = localOpenTrades.stream()
                         .filter(t -> t.getMagicNumber() == magic && t.getComment() != null
                                 && !t.getComment().isEmpty())
                         .map(Trade::getComment)
@@ -469,7 +472,7 @@ public class Account {
                         .orElse("");
                 // Fallback: Try closed trades
                 if (magicName.isEmpty()) {
-                    magicName = closedTrades.stream()
+                    magicName = localClosedTrades.stream()
                             .filter(t -> t.getMagicNumber() == magic && t.getComment() != null
                                     && !t.getComment().isEmpty())
                             .map(ClosedTrade::getComment)
@@ -480,10 +483,10 @@ public class Account {
 
             // 1. Gather Symbol Data
             Map<String, Integer> tradedSymbols = new HashMap<>();
-            openTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
+            localOpenTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
                 tradedSymbols.put(t.getSymbol(), tradedSymbols.getOrDefault(t.getSymbol(), 0) + 1);
             });
-            closedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
+            localClosedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(t -> {
                 tradedSymbols.put(t.getSymbol(), tradedSymbols.getOrDefault(t.getSymbol(), 0) + 1);
             });
 
@@ -498,7 +501,7 @@ public class Account {
             double peakAtMaxDrawdown = 0.0;
 
             List<ClosedTrade> magicClosedTrades = new ArrayList<>();
-            closedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(magicClosedTrades::add);
+            localClosedTrades.stream().filter(t -> t.getMagicNumber() == magic).forEach(magicClosedTrades::add);
 
             // Sort ascending by close time
             magicClosedTrades.sort(Comparator.comparing(t -> t.getCloseTime() == null ? "" : t.getCloseTime()));
@@ -543,7 +546,8 @@ public class Account {
             // Myfxbook Drawdown % formula: Max Drawdown / (Net Deposits + Peak Profit)
             double maxDrawdownPercent = 0.0;
             double maxEquityDrawdownPercent = 0.0;
-            double netDeposits = this.balance - this.getTotalHistoryProfit();
+            double doublePnl = localClosedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
+            double netDeposits = this.balance - doublePnl;
             double denominator = netDeposits + peakAtMaxDrawdown;
 
             if (denominator > 0) {
@@ -609,7 +613,10 @@ public class Account {
      */
     public Map<String, Object> getPerformanceMetrics() {
         Map<String, Object> metrics = new HashMap<>();
-        double totalHistoryProfit = getTotalHistoryProfit();
+        List<ClosedTrade> localClosedTrades = this.closedTrades; // Thread-safe snapshot
+        List<Trade> localOpenTrades = this.openTrades;           // Thread-safe snapshot
+
+        double totalHistoryProfit = localClosedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
         double initialBalance = balance - totalHistoryProfit;
         if (initialBalance <= 0) {
             initialBalance = balance > 0 ? balance : 1.0; // Fallback
@@ -621,8 +628,8 @@ public class Account {
 
         // 2. Account Age & Monthly Profit %
         double accountAgeMonths = 1.0;
-        if (closedTrades != null && !closedTrades.isEmpty()) {
-            Optional<String> oldestTimeStr = closedTrades.stream()
+        if (localClosedTrades != null && !localClosedTrades.isEmpty()) {
+            Optional<String> oldestTimeStr = localClosedTrades.stream()
                     .map(ClosedTrade::getCloseTime)
                     .filter(Objects::nonNull)
                     .min(String::compareTo);
@@ -643,12 +650,12 @@ public class Account {
 
         // 3. M-PDD (3-Months)
         double mpdd3 = 0.0;
-        if (closedTrades != null && !closedTrades.isEmpty()) {
+        if (localClosedTrades != null && !localClosedTrades.isEmpty()) {
             LocalDateTime threeMonthsAgo = LocalDateTime.now().minusDays(90);
             java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
             
             List<ClosedTrade> recentTrades = new ArrayList<>();
-            for (ClosedTrade t : closedTrades) {
+            for (ClosedTrade t : localClosedTrades) {
                 if (t.getCloseTime() != null) {
                     try {
                         LocalDateTime ctTime = LocalDateTime.parse(t.getCloseTime(), formatter);
@@ -666,7 +673,8 @@ public class Account {
                 recentTrades.sort(Comparator.comparing(ClosedTrade::getCloseTime));
                 
                 double recentProfit = recentTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
-                double startBalance3M = balance - recentProfit - getTotalProfit(); // Approximate starting balance 3M ago
+                double totalOpenProfit = localOpenTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap()).sum();
+                double startBalance3M = balance - recentProfit - totalOpenProfit; // Approximate starting balance 3M ago
                 if (startBalance3M <= 0) startBalance3M = balance > 0 ? balance : 1.0;
                 
                 double threeMonthProfitPct = (recentProfit / startBalance3M) * 100.0;
@@ -691,7 +699,7 @@ public class Account {
                 }
                 
                 // Include current open profit in the 3M drawdown calculus
-                runningBalance += getTotalProfit();
+                runningBalance += totalOpenProfit;
                 if (runningBalance > hwm) {
                     hwm = runningBalance;
                 }
@@ -719,13 +727,14 @@ public class Account {
         double m2Profit = 0.0; // Prev Month
         double m1Profit = 0.0; // P-Prev Month
 
-        double startBalanceM3 = balance - getTotalProfit(); 
+        double totalOpenProfit = localOpenTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap()).sum();
+        double startBalanceM3 = balance - totalOpenProfit; 
         double startBalanceM2 = startBalanceM3;
         double startBalanceM1 = startBalanceM3;
 
-        if (closedTrades != null && !closedTrades.isEmpty()) {
+        if (localClosedTrades != null && !localClosedTrades.isEmpty()) {
             java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
-            for (ClosedTrade t : closedTrades) {
+            for (ClosedTrade t : localClosedTrades) {
                 if (t.getCloseTime() != null) {
                     try {
                         LocalDateTime ctTime = LocalDateTime.parse(t.getCloseTime(), formatter);
@@ -760,16 +769,10 @@ public class Account {
         if (startBalanceM3 <= 0) startBalanceM3 = balance > 0 ? balance : 1.0;
 
         // 5. All-Time Closed DD % 
-        // We cannot use startBalance = balance - totalHistProfit because we don't know 
-        // WHEN deposits were made. Instead, we reconstruct the balance at each trade close
-        // by walking backwards from current balance.
-        // currentBalance = allDeposits + totalPnL
-        // balanceAfterTrade[i] = currentBalance - sum(pnl from trade[i+1] to last)
-        // This correctly accounts for deposits made at various times.
         double maxDrawdownPctAllTime = 0.0;
         
-        if (closedTrades != null && !closedTrades.isEmpty()) {
-            List<ClosedTrade> sortedAllTrades = new ArrayList<>(closedTrades);
+        if (localClosedTrades != null && !localClosedTrades.isEmpty()) {
+            List<ClosedTrade> sortedAllTrades = new ArrayList<>(localClosedTrades);
             java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
             
             sortedAllTrades.sort((a, b) -> {
@@ -783,31 +786,9 @@ public class Account {
                 return timeA.compareTo(timeB);
             });
             
-            // Reconstruct the balance AFTER each trade by walking backwards from current balance.
-            // balanceAfterTrade[n-1] = currentBalance (after last trade, before any new trades)
-            // balanceAfterTrade[i] = balanceAfterTrade[i+1] - pnl[i+1]
-            // But this still doesn't know about deposit timing.
-            //
-            // BETTER APPROACH: Use a simple peak-to-valley on the cumulative P&L curve only.
-            // The DD% is measured relative to the equity at the peak, not the starting balance.
-            // We track running_pnl and its high water mark. DD = (hwm_pnl - running_pnl) / (startBal + hwm_pnl)
-            // But we still don't know startBal at that point...
-            //
-            // SIMPLEST CORRECT APPROACH: Track running balance by adding each trade's P&L.
-            // Start at current balance minus all future P&L = balance at beginning.
-            // BUT we know this is wrong for multi-deposit accounts.
-            //
-            // PRAGMATIC APPROACH: Just measure the max percentage drop in the RUNNING P&L curve
-            // relative to its own peak. This measures "how much of the GAINED profit was given back"
-            // which is actually what close-to-close DD means without deposit knowledge.
-            // DD% = (peak_pnl - current_pnl) / (estimatedBalAtPeak) * 100
-            // where estimatedBalAtPeak can be estimated as: currentBalance - totalPnl + peak_pnl
-            
-            // Actually, the cleanest: walk forward, track running P&L and compute drawdown
-            // against the reconstructed balance at the peak point.
             double runPnl = 0.0;
             double peakPnl = 0.0;
-            double totalPnl = getTotalHistoryProfit(); // = sum of all closed trade profits (NO deposits)
+            double totalPnl = totalHistoryProfit; 
             double netDeposits = balance - totalPnl; // total deposited money
             
             for (ClosedTrade t : sortedAllTrades) {
@@ -821,12 +802,6 @@ public class Account {
                 // Drawdown in P&L terms
                 double ddPnl = peakPnl - runPnl;
                 if (ddPnl > 0) {
-                    // The balance at the peak was: netDeposits + peakPnl
-                    // But if deposits came AFTER the peak, netDeposits is too high.
-                    // Use the actual balance at peak: we know the current state is
-                    // balance = netDeposits + totalPnl, so balance at peak would be
-                    // at least: netDeposits + peakPnl (if all deposits were already done)
-                    // To be conservative (lower DD%), use the highest reasonable denominator.
                     double balanceAtPeak = netDeposits + peakPnl;
                     if (balanceAtPeak > 0) {
                         double ddPct = (ddPnl / balanceAtPeak) * 100.0;
@@ -838,7 +813,7 @@ public class Account {
             }
             
             // Include current open profit
-            double currentPnlWithOpen = runPnl + getTotalProfit();
+            double currentPnlWithOpen = runPnl + totalOpenProfit;
             if (currentPnlWithOpen < peakPnl) {
                 double ddPnl = peakPnl - currentPnlWithOpen;
                 double balanceAtPeak = netDeposits + peakPnl;
@@ -856,8 +831,8 @@ public class Account {
         metrics.put("m3Pct", (m3Profit / startBalanceM3) * 100.0);
         metrics.put("mpdd3", mpdd3);
         metrics.put("maxDrawdownPct", maxDrawdownPctAllTime);
-        metrics.put("openTradesCount", openTrades != null ? openTrades.size() : 0);
-        metrics.put("closedTradesCount", closedTrades != null ? closedTrades.size() : 0);
+        metrics.put("openTradesCount", localOpenTrades != null ? localOpenTrades.size() : 0);
+        metrics.put("closedTradesCount", localClosedTrades != null ? localClosedTrades.size() : 0);
 
         return metrics;
     }

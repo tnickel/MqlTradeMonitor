@@ -130,4 +130,102 @@ public class ApiControllerSecurityTest {
                 .content("{\"accountId\": 12345, \"logEntries\": [\"Test entry\"]}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    public void testReceiveEaLogsLimitExceeded() throws Exception {
+        String testApiKey = "test-api-key-xyz";
+        UserEntity user = new UserEntity("testuser", "password", "ROLE_USER");
+        user.setAllowedAccountIds(new HashSet<>(Arrays.asList(12345L)));
+        user.setApiKey(testApiKey);
+
+        when(userRepository.findByApiKey(testApiKey)).thenReturn(Optional.of(user));
+
+        // Create a payload with 1001 entries
+        List<String> entries = new ArrayList<>();
+        for (int i = 0; i < 1001; i++) {
+            entries.add("Entry " + i);
+        }
+        
+        StringBuilder jsonBuilder = new StringBuilder();
+        jsonBuilder.append("{\"accountId\": 12345, \"logEntries\": [");
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) jsonBuilder.append(",");
+            jsonBuilder.append("\"").append(entries.get(i)).append("\"");
+        }
+        jsonBuilder.append("]}");
+
+        mockMvc.perform(post("/api/ea-logs")
+                .header("X-User-Key", testApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonBuilder.toString()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testRegisterInvalidParameters() throws Exception {
+        String testApiKey = "test-api-key-xyz";
+        UserEntity user = new UserEntity("testuser", "password", "ROLE_USER");
+        user.setAllowedAccountIds(new HashSet<>(Arrays.asList(12345L)));
+        user.setApiKey(testApiKey);
+
+        when(userRepository.findByApiKey(testApiKey)).thenReturn(Optional.of(user));
+
+        // invalid accountId
+        mockMvc.perform(post("/api/register")
+                .header("X-User-Key", testApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"accountId\": 0, \"broker\": \"ICMarkets\", \"currency\": \"USD\", \"balance\": 1000.0}"))
+                .andExpect(status().isBadRequest());
+
+        // invalid balance (NaN)
+        mockMvc.perform(post("/api/register")
+                .header("X-User-Key", testApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"accountId\": 12345, \"broker\": \"ICMarkets\", \"currency\": \"USD\", \"balance\": \"NaN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testInitTradesLimitExceeded() throws Exception {
+        String testApiKey = "test-api-key-xyz";
+        UserEntity user = new UserEntity("testuser", "password", "ROLE_USER");
+        user.setAllowedAccountIds(new HashSet<>(Arrays.asList(12345L)));
+        user.setApiKey(testApiKey);
+
+        when(userRepository.findByApiKey(testApiKey)).thenReturn(Optional.of(user));
+
+        // Let's create an excessively large list of trades/closedTrades
+        StringBuilder jsonBuilder = new StringBuilder();
+        jsonBuilder.append("{\"accountId\": 12345, \"trades\": [], \"closedTrades\": [");
+        for (int i = 0; i < 100005; i++) {
+            if (i > 0) jsonBuilder.append(",");
+            jsonBuilder.append("{\"ticket\": ").append(i).append("}");
+        }
+        jsonBuilder.append("]}");
+
+        mockMvc.perform(post("/api/trades-init")
+                .header("X-User-Key", testApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonBuilder.toString()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testGetMarketRateSanitization() throws Exception {
+        UserEntity testUser = new UserEntity("testuser", "password", "ROLE_USER");
+        CustomUserDetails userDetails = new CustomUserDetails(testUser);
+
+        // Invalid symbol (contains special characters)
+        mockMvc.perform(get("/api/market/rate")
+                .param("symbol", "EURUSD?param=1")
+                .with(user(userDetails)))
+                .andExpect(status().isBadRequest());
+
+        // Too long symbol
+        mockMvc.perform(get("/api/market/rate")
+                .param("symbol", "A".repeat(21) )
+                .with(user(userDetails)))
+                .andExpect(status().isBadRequest());
+    }
 }
+
