@@ -75,7 +75,7 @@ int g_lastError = 0;                     // Last web request error
 #define LBL_STATUS "lblStatus"
 
 //--- MetaTrader GlobalVariable names for persisting state
-string GV_LAST_SYNC_TIME = "";          // Stores last synced close time as string hash
+
 
 //+------------------------------------------------------------------+
 //| Forward declarations                                               |
@@ -282,7 +282,6 @@ int OnInit()
    GV_TRADELIST_SENT = "TM_Trade_Sent_" + accStr;
    GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
    GV_LAST_LOG_DATE  = "TM_LastLogDate_" + accStr;
-   GV_LAST_SYNC_TIME  = "TM_LastSync_" + accStr;
    
    // Load persisted states
    if(GlobalVariableCheck(GV_TRADELIST_SENT))
@@ -664,8 +663,8 @@ bool RegisterWithServer()
    // Build JSON payload
    string json = "{";
    json += "\"accountId\":" + IntegerToString(login) + ",";
-   json += "\"broker\":\"" + AccountInfoString(ACCOUNT_COMPANY) + "\",";
-   json += "\"currency\":\"" + AccountInfoString(ACCOUNT_CURRENCY) + "\",";
+   json += "\"broker\":\"" + EscapeJson(AccountInfoString(ACCOUNT_COMPANY)) + "\",";
+   json += "\"currency\":\"" + EscapeJson(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
    json += "\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
@@ -750,7 +749,7 @@ string BuildOpenTradesJson()
              
              tradesJson += "{";
              tradesJson += "\"ticket\":" + IntegerToString(ticket) + ",";
-             tradesJson += "\"symbol\":\"" + symbol + "\",";
+             tradesJson += "\"symbol\":\"" + EscapeJson(symbol) + "\",";
              tradesJson += "\"type\":\"" + typeStr + "\",";
              tradesJson += "\"volume\":" + DoubleToString(OrderLots(), 2) + ",";
              tradesJson += "\"openPrice\":" + DoubleToString(OrderOpenPrice(), 5) + ",";
@@ -802,8 +801,11 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
              {
                  string closeTime = TimeToString(closeTimeVal, TIME_DATE|TIME_SECONDS);
                  
-                 // Skip trades already synced (incremental mode)
-                 if(isIncremental && closeTime <= sinceCloseTime)
+                 // Skip trades already synced (incremental mode).
+                 // Use '<' (not '<=') so trades that closed in the same second as the
+                 // last synced trade are not permanently skipped. Re-sent duplicates
+                 // are deduplicated server-side by (accountId + ticket).
+                 if(isIncremental && closeTime < sinceCloseTime)
                  {
                     skippedCount++;
                     continue;
@@ -821,7 +823,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                  
                  historyJson += "{";
                  historyJson += "\"ticket\":" + IntegerToString(OrderTicket()) + ",";
-                 historyJson += "\"symbol\":\"" + OrderSymbol() + "\",";
+                 historyJson += "\"symbol\":\"" + EscapeJson(OrderSymbol()) + "\",";
                  historyJson += "\"type\":\"" + typeStr + "\",";
                  historyJson += "\"volume\":" + DoubleToString(OrderLots(), 2) + ",";
                  historyJson += "\"openPrice\":" + DoubleToString(OrderOpenPrice(), 5) + ",";
@@ -878,7 +880,8 @@ void SendTradeUpdate()
    
    if(!SendHttpPost(url, json))
    {
-      isRegistered = false;  // Will trigger re-registration
+      g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
+      isRegistered = false;  // Will trigger re-registration with backoff
    }
 }
 
@@ -942,7 +945,8 @@ void SendHeartbeat()
    
    if(!SendHttpPost(url, json))
    {
-      isRegistered = false;  // Will trigger re-registration
+      g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
+      isRegistered = false;  // Will trigger re-registration with backoff
    }
 }
 

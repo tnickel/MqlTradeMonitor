@@ -335,8 +335,10 @@ public class AccountManager {
     public void resetAccountTrades(long accountId) {
         Account account = accounts.get(accountId);
         if (account != null) {
-            account.getOpenTrades().clear();
-            account.getClosedTrades().clear();
+            // Replace the list references instead of clearing in place, so concurrent
+            // readers (scheduled alarm/copier services) never observe a half-emptied list.
+            account.setOpenTrades(new ArrayList<>());
+            account.setClosedTrades(new ArrayList<>());
         }
         tradeStorage.resetAccountTrades(accountId);
     }

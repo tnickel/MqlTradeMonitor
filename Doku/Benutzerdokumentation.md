@@ -271,7 +271,7 @@ SMTP-Einstellungen fuer E-Mail-Benachrichtigungen:
 
 Konfiguration der Webhook-Anbindung fuer Sirenen-Alarme:
 - Homey-ID und Event-Name
-- Trigger-Quellen (Sync-Warnung, API)
+- Trigger-Quellen (Sync-Warnung, API, Profit-Alarm / Drawdown)
 - Wiederholungen und Alarm-Delay
 - **Test-Sirene-Funktion** zum Pruefen der Anbindung
 

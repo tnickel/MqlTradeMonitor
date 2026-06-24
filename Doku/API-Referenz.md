@@ -190,9 +190,25 @@ Gibt alle Accounts mit aktuellem Status als JSON zurück (für AJAX-Updates im D
 
 ### POST `/api/test-email`
 
-Sendet eine Test-E-Mail mit der aktuellen SMTP-Konfiguration.
+Sendet eine Test-E-Mail mit der aktuellen SMTP-Konfiguration. **Erfordert Admin-Rechte (`ROLE_ADMIN`)**.
 
-**Response:** `200 OK` bei Erfolg, Fehlerdetails bei Misserfolg.
+**Response:**
+- `200 OK` bei Erfolg:
+  ```json
+  {
+    "status": "ok",
+    "message": "Test email sent successfully"
+  }
+  ```
+- `403 Forbidden` wenn der anfragende Benutzer kein Administrator ist:
+  ```json
+  {
+    "status": "error",
+    "message": "Admin access required"
+  }
+  ```
+- Fehlerdetails bei technischem Misserfolg.
+
 
 ---
 

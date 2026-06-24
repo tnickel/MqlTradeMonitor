@@ -97,7 +97,7 @@ Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickel
 
 | Controller | Endpunkte | Verantwortung |
 |---|---|---|
-| **ApiController** | `POST /api/register`, `/trades-init`, `/trades`, `/heartbeat`, `/history`; `GET /api/accounts`; `POST /api/test-email` | REST-Schnittstelle fuer MetaTrader EA und AJAX |
+| **ApiController** | `POST /api/register`, `/trades-init`, `/trades`, `/heartbeat`, `/history`; `GET /api/accounts`; `POST /api/test-email` (Admin-only) | REST-Schnittstelle fuer MetaTrader EA und AJAX |
 | **DashboardController** | `GET /`, `/open-trades`, `/account/{id}`, `/report/{period}`, `/trade-comparison`, `/mobile/drawdown`; diverse AJAX-Endpoints | Web-Views und dynamische Datenabfragen |
 | **AdminController** | `GET /admin`, `/admin/logs`, `/admin/requests`, `/admin/client-logs`; `POST /admin/create-user`, `/admin/security`, u.v.m. | Administration, Benutzerverwaltung, Konfiguration |
 | **SecurityController** | `GET /login` | Login-Seite |
@@ -241,7 +241,7 @@ server.tomcat.threads.max=50
 | **E-Mail** | SMTP-Host, Port, User, Password, From, To, Max/Tag |
 | **Logging** | Aufbewahrungsdauer Login/Verbindungs/Client-Logs (Tage) |
 | **Security** | Rate-Limit ein/aus + Wert, Brute-Force ein/aus + Attempts + Lockout, Headers, Max Sessions, H2-Konsole |
-| **Homey** | Webhook-ID, Event, Trigger-Quellen (Sync/API), Wiederholungen, Alarm-Delay |
+| **Homey** | Webhook-ID, Event, Trigger-Quellen (Sync/API/Profit-Alarm), Wiederholungen, Alarm-Delay |
 | **Sync** | Ausgenommene Magic Numbers (kommagetrennt) |
 
 ---

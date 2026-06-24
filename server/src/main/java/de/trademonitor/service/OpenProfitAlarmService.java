@@ -72,7 +72,9 @@ public class OpenProfitAlarmService {
                 if (!alreadyFired) {
                     triggerAlarm(account, openProfit, balance);
                     alarmFiredMap.put(account.getAccountId(), true);
-                    if (globalConfigService.isHomeyTriggerSync()) {
+                    // Gate the siren behind the dedicated profit trigger flag
+                    // (previously used the unrelated "sync" flag by mistake).
+                    if (globalConfigService.isHomeyTriggerProfit()) {
                         homeyService.setAlarmState("PROFIT_" + account.getAccountId(), true);
                     }
                 }

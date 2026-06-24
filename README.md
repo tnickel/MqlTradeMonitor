@@ -309,3 +309,32 @@ Im Ordner [`Doku/`](Doku/) finden Sie detaillierte Dokumentation:
 - **Configuration as Code**: Dynamische Konfiguration via Admin-Panel, keine hartcodierten Werte
 - **Responsive Design**: Mobile-First Ansatz fuer kritische Monitoring-Views
 - **Zero-Config Deployment**: Embedded Database, selbstregistrierende Clients, Auto-Schema-Migration
+
+---
+
+## Changelog – Juni 2026
+
+Folgende Fehlerbehebungen und Sicherheitsverbesserungen wurden auf Basis eines umfassenden Code-Reviews (Grok & Cursor) implementiert:
+
+### Server (Spring Boot Backend)
+- **Security-Härtung**:
+  - `/api/perf-test` wurde aus der Whitelist (`permitAll()`) in `SecurityConfig.java` entfernt.
+  - `/api/test-email` erfordert nun explizit Administrator-Rechte (`ROLE_ADMIN`).
+- **Smart-Home-Erweiterung (Homey)**:
+  - Dedizierter Config-Key `HOMEY_TRIGGER_PROFIT` zur Aktivierung/Deaktivierung der Homey-Sirene bei Drawdown-Profit-Alarmen.
+  - Integration eines konfigurierbaren Toggles für den Profit-Alarm im Admin-Panel (`admin.html`) und Anbindung im `DashboardController` sowie `AdminController`.
+- **Thread-Safety & Race Conditions**:
+  - `openTrades` und `closedTrades` in `Account.java` wurden als `volatile` deklariert.
+  - Listen-Referenzen werden nun atomar per Copy-and-Swap (`setOpenTrades()`) ersetzt statt in-place geleert (`clear()`), um Race-Conditions bei zeitgleichen Lesezugriffen zu verhindern.
+- **Equity-Snapshot-Optimierung**:
+  - Snapshot-Rate-Limitierung in `TradeStorage.java` auf echten 60-Sekunden-Vergleich umgestellt (`ChronoUnit.SECONDS.between()`), um doppelte Einträge bei Minutenübergängen zu vermeiden.
+
+### MQL5 & MQL4 Clients (Expert Advisor)
+- **JSON-Escaping**: Sonderzeichen in Broker-Namen (`ACCOUNT_COMPANY`) und Kontowährungen (`ACCOUNT_CURRENCY`) sowie Symbolnamen werden nun vor der JSON-Serialisierung maskiert (`EscapeJson()`), um Syntaxfehler bei Umlauten oder Anführungszeichen zu verhindern.
+- **Same-Second Sync Bug**: Vergleich bei inkrementellem History-Sync von `<=` auf `<` korrigiert. Trades, die in der exakt selben Sekunde wie der letzte Bookmark schließen, werden nun nicht mehr permanent übersprungen.
+- **Reconnect Backoff**: Bei Verbindungsfehlern wird die nächste Verbindungszeit (`g_nextRetryTime`) nun korrekt berechnet und eingehalten, um einen Reconnect-Sturm zu vermeiden.
+- **Array-Sicherheitsprüfungen**: Out-of-Bounds Absicherungen bei `ArrayResize` vor der Nullterminierung implementiert.
+- **Fehler-Protokollierung (nur MT5)**: Detaillierte Auswertung von MT-spezifischen WebRequest-Fehlern (Fehler 4060, 5200 (INVALID_ADDRESS), 5201 (CONNECT_FAILED), 5202 (TIMEOUT)).
+- **Partial-Close Commission (nur MT5)**: Aggregation der Kommissionen bei Teilschließungen korrigiert (berücksichtigt nur noch den zugehörigen IN-Deal statt fälschlicherweise alle Deals der Position).
+- **Hedging-Support (nur MT5)**: Unterstützung für den Typ `DEAL_ENTRY_OUT_BY` (Schließung durch Gegenposition) hinzugefügt.
+

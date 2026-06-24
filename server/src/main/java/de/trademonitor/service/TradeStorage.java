@@ -54,7 +54,7 @@ public class TradeStorage {
      * Track last snapshot time per account to avoid saving too frequently (every
      * 60s is enough)
      */
-    private final java.util.concurrent.ConcurrentHashMap<Long, String> lastSnapshotTime = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<Long, LocalDateTime> lastSnapshotTime = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Save or update account in DB.
@@ -379,22 +379,19 @@ public class TradeStorage {
      */
     @Transactional
     public void saveEquitySnapshot(long accountId, double equity, double balance) {
-        String now = LocalDateTime.now().format(SNAPSHOT_FMT);
+        LocalDateTime nowTime = LocalDateTime.now();
 
-        // Rate-limit: only save once per minute per account
-        String last = lastSnapshotTime.get(accountId);
-        if (last != null) {
-            // Compare lexicographically: format is ISO-like so it works
-            // We need at least 60 seconds difference → compare length truncated to minute
-            String nowMinute = now.substring(0, 16); // yyyy-MM-dd'T'HH:mm
-            String lastMinute = last.substring(0, 16);
-            if (nowMinute.equals(lastMinute)) {
-                return; // Same minute → skip
-            }
+        // Rate-limit: require at least 60 real seconds since the last snapshot.
+        // (Comparing only the minute string previously allowed two snapshots ~1s apart
+        // across a minute boundary, e.g. 12:00:59 and 12:01:00.)
+        LocalDateTime last = lastSnapshotTime.get(accountId);
+        if (last != null && java.time.temporal.ChronoUnit.SECONDS.between(last, nowTime) < 60) {
+            return;
         }
 
+        String now = nowTime.format(SNAPSHOT_FMT);
         equitySnapshotRepository.save(new EquitySnapshotEntity(accountId, now, equity, balance));
-        lastSnapshotTime.put(accountId, now);
+        lastSnapshotTime.put(accountId, nowTime);
 
         // Cleanup: delete snapshots older than 90 days
         String cutoff = LocalDateTime.now().minusDays(90).format(SNAPSHOT_FMT);

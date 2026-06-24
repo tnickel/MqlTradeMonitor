@@ -144,6 +144,7 @@ public class AdminController {
         model.addAttribute("homeyTriggerHealth", globalConfigService.isHomeyTriggerHealth());
         model.addAttribute("homeyTriggerSecurity", globalConfigService.isHomeyTriggerSecurity());
         model.addAttribute("homeyTriggerOffline", globalConfigService.isHomeyTriggerOffline());
+        model.addAttribute("homeyTriggerProfit", globalConfigService.isHomeyTriggerProfit());
         model.addAttribute("homeyRepeatCount", globalConfigService.getHomeyRepeatCount());
         model.addAttribute("homeyRepeatIntervalMins", globalConfigService.getHomeyRepeatIntervalMins());
         model.addAttribute("syncAlarmDelayMins", globalConfigService.getSyncAlarmDelayMins());

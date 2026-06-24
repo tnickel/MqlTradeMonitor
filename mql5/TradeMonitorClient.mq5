@@ -75,7 +75,7 @@ int g_lastError = 0;                     // Last web request error
 #define LBL_STATUS "lblStatus"
 
 //--- MetaTrader GlobalVariable names for persisting state
-string GV_LAST_SYNC_TIME = "";          // Stores last synced close time as string hash
+
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -237,6 +237,16 @@ void InitConfig()
       cfg_ReconnectIntervalSeconds = 30;
    }
    
+   // Normalize URL: trim whitespace, remove trailing slash and \r
+   StringTrimRight(cfg_ServerURL);
+   StringTrimLeft(cfg_ServerURL);
+   int urlLen = StringLen(cfg_ServerURL);
+   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == '/')
+      cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
+   urlLen = StringLen(cfg_ServerURL);
+   if(urlLen > 0 && StringGetCharacter(cfg_ServerURL, urlLen - 1) == 13)
+      cfg_ServerURL = StringSubstr(cfg_ServerURL, 0, urlLen - 1);
+   
    Print("Active config: ServerURL=", cfg_ServerURL,
          " UpdateInterval=", cfg_UpdateIntervalSeconds,
          " HeartbeatInterval=", cfg_HeartbeatIntervalSeconds,
@@ -261,7 +271,6 @@ int OnInit()
    GV_TRADELIST_SENT = "TM_Trade_Sent_" + accStr;
    GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
    GV_LAST_LOG_DATE  = "TM_LastLogDate_" + accStr;
-   GV_LAST_SYNC_TIME = "TM_LastSync_" + accStr;
     
    // Load persisted states
    if(GlobalVariableCheck(GV_TRADELIST_SENT))
@@ -667,8 +676,8 @@ bool RegisterWithServer()
    // Build JSON payload
    string json = "{";
    json += "\"accountId\":" + IntegerToString(login) + ",";
-   json += "\"broker\":\"" + AccountInfoString(ACCOUNT_COMPANY) + "\",";
-   json += "\"currency\":\"" + AccountInfoString(ACCOUNT_CURRENCY) + "\",";
+   json += "\"broker\":\"" + EscapeJson(AccountInfoString(ACCOUNT_COMPANY)) + "\",";
+   json += "\"currency\":\"" + EscapeJson(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
    json += "\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
@@ -747,7 +756,7 @@ string BuildOpenTradesJson()
          
          tradesJson += "{";
          tradesJson += "\"ticket\":" + IntegerToString(ticket) + ",";
-         tradesJson += "\"symbol\":\"" + PositionGetString(POSITION_SYMBOL) + "\",";
+         tradesJson += "\"symbol\":\"" + EscapeJson(PositionGetString(POSITION_SYMBOL)) + "\",";
          tradesJson += "\"type\":\"" + (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY ? "BUY" : "SELL") + "\",";
          tradesJson += "\"volume\":" + DoubleToString(PositionGetDouble(POSITION_VOLUME), 2) + ",";
          tradesJson += "\"openPrice\":" + DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), 5) + ",";
@@ -798,12 +807,12 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
       if(ticket > 0)
       {
          ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(ticket, DEAL_ENTRY);
-         if(entry == DEAL_ENTRY_OUT)
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
          {
             string closeTime = TimeToString((datetime)HistoryDealGetInteger(ticket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
             
             // Skip trades already synced (incremental mode)
-            if(isIncremental && closeTime <= sinceCloseTime)
+            if(isIncremental && closeTime < sinceCloseTime)
             {
                skippedCount++;
                continue;
@@ -836,12 +845,13 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                   if(otherTicket > 0 && otherTicket != ticket 
                      && HistoryDealGetInteger(otherTicket, DEAL_POSITION_ID) == positionId)
                   {
-                     // Add commissions from all deals belonging to this position (Entry, exit, etc.)
-                     totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION);
-                     
-                     // Find the IN deal for open data
+                     // Find the IN deal for open data and its commission
                      if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(otherTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
                      {
+                        // Only add the IN deal's commission to the OUT deal's commission
+                        // (NOT other OUT deals, which would cause double-counting on partial closes)
+                        totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION);
+                        
                         ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(otherTicket, DEAL_TYPE);
                         typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
                         openPrice = HistoryDealGetDouble(otherTicket, DEAL_PRICE);
@@ -863,7 +873,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             
             historyJson += "{";
             historyJson += "\"ticket\":" + IntegerToString(ticket) + ",";
-            historyJson += "\"symbol\":\"" + HistoryDealGetString(ticket, DEAL_SYMBOL) + "\",";
+            historyJson += "\"symbol\":\"" + EscapeJson(HistoryDealGetString(ticket, DEAL_SYMBOL)) + "\",";
             historyJson += "\"type\":\"" + typeStr + "\",";
             historyJson += "\"volume\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_VOLUME), 2) + ",";
             historyJson += "\"openPrice\":" + DoubleToString(openPrice, 5) + ",";
@@ -919,7 +929,8 @@ void SendTradeUpdate()
    
    if(!SendHttpPost(url, json))
    {
-      isRegistered = false;  // Will trigger re-registration
+      g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
+      isRegistered = false;  // Will trigger re-registration with backoff
    }
 }
 
@@ -949,18 +960,7 @@ void SendHistoryUpdate()
    
    // Skip if no new trades
    if(historyJson == "[]")
-   {
-      // If we have no sync time yet (e.g. brand-new account with only a balance entry
-      // and no closed trades at all), set it to "now" so that the next call runs in
-      // incremental mode and no longer logs "Processing full history" every 5 seconds.
-      if(g_lastSyncedCloseTime == "")
-      {
-         g_lastSyncedCloseTime = TimeToString(TimeCurrent() - 1, TIME_DATE|TIME_SECONDS);
-         SaveLastSyncTime(g_lastSyncedCloseTime);
-         Print("No closed trades found - setting sync bookmark to now: ", g_lastSyncedCloseTime);
-      }
       return;
-   }
    
    // Build main JSON payload
    string json = "{";
@@ -996,7 +996,8 @@ void SendHeartbeat()
    
    if(!SendHttpPost(url, json))
    {
-      isRegistered = false;  // Will trigger re-registration
+      g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
+      isRegistered = false;  // Will trigger re-registration with backoff
    }
 }
 
@@ -1019,7 +1020,9 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
    
    // Convert string to char array
    StringToCharArray(json, postData, 0, WHOLE_ARRAY, CP_UTF8);
-   ArrayResize(postData, ArraySize(postData) - 1);  // Remove null terminator
+   int postSize = ArraySize(postData);
+   if(postSize > 0)
+      ArrayResize(postData, postSize - 1);  // Remove null terminator
    
    string headers = "Content-Type: application/json\r\n";
    if (StringLen(cfg_UserKey) > 0) {
@@ -1034,11 +1037,20 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
       int error = GetLastError();
       if(error == 4060)
       {
-         Print("Error: URL not allowed. Please add ", cfg_ServerURL, " to allowed URLs in Tools -> Options -> Expert Advisors");
+         Print("Error 4060: WebRequest not allowed. Enable 'WebRequest for listed URLs' in Tools -> Options -> Expert Advisors and add: ", cfg_ServerURL);
       }
+      else if(error == 5200)
+      {
+         Print("Error 5200 (INVALID_ADDRESS): URL rejected by MT5. URL was: '", url, "'");
+         Print("  Fix: In MT5 -> Tools -> Options -> Expert Advisors -> add EXACTLY: '", cfg_ServerURL, "'");
+      }
+      else if(error == 5201)
+         Print("Error 5201 (CONNECT_FAILED): Cannot reach server at ", url, " - check if server is running");
+      else if(error == 5202)
+         Print("Error 5202 (TIMEOUT): Request timed out after ", timeout, "ms - server too slow or unreachable");
       else
       {
-         Print("HTTP request failed, error: ", error, " (timeout was ", timeout, "ms)");
+         Print("HTTP request failed, error: ", error, " (timeout was ", timeout, "ms) URL: ", url);
       }
       return false;
    }

@@ -513,6 +513,7 @@ public class GlobalConfigService {
     public static final String KEY_HOMEY_TRIGGER_HEALTH = "HOMEY_TRIGGER_HEALTH";
     public static final String KEY_HOMEY_TRIGGER_SECURITY = "HOMEY_TRIGGER_SECURITY";
     public static final String KEY_HOMEY_TRIGGER_OFFLINE = "HOMEY_TRIGGER_OFFLINE";
+    public static final String KEY_HOMEY_TRIGGER_PROFIT = "HOMEY_TRIGGER_PROFIT";
     public static final String KEY_HOMEY_REPEAT_COUNT = "HOMEY_REPEAT_COUNT";
     public static final String KEY_HOMEY_REPEAT_INTERVAL_MINS = "HOMEY_REPEAT_INTERVAL_MINS";
     public static final String KEY_SYNC_ALARM_DELAY_MINS = "SYNC_ALARM_DELAY_MINS";
@@ -571,8 +572,18 @@ public class GlobalConfigService {
                 .orElse(false);
     }
 
+    /**
+     * Whether the Homey siren should fire for open-profit alarms.
+     * Defaults to true: the alarm is already opt-in per account
+     * ({@code openProfitAlarmEnabled}), so the global switch only acts as a kill-switch.
+     */
+    public boolean isHomeyTriggerProfit() {
+        return repository.findById(KEY_HOMEY_TRIGGER_PROFIT).map(e -> Boolean.parseBoolean(e.getConfValue()))
+                .orElse(true);
+    }
+
     public void saveHomeyConfig(String homeyId, String eventName, boolean triggerSync, boolean triggerApi,
-                                boolean triggerHealth, boolean triggerSecurity, boolean triggerOffline, int repeatCount, int syncAlarmDelayMins, int repeatIntervalMins) {
+                                boolean triggerHealth, boolean triggerSecurity, boolean triggerOffline, boolean triggerProfit, int repeatCount, int syncAlarmDelayMins, int repeatIntervalMins) {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_ID, homeyId));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_EVENT, eventName));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SYNC, String.valueOf(triggerSync)));
@@ -580,6 +591,7 @@ public class GlobalConfigService {
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_HEALTH, String.valueOf(triggerHealth)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_SECURITY, String.valueOf(triggerSecurity)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_OFFLINE, String.valueOf(triggerOffline)));
+        repository.save(new GlobalConfigEntity(KEY_HOMEY_TRIGGER_PROFIT, String.valueOf(triggerProfit)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_COUNT, String.valueOf(repeatCount)));
         repository.save(new GlobalConfigEntity(KEY_HOMEY_REPEAT_INTERVAL_MINS, String.valueOf(repeatIntervalMins)));
         repository.save(new GlobalConfigEntity(KEY_SYNC_ALARM_DELAY_MINS, String.valueOf(syncAlarmDelayMins)));

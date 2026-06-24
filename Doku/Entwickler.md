@@ -323,7 +323,7 @@ Key-Value-Speicher in der DB. Alle Werte sind über das Admin-Panel editierbar:
 | E-Mail | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_FROM`, `MAIL_TO` |
 | Logging | `LOG_LOGIN_DAYS`, `LOG_CONN_DAYS`, `LOG_CLIENT_DAYS` |
 | Security | `SEC_RATE_LIMIT_ENABLED`, `SEC_BRUTE_FORCE_MAX_ATTEMPTS` |
-| Homey | `HOMEY_ID`, `HOMEY_EVENT`, `HOMEY_TRIGGER_SYNC` |
+| Homey | `HOMEY_ID`, `HOMEY_EVENT`, `HOMEY_TRIGGER_SYNC`, `HOMEY_TRIGGER_PROFIT` |
 | Sync | `SYNC_EXEMPT_MAGIC_NUMBERS` |
 
 ---

@@ -85,11 +85,14 @@ Die H2-Datenbank ist mit User `sa` und **leerem Passwort** konfiguriert. Dies is
 
 | Pfad | Zugriff |
 |---|---|
-| `/api/**` | Öffentlich (MetaTrader EA, kein CSRF) |
+| `/api/**` | Öffentlich (MetaTrader EA, kein CSRF; außer administrative Endpunkte wie `/api/test-email`) |
 | `/login`, `/css/**`, `/js/**` | Öffentlich |
 | `/mobile/**` | Öffentlich |
 | `/admin/**` | Nur ROLE_ADMIN |
 | Alle anderen Pfade | Authentifizierung erforderlich |
+
+> **Hinweis:** `/api/perf-test` wurde aus Sicherheitsgründen vollständig entfernt. `/api/test-email` erfordert trotz des Pfadpräfixes `/api/` eine Authentifizierung mit Administratorrechten (`ROLE_ADMIN`).
+
 
 ---
 
@@ -241,7 +244,8 @@ Die H2-Datenbankkonsole (`/h2-console`) ist standardmäßig aktiviert, kann aber
 
 - Kein CSRF-Schutz (extern aufgerufene REST-API).
 - Kein Rate-Limiting (EA muss zuverlässig kommunizieren).
-- Öffentlich zugänglich (keine Authentifizierung erforderlich).
+- Öffentlich zugänglich (mit Ausnahme von administrativen Endpunkten wie `/api/test-email`, welcher eine Authentifizierung mit `ROLE_ADMIN` erfordert).
+
 
 **Empfehlung für Produktionsumgebungen:**
 - Setzen Sie den Server hinter einen Reverse-Proxy (nginx/Apache).

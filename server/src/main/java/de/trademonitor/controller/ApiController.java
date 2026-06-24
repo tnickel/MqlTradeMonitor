@@ -90,10 +90,17 @@ public class ApiController {
     }
 
     /**
-     * Test email configuration.
+     * Test email configuration. Admin-only.
      */
     @PostMapping("/test-email")
     public ResponseEntity<?> testEmail() {
+        // Only admins may trigger test emails
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities().stream()
+                .noneMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
+            return ResponseEntity.status(403).body(Map.of("status", "error", "message", "Admin access required"));
+        }
         try {
             emailService.sendTestEmail();
             return ResponseEntity.ok(Map.of("status", "ok", "message", "Test email sent successfully"));

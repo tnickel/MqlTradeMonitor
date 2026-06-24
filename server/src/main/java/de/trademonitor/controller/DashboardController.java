@@ -971,12 +971,13 @@ public class DashboardController {
             @RequestParam(required = false) boolean triggerHealth,
             @RequestParam(required = false) boolean triggerSecurity,
             @RequestParam(required = false) boolean triggerOffline,
+            @RequestParam(required = false) boolean triggerProfit,
             @RequestParam int repeatCount,
             @RequestParam(defaultValue = "5") int syncAlarmDelayMins,
             @RequestParam(defaultValue = "15") int homeyRepeatIntervalMins) {
 
         globalConfigService.saveHomeyConfig(homeyId, homeyEvent, triggerSync, triggerApi,
-                triggerHealth, triggerSecurity, triggerOffline, repeatCount, syncAlarmDelayMins, homeyRepeatIntervalMins);
+                triggerHealth, triggerSecurity, triggerOffline, triggerProfit, repeatCount, syncAlarmDelayMins, homeyRepeatIntervalMins);
         return "redirect:/admin";
     }
 

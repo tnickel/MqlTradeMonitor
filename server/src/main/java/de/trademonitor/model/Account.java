@@ -129,7 +129,10 @@ public class Account {
         this.metaTraderInfo = metaTraderInfo;
     }
 
-    private List<Trade> openTrades = new ArrayList<>();
+    // volatile: the list reference is replaced atomically by setOpenTrades(),
+    // while scheduled services (alarms, copier verification) iterate it from other
+    // threads. Readers always see a fully built list and never mutate it in place.
+    private volatile List<Trade> openTrades = new ArrayList<>();
     private final Map<Long, String> syncStatusMap = new ConcurrentHashMap<>();
 
     public Account() {
@@ -275,11 +278,11 @@ public class Account {
     }
 
     public void setOpenTrades(List<Trade> openTrades) {
-        this.openTrades = openTrades;
-        if (this.openTrades != null) {
-            // Apply known statuses
+        if (openTrades != null) {
+            // Prepare the list locally before publishing: apply known sync statuses
+            // so concurrent readers never see a half-built list.
             Set<Long> activeTickets = new HashSet<>();
-            for (Trade t : this.openTrades) {
+            for (Trade t : openTrades) {
                 activeTickets.add(t.getTicket());
                 if (syncStatusMap.containsKey(t.getTicket())) {
                     t.setSyncStatus(syncStatusMap.get(t.getTicket()));
@@ -288,6 +291,8 @@ public class Account {
             // Prune map to avoid memory leaks
             syncStatusMap.keySet().retainAll(activeTickets);
         }
+        // Single volatile write publishes the fully prepared list
+        this.openTrades = openTrades;
     }
 
     public void updateSyncStatuses(Map<Long, String> newStatuses) {
@@ -362,7 +367,7 @@ public class Account {
     }
 
     // Closed trades history
-    private List<ClosedTrade> closedTrades = new ArrayList<>();
+    private volatile List<ClosedTrade> closedTrades = new ArrayList<>();
 
     public List<ClosedTrade> getClosedTrades() {
         return closedTrades;
