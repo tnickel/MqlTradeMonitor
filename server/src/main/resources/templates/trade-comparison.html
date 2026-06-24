@@ -45,7 +45,7 @@
 
         /* === Filter Panel === */
         .filter-panel {
-            max-width: 1400px;
+            max-width: 1750px;
             margin: 0 auto 20px auto;
             background: var(--bg-card);
             border-radius: 12px;
@@ -263,7 +263,7 @@
 
         /* === Summary === */
         .summary-bar {
-            max-width: 1400px;
+            max-width: 1750px;
             margin: 0 auto 16px auto;
             display: flex;
             gap: 12px;
@@ -302,7 +302,7 @@
 
         /* === Comparison Table === */
         .comparison-container {
-            max-width: 1400px;
+            max-width: 1750px;
             margin: 0 auto;
             background: var(--bg-card);
             border-radius: 12px;
@@ -458,7 +458,7 @@
 
         /* === Empty / Prompt State === */
         .prompt-state {
-            max-width: 1400px;
+            max-width: 1750px;
             margin: 0 auto;
             background: var(--bg-card);
             border-radius: 12px;
@@ -634,7 +634,7 @@
 
 <body>
 
-    <div style="max-width: 1400px; margin: 0 auto 1rem;">
+    <div style="max-width: 1750px; margin: 0 auto 1rem;">
         <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
     </div>
 
@@ -751,9 +751,9 @@
             <thead>
                 <tr>
                     <!-- Column Group: Account A -->
-                    <th class="col-group-a" colspan="5">Account A — Trades</th>
+                    <th class="col-group-a" colspan="8">Account A — Trades</th>
                     <!-- Column Group: Account B -->
-                    <th class="col-group-b" colspan="5">Account B — Trades</th>
+                    <th class="col-group-b" colspan="8">Account B — Trades</th>
                     <!-- Column Group: Status -->
                     <th class="col-group-status" colspan="4">Status</th>
                 </tr>
@@ -762,12 +762,18 @@
                     <th class="col-group-a text-center">Type</th>
                     <th class="col-group-a text-right">Vol</th>
                     <th class="col-group-a">Open Time</th>
+                    <th class="col-group-a">Close Time</th>
+                    <th class="col-group-a text-right">Open Price</th>
+                    <th class="col-group-a text-right">Close Price</th>
                     <th class="col-group-a text-right">Netto (0.01)</th>
 
                     <th class="col-group-b">Symbol</th>
                     <th class="col-group-b text-center">Type</th>
                     <th class="col-group-b text-right">Vol</th>
                     <th class="col-group-b">Open Time</th>
+                    <th class="col-group-b">Close Time</th>
+                    <th class="col-group-b text-right">Open Price</th>
+                    <th class="col-group-b text-right">Close Price</th>
                     <th class="col-group-b text-right">Netto (0.01)</th>
 
                     <th class="col-group-status text-center">Match</th>
@@ -785,11 +791,14 @@
                     </td>
                     <td class="cell-a text-right mono" th:if="${comp.tradeA != null}" th:text="${comp.tradeA.volume}"></td>
                     <td class="cell-a mono" th:if="${comp.tradeA != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeA.openTime}"></td>
+                    <td class="cell-a mono" th:if="${comp.tradeA != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeA.closeTime}"></td>
+                    <td class="cell-a text-right mono" th:if="${comp.tradeA != null}" th:text="${comp.tradeA.openPrice}"></td>
+                    <td class="cell-a text-right mono" th:if="${comp.tradeA != null}" th:text="${comp.tradeA.closePrice}"></td>
                     <td class="cell-a text-right mono" th:if="${comp.tradeA != null}" 
                         th:text="${comp.normalizedNetProfitAFormatted}"
                         th:style="${comp.normalizedNetProfitA > 0 ? 'color: var(--success)' : (comp.normalizedNetProfitA < 0 ? 'color: var(--danger)' : 'color: var(--text-muted)')}"></td>
 
-                    <td class="cell-a dash-cell" th:if="${comp.tradeA == null}" colspan="5">—</td>
+                    <td class="cell-a dash-cell" th:if="${comp.tradeA == null}" colspan="8">—</td>
 
                     <!-- Account B Cells -->
                     <td class="cell-b mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.symbol}"></td>
@@ -798,11 +807,14 @@
                     </td>
                     <td class="cell-b text-right mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.volume}"></td>
                     <td class="cell-b mono" th:if="${comp.tradeB != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeB.openTime}"></td>
+                    <td class="cell-b mono" th:if="${comp.tradeB != null}" style="color: var(--text-muted); font-size: 0.78rem;" th:text="${comp.tradeB.closeTime}"></td>
+                    <td class="cell-b text-right mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.openPrice}"></td>
+                    <td class="cell-b text-right mono" th:if="${comp.tradeB != null}" th:text="${comp.tradeB.closePrice}"></td>
                     <td class="cell-b text-right mono" th:if="${comp.tradeB != null}" 
                         th:text="${comp.normalizedNetProfitBFormatted}"
                         th:style="${comp.normalizedNetProfitB > 0 ? 'color: var(--success)' : (comp.normalizedNetProfitB < 0 ? 'color: var(--danger)' : 'color: var(--text-muted)')}"></td>
 
-                    <td class="cell-b dash-cell" th:if="${comp.tradeB == null}" colspan="5">—</td>
+                    <td class="cell-b dash-cell" th:if="${comp.tradeB == null}" colspan="8">—</td>
 
                     <!-- Status Cells -->
                     <td class="cell-status text-center">
@@ -846,7 +858,7 @@
         <p>Keine Trades im gewählten Zeitraum gefunden. Versuche einen anderen Zeitraum oder eine höhere Toleranz.</p>
     </div>
 
-    <div style="max-width: 1400px; margin: 2rem auto 0;">
+    <div style="max-width: 1750px; margin: 2rem auto 0;">
         <a href="/" class="nav-dashboard-btn">🏠 Zurück zum Dashboard</a>
     </div>
 
