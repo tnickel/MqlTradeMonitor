@@ -797,8 +797,17 @@ string BuildOpenTradesJson()
 //+------------------------------------------------------------------+
 string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
 {
-   // Select ALL available history (since year 2000)
-   datetime fromDate = D'2000.01.01 00:00:00';
+   // Determine incremental vs full sync BEFORE selecting history
+   bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
+   datetime sinceTimeVal = 0;
+   if(isIncremental)
+   {
+      sinceTimeVal = StringToTime(sinceCloseTime) - 7200; // 2 hours safety window
+   }
+   
+   // For incremental updates, only load deals from the relevant time range.
+   // For full sync, load entire history since year 2000.
+   datetime fromDate = isIncremental ? sinceTimeVal : D'2000.01.01 00:00:00';
    datetime toDate = TimeCurrent();
    
    if(!HistorySelect(fromDate, toDate))
@@ -814,12 +823,6 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    bool firstDeal = true;
    outLatestCloseTime = "";
    
-   bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
-   datetime sinceTimeVal = 0;
-   if(isIncremental)
-   {
-      sinceTimeVal = StringToTime(sinceCloseTime) - 7200; // 2 hours safety window
-   }
    if(!isIncremental && cfg_DebugMode > 0)
       Print("Processing full history: ", totalDeals, " deals found...");
    

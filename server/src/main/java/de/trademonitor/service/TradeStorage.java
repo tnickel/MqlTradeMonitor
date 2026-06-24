@@ -411,7 +411,7 @@ public class TradeStorage {
         equitySnapshotRepository.save(new EquitySnapshotEntity(accountId, now, equity, balance));
 
         // Cleanup: delete snapshots older than 90 days
-        String cutoff = LocalDateTime.now().minusDays(90).format(SNAPSHOT_FMT);
+        String cutoff = nowTime.minusDays(90).format(SNAPSHOT_FMT);
         equitySnapshotRepository.deleteOlderThan(accountId, cutoff);
     }
 
