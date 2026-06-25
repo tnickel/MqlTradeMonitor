@@ -345,6 +345,33 @@ public class AccountManager {
     }
 
     /**
+     * Permanently delete an account ("Delete Robot"): removes it from the in-memory
+     * cache, clears any pending Homey alarm states / latches and performance caches,
+     * and deletes all persisted data via TradeStorage.
+     */
+    public void deleteAccount(long accountId) {
+        synchronized (getAccountLock(accountId)) {
+            // Clear any active Homey alarms for this account before removing it.
+            if (offlineSirenLatch.remove(accountId)) {
+                homeyService.setAlarmState("OFFLINE_" + accountId, false);
+            }
+            homeyService.setAlarmState("PROFIT_" + accountId, false);
+
+            // Remove from in-memory caches.
+            accounts.remove(accountId);
+            cachedMaxDrawdownPct.remove(accountId);
+            cachedPerformanceMetrics.remove(accountId);
+            cachedDailyProfit.remove(accountId);
+
+            // Delete all persisted data + the account entity.
+            tradeStorage.deleteAccount(accountId);
+        }
+        // Drop the per-account lock object itself (after leaving the synchronized block).
+        accountLocks.remove(accountId);
+        LOG.info("Account " + accountId + " permanently deleted (Delete Robot).");
+    }
+
+    /**
      * Save layout preference for an account.
      */
     // Deprecated signature

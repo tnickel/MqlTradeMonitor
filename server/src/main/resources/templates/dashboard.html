@@ -9,6 +9,7 @@
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
     <style>
         @keyframes blink-text {
             0% { opacity: 0.4; }
@@ -258,6 +259,79 @@
                 </div>
                 <div class="view-details-btn"
                     style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top: auto; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">Details →
+                </div>
+            </div>
+
+            <!-- Report Generator Tile -->
+            <div id="report-generator-card" class="account-card" onclick="openReportModal()"
+                style="cursor: pointer; border: 1px solid #f59e0b; background: linear-gradient(to bottom right, #2a2e39, rgba(245, 158, 11, 0.12)); flex: 0 1 auto; min-width: 300px; display: flex; flex-direction: column;">
+                <div class="account-header">
+                    <span class="account-id" style="font-size: 1.2rem;">📄 Report Generator</span>
+                    <span class="status-badge online" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">REPORT</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr; gap: 0.5rem; text-align: center; padding: 12px 0;">
+                    <span style="font-size: 0.95rem; color: var(--text-secondary);">Trade-Report nach Account & Zeitraum erstellen</span>
+                </div>
+                <div class="view-details-btn" style="padding: 0.5rem; font-size: 0.9rem; background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);">Report erstellen →</div>
+            </div>
+
+            <!-- Report Generator Modal -->
+            <div id="reportModal" class="modal">
+                <div class="modal-content" style="max-width: 1150px; width: 96%;">
+                    <span class="close-modal" onclick="closeReportModal()">×</span>
+                    <h2 style="text-align: left;">📄 Report Generator</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px; text-align: left;">
+                        Wähle MetaTrader-Accounts und einen Zeitraum. Der Report listet alle geschlossenen Trades
+                        gruppiert nach Account auf und kann kopiert oder gedruckt werden.</p>
+
+                    <!-- Configuration area -->
+                    <div id="report-config-area">
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; text-align: left;">
+                            <!-- Account selection -->
+                            <div style="flex: 2; min-width: 280px;">
+                                <label style="font-weight: bold; color: var(--text-primary); display:block; margin-bottom: 6px;">Accounts</label>
+                                <div style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary);">
+                                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-secondary); cursor: pointer;" onclick="document.getElementById('report-select-all').click()">
+                                        <input type="checkbox" id="report-select-all" onclick="event.stopPropagation(); toggleSelectAllReportAccounts(this)" style="width:auto !important; height:auto !important; margin:0 !important; cursor:pointer; transform: scale(1.2); flex-shrink:0;" />
+                                        <label for="report-select-all" style="display:inline-block !important; width:auto !important; margin:0 !important; cursor:pointer; font-weight:bold !important; color: var(--text-primary);">Alle auswählen / abwählen</label>
+                                    </div>
+                                    <div th:each="acc : ${accounts}" style="display:flex; align-items:center; gap:12px; padding:8px 10px; border-bottom:1px dashed var(--border-color); cursor:pointer;" th:attr="onclick='if(event.target.tagName !== \'INPUT\') { const cb = document.getElementById(\'report-acc-\' + ' + ${acc.accountId} + '); cb.checked = !cb.checked; }'">
+                                        <input type="checkbox" class="report-account-checkbox" th:id="'report-acc-' + ${acc.accountId}" th:value="${acc.accountId}" style="width:auto !important; height:auto !important; margin:0 !important; cursor:pointer; transform: scale(1.2); flex-shrink:0;" onclick="event.stopPropagation();" />
+                                        <label th:for="'report-acc-' + ${acc.accountId}" style="display:inline-block !important; width:auto !important; margin:0 !important; cursor:pointer; color: var(--text-primary); font-size:0.95rem; font-weight:normal !important;" th:text="${(acc.name != null && !acc.name.isEmpty() ? acc.name : acc.accountId) + ' (' + acc.accountId + ')'}" onclick="event.stopPropagation();">Account Name</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Period selection -->
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-weight: bold; color: var(--text-primary); display:block; margin-bottom: 6px;">Zeitraum</label>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
+                                        <input type="radio" name="report-period" value="day" checked style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Tagesreport (heute)
+                                    </label>
+                                    <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
+                                        <input type="radio" name="report-period" value="week" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Wochenreport (akt. Woche)
+                                    </label>
+                                    <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
+                                        <input type="radio" name="report-period" value="month" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Monatsreport (akt. Monat)
+                                    </label>
+                                </div>
+                                <button class="save-btn" onclick="generateReport()" style="margin-top: 18px; width:100%; background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);">Report erstellen</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Result area -->
+                    <div id="report-result-area" style="display:none; margin-top: 20px;">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 12px;">
+                            <button class="view-toggle-btn" onclick="backToReportConfig()">← Auswahl ändern</button>
+                            <button class="view-toggle-btn" onclick="copyReport()" style="background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.4); color:#10b981;">📋 Kopieren</button>
+                            <button id="report-pdf-btn" class="view-toggle-btn" onclick="exportReportPdf()" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color:#ef4444;">📄 Export PDF</button>
+                            <button class="view-toggle-btn" onclick="printReport()" style="background: rgba(122,162,247,0.15); border-color: rgba(122,162,247,0.4); color: var(--accent);">🖨️ Drucken</button>
+                        </div>
+                        <div id="report-output" style="background:#ffffff; color:#111; padding: 20px; border-radius: 8px; max-height: 60vh; overflow-y:auto;">
+                            <!-- Rendered report (light background for clean printing) -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -541,6 +615,196 @@
                 document.getElementById('systemStatusModal').style.display = 'none';
             }
 
+            // ===================== Report Generator =====================
+            function openReportModal() {
+                document.getElementById('reportModal').style.display = 'block';
+                backToReportConfig();
+            }
+
+            function closeReportModal() {
+                document.getElementById('reportModal').style.display = 'none';
+            }
+
+            function toggleSelectAllReportAccounts(master) {
+                document.querySelectorAll('.report-account-checkbox').forEach(cb => cb.checked = master.checked);
+            }
+
+            function backToReportConfig() {
+                document.getElementById('report-config-area').style.display = 'block';
+                document.getElementById('report-result-area').style.display = 'none';
+            }
+
+            function fmtNum(v, dec) {
+                if (v === null || v === undefined || isNaN(v)) return '0.' + '0'.repeat(dec || 2);
+                return Number(v).toLocaleString('de-DE', { minimumFractionDigits: dec || 2, maximumFractionDigits: dec || 2 });
+            }
+
+            function generateReport() {
+                const ids = Array.from(document.querySelectorAll('.report-account-checkbox'))
+                    .filter(cb => cb.checked).map(cb => cb.value);
+                if (ids.length === 0) {
+                    alert('Bitte mindestens einen Account auswählen.');
+                    return;
+                }
+                const period = document.querySelector('input[name="report-period"]:checked').value;
+                const output = document.getElementById('report-output');
+                output.innerHTML = '<p style="color:#555;">Lade Report...</p>';
+                document.getElementById('report-config-area').style.display = 'none';
+                document.getElementById('report-result-area').style.display = 'block';
+
+                fetch('/api/report/closed-trades?accountIds=' + encodeURIComponent(ids.join(',')) + '&period=' + encodeURIComponent(period))
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                    .then(data => renderReport(data))
+                    .catch(err => { output.innerHTML = '<p style="color:#b91c1c;">Fehler beim Laden des Reports: ' + err.message + '</p>'; });
+            }
+
+            let currentReportMeta = { periodLabel: 'Report', period: 'day' };
+
+            function renderReport(data) {
+                currentReportMeta = { periodLabel: data.periodLabel || 'Report', period: data.period || 'day' };
+                const output = document.getElementById('report-output');
+                const tStyle = 'width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px;';
+                const thStyle = 'border-bottom:2px solid #333; padding:5px 7px; text-align:left; background:#f0f0f0;';
+                const thR = thStyle + ' text-align:right;';
+                const tdStyle = 'border-bottom:1px solid #ddd; padding:4px 7px;';
+                const tdR = tdStyle + ' text-align:right; font-variant-numeric: tabular-nums;';
+
+                let html = '';
+                html += '<div style="font-family: Arial, sans-serif;">';
+                html += '<h2 style="margin:0 0 4px 0; color:#111;">Trade Report &ndash; ' + data.periodLabel + '</h2>';
+                html += '<p style="margin:0 0 16px 0; color:#555; font-size:12px;">Zeitraum ab: ' + data.from
+                    + ' &nbsp;|&nbsp; Erstellt: ' + data.generatedAt
+                    + ' &nbsp;|&nbsp; Trades gesamt: ' + data.grandCount
+                    + ' &nbsp;|&nbsp; Netto gesamt: ' + fmtNum(data.grandNet) + '</p>';
+
+                if (!data.accounts || data.accounts.length === 0) {
+                    html += '<p>Keine Accounts ausgewählt.</p>';
+                }
+
+                data.accounts.forEach(acc => {
+                    html += '<div style="margin-bottom:22px;">';
+                    html += '<h3 style="margin:0 0 6px 0; color:#111; border-bottom:2px solid #f59e0b; padding-bottom:3px;">'
+                        + escapeHtml(acc.name) + ' (' + acc.accountId + ')'
+                        + ' <span style="font-weight:normal; font-size:12px; color:#666;">[' + (acc.type || '-') + ', ' + (acc.currency || '') + ']</span></h3>';
+
+                    if (!acc.trades || acc.trades.length === 0) {
+                        html += '<p style="font-size:12px; color:#777; margin:4px 0 0 0;">Keine geschlossenen Trades in diesem Zeitraum.</p>';
+                    } else {
+                        html += '<table style="' + tStyle + '">';
+                        html += '<thead><tr>'
+                            + '<th style="' + thStyle + '">Ticket</th>'
+                            + '<th style="' + thStyle + '">Symbol</th>'
+                            + '<th style="' + thStyle + '">Richtung</th>'
+                            + '<th style="' + thR + '">Volumen</th>'
+                            + '<th style="' + thStyle + '">Open</th>'
+                            + '<th style="' + thStyle + '">Close</th>'
+                            + '<th style="' + thR + '">Open Preis</th>'
+                            + '<th style="' + thR + '">Close Preis</th>'
+                            + '<th style="' + thR + '">Gewinn</th>'
+                            + '<th style="' + thR + '">Kommission</th>'
+                            + '<th style="' + thR + '">Swap</th>'
+                            + '<th style="' + thR + '">Netto</th>'
+                            + '</tr></thead><tbody>';
+                        acc.trades.forEach(t => {
+                            const netColor = t.net >= 0 ? '#15803d' : '#b91c1c';
+                            html += '<tr>'
+                                + '<td style="' + tdStyle + '">' + t.ticket + '</td>'
+                                + '<td style="' + tdStyle + '">' + escapeHtml(t.symbol || '') + '</td>'
+                                + '<td style="' + tdStyle + '">' + escapeHtml(t.type || '') + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.volume) + '</td>'
+                                + '<td style="' + tdStyle + '">' + escapeHtml(t.openTime || '') + '</td>'
+                                + '<td style="' + tdStyle + '">' + escapeHtml(t.closeTime || '') + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.openPrice, 5) + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.closePrice, 5) + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.profit) + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.commission) + '</td>'
+                                + '<td style="' + tdR + '">' + fmtNum(t.swap) + '</td>'
+                                + '<td style="' + tdR + ' color:' + netColor + '; font-weight:bold;">' + fmtNum(t.net) + '</td>'
+                                + '</tr>';
+                        });
+                        html += '</tbody><tfoot><tr style="font-weight:bold; background:#f0f0f0;">'
+                            + '<td style="' + tdStyle + '" colspan="8">Summe (' + acc.tradeCount + ' Trades)</td>'
+                            + '<td style="' + tdR + '">' + fmtNum(acc.totalProfit) + '</td>'
+                            + '<td style="' + tdR + '">' + fmtNum(acc.totalCommission) + '</td>'
+                            + '<td style="' + tdR + '">' + fmtNum(acc.totalSwap) + '</td>'
+                            + '<td style="' + tdR + ' color:' + (acc.netProfit >= 0 ? '#15803d' : '#b91c1c') + ';">' + fmtNum(acc.netProfit) + '</td>'
+                            + '</tr></tfoot>';
+                        html += '</table>';
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
+                output.innerHTML = html;
+            }
+
+            function escapeHtml(str) {
+                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            function copyReport() {
+                const output = document.getElementById('report-output');
+                const range = document.createRange();
+                range.selectNode(output);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                try {
+                    document.execCommand('copy');
+                    sel.removeAllRanges();
+                    alert('Report in die Zwischenablage kopiert. Du kannst ihn jetzt einfügen (z.B. in Excel/Word).');
+                } catch (e) {
+                    alert('Kopieren fehlgeschlagen. Bitte manuell markieren und kopieren.');
+                }
+            }
+
+            function printReport() {
+                const output = document.getElementById('report-output');
+                const win = window.open('', '_blank');
+                win.document.write('<html><head><title>Trade Report</title></head><body>' + output.innerHTML + '</body></html>');
+                win.document.close();
+                win.focus();
+                win.print();
+            }
+
+            function exportReportPdf() {
+                const output = document.getElementById('report-output');
+                if (typeof html2pdf === 'undefined') {
+                    // Fallback: use the browser print dialog (user can "Save as PDF")
+                    alert('PDF-Bibliothek nicht geladen. Es wird stattdessen der Druckdialog geöffnet (dort "Als PDF speichern" wählen).');
+                    printReport();
+                    return;
+                }
+                const btn = document.getElementById('report-pdf-btn');
+                const origText = btn ? btn.textContent : null;
+                if (btn) { btn.textContent = '⏳ Erstelle PDF...'; btn.disabled = true; }
+
+                const now = new Date();
+                const stamp = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+                const filename = 'Trade-' + (currentReportMeta.periodLabel || 'Report') + '-' + stamp + '.pdf';
+
+                // Clone the content onto a white A4-friendly container for clean rendering.
+                const wrapper = document.createElement('div');
+                wrapper.style.background = '#ffffff';
+                wrapper.style.padding = '10px';
+                wrapper.innerHTML = output.innerHTML;
+
+                const opt = {
+                    margin: [8, 8, 10, 8],
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                };
+
+                html2pdf().set(opt).from(wrapper).save()
+                    .then(() => { if (btn) { btn.textContent = origText; btn.disabled = false; } })
+                    .catch(err => {
+                        if (btn) { btn.textContent = origText; btn.disabled = false; }
+                        alert('PDF-Export fehlgeschlagen: ' + err.message);
+                    });
+            }
+
             function initSystemStatusMonitor() {
                 fetchAndRenderSystemStatus();
                 setInterval(fetchAndRenderSystemStatus, 30000);
@@ -578,6 +842,9 @@
                         }
 
                         const getDot = (ok) => ok ? '<span style="color:#10b981; font-size: 1.2rem;">●</span>' : '<span style="color:#ef4444; font-size: 1.2rem;">●</span>';
+                        const getAccountDot = (acc) => acc.monitored === false
+                            ? '<span style="color:#6b6b8f; font-size: 1.2rem;" title="Nicht überwacht">●</span>'
+                            : getDot(acc.statusOk);
                         
                         if (data.isAdmin && data.server) {
                             document.getElementById('sys-server-column').style.display = 'block';
@@ -610,7 +877,7 @@
                                             <strong>${acc.name || acc.accountId}</strong>
                                         </td>
                                         <td style="padding: 10px 0; text-align: center;">
-                                            ${getDot(acc.statusOk)}
+                                            ${getAccountDot(acc)}
                                         </td>
                                         <td style="padding: 10px 0; text-align: right;">
                                             ${acc.openTrades}
@@ -795,6 +1062,17 @@
                                 title="EA Logs anzeigen">
                                 <i class="fa-solid fa-file-code"></i> EA Logs
                             </a>
+                        </div>
+
+                        <!-- Delete Robot: only shown for accounts that are no longer monitored -->
+                        <div th:if="${acc.monitored == false}" style="margin-top: 8px; width: 100%;">
+                            <button type="button" class="delete-robot-btn"
+                                th:data-id="${acc.accountId}"
+                                th:data-name="${acc.name != null ? acc.name : acc.accountId}"
+                                th:onclick="'event.stopPropagation(); deleteRobot(this)'"
+                                style="width: 100%; padding: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.45); color: #ef4444; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                                🗑️ Delete Robot
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1611,6 +1889,10 @@
             if (event.target == editModal) {
                 closeEditModal();
             }
+            const reportModal = document.getElementById('reportModal');
+            if (event.target == reportModal) {
+                closeReportModal();
+            }
         }
 
         // Modal functions
@@ -1731,6 +2013,38 @@
             if (!isEditMode) {
                 location.href = url;
             }
+        }
+
+        function deleteRobot(btn) {
+            const accountId = btn.getAttribute('data-id');
+            const accountName = btn.getAttribute('data-name') || accountId;
+            if (!confirm('Roboter "' + accountName + '" (ID ' + accountId + ') endgültig löschen?\n\n' +
+                'Alle Daten dieses MetaTraders (Trades, Historie, Equity-Verlauf, EA-Logs) werden ' +
+                'unwiderruflich entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.')) {
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Lösche...';
+            const params = new URLSearchParams();
+            params.append('accountId', accountId);
+            fetch('/api/account/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            })
+                .then(r => {
+                    if (r.ok) {
+                        // Remove the card from the DOM and reload to refresh layout/state.
+                        location.reload();
+                    } else {
+                        return r.text().then(t => { throw new Error(t || ('HTTP ' + r.status)); });
+                    }
+                })
+                .catch(err => {
+                    alert('Löschen fehlgeschlagen: ' + err.message);
+                    btn.disabled = false;
+                    btn.textContent = '🗑️ Delete Robot';
+                });
         }
 
         function toggleEditMode() {

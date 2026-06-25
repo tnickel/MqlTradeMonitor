@@ -47,6 +47,12 @@ public class TradeStorage {
     @Autowired
     private LlmAnalysisLogRepository llmAnalysisLogRepository;
 
+    @Autowired
+    private de.trademonitor.repository.EaLogEntryRepository eaLogEntryRepository;
+
+    @Autowired
+    private de.trademonitor.repository.TimelineRepository timelineRepository;
+
     /**
      * Timestamp format for equity snapshots (lexicographic ordering works
      * correctly)
@@ -445,6 +451,25 @@ public class TradeStorage {
         closedTradeRepository.deleteByAccountId(accountId);
         equitySnapshotRepository.deleteByAccountId(accountId);
         ticketMaxDrawdownCache.entrySet().removeIf(e -> e.getKey().startsWith(accountId + "_"));
+    }
+
+    /**
+     * Permanently delete an account and ALL associated data (open/closed trades,
+     * equity snapshots, EA logs, timelines, LLM analysis logs and the account
+     * entity itself). Used by the "Delete Robot" feature.
+     */
+    @Transactional
+    public void deleteAccount(long accountId) {
+        LOG.info("DELETE Account " + accountId + ": Permanently deleting account and all associated data.");
+        openTradeRepository.deleteByAccountId(accountId);
+        closedTradeRepository.deleteByAccountId(accountId);
+        equitySnapshotRepository.deleteByAccountId(accountId);
+        ticketMaxDrawdownCache.entrySet().removeIf(e -> e.getKey().startsWith(accountId + "_"));
+        lastSnapshotTime.remove(accountId);
+        try { eaLogEntryRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete EA logs for " + accountId + ": " + e.getMessage()); }
+        try { timelineRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete timelines for " + accountId + ": " + e.getMessage()); }
+        try { llmAnalysisLogRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete LLM logs for " + accountId + ": " + e.getMessage()); }
+        accountRepository.deleteById(accountId);
     }
 
     public void updatePromptAnalysisConfig(long accountId, boolean enabled, String customPrompt) {

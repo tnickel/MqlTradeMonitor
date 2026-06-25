@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import de.trademonitor.security.CustomUserDetails;
@@ -603,6 +604,27 @@ public class DashboardController {
         return ResponseEntity.ok("Reset complete");
     }
 
+    /**
+     * AJAX Endpoint to permanently delete an account and all its data
+     * ("Delete Robot"). Only allowed for accounts that are no longer monitored,
+     * so an actively watched MetaTrader cannot be removed by accident.
+     */
+    @PostMapping("/api/account/delete")
+    @ResponseBody
+    public ResponseEntity<String> deleteAccount(
+            @RequestParam("accountId") Long accountId) {
+        de.trademonitor.model.Account account = accountManager.getAccount(accountId);
+        if (account == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Account not found");
+        }
+        if (account.isMonitored()) {
+            return ResponseEntity.badRequest()
+                    .body("Account is still monitored. Disable monitoring before deleting.");
+        }
+        accountManager.deleteAccount(accountId);
+        return ResponseEntity.ok("Deleted");
+    }
+
     // --- Section Management API ---
 
     @PostMapping("/api/section/create")
@@ -759,6 +781,125 @@ public class DashboardController {
         // Use the in-memory cache from Account to avoid DB load overhead where possible
         // The frontend JS will handle sorting and filtering
         return ResponseEntity.ok(account.getClosedTrades());
+    }
+
+    /**
+     * Report generator: returns all closed trades for the selected accounts within
+     * the given period (day/week/month), grouped per account with summary totals.
+     * Used by the "Report Generator" dashboard tile.
+     */
+    @GetMapping("/api/report/closed-trades")
+    @ResponseBody
+    public ResponseEntity<?> getReportClosedTrades(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam("accountIds") String accountIds,
+            @RequestParam(value = "period", defaultValue = "day") String period) {
+
+        // Determine period start (inclusive). closeTime format is "yyyy.MM.dd HH:mm:ss"
+        // which sorts lexicographically, so a string comparison is sufficient.
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate startDate;
+        String periodLabel;
+        switch (period == null ? "day" : period.toLowerCase()) {
+            case "week":
+                startDate = today.with(java.time.temporal.WeekFields.ISO.dayOfWeek(), 1);
+                periodLabel = "Wochenreport";
+                break;
+            case "month":
+                startDate = today.withDayOfMonth(1);
+                periodLabel = "Monatsreport";
+                break;
+            case "day":
+            default:
+                startDate = today;
+                periodLabel = "Tagesreport";
+                break;
+        }
+        String fromStr = startDate.toString().replace("-", ".") + " 00:00:00";
+
+        List<Long> requestedIds = new ArrayList<>();
+        for (String part : accountIds.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                try { requestedIds.add(Long.parseLong(trimmed)); } catch (NumberFormatException ignored) { }
+            }
+        }
+
+        List<Map<String, Object>> accountReports = new ArrayList<>();
+        double grandNet = 0.0;
+        int grandCount = 0;
+
+        for (Long accountId : requestedIds) {
+            if (!isAllowedAccess(userDetails, accountId)) {
+                continue;
+            }
+            Account account = accountManager.getAccount(accountId);
+            if (account == null || account.getClosedTrades() == null) {
+                continue;
+            }
+            double commissionFactor = account.getCommissionFactor();
+
+            List<Map<String, Object>> trades = new ArrayList<>();
+            double sumProfit = 0.0, sumCommission = 0.0, sumSwap = 0.0, sumNet = 0.0;
+
+            List<ClosedTrade> sorted = account.getClosedTrades().stream()
+                    .filter(ct -> ct.getCloseTime() != null && ct.getCloseTime().compareTo(fromStr) >= 0)
+                    .sorted(Comparator.comparing(ClosedTrade::getCloseTime))
+                    .collect(Collectors.toList());
+
+            for (ClosedTrade ct : sorted) {
+                double commission = ct.getCommission() * commissionFactor;
+                double net = ct.getProfit() + ct.getSwap() + commission;
+                sumProfit += ct.getProfit();
+                sumCommission += commission;
+                sumSwap += ct.getSwap();
+                sumNet += net;
+
+                Map<String, Object> t = new LinkedHashMap<>();
+                t.put("ticket", ct.getTicket());
+                t.put("symbol", ct.getSymbol());
+                t.put("type", ct.getType());
+                t.put("volume", ct.getVolume());
+                t.put("openPrice", ct.getOpenPrice());
+                t.put("closePrice", ct.getClosePrice());
+                t.put("openTime", ct.getOpenTime());
+                t.put("closeTime", ct.getCloseTime());
+                t.put("profit", ct.getProfit());
+                t.put("commission", commission);
+                t.put("swap", ct.getSwap());
+                t.put("net", net);
+                t.put("magicNumber", ct.getMagicNumber());
+                trades.add(t);
+            }
+
+            Map<String, Object> accReport = new LinkedHashMap<>();
+            accReport.put("accountId", accountId);
+            accReport.put("name", account.getName() != null && !account.getName().isEmpty()
+                    ? account.getName() : String.valueOf(accountId));
+            accReport.put("type", account.getType());
+            accReport.put("currency", account.getCurrency());
+            accReport.put("tradeCount", trades.size());
+            accReport.put("totalProfit", sumProfit);
+            accReport.put("totalCommission", sumCommission);
+            accReport.put("totalSwap", sumSwap);
+            accReport.put("netProfit", sumNet);
+            accReport.put("trades", trades);
+            accountReports.add(accReport);
+
+            grandNet += sumNet;
+            grandCount += trades.size();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("periodLabel", periodLabel);
+        result.put("period", period);
+        result.put("from", fromStr);
+        result.put("generatedAt", java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+        result.put("accounts", accountReports);
+        result.put("grandNet", grandNet);
+        result.put("grandCount", grandCount);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -1569,13 +1710,17 @@ public class DashboardController {
                     boolean hasError = Boolean.TRUE.equals(acc.get("errorState"));
                     boolean hasSyncWarning = Boolean.TRUE.equals(acc.get("copierError"));
                     boolean hasAlarm = Boolean.TRUE.equals(acc.get("openProfitAlarmTriggered"));
+                    boolean monitored = Boolean.TRUE.equals(acc.get("monitored"));
                     
                     boolean statusOk = isOnline && !hasError && !hasSyncWarning && !hasAlarm;
-                    if (isReal && !statusOk) {
+                    // Unmonitored accounts are intentionally not watched: they must never
+                    // contribute to the overall "Warnung / Fehler" state nor raise alarms.
+                    if (isReal && monitored && !statusOk) {
                         accountsOkRef[0] = false;
                     }
                     
                     rAcc.put("statusOk", statusOk);
+                    rAcc.put("monitored", monitored);
                     rAcc.put("online", isOnline);
                     rAcc.put("error", hasError);
                     rAcc.put("syncWarning", hasSyncWarning);

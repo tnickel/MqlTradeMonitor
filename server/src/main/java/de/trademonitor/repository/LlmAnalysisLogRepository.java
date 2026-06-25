@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface LlmAnalysisLogRepository extends JpaRepository<LlmAnalysisLogEntity, Long> {
     List<LlmAnalysisLogEntity> findByAccountIdOrderByTimestampDesc(long accountId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByAccountId(long accountId);
 }

@@ -21,6 +21,11 @@ public interface EaLogEntryRepository extends JpaRepository<EaLogEntry, Long> {
     @Query("DELETE FROM EaLogEntry e WHERE e.timestamp < :cutoff")
     void deleteByTimestampBefore(LocalDateTime cutoff);
 
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM EaLogEntry e WHERE e.accountId = :accountId")
+    void deleteByAccountId(@org.springframework.data.repository.query.Param("accountId") Long accountId);
+
     long countByAccountId(Long accountId);
 
     @Query(value = "SELECT CASE " +

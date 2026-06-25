@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface TimelineRepository extends JpaRepository<TimelineEntity, Long> {
     List<TimelineEntity> findByAccountIdOrderByTimelineDateAsc(long accountId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByAccountId(long accountId);
 }
