@@ -9,7 +9,6 @@
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
     <style>
         @keyframes blink-text {
             0% { opacity: 0.4; }
@@ -314,6 +313,9 @@
                                     <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
                                         <input type="radio" name="report-period" value="month" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Monatsreport (akt. Monat)
                                     </label>
+                                    <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
+                                        <input type="radio" name="report-period" value="year" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Jahresreport (akt. Jahr)
+                                    </label>
                                 </div>
                                 <button class="save-btn" onclick="generateReport()" style="margin-top: 18px; width:100%; background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);">Report erstellen</button>
                             </div>
@@ -557,7 +559,7 @@
 
         </div>
 
-        <script>
+        <script th:inline="none">
             function initCombinedChart() {
                 fetch('/api/report-chart/weekly')
                     .then(response => response.json())
@@ -659,9 +661,11 @@
             }
 
             let currentReportMeta = { periodLabel: 'Report', period: 'day' };
+            let currentReportData = null;
 
             function renderReport(data) {
                 currentReportMeta = { periodLabel: data.periodLabel || 'Report', period: data.period || 'day' };
+                currentReportData = data;
                 const output = document.getElementById('report-output');
                 const tStyle = 'width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px;';
                 const thStyle = 'border-bottom:2px solid #333; padding:5px 7px; text-align:left; background:#f0f0f0;';
@@ -683,9 +687,10 @@
 
                 data.accounts.forEach(acc => {
                     html += '<div style="margin-bottom:22px;">';
+                    const brokerTag = acc.broker ? ' &bull; ' + escapeHtml(acc.broker) : '';
                     html += '<h3 style="margin:0 0 6px 0; color:#111; border-bottom:2px solid #f59e0b; padding-bottom:3px;">'
                         + escapeHtml(acc.name) + ' (' + acc.accountId + ')'
-                        + ' <span style="font-weight:normal; font-size:12px; color:#666;">[' + (acc.type || '-') + ', ' + (acc.currency || '') + ']</span></h3>';
+                        + ' <span style="font-weight:normal; font-size:12px; color:#666;">[' + (acc.type || '-') + ', ' + (acc.currency || '') + brokerTag + ']</span></h3>';
 
                     if (!acc.trades || acc.trades.length === 0) {
                         html += '<p style="font-size:12px; color:#777; margin:4px 0 0 0;">Keine geschlossenen Trades in diesem Zeitraum.</p>';
@@ -766,44 +771,161 @@
                 win.print();
             }
 
-            function exportReportPdf() {
-                const output = document.getElementById('report-output');
-                if (typeof html2pdf === 'undefined') {
-                    // Fallback: use the browser print dialog (user can "Save as PDF")
-                    alert('PDF-Bibliothek nicht geladen. Es wird stattdessen der Druckdialog geöffnet (dort "Als PDF speichern" wählen).');
+            let _jsPdfReady = false;
+
+            function _loadJsPdfLibs(callback) {
+                if (_jsPdfReady) { callback(); return; }
+                const s1 = document.createElement('script');
+                s1.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+                s1.onload = function() {
+                    const s2 = document.createElement('script');
+                    s2.src = 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
+                    s2.onload = function() { _jsPdfReady = true; callback(); };
+                    s2.onerror = function() { alert('autoTable konnte nicht geladen werden.'); };
+                    document.head.appendChild(s2);
+                };
+                s1.onerror = function() {
+                    alert('jsPDF konnte nicht geladen werden (CDN blockiert?). Öffne stattdessen den Druckdialog – dort "Als PDF speichern" wählen.');
                     printReport();
+                };
+                document.head.appendChild(s1);
+            }
+
+            function exportReportPdf() {
+                if (!currentReportData) {
+                    alert('Kein Report vorhanden. Bitte zuerst einen Report erstellen.');
                     return;
                 }
                 const btn = document.getElementById('report-pdf-btn');
                 const origText = btn ? btn.textContent : null;
-                if (btn) { btn.textContent = '⏳ Erstelle PDF...'; btn.disabled = true; }
+                if (btn) { btn.textContent = '⏳ Lade PDF-Bibliothek...'; btn.disabled = true; }
 
-                const now = new Date();
-                const stamp = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-                const filename = 'Trade-' + (currentReportMeta.periodLabel || 'Report') + '-' + stamp + '.pdf';
-
-                // Clone the content onto a white A4-friendly container for clean rendering.
-                const wrapper = document.createElement('div');
-                wrapper.style.background = '#ffffff';
-                wrapper.style.padding = '10px';
-                wrapper.innerHTML = output.innerHTML;
-
-                const opt = {
-                    margin: [8, 8, 10, 8],
-                    filename: filename,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                    pagebreak: { mode: ['css', 'legacy'] }
-                };
-
-                html2pdf().set(opt).from(wrapper).save()
-                    .then(() => { if (btn) { btn.textContent = origText; btn.disabled = false; } })
-                    .catch(err => {
-                        if (btn) { btn.textContent = origText; btn.disabled = false; }
-                        alert('PDF-Export fehlgeschlagen: ' + err.message);
-                    });
+                _loadJsPdfLibs(function() {
+                    _doExportPdf(btn, origText);
+                });
             }
+
+            function _doExportPdf(btn, origText) {
+                if (typeof window.jspdf === 'undefined') {
+                    if (btn) { btn.textContent = origText; btn.disabled = false; }
+                    alert('jsPDF konnte nicht initialisiert werden.');
+                    return;
+                }
+                if (btn) { btn.textContent = '⏳ Erstelle PDF...'; }
+
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                    const pageW = doc.internal.pageSize.getWidth();
+                    const margin = 10;
+                    const now = new Date();
+                    const stamp = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+                    const filename = 'Trade-' + (currentReportData.periodLabel || 'Report') + '-' + stamp + '.pdf';
+
+                    // Page header
+                    let y = margin;
+                    doc.setFontSize(16);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('Trade Report \u2013 ' + currentReportData.periodLabel, margin, y);
+                    y += 7;
+                    doc.setFontSize(8.5);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(80, 80, 80);
+                    doc.text(
+                        'Zeitraum ab: ' + currentReportData.from
+                        + '   |   Erstellt: ' + currentReportData.generatedAt
+                        + '   |   Trades gesamt: ' + currentReportData.grandCount
+                        + '   |   Netto gesamt: ' + fmtNum(currentReportData.grandNet),
+                        margin, y
+                    );
+                    y += 8;
+                    doc.setTextColor(0, 0, 0);
+
+                    currentReportData.accounts.forEach(acc => {
+                        // Account heading
+                        if (y > 178) { doc.addPage(); y = margin; }
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'bold');
+                        const brokerStr = acc.broker ? ' \u2022 ' + acc.broker : '';
+                        doc.text(
+                            acc.name + ' (' + acc.accountId + ')  ['
+                            + (acc.type || '') + ', ' + (acc.currency || '') + brokerStr + ']',
+                            margin, y
+                        );
+                        y += 3;
+                        doc.setDrawColor(245, 158, 11);
+                        doc.setLineWidth(0.5);
+                        doc.line(margin, y, pageW - margin, y);
+                        y += 3;
+                        doc.setDrawColor(0, 0, 0);
+                        doc.setFont(undefined, 'normal');
+
+                        if (!acc.trades || acc.trades.length === 0) {
+                            doc.setFontSize(8.5);
+                            doc.setTextColor(120, 120, 120);
+                            doc.text('Keine geschlossenen Trades in diesem Zeitraum.', margin, y);
+                            doc.setTextColor(0, 0, 0);
+                            y += 8;
+                            return;
+                        }
+
+                        // Trade rows
+                        const body = acc.trades.map((t, i) => [
+                            String(t.ticket), t.symbol || '', t.type || '',
+                            fmtNum(t.volume), t.openTime || '', t.closeTime || '',
+                            fmtNum(t.openPrice, 5), fmtNum(t.closePrice, 5),
+                            fmtNum(t.profit), fmtNum(t.commission), fmtNum(t.swap), fmtNum(t.net)
+                        ]);
+                        // Summary row
+                        body.push([
+                            { content: 'Summe (' + acc.tradeCount + ' Trades)', colSpan: 8,
+                              styles: { fontStyle: 'bold', fillColor: [240,240,240] } },
+                            { content: fmtNum(acc.totalProfit),
+                              styles: { fontStyle: 'bold', fillColor: [240,240,240], halign: 'right' } },
+                            { content: fmtNum(acc.totalCommission),
+                              styles: { fontStyle: 'bold', fillColor: [240,240,240], halign: 'right' } },
+                            { content: fmtNum(acc.totalSwap),
+                              styles: { fontStyle: 'bold', fillColor: [240,240,240], halign: 'right' } },
+                            { content: fmtNum(acc.netProfit),
+                              styles: { fontStyle: 'bold', fillColor: [240,240,240], halign: 'right',
+                                textColor: acc.netProfit >= 0 ? [21,128,61] : [185,28,28] } }
+                        ]);
+
+                        doc.autoTable({
+                            startY: y,
+                            margin: { left: margin, right: margin },
+                            head: [['Ticket','Symbol','Richtung','Volumen','Open','Close',
+                                    'Open Preis','Close Preis','Gewinn','Komm.','Swap','Netto']],
+                            body: body,
+                            styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
+                            headStyles: { fillColor: [230,230,230], textColor: [0,0,0], fontStyle: 'bold' },
+                            columnStyles: {
+                                0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 15 },
+                                3: { cellWidth: 14, halign: 'right' },
+                                4: { cellWidth: 30 }, 5: { cellWidth: 30 },
+                                6: { cellWidth: 20, halign: 'right' }, 7: { cellWidth: 20, halign: 'right' },
+                                8: { cellWidth: 18, halign: 'right' }, 9: { cellWidth: 16, halign: 'right' },
+                                10:{ cellWidth: 14, halign: 'right' }, 11:{ cellWidth: 18, halign: 'right' }
+                            },
+                            didParseCell: function(data) {
+                                if (data.column.index === 11 && data.section === 'body'
+                                        && data.row.index < acc.trades.length) {
+                                    const net = acc.trades[data.row.index].net;
+                                    data.cell.styles.textColor = net >= 0 ? [21,128,61] : [185,28,28];
+                                    data.cell.styles.fontStyle = 'bold';
+                                }
+                            }
+                        });
+                        y = doc.lastAutoTable.finalY + 8;
+                    });
+
+                    doc.save(filename);
+                    if (btn) { btn.textContent = origText; btn.disabled = false; }
+                } catch (err) {
+                    if (btn) { btn.textContent = origText; btn.disabled = false; }
+                    alert('PDF-Export fehlgeschlagen: ' + err.message);
+                }
+            } // end _doExportPdf
 
             function initSystemStatusMonitor() {
                 fetchAndRenderSystemStatus();

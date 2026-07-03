@@ -809,6 +809,10 @@ public class DashboardController {
                 startDate = today.withDayOfMonth(1);
                 periodLabel = "Monatsreport";
                 break;
+            case "year":
+                startDate = today.withDayOfYear(1);
+                periodLabel = "Jahresreport";
+                break;
             case "day":
             default:
                 startDate = today;
@@ -876,6 +880,7 @@ public class DashboardController {
             accReport.put("accountId", accountId);
             accReport.put("name", account.getName() != null && !account.getName().isEmpty()
                     ? account.getName() : String.valueOf(accountId));
+            accReport.put("broker", account.getBroker() != null ? account.getBroker() : "");
             accReport.put("type", account.getType());
             accReport.put("currency", account.getCurrency());
             accReport.put("tradeCount", trades.size());
@@ -1143,6 +1148,10 @@ public class DashboardController {
                 startDt = today.withDayOfMonth(1);
                 endDt = today.withDayOfMonth(today.lengthOfMonth());
                 break;
+            case "yearly":
+                startDt = today.withDayOfYear(1);
+                endDt = today.withDayOfYear(today.lengthOfYear());
+                break;
         }
         java.time.format.DateTimeFormatter tradeDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd");
         String startCloseTime = startDt.format(tradeDateFormatter) + " 00:00:00";
@@ -1317,6 +1326,9 @@ public class DashboardController {
                         return false;
                     }
                 };
+            case "yearly":
+                String yearStr = String.valueOf(today.getYear());
+                return s -> s.getTimestamp() != null && s.getTimestamp().startsWith(yearStr);
             default:
                 return s -> true;
         }
@@ -1349,6 +1361,9 @@ public class DashboardController {
                         return false;
                     }
                 };
+            case "yearly":
+                String yearStr = String.valueOf(today.getYear()) + ".";
+                return date -> date.startsWith(yearStr);
             default:
                 return date -> true;
         }
@@ -1372,6 +1387,10 @@ public class DashboardController {
             case "monthly":
                 startDt = today.withDayOfMonth(1);
                 endDt = today.withDayOfMonth(today.lengthOfMonth());
+                break;
+            case "yearly":
+                startDt = today.withDayOfYear(1);
+                endDt = today.withDayOfYear(today.lengthOfYear());
                 break;
         }
 
@@ -1424,6 +1443,11 @@ public class DashboardController {
                 startDt = today.withDayOfMonth(1);
                 endDt = today.withDayOfMonth(today.lengthOfMonth());
                 periodTitle = "Monatsreport";
+                break;
+            case "yearly":
+                startDt = today.withDayOfYear(1);
+                endDt = today.withDayOfYear(today.lengthOfYear());
+                periodTitle = "Jahresreport";
                 break;
             default:
                 periodTitle = "Report (" + period + ")";

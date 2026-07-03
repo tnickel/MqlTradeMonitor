@@ -1520,12 +1520,89 @@
                 </div>
             </div>
 
-            <!-- Section 4: Open Trades per Symbol Scrollable Bar Chart -->
-            <div style="margin-top: 2rem; background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 2rem;">
-                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Offene Trades pro Währungspaar</h3>
-                <div style="overflow-x: auto; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; position: relative;">
-                    <div id="open-trades-scroll-container" style="height: 300px; min-width: 800px; width: 100%;">
-                        <canvas id="open-trades-pair-chart"></canvas>
+            <!-- Row 3: Trading Times Analysis (Open, Close, Active Hours) -->
+            <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-top: 2rem;">
+                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">⏰ Trading-Zeiten Analyse (Stündliche Verteilung)</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                    <!-- Chart: Open Times -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.0rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #10b981;">●</span> Eröffnete Trades nach Uhrzeit
+                        </h4>
+                        <div class="chart-container" style="position: relative; height: 260px;">
+                            <canvas id="hourly-open-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Close Times -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.0rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #ef4444;">●</span> Geschlossene Trades nach Uhrzeit
+                        </h4>
+                        <div class="chart-container" style="position: relative; height: 260px;">
+                            <canvas id="hourly-close-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Active Trades Overlap -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.0rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #6366f1;">●</span> Aktive Trades nach Uhrzeit (Überschneidung)
+                        </h4>
+                        <div class="chart-container" style="position: relative; height: 260px;">
+                            <canvas id="hourly-active-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3.5: Weekday Analysis (Open, Close) -->
+            <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-top: 2rem;">
+                <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📅 Wochentags-Analyse</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px;">
+                    <!-- Chart: Weekday Open Times -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.0rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #10b981;">●</span> Eröffnete Trades nach Wochentag
+                        </h4>
+                        <div class="chart-container" style="position: relative; height: 260px;">
+                            <canvas id="weekday-open-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Weekday Close Times -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.0rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #ef4444;">●</span> Geschlossene Trades nach Wochentag
+                        </h4>
+                        <div class="chart-container" style="position: relative; height: 260px;">
+                            <canvas id="weekday-close-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Trades per Währungspaar (Open and Closed side-by-side) -->
+            <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-bottom: 2rem;">
+                <!-- Open Trades per Währungspaar -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Offene Trades pro Währungspaar</h3>
+                    <div style="overflow-x: auto; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; position: relative;">
+                        <div id="open-trades-scroll-container" style="height: 300px; min-width: 400px; width: 100%;">
+                            <canvas id="open-trades-pair-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Closed Trades per Währungspaar -->
+                <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📊 Geschlossene Trades pro Währungspaar</h3>
+                    <div style="overflow-x: auto; background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; position: relative;">
+                        <div id="closed-trades-scroll-container" style="height: 300px; min-width: 400px; width: 100%;">
+                            <canvas id="closed-trades-pair-chart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -5271,6 +5348,12 @@
         var durationScatterChart = null;
         var durationHistogramChart = null;
         var openTradesPairChart = null;
+        var closedTradesPairChart = null;
+        var hourlyOpenChart = null;
+        var hourlyCloseChart = null;
+        var hourlyActiveChart = null;
+        var weekdayOpenChart = null;
+        var weekdayCloseChart = null;
 
         function formatDuration(hours) {
             if (hours === null || isNaN(hours) || hours < 0) return '-';
@@ -5490,6 +5573,385 @@
                 });
             }
 
+            // Hourly trading times arrays (0-23)
+            var hourlyOpenCounts = new Array(24).fill(0);
+            var hourlyCloseCounts = new Array(24).fill(0);
+            var hourlyActiveCounts = new Array(24).fill(0);
+            var hourlyLabels = [
+                '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+                '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+                '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+                '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+            ];
+
+            // Weekday trading times arrays (0-6)
+            var weekdayOpenCounts = new Array(7).fill(0);
+            var weekdayCloseCounts = new Array(7).fill(0);
+            var weekdayLabels = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+            
+            function getMondayStartDayIndex(jsDay) {
+                return jsDay === 0 ? 6 : jsDay - 1;
+            }
+
+            trades.forEach(function(t) {
+                if (!t.openTime || !t.closeTime) return;
+                
+                var o = t.openTime.split(/[- :.]/);
+                var oDate = new Date(o[0], o[1] - 1, o[2], o[3] || 0, o[4] || 0, o[5] || 0);
+                var c = t.closeTime.split(/[- :.]/);
+                var cDate = new Date(c[0], c[1] - 1, c[2], c[3] || 0, c[4] || 0, c[5] || 0);
+
+                // 1. Open Hour
+                var openHour = oDate.getHours();
+                if (!isNaN(openHour)) {
+                    hourlyOpenCounts[openHour]++;
+                }
+                var openDay = oDate.getDay();
+                if (!isNaN(openDay)) {
+                    weekdayOpenCounts[getMondayStartDayIndex(openDay)]++;
+                }
+
+                // 2. Close Hour
+                var closeHour = cDate.getHours();
+                if (!isNaN(closeHour)) {
+                    hourlyCloseCounts[closeHour]++;
+                }
+                var closeDay = cDate.getDay();
+                if (!isNaN(closeDay)) {
+                    weekdayCloseCounts[getMondayStartDayIndex(closeDay)]++;
+                }
+
+                // 3. Active Hour Overlap
+                var durationMs = cDate.getTime() - oDate.getTime();
+                if (durationMs >= 0 && !isNaN(openHour) && !isNaN(closeHour)) {
+                    if (durationMs >= 24 * 60 * 60 * 1000) {
+                        for (var h = 0; h < 24; h++) {
+                            hourlyActiveCounts[h]++;
+                        }
+                    } else {
+                        var current = new Date(oDate.getTime());
+                        current.setMinutes(0, 0, 0);
+                        var safetyLimit = 0;
+                        while (current.getTime() <= cDate.getTime() && safetyLimit < 30) {
+                            hourlyActiveCounts[current.getHours()]++;
+                            current.setTime(current.getTime() + 60 * 60 * 1000);
+                            safetyLimit++;
+                        }
+                    }
+                }
+            });
+
+            // Render Hourly Open Chart
+            var ctxHourlyOpen = document.getElementById('hourly-open-chart');
+            if (ctxHourlyOpen) {
+                var existing = Chart.getChart(ctxHourlyOpen);
+                if (existing) existing.destroy();
+
+                hourlyOpenChart = new Chart(ctxHourlyOpen, {
+                    type: 'bar',
+                    data: {
+                        labels: hourlyLabels,
+                        datasets: [{
+                            label: 'Eröffnungen',
+                            data: hourlyOpenCounts,
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            borderColor: '#10b981',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades eröffnet';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Uhrzeit (Stunde)', color: '#a0a0c0', font: { size: 10 } },
+                                ticks: { color: '#a0a0c0', font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl', color: '#a0a0c0', font: { size: 10 } },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', font: { size: 9 }, stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.15)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render Hourly Close Chart
+            var ctxHourlyClose = document.getElementById('hourly-close-chart');
+            if (ctxHourlyClose) {
+                var existing = Chart.getChart(ctxHourlyClose);
+                if (existing) existing.destroy();
+
+                hourlyCloseChart = new Chart(ctxHourlyClose, {
+                    type: 'bar',
+                    data: {
+                        labels: hourlyLabels,
+                        datasets: [{
+                            label: 'Schließungen',
+                            data: hourlyCloseCounts,
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades geschlossen';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Uhrzeit (Stunde)', color: '#a0a0c0', font: { size: 10 } },
+                                ticks: { color: '#a0a0c0', font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl', color: '#a0a0c0', font: { size: 10 } },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', font: { size: 9 }, stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.15)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render Hourly Active Chart
+            var ctxHourlyActive = document.getElementById('hourly-active-chart');
+            if (ctxHourlyActive) {
+                var existing = Chart.getChart(ctxHourlyActive);
+                if (existing) existing.destroy();
+
+                hourlyActiveChart = new Chart(ctxHourlyActive, {
+                    type: 'bar',
+                    data: {
+                        labels: hourlyLabels,
+                        datasets: [{
+                            label: 'Aktive Trades',
+                            data: hourlyActiveCounts,
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderColor: '#6366f1',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades aktiv';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Uhrzeit (Stunde)', color: '#a0a0c0', font: { size: 10 } },
+                                ticks: { color: '#a0a0c0', font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl', color: '#a0a0c0', font: { size: 10 } },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', font: { size: 9 }, stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.15)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render Weekday Open Chart
+            var ctxWeekdayOpen = document.getElementById('weekday-open-chart');
+            if (ctxWeekdayOpen) {
+                var existing = Chart.getChart(ctxWeekdayOpen);
+                if (existing) existing.destroy();
+
+                weekdayOpenChart = new Chart(ctxWeekdayOpen, {
+                    type: 'bar',
+                    data: {
+                        labels: weekdayLabels,
+                        datasets: [{
+                            label: 'Eröffnungen',
+                            data: weekdayOpenCounts,
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            borderColor: '#10b981',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades eröffnet';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Wochentag', color: '#a0a0c0', font: { size: 10 } },
+                                ticks: { color: '#a0a0c0', font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl', color: '#a0a0c0', font: { size: 10 } },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', font: { size: 9 }, stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.15)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render Weekday Close Chart
+            var ctxWeekdayClose = document.getElementById('weekday-close-chart');
+            if (ctxWeekdayClose) {
+                var existing = Chart.getChart(ctxWeekdayClose);
+                if (existing) existing.destroy();
+
+                weekdayCloseChart = new Chart(ctxWeekdayClose, {
+                    type: 'bar',
+                    data: {
+                        labels: weekdayLabels,
+                        datasets: [{
+                            label: 'Schließungen',
+                            data: weekdayCloseCounts,
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + ' Trades geschlossen';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Wochentag', color: '#a0a0c0', font: { size: 10 } },
+                                ticks: { color: '#a0a0c0', font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: 'Anzahl', color: '#a0a0c0', font: { size: 10 } },
+                                beginAtZero: true,
+                                ticks: { color: '#a0a0c0', font: { size: 9 }, stepSize: 1 },
+                                grid: { color: 'rgba(63,63,95,0.15)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Closed trades per symbol calculation
+            var closedPairCounts = {};
+            trades.forEach(function(t) {
+                if (!t.symbol) return;
+                var symbol = t.symbol.trim().toUpperCase();
+                closedPairCounts[symbol] = (closedPairCounts[symbol] || 0) + 1;
+            });
+
+            var closedLabels = Object.keys(closedPairCounts).sort();
+            var closedData = closedLabels.map(function(k) { return closedPairCounts[k]; });
+
+            var minWidthClosed = Math.max(400, closedLabels.length * 60);
+            var scrollContainerClosed = document.getElementById('closed-trades-scroll-container');
+            if (scrollContainerClosed) {
+                scrollContainerClosed.style.width = minWidthClosed + 'px';
+            }
+
+            var ctxClosed = document.getElementById('closed-trades-pair-chart');
+            if (ctxClosed) {
+                var existingClosed = Chart.getChart(ctxClosed);
+                if (existingClosed) existingClosed.destroy();
+
+                if (closedLabels.length > 0) {
+                    closedTradesPairChart = new Chart(ctxClosed, {
+                        type: 'bar',
+                        data: {
+                            labels: closedLabels,
+                            datasets: [{
+                                label: 'Geschlossene Trades',
+                                data: closedData,
+                                backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                                borderColor: '#6366f1',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.parsed.y + ' geschlossene Trades';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    title: { display: true, text: 'Währungspaar (Symbol)', color: '#a0a0c0' },
+                                    ticks: { color: '#a0a0c0' },
+                                    grid: { display: false }
+                                },
+                                y: {
+                                    title: { display: true, text: 'Anzahl geschlossene Trades', color: '#a0a0c0' },
+                                    beginAtZero: true,
+                                    ticks: { color: '#a0a0c0', stepSize: 1 },
+                                    grid: { color: 'rgba(63,63,95,0.2)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
             renderOpenTradesChart();
         }
 
@@ -5526,7 +5988,7 @@
             var labels = Object.keys(pairCounts).sort();
             var data = labels.map(function(k) { return pairCounts[k]; });
 
-            var minWidth = Math.max(800, labels.length * 60);
+            var minWidth = Math.max(400, labels.length * 60);
             var scrollContainer = document.getElementById('open-trades-scroll-container');
             if (scrollContainer) {
                 scrollContainer.style.width = minWidth + 'px';
