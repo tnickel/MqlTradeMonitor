@@ -38,8 +38,16 @@ class HomeyServiceTest {
         LocalDateTime monMorning = LocalDateTime.of(2026, 6, 22, 8, 0);
         assertFalse(homeyService.isSirenMutedPeriod(monMorning));
 
-        // Friday afternoon
+        // Friday afternoon (before 23:00)
         LocalDateTime friAfternoon = LocalDateTime.of(2026, 6, 19, 15, 0);
         assertFalse(homeyService.isSirenMutedPeriod(friAfternoon));
+
+        // Friday evening at 23:00
+        LocalDateTime friEveningAt = LocalDateTime.of(2026, 6, 19, 23, 0);
+        assertTrue(homeyService.isSirenMutedPeriod(friEveningAt));
+
+        // Friday evening after 23:00 (e.g. 23:43)
+        LocalDateTime friEveningAfter = LocalDateTime.of(2026, 6, 19, 23, 43);
+        assertTrue(homeyService.isSirenMutedPeriod(friEveningAfter));
     }
 }

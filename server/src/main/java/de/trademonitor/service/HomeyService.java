@@ -71,10 +71,13 @@ public class HomeyService {
     }
 
     /**
-     * Checks if the given time is in the siren mute period (Saturday 00:00 until Sunday 23:00).
+     * Checks if the given time is in the siren mute period (Friday 23:00 until Sunday 23:00).
      */
     public boolean isSirenMutedPeriod(java.time.LocalDateTime now) {
         java.time.DayOfWeek day = now.getDayOfWeek();
+        if (day == java.time.DayOfWeek.FRIDAY) {
+            return now.getHour() >= 23;
+        }
         if (day == java.time.DayOfWeek.SATURDAY) {
             return true;
         }
