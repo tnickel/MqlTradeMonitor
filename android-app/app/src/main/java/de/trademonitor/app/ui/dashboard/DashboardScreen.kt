@@ -111,6 +111,50 @@ fun DashboardScreen(
         accounts.filter { "DEMO".equals(it.type, ignoreCase = true) }
     }
 
+    val updateSelectedAndKnownAccounts = { newAccounts: List<Account> ->
+        val knownIds = sharedPrefs.getStringSet("known_accounts", emptySet()) ?: emptySet()
+        val newKnownIds = knownIds.toMutableSet()
+        var changed = false
+
+        val currentSelectedReal = selectedAccountIdsReal.toMutableSet()
+        val currentSelectedDemo = selectedAccountIdsDemo.toMutableSet()
+
+        var realChanged = false
+        var demoChanged = false
+
+        for (account in newAccounts) {
+            val idStr = account.accountId.toString()
+            if (idStr !in knownIds) {
+                newKnownIds.add(idStr)
+                changed = true
+                
+                // Select new accounts by default
+                if ("DEMO".equals(account.type, ignoreCase = true)) {
+                    currentSelectedDemo.add(idStr)
+                    demoChanged = true
+                } else {
+                    currentSelectedReal.add(idStr)
+                    realChanged = true
+                }
+            }
+        }
+
+        if (changed) {
+            val editor = sharedPrefs.edit().putStringSet("known_accounts", newKnownIds)
+            if (realChanged) {
+                selectedAccountIdsReal = currentSelectedReal
+                editor.putStringSet("summary_accounts_real", currentSelectedReal)
+                editor.putBoolean("summary_configured_real", true)
+            }
+            if (demoChanged) {
+                selectedAccountIdsDemo = currentSelectedDemo
+                editor.putStringSet("summary_accounts_demo", currentSelectedDemo)
+                editor.putBoolean("summary_configured_demo", true)
+            }
+            editor.apply()
+        }
+    }
+
     // Default to all monitored accounts when loaded if not configured
     LaunchedEffect(realAccounts) {
         if (!sharedPrefs.getBoolean("summary_configured_real", false) && realAccounts.isNotEmpty()) {
@@ -124,14 +168,15 @@ fun DashboardScreen(
         }
     }
 
-    
     val fetchAccounts = {
         isLoading = true
         errorMessage = null
         coroutineScope.launch {
             try {
                 val api = ApiClient.getService(context)
-                accounts = api.getAccounts().filter { it.monitored && !"CSV".equals(it.type, ignoreCase = true) }
+                val fetched = api.getAccounts().filter { it.monitored && !"CSV".equals(it.type, ignoreCase = true) }
+                updateSelectedAndKnownAccounts(fetched)
+                accounts = fetched
                 try {
                     val status = api.getSystemStatus()
                     isAdmin = status.isAdmin
@@ -153,7 +198,9 @@ fun DashboardScreen(
             delay(30000)
             try {
                 val api = ApiClient.getService(context)
-                accounts = api.getAccounts().filter { it.monitored && !"CSV".equals(it.type, ignoreCase = true) }
+                val fetched = api.getAccounts().filter { it.monitored && !"CSV".equals(it.type, ignoreCase = true) }
+                updateSelectedAndKnownAccounts(fetched)
+                accounts = fetched
                 try {
                     val status = api.getSystemStatus()
                     isAdmin = status.isAdmin

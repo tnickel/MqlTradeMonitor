@@ -52,6 +52,16 @@ uint g_lastInitRetryTime = 0;            // Cooldown tracker for init retries (m
 int g_initRetryCount = 0;                // Number of init trade list retry attempts
 #define MAX_INIT_RETRIES 5               // Max retries before giving up
 
+//--- History sync tracking
+string g_lastSyncedCloseTime = "";       // Last close time successfully synced to server
+string GV_LAST_SYNC_TIME = "";           // Stores last synced close time as string hash
+
+//--- EA Log tracking
+int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
+string GV_TRADELIST_SENT = "";           // GlobalVariable name for persisting trade list sync status
+string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
+string GV_LAST_LOG_DATE = "";            // GlobalVariable name for persisting the log date format YYYYMMDD
+
 //--- Reconnect tracking
 int g_reconnectAttempts = 0;             // Number of reconnect attempts
 bool g_extendedRetryMode = false;        // Whether we are in the 15-minute extended retry phase
@@ -872,9 +882,12 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                      // Find the IN deal for open data and its commission
                      if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(otherTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
                      {
-                        // Only add the IN deal's commission to the OUT deal's commission
-                        // (NOT other OUT deals, which would cause double-counting on partial closes)
-                        totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION);
+                        // Proportional allocation of IN deal commission to avoid double-counting on partial closes
+                        double inVol = HistoryDealGetDouble(otherTicket, DEAL_VOLUME);
+                        double outVol = HistoryDealGetDouble(ticket, DEAL_VOLUME);
+                        double proportion = (inVol > 0) ? (outVol / inVol) : 1.0;
+                        if(proportion > 1.0) proportion = 1.0;
+                        totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION) * proportion;
                         
                         ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(otherTicket, DEAL_TYPE);
                         typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";

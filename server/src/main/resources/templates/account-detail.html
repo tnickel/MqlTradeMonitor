@@ -1158,7 +1158,13 @@
 
             <!-- ======= OPEN TRADES ======= -->
             <section class="trades-section">
-                <h2>📈 Offene Positionen</h2>
+                <h2>📈 Offene Positionen
+                    <span th:if="${#lists.size(account.openTrades) > 0}"
+                          th:class="${account.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}"
+                          style="font-size: 1.1rem; font-weight: bold; margin-left: 15px;"
+                          th:text="'(Gesamt: ' + (${account.totalProfit > 0} ? '+' : '') + ${#numbers.formatDecimal(account.totalProfit, 1, 2)} + ' ' + ${account.currency} + ')'">
+                    </span>
+                </h2>
 
                 <div th:if="${#lists.size(account.openTrades) == 0}" class="no-trades">
                     <p>Keine offenen Positionen</p>
@@ -1275,11 +1281,12 @@
                                 <th>Commission</th>
                                 <th>Profit</th>
                                 <th>Magic</th>
+                                <th>Comment</th>
                             </tr>
                         </thead>
                         <tbody id="closed-trades-tbody">
                             <tr>
-                                <td colspan="12" style="text-align: center; padding: 2rem; color: #a0a0c0;">
+                                <td colspan="13" style="text-align: center; padding: 2rem; color: #a0a0c0;">
                                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                                         <div style="width: 20px; height: 20px; border: 3px solid rgba(99,102,241,0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                                         Lade historische Trades...
@@ -1299,9 +1306,16 @@
                             </span>
                             <span th:if="${accountTradeCount == 0}">Keine Trades für diesen Account vorhanden.</span>
                         </div>
-                        <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px;">
-                            <span>📥</span> Export all Trades (CSV)
-                        </button>
+                        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; width: 100%;">
+                            <button class="view-toggle-btn" th:onclick="'window.location.href=\'/api/trades/export/csv/' + ${account.accountId} + '\''" th:disabled="${accountTradeCount == 0}" style="background: var(--accent-primary); color: white; border-color: var(--accent-primary); padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                                <span>📥</span> Export all Trades (CSV)
+                            </button>
+                            <a th:href="@{/trade-comparison(accountA=${account.accountId})}" class="view-toggle-btn" style="background: rgba(122, 162, 247, 0.15); color: var(--accent); border: 1px solid rgba(122, 162, 247, 0.4); padding: 10px 20px; text-decoration: none; cursor: pointer; border-radius: 8px; font-weight: 600; min-width: 200px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.3s ease;"
+                               onmouseover="this.style.background='rgba(122, 162, 247, 0.25)'; this.style.borderColor='rgba(122, 162, 247, 0.6)';"
+                               onmouseout="this.style.background='rgba(122, 162, 247, 0.15)'; this.style.borderColor='rgba(122, 162, 247, 0.4)';">
+                                <span>⚖️</span> Trade Compare
+                            </a>
+                        </div>
                     </div>
                 </div>
 
@@ -2558,6 +2572,7 @@
                             <td>${fmtNum(trade.commission)}</td>
                             <td class="profit-cell ${profitClass}">${trade.profit >= 0 ? '+'+fmtNum(trade.profit) : fmtNum(trade.profit)}</td>
                             <td>${trade.magicNumber}</td>
+                            <td class="trade-comment">${trade.comment || ''}</td>
                         </tr>`;
             }
             tbody.innerHTML = html;
@@ -5355,7 +5370,7 @@
         var weekdayOpenChart = null;
         var weekdayCloseChart = null;
 
-        function formatDuration(hours) {
+        function formatDurationHours(hours) {
             if (hours === null || isNaN(hours) || hours < 0) return '-';
             if (hours < 1) {
                 var mins = Math.round(hours * 60);
@@ -5460,12 +5475,12 @@
             var minDurEl = document.getElementById('stats-duration-min');
             var medianAllEl = document.getElementById('stats-duration-median-all');
 
-            if (avgAllEl) avgAllEl.textContent = formatDuration(avgAll);
-            if (avgWinEl) avgWinEl.textContent = formatDuration(avgWin);
-            if (avgLossEl) avgLossEl.textContent = formatDuration(avgLoss);
-            if (maxDurEl) maxDurEl.textContent = formatDuration(maxDur);
-            if (minDurEl) minDurEl.textContent = formatDuration(minDur);
-            if (medianAllEl) medianAllEl.textContent = formatDuration(medianAll);
+            if (avgAllEl) avgAllEl.textContent = formatDurationHours(avgAll);
+            if (avgWinEl) avgWinEl.textContent = formatDurationHours(avgWin);
+            if (avgLossEl) avgLossEl.textContent = formatDurationHours(avgLoss);
+            if (maxDurEl) maxDurEl.textContent = formatDurationHours(maxDur);
+            if (minDurEl) minDurEl.textContent = formatDurationHours(minDur);
+            if (medianAllEl) medianAllEl.textContent = formatDurationHours(medianAll);
 
             var ctxScatter = document.getElementById('duration-profit-scatter-chart');
             if (ctxScatter) {
@@ -5505,7 +5520,7 @@
                                 callbacks: {
                                     label: function(context) {
                                         var pt = context.raw;
-                                        return pt.symbol + ' (Ticket ' + pt.ticket + '): ' + pt.y.toFixed(2) + ' ' + accountCurrency + ' / Haltedauer: ' + formatDuration(pt.x);
+                                        return pt.symbol + ' (Ticket ' + pt.ticket + '): ' + pt.y.toFixed(2) + ' ' + accountCurrency + ' / Haltedauer: ' + formatDurationHours(pt.x);
                                     }
                                 }
                             }

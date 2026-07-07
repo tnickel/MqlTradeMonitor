@@ -59,12 +59,27 @@ public class UserService {
             }
         } else {
             UserEntity existingAdmin = existingAdminOpt.get();
+            boolean updated = false;
+
+            // If a custom admin password is set in application.properties and doesn't match the DB, update it
+            if (defaultAdminPassword != null && !defaultAdminPassword.trim().isEmpty() && !"password".equals(defaultAdminPassword)) {
+                if (!passwordEncoder.matches(defaultAdminPassword, existingAdmin.getPassword())) {
+                    existingAdmin.setPassword(passwordEncoder.encode(defaultAdminPassword));
+                    updated = true;
+                    System.out.println("Updated admin password in DB to match new value from properties.");
+                }
+            }
+
             // Restore default key for the admin user if it was rotated or missing
             // This is required to keep backward compatibility with existing production clients.
             if (!"jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4".equals(existingAdmin.getApiKey())) {
                 existingAdmin.setApiKey("jILus66S1hLrd8m0i_pgoiCQIc6JuA3asfM328UGFQ4");
-                userRepository.save(existingAdmin);
+                updated = true;
                 System.out.println("Restored default key for admin user to match existing production clients.");
+            }
+
+            if (updated) {
+                userRepository.save(existingAdmin);
             }
         }
     }
