@@ -431,13 +431,20 @@
                 <!-- Magic Number Filter Bar -->
                 <div id="magic-filter-bar" th:if="${#lists.size(account.closedTrades) > 0}" style="display: flex; flex-direction: column; gap: 8px; padding: 1.25rem; background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                        <span style="color: #fff; font-size: 0.9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">🎯 Magic Filter:</span>
+                        <span onclick="toggleMagicFilter()" title="Zum Auf-/Zuklappen klicken" style="color: #fff; font-size: 0.9rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                            <span id="magic-filter-arrow" style="display: inline-block; transition: transform 0.2s ease; font-size: 0.8rem; color: var(--text-muted);">▶</span>
+                            🎯 Magic Filter:
+                            <span id="magic-filter-count" style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border-color);">aufklappen</span>
+                        </span>
                         <div style="display: flex; gap: 6px;">
                             <button type="button" id="magic-select-all" onclick="toggleAllMagics(true)" style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Alle</button>
                             <button type="button" id="magic-select-none" onclick="toggleAllMagics(false)" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">Keine</button>
                         </div>
                     </div>
-                    <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+                    <!-- Collapsed by default: this grid can hold hundreds of magic numbers -->
+                    <div id="magic-filter-collapse" style="display: none;">
+                        <div id="magic-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+                    </div>
                 </div>
 
                 <!-- Symbol Filter Bar -->
@@ -3123,6 +3130,38 @@
                 container.appendChild(label);
             });
             updateFilterSummary();
+
+            // Refresh the collapse header badge with the actual magic count
+            var mfCount = document.getElementById('magic-filter-count');
+            if (mfCount) {
+                var mfBox = document.getElementById('magic-filter-collapse');
+                var mfOpen = mfBox && mfBox.style.display !== 'none';
+                mfCount.textContent = magicFilterCountLabel(mfOpen);
+            }
+        }
+
+        // Magic filter is collapsed by default (it can list hundreds of magics).
+        function magicFilterCountLabel(open) {
+            var n = document.querySelectorAll('#magic-checkboxes .magic-checkbox').length;
+            if (n <= 0) return open ? 'zuklappen' : 'aufklappen';
+            return open ? (n + ' Magics – zuklappen') : (n + ' Magics – aufklappen');
+        }
+
+        function toggleMagicFilter() {
+            var box = document.getElementById('magic-filter-collapse');
+            var arrow = document.getElementById('magic-filter-arrow');
+            var count = document.getElementById('magic-filter-count');
+            if (!box) return;
+            var isOpen = box.style.display !== 'none';
+            if (isOpen) {
+                box.style.display = 'none';
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+                if (count) count.textContent = magicFilterCountLabel(false);
+            } else {
+                box.style.display = 'block';
+                if (arrow) arrow.style.transform = 'rotate(90deg)';
+                if (count) count.textContent = magicFilterCountLabel(true);
+            }
         }
 
         function toggleAllMagics(selectAll) {
