@@ -36,12 +36,13 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
 
         // Brute-force check for login endpoints (Web and API)
         String uri = request.getRequestURI();
-        if (("POST".equalsIgnoreCase(request.getMethod()) && (uri.equals("/login") || uri.equals("/api/login")))) {
+        if (("POST".equalsIgnoreCase(request.getMethod())
+                && (uri.equals("/login") || uri.equals("/api/login") || uri.equals("/api/demo-login")))) {
             String ip = getClientIP(request);
             if (bruteForceService.isBlocked(ip)) {
                 long remaining = bruteForceService.getRemainingLockoutSeconds(ip);
                 response.setStatus(429);
-                if (uri.equals("/api/login")) {
+                if (uri.equals("/api/login") || uri.equals("/api/demo-login")) {
                     response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(
                             "{\"error\":\"Zu viele fehlgeschlagene Login-Versuche. Bitte versuchen Sie es in " 

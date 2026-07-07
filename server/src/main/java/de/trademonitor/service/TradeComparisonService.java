@@ -61,6 +61,8 @@ public class TradeComparisonService {
             allDemoTrades.addAll(closedTradeRepository.findByAccountId(demoAcc.getAccountId()));
         }
 
+        Set<Long> matchedDemoTickets = new HashSet<>();
+
         for (Account realAcc : realAccounts) {
             List<ClosedTradeEntity> realTrades = closedTradeRepository.findByAccountId(realAcc.getAccountId());
 
@@ -81,9 +83,10 @@ public class TradeComparisonService {
                 dto.setRealAccountName(realAcc.getName());
 
                 // Find matching demo trade
-                ClosedTradeEntity matchedDemo = findMatchingDemoTrade(realTrade, allDemoTrades);
+                ClosedTradeEntity matchedDemo = findMatchingDemoTrade(realTrade, allDemoTrades, matchedDemoTickets);
 
                 if (matchedDemo != null) {
+                    matchedDemoTickets.add(matchedDemo.getTicket());
                     dto.setDemoTrade(matchedDemo);
                     // Get demo account name
                     Account matchedDemoAcc = demoAccounts.stream()
@@ -134,7 +137,8 @@ public class TradeComparisonService {
         }
     }
 
-    private ClosedTradeEntity findMatchingDemoTrade(ClosedTradeEntity realTrade, List<ClosedTradeEntity> demoTrades) {
+    private ClosedTradeEntity findMatchingDemoTrade(ClosedTradeEntity realTrade, List<ClosedTradeEntity> demoTrades,
+            Set<Long> matchedDemoTickets) {
         if (realTrade.getOpenTime() == null || realTrade.getSymbol() == null || realTrade.getType() == null) {
             return null;
         }
@@ -143,21 +147,20 @@ public class TradeComparisonService {
         try {
             realOpenTime = LocalDateTime.parse(realTrade.getOpenTime(), formatter);
         } catch (Exception e) {
-            return null; // Cannot parse time
+            return null;
         }
 
         ClosedTradeEntity bestMatch = null;
         long smallestDiff = Long.MAX_VALUE;
 
         for (ClosedTradeEntity demoTrade : demoTrades) {
-            if (demoTrade.getOpenTime() == null)
-                continue;
+            if (matchedDemoTickets.contains(demoTrade.getTicket())) continue;
+            if (demoTrade.getOpenTime() == null) continue;
 
-            // 1. Symbol and Type MUST match
             String rSym = normalizeSymbol(realTrade.getSymbol().toUpperCase());
             String dSym = normalizeSymbol(demoTrade.getSymbol().toUpperCase());
             if (!rSym.contains(dSym) && !dSym.contains(rSym)) continue;
-            if (!realTrade.getType().equalsIgnoreCase(demoTrade.getType())) continue;
+            if (!typesMatch(realTrade.getType(), demoTrade.getType())) continue;
 
             try {
                 LocalDateTime demoOpenTime = LocalDateTime.parse(demoTrade.getOpenTime(), formatter);
@@ -208,12 +211,13 @@ public class TradeComparisonService {
         double openDiff = real.getOpenPrice() - demo.getOpenPrice();
         double closeDiff = real.getClosePrice() - demo.getClosePrice();
 
-        if ("BUY".equalsIgnoreCase(real.getType())) {
-            dto.setOpenSlippage(openDiff); // Real bought higher than Demo -> Bad (Positive)
-            dto.setCloseSlippage(closeDiff * -1); // Real sold lower than Demo -> Bad (Positive)
-        } else if ("SELL".equalsIgnoreCase(real.getType())) {
-            dto.setOpenSlippage(openDiff * -1); // Real sold lower than Demo -> Bad (Positive)
-            dto.setCloseSlippage(closeDiff); // Real bought higher than demo -> Bad (Positive)
+        String normalizedType = normalizeTradeType(real.getType());
+        if ("BUY".equals(normalizedType)) {
+            dto.setOpenSlippage(openDiff);
+            dto.setCloseSlippage(closeDiff * -1);
+        } else if ("SELL".equals(normalizedType)) {
+            dto.setOpenSlippage(openDiff * -1);
+            dto.setCloseSlippage(closeDiff);
         }
 
         // Format for display: precision to 5 decimals. Very tiny slippage counts as 0.
@@ -306,7 +310,7 @@ public class TradeComparisonService {
                 String symA = normalizeSymbol(tradeA.getSymbol().toUpperCase());
                 String symB = normalizeSymbol(tradeB.getSymbol().toUpperCase());
                 if (!symA.contains(symB) && !symB.contains(symA)) continue;
-                if (!tradeA.getType().equalsIgnoreCase(tradeB.getType())) continue;
+                if (!typesMatch(tradeA.getType(), tradeB.getType())) continue;
 
                 try {
                     LocalDateTime openTimeB = LocalDateTime.parse(tradeB.getOpenTime(), formatter);
@@ -394,10 +398,10 @@ public class TradeComparisonService {
         double openDiff = tradeA.getOpenPrice() - tradeB.getOpenPrice();
         double closeDiff = tradeA.getClosePrice() - tradeB.getClosePrice();
 
-        if ("BUY".equalsIgnoreCase(tradeA.getType())) {
+        if ("BUY".equals(normalizeTradeType(tradeA.getType()))) {
             dto.setOpenSlippage(openDiff); 
             dto.setCloseSlippage(closeDiff * -1);
-        } else if ("SELL".equalsIgnoreCase(tradeA.getType())) {
+        } else if ("SELL".equals(normalizeTradeType(tradeA.getType()))) {
             dto.setOpenSlippage(openDiff * -1); 
             dto.setCloseSlippage(closeDiff);
         }
@@ -433,6 +437,20 @@ public class TradeComparisonService {
             return dto.getTradeB().getCloseTime();
         }
         return null;
+    }
+
+    private String normalizeTradeType(String type) {
+        if (type == null) return null;
+        String t = type.trim().toUpperCase();
+        if ("0".equals(t) || "BUY".equals(t)) return "BUY";
+        if ("1".equals(t) || "SELL".equals(t)) return "SELL";
+        return t;
+    }
+
+    private boolean typesMatch(String typeA, String typeB) {
+        String a = normalizeTradeType(typeA);
+        String b = normalizeTradeType(typeB);
+        return a != null && a.equals(b);
     }
 
     /**

@@ -109,8 +109,8 @@ Der Client ist ein nativer MetaTrader 5 Expert Advisor (Version 1.04), entwickel
 |---|---|---|
 | **AccountManager** | On-Demand | In-Memory Account-Cache, Account-/Trade-Verwaltung, Sektions-Management, Magic-Number-Profit-Berechnung |
 | **TradeStorage** | On-Demand | DB-Persistenz fuer Trades und Equity-Snapshots (Rate-limitiert: 1x/Min, Auto-Cleanup >90 Tage) |
-| **TradeSyncService** | 1 Sekunde | REAL/DEMO-Sync-Check mit zweistufigem Matching (Strict: Symbol+Typ+Zeit; Fallback: Symbol+Typ+SL) |
-| **TradeComparisonService** | On-Demand | Slippage- und Delay-Analyse fuer Copy-Trading (Matching ueber 120s-Zeitfenster) |
+| **CopierVerificationService** | konfigurierbar (Standard: 1 Min.) | Copier-Sync-Pruefung mit 3-stufigem Matching; Fehler werden gesammelt statt vorab geloescht |
+| **TradeComparisonService** | On-Demand | Slippage- und Delay-Analyse fuer Copy-Trading (Matching ueber 120s-Zeitfenster, 1:1 Demo-Zuordnung) |
 | **OpenProfitAlarmService** | 5 Sekunden | Schwellwert-Monitoring (absolut/prozentual) mit Latch-Logik gegen Alarm-Fluten |
 | **LlmService** | On-Demand | KI-gestuetzte Trade-Bewertung und Risiko-Analyse via OpenRouter API |
 | **GlobalConfigService** | On-Demand | Zentrale Key-Value-Konfiguration (25+ Parameter), persistiert in DB |

@@ -19,7 +19,7 @@ MqlTradeMonitor/
 │       │   ├── service/                 # Geschäftslogik (11 Services)
 │       │   │   ├── AccountManager.java        # In-Memory Cache + Hauptlogik
 │       │   │   ├── TradeStorage.java          # DB-Persistenz
-│       │   │   ├── TradeSyncService.java      # REAL/DEMO Sync-Check
+│       │   │   ├── CopierVerificationService.java # Copier-Sync-Check
 │       │   │   ├── TradeComparisonService.java# Trade-Vergleich
 │       │   │   ├── OpenProfitAlarmService.java# Open-Profit-Alarm
 │       │   │   ├── GlobalConfigService.java   # Konfigurationsverwaltung
@@ -104,16 +104,24 @@ Controller (HTTP) → Service (Logik) → Repository (DB)
 
 Der `AccountManager` hält alle Accounts im Speicher für schnellen Dashboard-Zugriff:
 
-1. **Startup**: Accounts werden aus der DB geladen.
-2. **Updates**: Änderungen werden sofort im Cache und asynchron in der DB aktualisiert.
-3. **Reads**: Dashboard liest immer aus dem Cache (keine DB-Abfrage).
+1. **Startup**: Accounts werden aus der DB geladen; der broker-spezifische **Commission-Faktor** wird sofort gesetzt.
+2. **Updates**: Änderungen werden **zuerst in der DB** persistiert, danach im In-Memory-Cache aktualisiert (konsistenter Zustand bei DB-Fehlern).
+3. **Auto-Register**: Fehlende Accounts werden beim ersten autorisierten EA-Request automatisch angelegt (`ensureAccountExists`).
+4. **Reads**: Dashboard liest immer aus dem Cache (keine DB-Abfrage pro Kachel).
+
+**Wichtige Methoden:**
+- `initTrades()` – atomares Initial-Upload (Open + Closed in einer `@Transactional`-Methode)
+- `updateHeartbeat()` – persistiert `lastSeen` in DB und Memory
+- `isWeekendForAccount()` – Broker-Zeit via Server-Offset für Alarm-Unterdrückung
 
 ### 2.3 Scheduled Tasks
 
 | Service | Intervall | Aufgabe |
 |---|---|---|
-| `TradeSyncService` | 1 Sekunde | Sync-Check REAL vs. DEMO |
+| `CopierVerificationService` | konfigurierbar (Standard: 1 Min.) | Copier-Sync-Prüfung REAL vs. Source-Accounts |
 | `OpenProfitAlarmService` | 5 Sekunden | Open-Profit-Schwellwert prüfen |
+| `AccountManager.checkAccountsOffline()` | 2 Minuten | Offline-Alarm für REAL-Konten (Homey) |
+| `AccountManager.scheduledCacheRefresh()` | 5 Minuten | Performance-Caches aktualisieren |
 | `LogCleanupService` | Täglich 2:00 Uhr | Alte Logs bereinigen |
 
 ### 2.4 Equity-Snapshots

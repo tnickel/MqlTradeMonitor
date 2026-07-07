@@ -73,7 +73,11 @@ Initialer vollständiger Trade-Upload beim ersten Verbinden oder Reconnect. Enth
 
 **Response:** `200 OK`
 
-**Hinweis:** Geschlossene Trades werden mit Duplikat-Prüfung gespeichert (accountId + ticket = unique key).
+**Hinweis:** Open Trades und geschlossene History werden in **einer atomaren Transaktion** gespeichert. Geschlossene Trades werden mit Duplikat-Prüfung gespeichert (accountId + ticket = unique key). Duplikate innerhalb eines einzelnen Payloads werden ebenfalls erkannt.
+
+**Auto-Register:** Wenn der Account noch nicht existiert (z. B. `/api/register` wurde übersprungen), wird er beim ersten autorisierten Daten-Upload automatisch mit Broker `Unknown` und Währung `USD` angelegt.
+
+**Validierung:** `equity` und `balance` müssen endliche Zahlen sein (`400 Bad Request` bei NaN/Infinity).
 
 ---
 
@@ -109,11 +113,15 @@ Inkrementelles Trade-Update nach der Initialisierung. Enthält nur offene Trades
 
 **Response:** `200 OK`
 
+**Validierung:** `equity` und `balance` müssen endliche Zahlen sein. Leerer oder fehlender Request-Body → `400 Bad Request`.
+
 ---
 
 ### POST `/api/heartbeat`
 
-Keep-Alive-Signal vom MetaTrader Client. Aktualisiert den `lastSeen`-Zeitstempel.
+Keep-Alive-Signal vom MetaTrader Client. Aktualisiert den `lastSeen`-Zeitstempel **im In-Memory-Cache und in der Datenbank** (überlebt Server-Neustarts).
+
+Der Broker-Zeitstempel wird genutzt, um den Server-Zeit-Offset zu berechnen (`serverTime − brokerTime`). Broker-Zeit = `serverTime − offset` (für Wochenend-Unterdrückung von Offline- und Copier-Alarmen).
 
 **Request Body:**
 ```json
@@ -159,7 +167,9 @@ Inkrementelles Update geschlossener Trades (Historien-Synchronisation).
 
 **Response:** `200 OK`
 
-**Hinweis:** Duplikate (gleiche accountId + ticket) werden automatisch übersprungen.
+**Hinweis:** Duplikate (gleiche accountId + ticket) werden automatisch übersprungen – auch mehrfach im selben Payload.
+
+**Auto-Register:** Fehlende Accounts werden beim ersten autorisierten Request automatisch angelegt.
 
 ---
 

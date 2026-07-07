@@ -147,6 +147,9 @@ MqlTradeMonitor/
 - **Equity-Kurve:** Gespeicherte Snapshots aus `equity_snapshots` Tabelle (max. 1x/Min.)
 - **Magic Numbers:** Identifizieren Strategien/EAs; können in Admin mit Namen/Kommentaren versehen werden
 - **Sync-Status:** Real-Trades erhalten nach Synccheck einen von 3 Stati: `MATCHED` ✅, `WARNING` ⚠️, `EXEMPTED` 🟠
+- **Trade-Typen:** MT5 sendet teils `0`/`1` statt `BUY`/`SELL` – Server normalisiert für Copier- und Vergleichslogik
+- **Commission-Faktor:** Broker-spezifisch, wird beim Account-Laden gesetzt (nicht erst auf der Detail-Seite)
+- **EA Auto-Register:** Accounts werden beim ersten autorisierten Daten-Upload angelegt, falls `/api/register` fehlt
 - **Sync-Ausnahmen:** Magic Numbers im Admin unter "🟠 Synccheck Ausnahmen" eintragen → kein Alarm, Anzeige orange. Config-Key: `SYNC_EXEMPT_MAGIC_NUMBERS` (kommagetrennte Zahlen)
 - **Sections:** Dashboard-Accounts sind in benannten Sektionen organisiert (DashboardSectionEntity)
 - **Filter-Ranges:** `today`, `1week`, `1month`, `thismonth`, `6months`, `thisyear`, `1year`, `all`

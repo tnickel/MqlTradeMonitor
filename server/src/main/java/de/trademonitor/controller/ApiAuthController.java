@@ -31,6 +31,9 @@ public class ApiAuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials, HttpServletRequest request) {
+        if (credentials == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Request body required"));
+        }
         try {
             String username = credentials.get("username");
             String password = credentials.get("password");
@@ -57,10 +60,16 @@ public class ApiAuthController {
     public ResponseEntity<?> demoLogin(HttpServletRequest request) {
         try {
             String demoUsername = "demouser";
-            
-            UserEntity demoUser = userService.getUserByUsername(demoUsername).orElseGet(() -> {
-                return userService.createUser(demoUsername, UUID.randomUUID().toString(), "ROLE_DEMO", new HashSet<>());
-            });
+
+            UserEntity demoUser = userService.getUserByUsername(demoUsername).orElse(null);
+            if (demoUser == null) {
+                try {
+                    demoUser = userService.createUser(demoUsername, UUID.randomUUID().toString(), "ROLE_DEMO", new HashSet<>());
+                } catch (IllegalArgumentException e) {
+                    demoUser = userService.getUserByUsername(demoUsername)
+                            .orElseThrow(() -> new IllegalStateException("Demo user could not be created"));
+                }
+            }
 
             CustomUserDetails userDetails = new CustomUserDetails(demoUser);
             Authentication authentication = new UsernamePasswordAuthenticationToken(

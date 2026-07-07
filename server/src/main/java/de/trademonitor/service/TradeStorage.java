@@ -237,6 +237,7 @@ public class TradeStorage {
                 entity.setComment(trade.getComment());
                 entity.setSl(trade.getSl());
                 toInsert.add(entity);
+                existingTicketsSet.add(trade.getTicket());
             }
         }
 
@@ -385,6 +386,17 @@ public class TradeStorage {
             entity.setEquity(equity);
             entity.setBalance(balance);
             entity.setLastSeen(LocalDateTime.now().toString());
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
+     * Persist lastSeen only (lightweight heartbeat update).
+     */
+    public void updateLastSeen(long accountId, LocalDateTime lastSeen) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity != null) {
+            entity.setLastSeen(lastSeen.toString());
             accountRepository.save(entity);
         }
     }

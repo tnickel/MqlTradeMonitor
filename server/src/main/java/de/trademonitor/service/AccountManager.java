@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
@@ -156,6 +157,7 @@ public class AccountManager {
                 saveAccountSection(account.getAccountId(), targetSectionId, account.getDisplayOrder());
             }
 
+            applyCommissionFactor(account);
             accounts.put(ae.getAccountId(), account);
             LOG.info("Loaded account " + ae.getAccountId() + " from DB");
         }
@@ -205,6 +207,50 @@ public class AccountManager {
         }
     }
 
+    private void applyCommissionFactor(Account account) {
+        if (account != null && account.getBroker() != null) {
+            account.setCommissionFactor(globalConfigService.getBrokerCommissionFactor(account.getBroker()));
+        }
+    }
+
+    /**
+     * Auto-register account on first EA data if /api/register was skipped.
+     */
+    private void ensureAccountExists(long accountId, Double balance, String broker, String currency) {
+        if (accounts.containsKey(accountId)) {
+            return;
+        }
+        synchronized (getAccountLock(accountId)) {
+            if (accounts.containsKey(accountId)) {
+                return;
+            }
+            String resolvedBroker = (broker != null && !broker.isBlank()) ? broker : "Unknown";
+            String resolvedCurrency = (currency != null && !currency.isBlank()) ? currency : "USD";
+            double resolvedBalance = (balance != null && Double.isFinite(balance)) ? balance : 0.0;
+            createAccountInMemoryAndDb(accountId, resolvedBroker, resolvedCurrency, resolvedBalance);
+            LOG.info("Auto-registered account " + accountId + " on first EA data");
+        }
+    }
+
+    private void createAccountInMemoryAndDb(long accountId, String broker, String currency, double balance) {
+        Account account = new Account(accountId, broker, currency, balance);
+        if (!sectionsCache.isEmpty()) {
+            Long defaultSecId = sectionsCache.keySet().iterator().next();
+            Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                    .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+            if (first.isPresent()) {
+                defaultSecId = first.get().getId();
+            }
+            account.setSectionId(defaultSecId);
+        }
+        applyCommissionFactor(account);
+        accounts.put(accountId, account);
+        tradeStorage.saveAccount(accountId, broker, currency, balance);
+        if (account.getSectionId() != null) {
+            tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+        }
+    }
+
     /**
      * Register or update an account.
      */
@@ -212,32 +258,15 @@ public class AccountManager {
         synchronized (getAccountLock(accountId)) {
             Account account = accounts.get(accountId);
             if (account == null) {
-                account = new Account(accountId, broker, currency, balance);
-                // Assign to first section by default
-                if (!sectionsCache.isEmpty()) {
-                    Long defaultSecId = sectionsCache.keySet().iterator().next();
-                    // Try to find the one with order 0
-                    Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
-                            .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
-                    if (first.isPresent())
-                        defaultSecId = first.get().getId();
-
-                    account.setSectionId(defaultSecId);
-                }
-
-                accounts.put(accountId, account);
+                createAccountInMemoryAndDb(accountId, broker, currency, balance);
                 LOG.info("New account registered: " + accountId + " (" + broker + ")");
             } else {
                 account.setBroker(broker);
                 account.setCurrency(currency);
                 account.setBalance(balance);
                 account.setLastSeen(LocalDateTime.now());
-            }
-            // Persist to DB
-            tradeStorage.saveAccount(accountId, broker, currency, balance);
-            // Also persist section if it was new
-            if (account.getSectionId() != null) {
-                tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+                applyCommissionFactor(account);
+                tradeStorage.saveAccount(accountId, broker, currency, balance);
             }
         }
     }
@@ -390,31 +419,68 @@ public class AccountManager {
     }
 
     public void updateTrades(long accountId, List<Trade> trades, double equity, double balance) {
+        ensureAccountExists(accountId, balance, null, null);
         Account account = accounts.get(accountId);
-        if (account != null) {
-            synchronized (getAccountLock(accountId)) {
-                account.setOpenTrades(trades != null ? trades : new ArrayList<>());
-                account.setEquity(equity);
-                account.setBalance(balance);
-                account.setLastSeen(LocalDateTime.now());
-
-                // Persist to DB
-                tradeStorage.replaceOpenTrades(accountId, trades);
-                tradeStorage.updateAccountMetrics(accountId, equity, balance);
-            }
-
-            // Save equity snapshot for chart (rate-limited to once per minute)
-            tradeStorage.saveEquitySnapshot(accountId, equity, balance);
+        if (account == null) {
+            return;
         }
+        synchronized (getAccountLock(accountId)) {
+            tradeStorage.replaceOpenTrades(accountId, trades);
+            tradeStorage.updateAccountMetrics(accountId, equity, balance);
+
+            account.setOpenTrades(trades != null ? trades : new ArrayList<>());
+            account.setEquity(equity);
+            account.setBalance(balance);
+            account.setLastSeen(LocalDateTime.now());
+        }
+
+        tradeStorage.saveEquitySnapshot(accountId, equity, balance);
+    }
+
+    /**
+     * Atomic init: open trades + closed history in one transaction, memory updated after DB.
+     */
+    @Transactional
+    public int initTrades(long accountId, List<Trade> trades, List<ClosedTrade> closedTrades,
+            double equity, double balance) {
+        ensureAccountExists(accountId, balance, null, null);
+        Account account = accounts.get(accountId);
+        if (account == null) {
+            return 0;
+        }
+        int inserted;
+        synchronized (getAccountLock(accountId)) {
+            tradeStorage.replaceOpenTrades(accountId, trades);
+            tradeStorage.updateAccountMetrics(accountId, equity, balance);
+            inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
+
+            account.setOpenTrades(trades != null ? trades : new ArrayList<>());
+            account.setEquity(equity);
+            account.setBalance(balance);
+            account.setLastSeen(LocalDateTime.now());
+            if (inserted > 0) {
+                account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
+            }
+        }
+
+        tradeStorage.saveEquitySnapshot(accountId, equity, balance);
+        if (inserted > 0) {
+            cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+            refreshDailyProfitForAccount(accountId);
+        }
+        return inserted;
     }
 
     /**
      * Update heartbeat for an account.
      */
     public void updateHeartbeat(long accountId) {
+        ensureAccountExists(accountId, null, null, null);
         Account account = accounts.get(accountId);
         if (account != null) {
-            account.setLastSeen(LocalDateTime.now());
+            LocalDateTime now = LocalDateTime.now();
+            account.setLastSeen(now);
+            tradeStorage.updateLastSeen(accountId, now);
         }
     }
 
@@ -637,11 +703,11 @@ public class AccountManager {
         return timeoutSeconds;
     }
 
-    private boolean isWeekendForAccount(Account account) {
+    public boolean isWeekendForAccount(Account account) {
         Long offset = account.getServerTimeOffsetSeconds();
         LocalDateTime localTime = LocalDateTime.now();
         if (offset != null) {
-            localTime = localTime.plusSeconds(offset);
+            localTime = localTime.minusSeconds(offset);
         }
         java.time.DayOfWeek day = localTime.getDayOfWeek();
         return day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY;
@@ -693,6 +759,7 @@ public class AccountManager {
     }
 
     public int updateHistory(long accountId, List<ClosedTrade> closedTrades) {
+        ensureAccountExists(accountId, null, null, null);
         Account account = accounts.get(accountId);
         if (account != null && closedTrades != null) {
             int inserted;

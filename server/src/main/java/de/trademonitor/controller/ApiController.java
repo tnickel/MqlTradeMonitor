@@ -52,20 +52,27 @@ public class ApiController {
     private void logClientAction(Long accountId, String action, String message,
             jakarta.servlet.http.HttpServletRequest request) {
         try {
-            // Always increment the daily counter
             java.time.LocalDate today = java.time.LocalDate.now();
-            de.trademonitor.entity.ClientActionCounter counter = clientActionCounterRepository
-                    .findByAccountIdAndActionAndDate(accountId, action, today)
-                    .orElse(null);
-            if (counter != null) {
-                counter.increment();
-                clientActionCounterRepository.save(counter);
-            } else {
-                clientActionCounterRepository.save(
-                        new de.trademonitor.entity.ClientActionCounter(accountId, action, today));
+            for (int attempt = 0; attempt < 3; attempt++) {
+                try {
+                    de.trademonitor.entity.ClientActionCounter counter = clientActionCounterRepository
+                            .findByAccountIdAndActionAndDate(accountId, action, today)
+                            .orElse(null);
+                    if (counter != null) {
+                        counter.increment();
+                        clientActionCounterRepository.save(counter);
+                    } else {
+                        clientActionCounterRepository.save(
+                                new de.trademonitor.entity.ClientActionCounter(accountId, action, today));
+                    }
+                    break;
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    if (attempt == 2) {
+                        throw e;
+                    }
+                }
             }
 
-            // For error actions, also save the full error message
             boolean isError = action.contains("ERROR") || action.equals("AUTH_FAILED");
             if (isError) {
                 String ip = request.getRemoteAddr();
@@ -90,6 +97,10 @@ public class ApiController {
             return true;
         }
         return user.getAllowedAccountIds().contains(accountId);
+    }
+
+    private boolean isValidTradeMetrics(double equity, double balance) {
+        return Double.isFinite(equity) && Double.isFinite(balance);
     }
 
     /**
@@ -169,6 +180,10 @@ public class ApiController {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
         }
 
+        if (!isValidTradeMetrics(request.getEquity(), request.getBalance())) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid equity or balance"));
+        }
+
         if (!isAuthorized(userKey, request.getAccountId())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("status", "error", "message", "Unauthorized"));
@@ -185,17 +200,12 @@ public class ApiController {
             logClientAction(request.getAccountId(), "INIT_TRADES", "Open: " + openCount + ", Closed: " + closedCount,
                     httpRequest);
 
-            // Update open trades
-            accountManager.updateTrades(
+            int newTradesInserted = accountManager.initTrades(
                     request.getAccountId(),
                     request.getTrades(),
+                    request.getClosedTrades(),
                     request.getEquity(),
                     request.getBalance());
-
-            // Save closed trades with duplicate check
-            int newTradesInserted = accountManager.updateHistory(
-                    request.getAccountId(),
-                    request.getClosedTrades());
 
             return ResponseEntity.ok(Map.of(
                     "status", "ok",
@@ -221,6 +231,14 @@ public class ApiController {
             @RequestHeader(value = "X-User-Key", required = false) String userKey,
             @RequestBody TradeUpdateRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
+        }
+
+        if (!isValidTradeMetrics(request.getEquity(), request.getBalance())) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid equity or balance"));
+        }
 
         if (!isAuthorized(userKey, request.getAccountId())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -261,6 +279,10 @@ public class ApiController {
             @RequestHeader(value = "X-User-Key", required = false) String userKey,
             @RequestBody HeartbeatRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
+        }
 
         if (!isAuthorized(userKey, request.getAccountId())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -353,6 +375,10 @@ public class ApiController {
             @RequestHeader(value = "X-User-Key", required = false) String userKey,
             @RequestBody HistoryUpdateRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
+
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
+        }
 
         if (!isAuthorized(userKey, request.getAccountId())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

@@ -103,6 +103,7 @@ Die H2-Datenbank ist mit User `sa` und **leerem Passwort** konfiguriert. Dies is
 ### Funktionsweise
 
 - Verfolgt fehlgeschlagene Login-Versuche pro IP-Adresse.
+- Gilt für `/login`, `/api/login` und `/api/demo-login`.
 - Nach Überschreitung der konfigurierten maximalen Fehlversuche wird die IP temporär gesperrt.
 - Gesperrte IPs erhalten HTTP 429 (Too Many Requests) mit formatierter HTML-Fehlermeldung.
 - Abgelaufene Sperreinträge werden automatisch alle 10 Minuten bereinigt.
