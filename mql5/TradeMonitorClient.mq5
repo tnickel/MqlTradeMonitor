@@ -868,6 +868,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             string openTime = closeTime; // fallback: same as close time
             long magicNumber = HistoryDealGetInteger(ticket, DEAL_MAGIC); // fallback: OUT deal magic number
             double totalCommission = HistoryDealGetDouble(ticket, DEAL_COMMISSION); // start with OUT deal commission
+            string tradeComment = HistoryDealGetString(ticket, DEAL_COMMENT);
             
             long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
             if(positionId > 0)
@@ -896,6 +897,9 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                         // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
                         long inMagic = HistoryDealGetInteger(otherTicket, DEAL_MAGIC);
                         if(inMagic > 0) magicNumber = inMagic;
+                        
+                        string inComment = HistoryDealGetString(otherTicket, DEAL_COMMENT);
+                        if(StringLen(inComment) > 0) tradeComment = inComment;
                         break; // Found matching IN deal, exit loop
                      }
                   }
@@ -921,7 +925,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "\"swap\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_SWAP), 2) + ",";
             historyJson += "\"commission\":" + DoubleToString(totalCommission, 2) + ",";
             historyJson += "\"magicNumber\":" + IntegerToString(magicNumber) + ",";
-            historyJson += "\"comment\":\"" + EscapeJson(HistoryDealGetString(ticket, DEAL_COMMENT)) + "\"";
+            historyJson += "\"comment\":\"" + EscapeJson(tradeComment) + "\"";
             historyJson += "}";
             
             // Progress logging every 100 closed trades

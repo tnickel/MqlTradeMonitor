@@ -532,7 +532,9 @@
                                                     Ausgen.</span>
                                             </span>
                                         </td>
-                                        <td th:text="${trade.comment}" style="color: var(--text-secondary); font-size: 0.9rem;">
+                                        <td th:with="mapped=${magicMappings.get(trade.magicNumber)}, displayComment=${(mapped != null and !#strings.isEmpty(mapped)) ? mapped : (trade.comment ?: '')}"
+                                            th:text="${displayComment}" th:title="${displayComment}"
+                                            style="color: var(--text-secondary); font-size: 0.9rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                                             -</td>
                                     </tr>
                                 </th:block>

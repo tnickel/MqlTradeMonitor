@@ -27,6 +27,23 @@ public class MagicMappingService {
     }
 
     /**
+     * Prefer magic-mapping name, fall back to trade comment from MT5.
+     */
+    public String resolveComment(long magicNumber, String tradeComment, Map<Long, String> mappings) {
+        if (mappings != null) {
+            String mapped = mappings.get(magicNumber);
+            if (mapped != null && !mapped.isBlank()) {
+                return mapped;
+            }
+        }
+        return tradeComment != null ? tradeComment : "";
+    }
+
+    public String resolveComment(long magicNumber, String tradeComment) {
+        return resolveComment(magicNumber, tradeComment, getAllMappings());
+    }
+
+    /**
      * Save a mapping (create or update).
      */
     public void saveMapping(Long magicNumber, String comment) {

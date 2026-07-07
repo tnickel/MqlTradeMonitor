@@ -340,7 +340,13 @@ public class DashboardController {
                 
                 Map<String, Object> groupSummary = new HashMap<>();
                 groupSummary.put("magic", magic);
-                groupSummary.put("name", magicMappings.getOrDefault(magic, "Magic " + magic));
+                groupSummary.put("name", magicMappingService.resolveComment(magic,
+                        trades.stream().map(de.trademonitor.model.Trade::getComment)
+                                .filter(c -> c != null && !c.isBlank()).findFirst().orElse(null),
+                        magicMappings));
+                if (((String) groupSummary.get("name")).isBlank()) {
+                    groupSummary.put("name", "Magic " + magic);
+                }
                 groupSummary.put("sumLots", sumLots);
                 groupSummary.put("sumProfit", sumProfit);
                 groupSummary.put("sumDrawdown", sumDrawdown);
@@ -793,9 +799,27 @@ public class DashboardController {
         if (account == null) {
             return ResponseEntity.notFound().build();
         }
-        // Use the in-memory cache from Account to avoid DB load overhead where possible
-        // The frontend JS will handle sorting and filtering
-        return ResponseEntity.ok(account.getClosedTrades());
+        Map<Long, String> mappings = magicMappingService.getAllMappings();
+        List<Map<String, Object>> payload = new ArrayList<>();
+        for (ClosedTrade ct : account.getClosedTrades()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("ticket", ct.getTicket());
+            row.put("symbol", ct.getSymbol());
+            row.put("type", ct.getType());
+            row.put("volume", ct.getVolume());
+            row.put("openPrice", ct.getOpenPrice());
+            row.put("closePrice", ct.getClosePrice());
+            row.put("openTime", ct.getOpenTime());
+            row.put("closeTime", ct.getCloseTime());
+            row.put("profit", ct.getProfit());
+            row.put("swap", ct.getSwap());
+            row.put("commission", ct.getCommission());
+            row.put("magicNumber", ct.getMagicNumber());
+            row.put("comment", magicMappingService.resolveComment(ct.getMagicNumber(), ct.getComment(), mappings));
+            row.put("sl", ct.getSl());
+            payload.add(row);
+        }
+        return ResponseEntity.ok(payload);
     }
 
     /**
@@ -993,7 +1017,14 @@ public class DashboardController {
             
             Map<String, Object> groupSummary = new HashMap<>();
             groupSummary.put("magic", magic);
-            groupSummary.put("name", mappings.getOrDefault(magic, "Magic " + magic));
+            String groupName = magicMappingService.resolveComment(magic,
+                    trades.stream().map(de.trademonitor.model.Trade::getComment)
+                            .filter(c -> c != null && !c.isBlank()).findFirst().orElse(null),
+                    mappings);
+            if (groupName.isBlank()) {
+                groupName = "Magic " + magic;
+            }
+            groupSummary.put("name", groupName);
             groupSummary.put("sumLots", sumLots);
             groupSummary.put("sumProfit", sumProfit);
             groupSummary.put("sumDrawdown", sumDrawdown);
@@ -2253,7 +2284,7 @@ public class DashboardController {
                 tMap.put("openTime", t.getOpenTime());
                 tMap.put("profit", t.getProfit());
                 tMap.put("magicNumber", t.getMagicNumber());
-                tMap.put("comment", magicMappings.getOrDefault(t.getMagicNumber(), t.getComment()));
+                tMap.put("comment", magicMappingService.resolveComment(t.getMagicNumber(), t.getComment(), magicMappings));
                 openTrades.add(tMap);
             }
 
@@ -2280,7 +2311,7 @@ public class DashboardController {
                     tMap.put("commission", ct.getCommission());
                     tMap.put("netProfit", tradeProfit);
                     tMap.put("magicNumber", ct.getMagicNumber());
-                    tMap.put("comment", magicMappings.getOrDefault(ct.getMagicNumber(), ct.getComment()));
+                    tMap.put("comment", magicMappingService.resolveComment(ct.getMagicNumber(), ct.getComment(), magicMappings));
                     closedTradesToday.add(tMap);
                 }
             }

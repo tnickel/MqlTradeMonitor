@@ -47,12 +47,13 @@
         }
 
         .trade-comment {
-            max-width: 150px;
+            max-width: 220px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
             color: var(--text-muted);
             font-size: 0.8125rem;
+            cursor: help;
         }
 
         .trade-today {
@@ -1576,7 +1577,10 @@
                                                     style="color: #f97316; font-weight: bold; font-size: 0.85rem;">🟠 Ausgen.</span>
                                             </span>
                                         </td>
-                                        <td class="trade-comment" th:text="${trade.comment}">Example Comment</td>
+                                        <td class="trade-comment"
+                                            th:with="mapped=${magicMappings.get(trade.magicNumber)}, displayComment=${(mapped != null and !#strings.isEmpty(mapped)) ? mapped : (trade.comment ?: '')}"
+                                            th:text="${displayComment}"
+                                            th:title="${displayComment}">Example Comment</td>
                                     </tr>
                                 </th:block>
                             </th:block>
@@ -2910,7 +2914,7 @@
                             <td>${fmtNum(trade.commission)}</td>
                             <td class="profit-cell ${profitClass}">${trade.profit >= 0 ? '+'+fmtNum(trade.profit) : fmtNum(trade.profit)}</td>
                             <td>${trade.magicNumber}</td>
-                            <td class="trade-comment">${trade.comment || ''}</td>
+                            <td class="trade-comment" title="${trade.comment || ''}">${trade.comment || ''}</td>
                         </tr>`;
             }
             tbody.innerHTML = html;
