@@ -899,6 +899,48 @@
             var parsedTradesCache = [];
             var tradesCachePrepared = false;
 
+            // Approximate contract size per instrument class, used to estimate the
+            // notional value of a position for the effective-leverage subplot.
+            // NOTE: the real contract size is broker/symbol specific and only known
+            // to MT5 — these are best-effort defaults. The important part is that an
+            // UNKNOWN symbol is NEVER treated as a 100k forex lot (that produced
+            // absurd 1:40000 leverage for index/commodity CFDs). Only genuine
+            // 6-letter currency pairs get the 100000 standard-lot size; everything
+            // else falls back to a small, bounded size.
+            var DD_CCY_CODES = "|USD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|SGD|HKD|NOK|SEK|DKK|PLN|ZAR|MXN|TRY|CNH|CNY|CZK|HUF|RUB|";
+            var DD_INDEX_KEYS = ["US30","DJ30","DOW","WS30","US500","SPX","SP500","US100","NAS100","NAS","NDX","USTEC","TECH100",
+                "GER40","GER30","DE30","DE40","DAX","UK100","FTSE","SPAIN35","ES35","IBEX","FRA40","CAC","EU50","STOXX","ESTX",
+                "JP225","JPN225","NIKKEI","NIK225","HK50","HSI","AUS200","AU200","ASX","US2000","RUSSELL","SWI20","CH20","NL25"];
+
+            function ddContractSizeFor(rawSymbol) {
+                var s = (rawSymbol || "").toUpperCase();
+                // Metals
+                if (s.indexOf("XAU") >= 0 || s.indexOf("GOLD") >= 0) return 100;
+                if (s.indexOf("XAG") >= 0 || s.indexOf("SILVER") >= 0) return 5000;
+                // Crypto (contract size 1)
+                if (s.indexOf("BTC") >= 0 || s.indexOf("XBT") >= 0 || s.indexOf("ETH") >= 0 ||
+                    s.indexOf("LTC") >= 0 || s.indexOf("XRP") >= 0 || s.indexOf("BCH") >= 0 ||
+                    s.indexOf("ADA") >= 0 || s.indexOf("SOL") >= 0 || s.indexOf("DOGE") >= 0) return 1;
+                // Oil / energy (~1000 units per lot)
+                if (s.indexOf("XTI") >= 0 || s.indexOf("WTI") >= 0 || s.indexOf("USOIL") >= 0 ||
+                    s.indexOf("UKOIL") >= 0 || s.indexOf("BRENT") >= 0 || s.indexOf("XBR") >= 0 ||
+                    s.indexOf("XNG") >= 0 || s.indexOf("NGAS") >= 0 || s.indexOf("NATGAS") >= 0) return 1000;
+                // Stock indices (1 unit per point)
+                for (var i = 0; i < DD_INDEX_KEYS.length; i++) {
+                    if (s.indexOf(DD_INDEX_KEYS[i]) >= 0) return 1;
+                }
+                // Genuine 6-letter forex pair (both halves are known ISO currency codes)
+                var m = s.match(/^[A-Z]{6}/);
+                if (m) {
+                    var base = m[0].substring(0, 3), quote = m[0].substring(3, 6);
+                    if (DD_CCY_CODES.indexOf("|" + base + "|") >= 0 && DD_CCY_CODES.indexOf("|" + quote + "|") >= 0) {
+                        return 100000;
+                    }
+                }
+                // Unknown instrument: bounded fallback so leverage can never explode.
+                return 1;
+            }
+
             function prepareTradesCache() {
                 parsedTradesCache = [];
                 if (typeof historyMgr !== 'undefined' && historyMgr.allRows) {
@@ -912,19 +954,7 @@
                         var cTime = Date.parse(t.closeTime.replace(/\./g, '/'));
                         if (isNaN(oTime) || isNaN(cTime)) return;
 
-                        var contractSize = 100000;
-                        var isGold = symbol.indexOf("XAU") >= 0 || symbol.indexOf("GOLD") >= 0;
-                        if (isGold) {
-                            contractSize = 100;
-                        } else if (symbol.indexOf("XAG") >= 0 || symbol.indexOf("SILVER") >= 0) {
-                            contractSize = 5000;
-                        } else if (symbol.indexOf("BTC") >= 0) {
-                            contractSize = 1;
-                        } else if (symbol.indexOf("ETH") >= 0) {
-                            contractSize = 1;
-                        } else if (symbol.indexOf("US30") >= 0 || symbol.indexOf("DE30") >= 0 || symbol.indexOf("GER40") >= 0 || symbol.indexOf("US500") >= 0 || symbol.indexOf("NAS100") >= 0 || symbol.indexOf("USTEC") >= 0) {
-                            contractSize = 10;
-                        }
+                        var contractSize = ddContractSizeFor(symbol);
 
                         parsedTradesCache.push({
                             oTime: oTime,
@@ -947,19 +977,7 @@
                         if (isNaN(oTime)) return;
                         var cTime = Infinity;
 
-                        var contractSize = 100000;
-                        var isGold = symbol.indexOf("XAU") >= 0 || symbol.indexOf("GOLD") >= 0;
-                        if (isGold) {
-                            contractSize = 100;
-                        } else if (symbol.indexOf("XAG") >= 0 || symbol.indexOf("SILVER") >= 0) {
-                            contractSize = 5000;
-                        } else if (symbol.indexOf("BTC") >= 0) {
-                            contractSize = 1;
-                        } else if (symbol.indexOf("ETH") >= 0) {
-                            contractSize = 1;
-                        } else if (symbol.indexOf("US30") >= 0 || symbol.indexOf("DE30") >= 0 || symbol.indexOf("GER40") >= 0 || symbol.indexOf("US500") >= 0 || symbol.indexOf("NAS100") >= 0 || symbol.indexOf("USTEC") >= 0) {
-                            contractSize = 10;
-                        }
+                        var contractSize = ddContractSizeFor(symbol);
 
                         parsedTradesCache.push({
                             oTime: oTime,
@@ -1047,8 +1065,12 @@
                         }
                     }
 
-                    var balance = s.balance || s.equity || 1.0;
-                    var effectiveLeverage = totalNotional / balance;
+                    // Effective leverage = notional exposure / equity (equity reflects
+                    // the true account value incl. floating P/L). Fall back to balance,
+                    // and guard against a non-positive denominator (blown account).
+                    var denom = (s.equity && s.equity > 0) ? s.equity
+                              : ((s.balance && s.balance > 0) ? s.balance : 0);
+                    var effectiveLeverage = denom > 0 ? totalNotional / denom : 0;
 
                     ddEquityCurve.push({ 
                         idx: i + 1, 
