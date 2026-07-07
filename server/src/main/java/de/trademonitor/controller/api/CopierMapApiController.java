@@ -4,8 +4,10 @@ import de.trademonitor.entity.AccountEntity;
 import de.trademonitor.entity.CopierLinkEntity;
 import de.trademonitor.repository.AccountRepository;
 import de.trademonitor.repository.CopierLinkRepository;
+import de.trademonitor.security.CustomUserDetails;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,11 +30,24 @@ public class CopierMapApiController {
     @Autowired
     private de.trademonitor.service.CopierVerificationService copierVerificationService;
 
+    private boolean isAdmin(CustomUserDetails userDetails) {
+        return userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+    }
+
+    /** Whether the caller may see the given account (admin, CSV, or explicitly allowed). */
+    private boolean mayAccess(CustomUserDetails userDetails, AccountEntity acc) {
+        if (userDetails == null || acc == null) return false;
+        if (isAdmin(userDetails)) return true;
+        if ("CSV".equalsIgnoreCase(acc.getType())) return true;
+        return userDetails.getUserEntity().getAllowedAccountIds().contains(acc.getAccountId());
+    }
+
     @GetMapping("/data")
-    public ResponseEntity<?> getMapData() {
+    public ResponseEntity<?> getMapData(@AuthenticationPrincipal CustomUserDetails userDetails) {
         List<AccountEntity> nodes = accountRepository.findAll().stream()
                 .filter(acc -> !"CSV".equalsIgnoreCase(acc.getType()))
                 .filter(acc -> acc.getMonitored() == null || acc.getMonitored())
+                .filter(acc -> mayAccess(userDetails, acc))
                 .collect(java.util.stream.Collectors.toList());
         List<CopierLinkEntity> edges = copierLinkRepository.findAll();
         java.util.Set<Long> nodeIds = nodes.stream()
@@ -45,7 +60,12 @@ public class CopierMapApiController {
     }
 
     @GetMapping("/verify/{accountId}")
-    public ResponseEntity<?> getVerificationReport(@PathVariable Long accountId) {
+    public ResponseEntity<?> getVerificationReport(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long accountId) {
+        AccountEntity acc = accountRepository.findById(accountId).orElse(null);
+        if (!mayAccess(userDetails, acc)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access Denied"));
+        }
         de.trademonitor.dto.CopierVerificationReportDto report = copierVerificationService.generateReport(accountId);
         if (report == null) {
             return ResponseEntity.notFound().build();
@@ -66,7 +86,11 @@ public class CopierMapApiController {
     }
 
     @PostMapping("/settings")
-    public ResponseEntity<?> updateSettings(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> updateSettings(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, Object> payload) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
         int tol = payload.containsKey("toleranceSeconds") ? ((Number) payload.get("toleranceSeconds")).intValue() : globalConfigService.getCopierToleranceSeconds();
         int inter = payload.containsKey("intervalMins") ? ((Number) payload.get("intervalMins")).intValue() : globalConfigService.getCopierIntervalMins();
         
@@ -81,7 +105,11 @@ public class CopierMapApiController {
     }
 
     @PostMapping("/link")
-    public ResponseEntity<?> createLink(@RequestBody CopierLinkEntity link) {
+    public ResponseEntity<?> createLink(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody CopierLinkEntity link) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(403).body("Admin access required");
+        }
         Optional<AccountEntity> srcOpt = accountRepository.findById(link.getSourceAccountId());
         Optional<AccountEntity> tgtOpt = accountRepository.findById(link.getTargetAccountId());
         if (srcOpt.isPresent()) {
@@ -107,13 +135,21 @@ public class CopierMapApiController {
     }
 
     @DeleteMapping("/link/{id}")
-    public ResponseEntity<?> deleteLink(@PathVariable Long id) {
+    public ResponseEntity<?> deleteLink(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(403).body("Admin access required");
+        }
         copierLinkRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/positions")
-    public ResponseEntity<?> updatePositions(@RequestBody List<NodePositionDto> positions) {
+    public ResponseEntity<?> updatePositions(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody List<NodePositionDto> positions) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(403).body("Admin access required");
+        }
         for (NodePositionDto pos : positions) {
             Optional<AccountEntity> accOpt = accountRepository.findById(pos.getAccountId());
             if (accOpt.isPresent()) {

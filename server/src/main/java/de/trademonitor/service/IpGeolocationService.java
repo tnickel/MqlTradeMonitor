@@ -75,7 +75,11 @@ public class IpGeolocationService {
      */
     public IpApiResponse lookupIp(String ip) {
         try {
-            String url = "http://ip-api.com/json/" + ip;
+            // NOTE: ip-api.com's free tier is HTTP-only (HTTPS requires a paid key).
+            // Only a non-secret IP address is sent, so plaintext is acceptable here.
+            // The IP is URL-encoded defensively so it cannot alter the request path.
+            String url = "http://ip-api.com/json/"
+                    + java.net.URLEncoder.encode(ip, java.nio.charset.StandardCharsets.UTF_8);
             return restTemplate.getForObject(url, IpApiResponse.class);
         } catch (Exception e) {
             System.err.println("[IpGeolocationService] Error looking up IP " + ip + ": " + e.getMessage());

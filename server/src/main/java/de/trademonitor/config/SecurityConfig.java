@@ -73,10 +73,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // Only the production host and local development are trusted. Credentialed
+        // cross-origin requests are allowed (allowCredentials=true), so this list
+        // must stay tight — never use broad third-party wildcards here.
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "https://*.janeway.replit.dev", 
-            "https://*.replit.dev",
-            "https://*.replit.app",
             "http://localhost:*",
             "https://monitor.tnickel-ki.de",
             "http://monitor.tnickel-ki.de",

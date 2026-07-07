@@ -41,6 +41,21 @@ public class DashboardController {
         return userDetails.getUserEntity().getAllowedAccountIds().contains(accountId);
     }
 
+    /**
+     * Returns the set of account IDs a user may see in cross-account (aggregate)
+     * analytics, or {@code null} for admins (= unrestricted / all accounts). Used
+     * by the analytics endpoints so a restricted or demo user never receives data
+     * for accounts they may not access. An unauthenticated principal gets an empty
+     * set (no access at all).
+     */
+    private Set<Long> analyticsAllowedIds(CustomUserDetails userDetails) {
+        if (userDetails == null)
+            return Collections.emptySet();
+        if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
+            return null;
+        return userDetails.getUserEntity().getAllowedAccountIds();
+    }
+
     @Autowired
     private AccountManager accountManager;
 
@@ -1843,9 +1858,13 @@ public class DashboardController {
      * EA Logs page for a specific account.
      */
     @GetMapping("/account/{accountId}/ea-logs")
-    public String eaLogs(@PathVariable Long accountId, Model model) {
+    public String eaLogs(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long accountId, Model model) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return "redirect:/";
+        }
         model.addAttribute("accountId", accountId);
-        
+
         // Get account name for display
         var acc = accountManager.getAllAccounts().stream()
                 .filter(a -> a.getAccountId() == accountId)
@@ -1876,7 +1895,11 @@ public class DashboardController {
      */
     @GetMapping("/api/ea-logs/{accountId}")
     @ResponseBody
-    public java.util.List<java.util.Map<String, Object>> getEaLogsApi(@PathVariable Long accountId) {
+    public ResponseEntity<?> getEaLogsApi(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access Denied"));
+        }
         java.util.List<de.trademonitor.entity.EaLogEntry> logs = eaLogEntryRepository.findTop5000ByAccountIdOrderByTimestampDesc(accountId);
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
@@ -1887,7 +1910,7 @@ public class DashboardController {
             item.put("logLine", log.getLogLine());
             result.add(item);
         }
-        return result;
+        return ResponseEntity.ok(result);
     }
 
     // ==================== ANALYTICS PAGE ====================
@@ -1904,14 +1927,19 @@ public class DashboardController {
      */
     @GetMapping("/api/stats/heatmap")
     @ResponseBody
-    public Map<String, Object> getHeatmapGlobal(@RequestParam(required = false) String type) {
-        return strategyAnalyticsService.buildHeatmap(null, type);
+    public Map<String, Object> getHeatmapGlobal(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) String type) {
+        return strategyAnalyticsService.buildHeatmap(null, type, analyticsAllowedIds(userDetails));
     }
 
     @GetMapping("/api/stats/heatmap/{accountId}")
     @ResponseBody
-    public Map<String, Object> getHeatmap(@PathVariable long accountId) {
-        return strategyAnalyticsService.buildHeatmap(accountId, null);
+    public ResponseEntity<?> getHeatmap(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access Denied"));
+        }
+        return ResponseEntity.ok(strategyAnalyticsService.buildHeatmap(accountId, null));
     }
 
     /**
@@ -1919,8 +1947,12 @@ public class DashboardController {
      */
     @GetMapping("/api/stats/strategy-kpis/{accountId}")
     @ResponseBody
-    public List<Map<String, Object>> getStrategyKpis(@PathVariable long accountId) {
-        return strategyAnalyticsService.getStrategyKpis(accountId);
+    public ResponseEntity<?> getStrategyKpis(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access Denied"));
+        }
+        return ResponseEntity.ok(strategyAnalyticsService.getStrategyKpis(accountId));
     }
 
     /**
@@ -1928,8 +1960,9 @@ public class DashboardController {
      */
     @GetMapping("/api/stats/strategy-leaderboard")
     @ResponseBody
-    public List<Map<String, Object>> getStrategyLeaderboard(@RequestParam(required = false) String type) {
-        return strategyAnalyticsService.getGlobalLeaderboard(type);
+    public List<Map<String, Object>> getStrategyLeaderboard(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) String type) {
+        return strategyAnalyticsService.getGlobalLeaderboard(type, analyticsAllowedIds(userDetails));
     }
 
     /**
@@ -1938,9 +1971,10 @@ public class DashboardController {
     @GetMapping("/api/stats/correlation-matrix")
     @ResponseBody
     public Map<String, Object> getCorrelationMatrix(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String period) {
-        return strategyAnalyticsService.getCorrelationMatrix(type, period);
+        return strategyAnalyticsService.getCorrelationMatrix(type, period, analyticsAllowedIds(userDetails));
     }
 
     /**
@@ -1949,9 +1983,10 @@ public class DashboardController {
     @GetMapping("/api/stats/drawdown-curves")
     @ResponseBody
     public List<Map<String, Object>> getDrawdownCurves(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String period) {
-        return strategyAnalyticsService.getDrawdownCurves(type, period);
+        return strategyAnalyticsService.getDrawdownCurves(type, period, analyticsAllowedIds(userDetails));
     }
 
     /**
@@ -1960,9 +1995,13 @@ public class DashboardController {
     @GetMapping("/api/stats/equity-overlay")
     @ResponseBody
     public List<Map<String, Object>> getEquityOverlay(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String period) {
+        final Set<Long> allowedIds = analyticsAllowedIds(userDetails);
         List<Account> accounts = accountManager.getAccountsSortedByPrivilege().stream()
+                .filter(a -> allowedIds == null || "CSV".equalsIgnoreCase(a.getType())
+                        || allowedIds.contains(a.getAccountId()))
                 .filter(a -> type == null || type.isEmpty() || type.equalsIgnoreCase(a.getType()))
                 .collect(Collectors.toList());
 

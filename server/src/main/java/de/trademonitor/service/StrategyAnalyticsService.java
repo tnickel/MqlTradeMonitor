@@ -45,6 +45,16 @@ public class StrategyAnalyticsService {
      * for a specific account or all accounts.
      */
     public Map<String, Object> buildHeatmap(Long accountId, String type) {
+        return buildHeatmap(accountId, type, null);
+    }
+
+    /**
+     * @param allowedIds account IDs the caller may see, or {@code null} for
+     *                   unrestricted (admin) access. Ignored when a single
+     *                   {@code accountId} is requested (that case is authorized
+     *                   by the caller).
+     */
+    public Map<String, Object> buildHeatmap(Long accountId, String type, Set<Long> allowedIds) {
         List<ClosedTradeEntity> trades;
         if (accountId != null) {
             trades = closedTradeRepository.findByAccountId(accountId);
@@ -52,6 +62,7 @@ public class StrategyAnalyticsService {
             // All accounts, optionally filtered by type
             trades = new ArrayList<>();
             for (Account acc : accountManager.getAccountsSortedByPrivilege()) {
+                if (!isAccountAllowed(acc, allowedIds)) continue;
                 if (type != null && !type.isEmpty() && !type.equalsIgnoreCase(acc.getType())) continue;
                 trades.addAll(closedTradeRepository.findByAccountId(acc.getAccountId()));
             }
@@ -214,9 +225,18 @@ public class StrategyAnalyticsService {
      * Global strategy leaderboard across all accounts.
      */
     public List<Map<String, Object>> getGlobalLeaderboard(String type) {
+        return getGlobalLeaderboard(type, null);
+    }
+
+    /**
+     * @param allowedIds account IDs the caller may see, or {@code null} for
+     *                   unrestricted (admin) access.
+     */
+    public List<Map<String, Object>> getGlobalLeaderboard(String type, Set<Long> allowedIds) {
         List<Map<String, Object>> all = new ArrayList<>();
 
         for (Account acc : accountManager.getAccountsSortedByPrivilege()) {
+            if (!isAccountAllowed(acc, allowedIds)) continue;
             if (type != null && !type.isEmpty() && !type.equalsIgnoreCase(acc.getType())) continue;
             List<Map<String, Object>> kpis = getStrategyKpis(acc.getAccountId());
             for (Map<String, Object> kpi : kpis) {
@@ -248,7 +268,16 @@ public class StrategyAnalyticsService {
      * Calculate Pearson correlation matrix between account daily returns.
      */
     public Map<String, Object> getCorrelationMatrix(String type, String period) {
+        return getCorrelationMatrix(type, period, null);
+    }
+
+    /**
+     * @param allowedIds account IDs the caller may see, or {@code null} for
+     *                   unrestricted (admin) access.
+     */
+    public Map<String, Object> getCorrelationMatrix(String type, String period, Set<Long> allowedIds) {
         List<Account> accounts = accountManager.getAccountsSortedByPrivilege().stream()
+                .filter(a -> isAccountAllowed(a, allowedIds))
                 .filter(a -> type == null || type.isEmpty() || type.equalsIgnoreCase(a.getType()))
                 .collect(Collectors.toList());
 
@@ -332,7 +361,16 @@ public class StrategyAnalyticsService {
      * Calculate percentage drawdown time series for each account.
      */
     public List<Map<String, Object>> getDrawdownCurves(String type, String period) {
+        return getDrawdownCurves(type, period, null);
+    }
+
+    /**
+     * @param allowedIds account IDs the caller may see, or {@code null} for
+     *                   unrestricted (admin) access.
+     */
+    public List<Map<String, Object>> getDrawdownCurves(String type, String period, Set<Long> allowedIds) {
         List<Account> accounts = accountManager.getAccountsSortedByPrivilege().stream()
+                .filter(a -> isAccountAllowed(a, allowedIds))
                 .filter(a -> type == null || type.isEmpty() || type.equalsIgnoreCase(a.getType()))
                 .collect(Collectors.toList());
 
@@ -456,6 +494,19 @@ public class StrategyAnalyticsService {
             default:
                 return s -> true;
         }
+    }
+
+    /**
+     * Whether an account may be included in aggregate analytics for the current
+     * caller. {@code allowedIds == null} means unrestricted (admin). Non-admins
+     * additionally always see CSV accounts (imported data), matching the access
+     * rules used elsewhere in the app.
+     */
+    private boolean isAccountAllowed(Account acc, Set<Long> allowedIds) {
+        if (allowedIds == null) return true;
+        if (acc == null) return false;
+        if ("CSV".equalsIgnoreCase(acc.getType())) return true;
+        return allowedIds.contains(acc.getAccountId());
     }
 
     private double getNetProfit(ClosedTradeEntity trade) {

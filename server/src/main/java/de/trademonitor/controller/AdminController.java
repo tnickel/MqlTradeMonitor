@@ -917,12 +917,16 @@ public class AdminController {
                 long rowCount = entry.getValue();
                 long estRowSize = 0;
 
-                java.sql.ResultSet colRs = stmt.executeQuery(
-                    "SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) AS MAX_LEN, " +
-                    "COALESCE(NUMERIC_PRECISION, 0) AS NUM_PREC " +
-                    "FROM INFORMATION_SCHEMA.COLUMNS " +
-                    "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = '" + tableName + "'"
-                );
+                // Parameterized to avoid string-concatenated SQL (table name comes
+                // from INFORMATION_SCHEMA, but keep it a bound parameter regardless).
+                java.sql.ResultSet colRs;
+                try (java.sql.PreparedStatement colStmt = conn.prepareStatement(
+                        "SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) AS MAX_LEN, " +
+                        "COALESCE(NUMERIC_PRECISION, 0) AS NUM_PREC " +
+                        "FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = ?")) {
+                    colStmt.setString(1, tableName);
+                    colRs = colStmt.executeQuery();
                 while (colRs.next()) {
                     String dataType = colRs.getString("DATA_TYPE").toUpperCase();
                     long maxLen = colRs.getLong("MAX_LEN");
@@ -959,7 +963,7 @@ public class AdminController {
                     }
                     estRowSize += colSize;
                 }
-                colRs.close();
+                } // end try-with-resources (colStmt auto-closes its ResultSet)
 
                 // Add ~16 bytes overhead per row for H2 internal bookkeeping
                 estRowSize += 16;

@@ -324,7 +324,9 @@ public class ApiController {
      */
     @GetMapping("/market/rate")
     public ResponseEntity<?> getMarketRate(@RequestParam("symbol") String symbol) {
-        if (symbol == null || symbol.length() > 20 || !symbol.matches("^[a-zA-Z0-9/-]+$")) {
+        // No '/' allowed: it is the only character that could restructure the
+        // downstream Yahoo Finance URL path. '.' supports dotted broker symbols.
+        if (symbol == null || symbol.length() > 20 || !symbol.matches("^[a-zA-Z0-9.-]+$")) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Invalid symbol parameter"));
         }
         de.trademonitor.service.ExchangeRateService.CachedRate rate = exchangeRateService.getRateDetails(symbol);

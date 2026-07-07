@@ -54,7 +54,6 @@ int g_initRetryCount = 0;                // Number of init trade list retry atte
 
 //--- History sync tracking
 string g_lastSyncedCloseTime = "";       // Last close time successfully synced to server
-string GV_LAST_SYNC_TIME = "";           // Stores last synced close time as string hash
 
 //--- EA Log tracking
 int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
@@ -1059,8 +1058,10 @@ bool SendHttpPostWithTimeout(string url, string json, int timeout)
    // Convert string to char array
    StringToCharArray(json, postData, 0, WHOLE_ARRAY, CP_UTF8);
    int postSize = ArraySize(postData);
-   if(postSize > 0)
-      ArrayResize(postData, postSize - 1);  // Remove null terminator
+   // Only strip a trailing null terminator if one is actually present
+   // (matches the MQL4 client and avoids truncating a real last byte).
+   if(postSize > 0 && postData[postSize - 1] == 0)
+      ArrayResize(postData, postSize - 1);
    
    string headers = "Content-Type: application/json\r\n";
    if (StringLen(cfg_UserKey) > 0) {

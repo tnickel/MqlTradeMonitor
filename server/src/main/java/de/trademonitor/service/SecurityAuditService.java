@@ -396,18 +396,43 @@ public class SecurityAuditService {
 
     // ---- Fail2Ban Dynamic Methods ----
 
+    // Accepts only IPv4/IPv6 literal characters. Deliberately strict so that no
+    // shell metacharacter (; | & $ ` space ...) can ever reach the sudo/bash
+    // commands below. Length capped to a valid IPv6 max.
+    private static final Pattern IP_LITERAL = Pattern.compile("^[0-9A-Fa-f:.]{2,45}$");
+
+    /**
+     * Strict IP-literal validation used to sanitize any value that is passed into
+     * a shell command. Must contain only hex/dot/colon characters and look like an
+     * IPv4 (has a dot) or IPv6 (has a colon) address.
+     */
+    private boolean isValidIp(String ip) {
+        if (ip == null) return false;
+        String t = ip.trim();
+        if (!IP_LITERAL.matcher(t).matches()) return false;
+        return t.indexOf('.') >= 0 || t.indexOf(':') >= 0;
+    }
+
     public void syncFail2banWhitelist(String newIp) {
         if (newIp != null && !newIp.isBlank()) {
-            globalConfigService.addFail2banWhitelistIp(newIp);
+            if (!isValidIp(newIp)) {
+                System.err.println("[SecurityAudit] Rejected invalid whitelist IP: " + newIp);
+                return;
+            }
+            globalConfigService.addFail2banWhitelistIp(newIp.trim());
         }
-        List<String> ips = globalConfigService.getFail2banWhitelistIps();
+        // Only pass validated IP literals to the shell — drop anything else defensively.
+        List<String> ips = globalConfigService.getFail2banWhitelistIps().stream()
+                .filter(this::isValidIp)
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toList());
         String ipsString = String.join(" ", ips);
-        
+
         try {
             // Use the wrapper script we created to bypass permission issues safely
             execCommand("bash", "-c", "sudo /usr/local/bin/update-fail2ban-whitelist.sh " + ipsString);
-            if (newIp != null && !newIp.isBlank()) {
-                execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client unban " + newIp + " --all");
+            if (newIp != null && isValidIp(newIp)) {
+                execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client unban " + newIp.trim() + " --all");
             }
         } catch (Exception e) {
             System.err.println("[SecurityAudit] Failed to sync fail2ban whitelist: " + e.getMessage());
@@ -415,7 +440,10 @@ public class SecurityAuditService {
     }
 
     public boolean unbanIp(String ipToUnban) {
-        if (ipToUnban == null || ipToUnban.isBlank()) return false;
+        if (!isValidIp(ipToUnban)) {
+            System.err.println("[SecurityAudit] Rejected invalid unban IP: " + ipToUnban);
+            return false;
+        }
         try {
             String output = execCommand("bash", "-c", "sudo /usr/bin/fail2ban-client unban " + ipToUnban.trim() + " --all");
             return !output.toLowerCase().contains("error");

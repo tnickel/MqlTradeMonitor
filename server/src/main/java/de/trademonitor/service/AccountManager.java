@@ -1040,7 +1040,14 @@ public class AccountManager {
     public double getCachedDailyProfit(long accountId) {
         String todayStr = java.time.LocalDateTime.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+        // Roll the cache over at midnight, then serve the cached value. It is kept
+        // fresh by updateHistory() (on new closed trades) and the 5-minute
+        // scheduled refresh, so we only recompute when nothing is cached yet.
         checkDailyProfitDateRollover(todayStr);
+        Double cached = cachedDailyProfit.get(accountId);
+        if (cached != null) {
+            return cached;
+        }
         refreshDailyProfitForAccount(accountId);
         return cachedDailyProfit.getOrDefault(accountId, 0.0);
     }
