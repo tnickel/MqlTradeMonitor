@@ -793,33 +793,48 @@ public class DashboardController {
     public ResponseEntity<?> getReportClosedTrades(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountIds") String accountIds,
-            @RequestParam(value = "period", defaultValue = "day") String period) {
+            @RequestParam(value = "period", defaultValue = "day") String period,
+            @RequestParam(value = "start", required = false) String start,
+            @RequestParam(value = "end", required = false) String end) {
 
-        // Determine period start (inclusive). closeTime format is "yyyy.MM.dd HH:mm:ss"
+        // Determine period start/end (inclusive). closeTime format is "yyyy.MM.dd HH:mm:ss"
         // which sorts lexicographically, so a string comparison is sufficient.
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate startDate;
+        String fromStr;
+        String toStr = null;
         String periodLabel;
-        switch (period == null ? "day" : period.toLowerCase()) {
-            case "week":
-                startDate = today.with(java.time.temporal.WeekFields.ISO.dayOfWeek(), 1);
-                periodLabel = "Wochenreport";
-                break;
-            case "month":
-                startDate = today.withDayOfMonth(1);
-                periodLabel = "Monatsreport";
-                break;
-            case "year":
-                startDate = today.withDayOfYear(1);
-                periodLabel = "Jahresreport";
-                break;
-            case "day":
-            default:
-                startDate = today;
-                periodLabel = "Tagesreport";
-                break;
+
+        if ("custom".equalsIgnoreCase(period) && start != null && !start.isEmpty()) {
+            fromStr = start.replace("-", ".") + " 00:00:00";
+            if (end != null && !end.isEmpty()) {
+                toStr = end.replace("-", ".") + " 23:59:59";
+                periodLabel = "Benutzerdefinierter Report (" + start + " bis " + end + ")";
+            } else {
+                periodLabel = "Benutzerdefinierter Report (ab " + start + ")";
+            }
+        } else {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate startDate;
+            switch (period == null ? "day" : period.toLowerCase()) {
+                case "week":
+                    startDate = today.with(java.time.temporal.WeekFields.ISO.dayOfWeek(), 1);
+                    periodLabel = "Wochenreport";
+                    break;
+                case "month":
+                    startDate = today.withDayOfMonth(1);
+                    periodLabel = "Monatsreport";
+                    break;
+                case "year":
+                    startDate = today.withDayOfYear(1);
+                    periodLabel = "Jahresreport";
+                    break;
+                case "day":
+                default:
+                    startDate = today;
+                    periodLabel = "Tagesreport";
+                    break;
+            }
+            fromStr = startDate.toString().replace("-", ".") + " 00:00:00";
         }
-        String fromStr = startDate.toString().replace("-", ".") + " 00:00:00";
 
         List<Long> requestedIds = new ArrayList<>();
         for (String part : accountIds.split(",")) {
@@ -846,8 +861,12 @@ public class DashboardController {
             List<Map<String, Object>> trades = new ArrayList<>();
             double sumProfit = 0.0, sumCommission = 0.0, sumSwap = 0.0, sumNet = 0.0;
 
+            final String finalFromStr = fromStr;
+            final String finalToStr = toStr;
             List<ClosedTrade> sorted = account.getClosedTrades().stream()
-                    .filter(ct -> ct.getCloseTime() != null && ct.getCloseTime().compareTo(fromStr) >= 0)
+                    .filter(ct -> ct.getCloseTime() != null 
+                            && ct.getCloseTime().compareTo(finalFromStr) >= 0
+                            && (finalToStr == null || ct.getCloseTime().compareTo(finalToStr) <= 0))
                     .sorted(Comparator.comparing(ClosedTrade::getCloseTime))
                     .collect(Collectors.toList());
 
@@ -899,6 +918,9 @@ public class DashboardController {
         result.put("periodLabel", periodLabel);
         result.put("period", period);
         result.put("from", fromStr);
+        if (toStr != null) {
+            result.put("to", toStr);
+        }
         result.put("generatedAt", java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
         result.put("accounts", accountReports);

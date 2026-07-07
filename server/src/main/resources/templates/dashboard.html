@@ -305,17 +305,30 @@
                                 <label style="font-weight: bold; color: var(--text-primary); display:block; margin-bottom: 6px;">Zeitraum</label>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
                                     <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
-                                        <input type="radio" name="report-period" value="day" checked style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Tagesreport (heute)
+                                        <input type="radio" name="report-period" value="day" checked style="width:auto !important; margin:0 !important; transform: scale(1.2);" onclick="toggleCustomDates(false)" /> Tagesreport (heute)
                                     </label>
                                     <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
-                                        <input type="radio" name="report-period" value="week" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Wochenreport (akt. Woche)
+                                        <input type="radio" name="report-period" value="week" style="width:auto !important; margin:0 !important; transform: scale(1.2);" onclick="toggleCustomDates(false)" /> Wochenreport (akt. Woche)
                                     </label>
                                     <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
-                                        <input type="radio" name="report-period" value="month" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Monatsreport (akt. Monat)
+                                        <input type="radio" name="report-period" value="month" style="width:auto !important; margin:0 !important; transform: scale(1.2);" onclick="toggleCustomDates(false)" /> Monatsreport (akt. Monat)
                                     </label>
                                     <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
-                                        <input type="radio" name="report-period" value="year" style="width:auto !important; margin:0 !important; transform: scale(1.2);" /> Jahresreport (akt. Jahr)
+                                        <input type="radio" name="report-period" value="year" style="width:auto !important; margin:0 !important; transform: scale(1.2);" onclick="toggleCustomDates(false)" /> Jahresreport (akt. Jahr)
                                     </label>
+                                    <label style="display:flex !important; align-items:center; gap:8px; cursor:pointer; color: var(--text-primary); font-weight:normal !important;">
+                                        <input type="radio" name="report-period" value="custom" style="width:auto !important; margin:0 !important; transform: scale(1.2);" onclick="toggleCustomDates(true)" /> Benutzerdefiniert
+                                    </label>
+                                </div>
+                                <div id="custom-date-container" style="display:none; flex-direction:column; gap:6px; margin-top:8px; border-top:1px dashed var(--border-color); padding-top:8px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <label for="report-start-date" style="font-size:0.85rem; color:var(--text-secondary); width:45px;">Start:</label>
+                                        <input type="date" id="report-start-date" style="background:var(--bg-primary); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 8px; border-radius:4px; font-size:0.85rem; flex:1;" />
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <label for="report-end-date" style="font-size:0.85rem; color:var(--text-secondary); width:45px;">Ende:</label>
+                                        <input type="date" id="report-end-date" style="background:var(--bg-primary); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 8px; border-radius:4px; font-size:0.85rem; flex:1;" />
+                                    </div>
                                 </div>
                                 <button class="save-btn" onclick="generateReport()" style="margin-top: 18px; width:100%; background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);">Report erstellen</button>
                             </div>
@@ -631,9 +644,26 @@
                 document.querySelectorAll('.report-account-checkbox').forEach(cb => cb.checked = master.checked);
             }
 
+            function toggleCustomDates(show) {
+                const container = document.getElementById('custom-date-container');
+                if (show) {
+                    container.style.display = 'flex';
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const startInput = document.getElementById('report-start-date');
+                    const endInput = document.getElementById('report-end-date');
+                    if (!startInput.value) startInput.value = todayStr;
+                    if (!endInput.value) endInput.value = todayStr;
+                } else {
+                    container.style.display = 'none';
+                }
+            }
+
             function backToReportConfig() {
                 document.getElementById('report-config-area').style.display = 'block';
                 document.getElementById('report-result-area').style.display = 'none';
+                const checkedRadio = document.querySelector('input[name="report-period"]:checked');
+                const isCustom = checkedRadio && checkedRadio.value === 'custom';
+                toggleCustomDates(isCustom);
             }
 
             function fmtNum(v, dec) {
@@ -654,7 +684,15 @@
                 document.getElementById('report-config-area').style.display = 'none';
                 document.getElementById('report-result-area').style.display = 'block';
 
-                fetch('/api/report/closed-trades?accountIds=' + encodeURIComponent(ids.join(',')) + '&period=' + encodeURIComponent(period))
+                let url = '/api/report/closed-trades?accountIds=' + encodeURIComponent(ids.join(',')) + '&period=' + encodeURIComponent(period);
+                if (period === 'custom') {
+                    const startVal = document.getElementById('report-start-date').value;
+                    const endVal = document.getElementById('report-end-date').value;
+                    if (startVal) url += '&start=' + encodeURIComponent(startVal);
+                    if (endVal) url += '&end=' + encodeURIComponent(endVal);
+                }
+
+                fetch(url)
                     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(data => renderReport(data))
                     .catch(err => { output.innerHTML = '<p style="color:#b91c1c;">Fehler beim Laden des Reports: ' + err.message + '</p>'; });
@@ -676,7 +714,10 @@
                 let html = '';
                 html += '<div style="font-family: Arial, sans-serif;">';
                 html += '<h2 style="margin:0 0 4px 0; color:#111;">Trade Report &ndash; ' + data.periodLabel + '</h2>';
-                html += '<p style="margin:0 0 16px 0; color:#555; font-size:12px;">Zeitraum ab: ' + data.from
+                const dateRangeStr = data.to 
+                    ? 'Zeitraum: ' + data.from + ' bis ' + data.to 
+                    : 'Zeitraum ab: ' + data.from;
+                html += '<p style="margin:0 0 16px 0; color:#555; font-size:12px;">' + dateRangeStr
                     + ' &nbsp;|&nbsp; Erstellt: ' + data.generatedAt
                     + ' &nbsp;|&nbsp; Trades gesamt: ' + data.grandCount
                     + ' &nbsp;|&nbsp; Netto gesamt: ' + fmtNum(data.grandNet) + '</p>';
@@ -831,8 +872,11 @@
                     doc.setFontSize(8.5);
                     doc.setFont(undefined, 'normal');
                     doc.setTextColor(80, 80, 80);
+                    const periodStr = currentReportData.to 
+                        ? 'Zeitraum: ' + currentReportData.from + ' bis ' + currentReportData.to 
+                        : 'Zeitraum ab: ' + currentReportData.from;
                     doc.text(
-                        'Zeitraum ab: ' + currentReportData.from
+                        periodStr
                         + '   |   Erstellt: ' + currentReportData.generatedAt
                         + '   |   Trades gesamt: ' + currentReportData.grandCount
                         + '   |   Netto gesamt: ' + fmtNum(currentReportData.grandNet),

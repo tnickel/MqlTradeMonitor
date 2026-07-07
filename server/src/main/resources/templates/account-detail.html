@@ -661,7 +661,7 @@
                 .dd-stat .dd-stat-value { display: block; font-size: 1.35rem; font-weight: 700; color: #fff; }
                 .dd-stat .dd-stat-value.dd-bad { color: var(--danger); }
                 .dd-stat .dd-stat-value.dd-warn { color: var(--warning); }
-                .dd-chart-wrap { position: relative; height: 320px; background: rgba(30,41,59,0.3); border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 1.5rem; overflow: hidden; }
+                .dd-chart-wrap { position: relative; height: 580px; background: rgba(30,41,59,0.3); border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 1.5rem; overflow: hidden; }
                 .dd-chart-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
                 .dd-empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px; flex-direction: column; gap: 8px; }
                 .dd-empty-state .dd-empty-icon { font-size: 2rem; opacity: 0.5; }
@@ -723,6 +723,10 @@
                         <button id="dd-xmode-index" onclick="ddSetXMode('index')">Snapshot #</button>
                         <button id="dd-xmode-time" class="active" onclick="ddSetXMode('time')">Datum</button>
                     </div>
+                    <span class="dd-ctrl-label" style="margin-left: 15px;">Hebel 1:</span>
+                    <input type="number" id="dd-leverage-input" value="20" min="1" max="1000" style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 4px 8px; border-radius: 6px; font-weight: 600; text-align: center; font-size: 0.8rem;" onchange="ddOnLeverageChange(this.value)">
+                    <button id="dd-leverage-save" onclick="ddSaveLeverage()" style="background: var(--accent-primary, #6366f1); border: none; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-left: 6px; transition: opacity 0.2s; white-space: nowrap;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Speichern</button>
+                    <span id="ddLeverageFeedback" style="font-size: 0.85rem; color: #3fb950; display: none; margin-left: 6px; font-weight: bold;">✓</span>
                 </div>
             </div>
 
@@ -794,6 +798,8 @@
                     <div class="dd-tt-row"><span class="dd-tt-label">Underwater:</span><span class="dd-tt-value dd-bad" id="dd-tt-uw">—</span></div>
                     <div class="dd-tt-row"><span class="dd-tt-label">Equity:</span><span class="dd-tt-value" id="dd-tt-eq">—</span></div>
                     <div class="dd-tt-row" id="dd-tt-peak-row"><span class="dd-tt-label">Peak:</span><span class="dd-tt-value" id="dd-tt-peak">—</span></div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Effekt. Hebel:</span><span class="dd-tt-value" id="dd-tt-margin" style="color: #f59e0b;">—</span></div>
+                    <div class="dd-tt-row"><span class="dd-tt-label">Offene Lots:</span><span class="dd-tt-value" id="dd-tt-lots" style="color: #38bdf8;">—</span></div>
                 </div>
             </div>
 
@@ -829,6 +835,8 @@
             'use strict';
             var ACCOUNT_ID = /*[[${accountId}]]*/ 0;
             var ACCOUNT_CURRENCY = /*[[${account.currency}]]*/ 'EUR';
+            var ACCOUNT_BROKER = /*[[${account.broker}]]*/ '';
+            var openTradesData = /*[[${account.openTrades}]]*/ [];
             var DAY_MS = 86400000;
             var ddSnapshots = [], ddAllSnapshots = [], ddEquityCurve = [], ddUnderwaterSeries = [], ddDrawdownPeriods = [];
             var ddXMode = 'time', ddSortKey = 'depth', ddSortDir = 'desc', ddSelectedDD = null, ddHover = null, ddLayout = null;
@@ -840,6 +848,131 @@
             var ddCrosshair = document.getElementById('dd-crosshair');
             var ddTooltip = document.getElementById('dd-tooltip');
             var ddCtx = ddCanvas.getContext('2d');
+
+            var defaultLeverage = 20;
+            if (ACCOUNT_BROKER && ACCOUNT_BROKER.toLowerCase().indexOf('pepperstone') >= 0) {
+                defaultLeverage = 20;
+            } else if (ACCOUNT_BROKER && ACCOUNT_BROKER.toLowerCase().indexOf('tickmill') >= 0) {
+                defaultLeverage = 500;
+            } else {
+                defaultLeverage = 30;
+            }
+            var savedLeverage = localStorage.getItem('dd_leverage_' + ACCOUNT_ID);
+            var ddLeverage = savedLeverage ? parseInt(savedLeverage) : defaultLeverage;
+            if (isNaN(ddLeverage) || ddLeverage < 1) ddLeverage = defaultLeverage;
+
+            var levInput = document.getElementById('dd-leverage-input');
+            if (levInput) {
+                levInput.value = ddLeverage;
+            }
+
+            window.ddOnLeverageChange = function(val) {
+                var lev = parseInt(val);
+                if (isNaN(lev) || lev < 1) lev = 1;
+                ddLeverage = lev;
+                localStorage.setItem('dd_leverage_' + ACCOUNT_ID, ddLeverage);
+                ddProcessData();
+                ddRenderAll();
+            };
+
+            window.ddSaveLeverage = function() {
+                var levInput = document.getElementById('dd-leverage-input');
+                if (levInput) {
+                    var lev = parseInt(levInput.value);
+                    if (isNaN(lev) || lev < 1) lev = 1;
+                    ddLeverage = lev;
+                    localStorage.setItem('dd_leverage_' + ACCOUNT_ID, ddLeverage);
+                    
+                    var feedback = document.getElementById('ddLeverageFeedback');
+                    if (feedback) {
+                        feedback.style.display = 'inline';
+                        setTimeout(function() {
+                            feedback.style.display = 'none';
+                        }, 2000);
+                    }
+                    
+                    ddProcessData();
+                    ddRenderAll();
+                }
+            };
+
+            var parsedTradesCache = [];
+            var tradesCachePrepared = false;
+
+            function prepareTradesCache() {
+                parsedTradesCache = [];
+                if (typeof historyMgr !== 'undefined' && historyMgr.allRows) {
+                    historyMgr.allRows.forEach(function(t) {
+                        var symbol = (t.symbol || "").toUpperCase();
+                        var lots = parseFloat(t.volume || 0);
+                        var openPx = parseFloat(t.openPrice || 0);
+                        if (lots <= 0 || openPx <= 0) return;
+
+                        var oTime = Date.parse(t.openTime.replace(/\./g, '/'));
+                        var cTime = Date.parse(t.closeTime.replace(/\./g, '/'));
+                        if (isNaN(oTime) || isNaN(cTime)) return;
+
+                        var contractSize = 100000;
+                        var isGold = symbol.indexOf("XAU") >= 0 || symbol.indexOf("GOLD") >= 0;
+                        if (isGold) {
+                            contractSize = 100;
+                        } else if (symbol.indexOf("XAG") >= 0 || symbol.indexOf("SILVER") >= 0) {
+                            contractSize = 5000;
+                        } else if (symbol.indexOf("BTC") >= 0) {
+                            contractSize = 1;
+                        } else if (symbol.indexOf("ETH") >= 0) {
+                            contractSize = 1;
+                        } else if (symbol.indexOf("US30") >= 0 || symbol.indexOf("DE30") >= 0 || symbol.indexOf("GER40") >= 0 || symbol.indexOf("US500") >= 0 || symbol.indexOf("NAS100") >= 0 || symbol.indexOf("USTEC") >= 0) {
+                            contractSize = 10;
+                        }
+
+                        parsedTradesCache.push({
+                            oTime: oTime,
+                            cTime: cTime,
+                            lots: lots,
+                            openPx: openPx,
+                            contractSize: contractSize,
+                            symbol: symbol
+                        });
+                    });
+                }
+                if (openTradesData && openTradesData.length > 0) {
+                    openTradesData.forEach(function(t) {
+                        var symbol = (t.symbol || "").toUpperCase();
+                        var lots = parseFloat(t.volume || 0);
+                        var openPx = parseFloat(t.openPrice || 0);
+                        if (lots <= 0 || openPx <= 0) return;
+
+                        var oTime = Date.parse(t.openTime.replace(/\./g, '/'));
+                        if (isNaN(oTime)) return;
+                        var cTime = Infinity;
+
+                        var contractSize = 100000;
+                        var isGold = symbol.indexOf("XAU") >= 0 || symbol.indexOf("GOLD") >= 0;
+                        if (isGold) {
+                            contractSize = 100;
+                        } else if (symbol.indexOf("XAG") >= 0 || symbol.indexOf("SILVER") >= 0) {
+                            contractSize = 5000;
+                        } else if (symbol.indexOf("BTC") >= 0) {
+                            contractSize = 1;
+                        } else if (symbol.indexOf("ETH") >= 0) {
+                            contractSize = 1;
+                        } else if (symbol.indexOf("US30") >= 0 || symbol.indexOf("DE30") >= 0 || symbol.indexOf("GER40") >= 0 || symbol.indexOf("US500") >= 0 || symbol.indexOf("NAS100") >= 0 || symbol.indexOf("USTEC") >= 0) {
+                            contractSize = 10;
+                        }
+
+                        parsedTradesCache.push({
+                            oTime: oTime,
+                            cTime: cTime,
+                            lots: lots,
+                            openPx: openPx,
+                            contractSize: contractSize,
+                            symbol: symbol
+                        });
+                    });
+                }
+                tradesCachePrepared = true;
+            }
 
             function ddLoadData() {
                 fetch('/api/equity-history/' + ACCOUNT_ID)
@@ -866,16 +999,84 @@
             }
 
             function ddProcessData() {
+                if (!tradesCachePrepared) {
+                    prepareTradesCache();
+                }
+
                 ddEquityCurve = [];
                 for (var i = 0; i < ddSnapshots.length; i++) {
-                    ddEquityCurve.push({ idx: i + 1, t: ddParseTs(ddSnapshots[i].timestamp), y: ddSnapshots[i].equity, bal: ddSnapshots[i].balance });
+                    var s = ddSnapshots[i];
+                    var sTime = ddParseTs(s.timestamp);
+                    
+                    var totalNotional = 0;
+                    var openLots = 0;
+                    for (var k = 0; k < parsedTradesCache.length; k++) {
+                        var pt = parsedTradesCache[k];
+                        if (pt.oTime <= sTime && pt.cTime >= sTime) {
+                            var notional = pt.lots * pt.contractSize * pt.openPx;
+                            
+                            var sym = pt.symbol.toUpperCase();
+                            var quote = "USD";
+                            if (sym.indexOf("JPY") >= 3) quote = "JPY";
+                            else if (sym.indexOf("CAD") >= 3) quote = "CAD";
+                            else if (sym.indexOf("CHF") >= 3) quote = "CHF";
+                            else if (sym.indexOf("GBP") >= 3) quote = "GBP";
+                            else if (sym.indexOf("AUD") >= 3) quote = "AUD";
+                            else if (sym.indexOf("NZD") >= 3) quote = "NZD";
+                            else if (sym.indexOf("EUR") >= 3) quote = "EUR";
+                            
+                            var acc = (ACCOUNT_CURRENCY || "EUR").toUpperCase();
+                            if (acc === "EUR") {
+                                if (quote === "USD") notional = notional / 1.08;
+                                else if (quote === "JPY") notional = notional / 170.0;
+                                else if (quote === "CAD") notional = notional / 1.48;
+                                else if (quote === "CHF") notional = notional / 0.92;
+                                else if (quote === "GBP") notional = notional / 0.85;
+                                else if (quote === "AUD") notional = notional / 1.63;
+                                else if (quote === "NZD") notional = notional / 1.80;
+                            } else if (acc === "USD") {
+                                if (quote === "EUR") notional = notional * 1.08;
+                                else if (quote === "JPY") notional = notional / 158.0;
+                                else if (quote === "CAD") notional = notional / 1.36;
+                                else if (quote === "CHF") notional = notional / 0.85;
+                                else if (quote === "GBP") notional = notional * 1.27;
+                                else if (quote === "AUD") notional = notional * 0.66;
+                            }
+                            totalNotional += notional;
+                            openLots += pt.lots;
+                        }
+                    }
+
+                    var balance = s.balance || s.equity || 1.0;
+                    var effectiveLeverage = totalNotional / balance;
+
+                    ddEquityCurve.push({ 
+                        idx: i + 1, 
+                        t: sTime, 
+                        y: s.equity, 
+                        bal: s.balance,
+                        totalNotional: totalNotional,
+                        effectiveLeverage: effectiveLeverage,
+                        openLots: openLots
+                    });
                 }
+
                 ddUnderwaterSeries = [];
                 var peak = ddEquityCurve[0].y;
                 for (var i = 0; i < ddEquityCurve.length; i++) {
                     var e = ddEquityCurve[i];
                     if (e.y > peak) peak = e.y;
-                    ddUnderwaterSeries.push({ t: e.t, idx: e.idx, y: e.y, bal: e.bal, peak: peak, uw: (e.y - peak) / (Math.abs(peak) || 1) * 100 });
+                    ddUnderwaterSeries.push({ 
+                        t: e.t, 
+                        idx: e.idx, 
+                        y: e.y, 
+                        bal: e.bal, 
+                        peak: peak, 
+                        uw: (e.y - peak) / (Math.abs(peak) || 1) * 100,
+                        totalNotional: e.totalNotional,
+                        effectiveLeverage: e.effectiveLeverage,
+                        openLots: e.openLots
+                    });
                 }
                 ddDrawdownPeriods = ddComputePeriods(ddEquityCurve);
             }
@@ -946,8 +1147,6 @@
                 if (elLongestUw) elLongestUw.textContent = lwUW.toFixed(0) + ' d';
             }
 
-            function ddRenderAll() { ddDraw(); ddRenderTable(); }
-
             function ddDraw() {
                 if (!ddCanvas || !ddCanvas.parentElement) return;
                 var wE = ddCanvas.parentElement, dpr = window.devicePixelRatio || 1;
@@ -958,8 +1157,17 @@
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
                 var uw = ddUnderwaterSeries;
                 if (!uw.length) { ddLayout = null; return; }
-                var pL = 64, pR = 20, pT = 22, pB = 32, cw = w - pL - pR, ch = h - pT - pB;
-                if (cw <= 0 || ch <= 0) { ddLayout = null; return; }
+
+                var pL = 64, pR = 20, pT1 = 20, pB = 32;
+                var totalCh = h - pT1 - pB - 50;
+                var ch1 = Math.floor(totalCh * 0.46);
+                var ch2 = Math.floor(totalCh * 0.27);
+                var ch3 = totalCh - ch1 - ch2;
+                var pT2 = pT1 + ch1 + 25;
+                var pT3 = pT2 + ch2 + 25;
+                var cw = w - pL - pR;
+                if (cw <= 0 || ch1 <= 0 || ch2 <= 0 || ch3 <= 0) { ddLayout = null; return; }
+
                 var xK = ddXMode === 'index' ? 'idx' : 't';
                 var xMn = uw[0][xK], xMx = uw[uw.length - 1][xK];
                 if (ddXMode === 'time') {
@@ -967,32 +1175,110 @@
                     if (ddSelectedTimeEndTs > 0) xMx = ddSelectedTimeEndTs;
                 }
                 var xR = (xMx - xMn) || 1;
+
                 var mnUw = 0;
                 for (var i = 0; i < uw.length; i++) if (uw[i].uw < mnUw) mnUw = uw[i].uw;
-                var yS = ddNiceScale(Math.min(-1, mnUw * 1.1), 0, 5);
-                var yMn = yS.min, yMx = Math.max(0, yS.max), yR = (yMx - yMn) || 1;
+                var yS1 = ddNiceScale(Math.min(-1, mnUw * 1.1), 0, 4);
+                var yMn1 = yS1.min, yMx1 = Math.max(0, yS1.max), yR1 = (yMx1 - yMn1) || 1;
+
+                var mxLeverage = 0;
+                for (var i = 0; i < uw.length; i++) if (uw[i].effectiveLeverage > mxLeverage) mxLeverage = uw[i].effectiveLeverage;
+                var yS2 = ddNiceScale(0, Math.max(5, mxLeverage * 1.15), 4);
+                var yMn2 = 0, yMx2 = yS2.max, yR2 = (yMx2 - yMn2) || 1;
+
+                var mxLots = 0;
+                for (var i = 0; i < uw.length; i++) if (uw[i].openLots > mxLots) mxLots = uw[i].openLots;
+                var yS3 = ddNiceScale(0, Math.max(0.1, mxLots * 1.15), 4);
+                var yMn3 = 0, yMx3 = yS3.max, yR3 = (yMx3 - yMn3) || 1;
+
                 var x2p = function(v) { return pL + ((v - xMn) / xR) * cw; };
-                var y2p = function(v) { return pT + ch - ((v - yMn) / yR) * ch; };
+                var y2p1 = function(v) { return pT1 + ch1 - ((v - yMn1) / yR1) * ch1; };
+                var y2p2 = function(v) { return pT2 + ch2 - ((v - yMn2) / yR2) * ch2; };
+                var y2p3 = function(v) { return pT3 + ch3 - ((v - yMn3) / yR3) * ch3; };
+
                 ctx.font = '500 12px "Inter","Segoe UI",sans-serif';
-                // Y grid
-                ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-                for (var i = 0; i <= yS.count; i++) { var yv = yMn + i * yS.step; if (yv > yMx + 1e-9) break; var py = y2p(yv); ctx.beginPath(); ctx.moveTo(pL, py); ctx.lineTo(pL + cw, py); ctx.stroke(); ctx.fillText(yv.toFixed(yS.step < 1 ? 1 : 0) + '%', pL - 8, py); }
-                // Zero
-                var z0 = y2p(0); ctx.strokeStyle = 'rgba(148,163,184,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pL, z0); ctx.lineTo(pL + cw, z0); ctx.stroke();
-                // X labels
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                for (var i = 0; i <= yS1.count; i++) { 
+                    var yv = yMn1 + i * yS1.step; 
+                    if (yv > yMx1 + 1e-9) break; 
+                    var py = y2p1(yv); 
+                    ctx.beginPath(); ctx.moveTo(pL, py); ctx.lineTo(pL + cw, py); ctx.stroke(); 
+                    ctx.fillText(yv.toFixed(yS1.step < 1 ? 1 : 0) + '%', pL - 8, py); 
+                }
+                var z0 = y2p1(0); ctx.strokeStyle = 'rgba(148,163,184,0.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pL, z0); ctx.lineTo(pL + cw, z0); ctx.stroke();
+
+                var gr1 = ctx.createLinearGradient(0, z0, 0, pT1 + ch1); gr1.addColorStop(0, 'rgba(239,68,68,0.02)'); gr1.addColorStop(1, 'rgba(239,68,68,0.22)');
+                ctx.beginPath(); ctx.moveTo(x2p(uw[0][xK]), z0);
+                for (var i = 0; i < uw.length; i++) ctx.lineTo(x2p(uw[i][xK]), y2p1(uw[i].uw));
+                ctx.lineTo(x2p(uw[uw.length - 1][xK]), z0); ctx.closePath(); ctx.fillStyle = gr1; ctx.fill();
+
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.beginPath();
+                for (var i = 0; i < uw.length; i++) { 
+                    var px = x2p(uw[i][xK]), py = y2p1(uw[i].uw); 
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); 
+                }
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                for (var i = 0; i <= yS2.count; i++) { 
+                    var yv = yMn2 + i * yS2.step; 
+                    if (yv > yMx2 + 1e-9) break; 
+                    var py = y2p2(yv); 
+                    ctx.beginPath(); ctx.moveTo(pL, py); ctx.lineTo(pL + cw, py); ctx.stroke(); 
+                    ctx.fillText(yv === 0 ? '0' : '1:' + yv.toFixed(0), pL - 8, py); 
+                }
+                var z0_2 = y2p2(0); ctx.strokeStyle = 'rgba(148,163,184,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pL, z0_2); ctx.lineTo(pL + cw, z0_2); ctx.stroke();
+
+                var gr2 = ctx.createLinearGradient(0, z0_2, 0, pT2); gr2.addColorStop(0, 'rgba(245,158,11,0.02)'); gr2.addColorStop(1, 'rgba(245,158,11,0.22)');
+                ctx.beginPath(); ctx.moveTo(x2p(uw[0][xK]), z0_2);
+                for (var i = 0; i < uw.length; i++) ctx.lineTo(x2p(uw[i][xK]), y2p2(uw[i].effectiveLeverage));
+                ctx.lineTo(x2p(uw[uw.length - 1][xK]), z0_2); ctx.closePath(); ctx.fillStyle = gr2; ctx.fill();
+
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.beginPath();
+                for (var i = 0; i < uw.length; i++) { 
+                    var px = x2p(uw[i][xK]), py = y2p2(uw[i].effectiveLeverage); 
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); 
+                }
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                for (var i = 0; i <= yS3.count; i++) { 
+                    var yv = yMn3 + i * yS3.step; 
+                    if (yv > yMx3 + 1e-9) break; 
+                    var py = y2p3(yv); 
+                    ctx.beginPath(); ctx.moveTo(pL, py); ctx.lineTo(pL + cw, py); ctx.stroke(); 
+                    ctx.fillText(yv.toFixed(yS3.step < 0.1 ? 2 : 1), pL - 8, py); 
+                }
+                var z0_3 = y2p3(0); ctx.strokeStyle = 'rgba(148,163,184,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pL, z0_3); ctx.lineTo(pL + cw, z0_3); ctx.stroke();
+
+                var gr3 = ctx.createLinearGradient(0, z0_3, 0, pT3); gr3.addColorStop(0, 'rgba(56,189,248,0.02)'); gr3.addColorStop(1, 'rgba(56,189,248,0.22)');
+                ctx.beginPath(); ctx.moveTo(x2p(uw[0][xK]), z0_3);
+                for (var i = 0; i < uw.length; i++) ctx.lineTo(x2p(uw[i][xK]), y2p3(uw[i].openLots));
+                ctx.lineTo(x2p(uw[uw.length - 1][xK]), z0_3); ctx.closePath(); ctx.fillStyle = gr3; ctx.fill();
+
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1.5; ctx.beginPath();
+                for (var i = 0; i < uw.length; i++) { 
+                    var px = x2p(uw[i][xK]), py = y2p3(uw[i].openLots); 
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); 
+                }
+                ctx.stroke();
+
                 ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
                 var xT = Math.min(8, Math.max(2, Math.floor(cw / 100)));
-                for (var i = 0; i <= xT; i++) { var xv = xMn + (xR * i / xT); ctx.fillText(ddFmtXL(xv), pL + (cw * i / xT), pT + ch + 8); }
-                // Fill
-                var gr = ctx.createLinearGradient(0, z0, 0, pT + ch); gr.addColorStop(0, 'rgba(239,68,68,0.05)'); gr.addColorStop(1, 'rgba(239,68,68,0.35)');
-                ctx.beginPath(); ctx.moveTo(x2p(uw[0][xK]), z0);
-                for (var i = 0; i < uw.length; i++) ctx.lineTo(x2p(uw[i][xK]), y2p(uw[i].uw));
-                ctx.lineTo(x2p(uw[uw.length - 1][xK]), z0); ctx.closePath(); ctx.fillStyle = gr; ctx.fill();
-                // Line
-                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.beginPath();
-                for (var i = 0; i < uw.length; i++) { var px = x2p(uw[i][xK]), py = y2p(uw[i].uw); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
-                ctx.stroke();
-                // Selected DD
+                for (var i = 0; i <= xT; i++) { 
+                    var xv = xMn + (xR * i / xT); 
+                    ctx.fillText(ddFmtXL(xv), pL + (cw * i / xT), pT3 + ch3 + 8); 
+                }
+
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.font = 'bold 11px "Inter","Segoe UI",sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText('UNDERWATER DRAWDOWN', pL + 10, pT1 + 8);
+                ctx.fillText('EFFEKTIVER HEBEL (LIMIT 1:' + ddLeverage + ')', pL + 10, pT2 + 8);
+                ctx.fillText('OFFENE LOTSIZE', pL + 10, pT3 + 8);
+
                 if (ddSelectedDD) {
                      var d = ddSelectedDD;
                      var pkX = ddXMode === 'index' ? d.peakIdx + 1 : d.peakTime;
@@ -1000,39 +1286,57 @@
                      var rcX = d.ongoing ? (ddXMode === 'index' ? uw[uw.length-1].idx : uw[uw.length-1].t) : (ddXMode === 'index' ? d.recoveryIdx + 1 : d.recoveryTime);
                      var ppk = x2p(pkX), ptr = x2p(trX), prc = x2p(rcX);
                      var bL = Math.max(pL, Math.min(pL+cw, ppk)), bR = Math.max(pL, Math.min(pL+cw, prc));
-                     ctx.fillStyle = 'rgba(245,158,11,0.12)'; ctx.fillRect(bL, pT, Math.max(2, bR - bL), ch);
-                     ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
-                     [ppk, ptr].forEach(function(vl) { if (vl >= pL-1 && vl <= pL+cw+1) { ctx.beginPath(); ctx.moveTo(vl, pT); ctx.lineTo(vl, pT+ch); ctx.stroke(); } });
+                     ctx.fillStyle = 'rgba(245,158,11,0.04)'; 
+                     ctx.fillRect(bL, pT1, Math.max(2, bR - bL), ch1);
+                     ctx.fillRect(bL, pT2, Math.max(2, bR - bL), ch2);
+                     ctx.fillRect(bL, pT3, Math.max(2, bR - bL), ch3);
+
+                     ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]);
+                     [ppk, ptr].forEach(function(vl) { if (vl >= pL-1 && vl <= pL+cw+1) { ctx.beginPath(); ctx.moveTo(vl, pT1); ctx.lineTo(vl, pT3+ch3); ctx.stroke(); } });
                      ctx.setLineDash([]);
                      var sS = d.peakIdx, sE = d.ongoing ? uw.length-1 : d.recoveryIdx;
                      if (sS != null && sE != null && sE >= sS) {
-                         ctx.beginPath(); ctx.moveTo(x2p(uw[sS][xK]), z0);
-                         for (var si = sS; si <= sE; si++) ctx.lineTo(x2p(uw[si][xK]), y2p(uw[si].uw));
-                         ctx.lineTo(x2p(uw[sE][xK]), z0); ctx.closePath(); ctx.fillStyle = 'rgba(245,158,11,0.25)'; ctx.fill();
-                         ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.beginPath();
-                         for (var si = sS; si <= sE; si++) { var sx = x2p(uw[si][xK]), sy = y2p(uw[si].uw); if (si === sS) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy); }
-                         ctx.stroke();
+                          ctx.beginPath(); ctx.moveTo(x2p(uw[sS][xK]), z0);
+                          for (var si = sS; si <= sE; si++) ctx.lineTo(x2p(uw[si][xK]), y2p1(uw[si].uw));
+                          ctx.lineTo(x2p(uw[sE][xK]), z0); ctx.closePath(); ctx.fillStyle = 'rgba(245,158,11,0.18)'; ctx.fill();
+                          ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.beginPath();
+                          for (var si = sS; si <= sE; si++) { var sx = x2p(uw[si][xK]), sy = y2p1(uw[si].uw); if (si === sS) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy); }
+                          ctx.stroke();
                      }
                      ctx.fillStyle = '#f59e0b';
-                     if (ppk >= pL && ppk <= pL+cw) { ctx.beginPath(); ctx.moveTo(ppk, pT); ctx.lineTo(ppk-5, pT-7); ctx.lineTo(ppk+5, pT-7); ctx.closePath(); ctx.fill(); }
-                     if (ptr >= pL && ptr <= pL+cw) { ctx.beginPath(); ctx.arc(ptr, y2p(uw[d.troughIdx].uw), 4, 0, Math.PI*2); ctx.fill(); }
+                     if (ppk >= pL && ppk <= pL+cw) { ctx.beginPath(); ctx.moveTo(ppk, pT1); ctx.lineTo(ppk-5, pT1-7); ctx.lineTo(ppk+5, pT1-7); ctx.closePath(); ctx.fill(); }
+                     if (ptr >= pL && ptr <= pL+cw) { ctx.beginPath(); ctx.arc(ptr, y2p1(uw[d.troughIdx].uw), 4, 0, Math.PI*2); ctx.fill(); }
                      var lb = (d.ongoing ? 'Laufend · ' : 'DD · ') + d.depthPct.toFixed(2) + '%';
-                     ctx.font = '600 12px "Inter","Segoe UI",sans-serif';
+                     ctx.font = '600 11px "Inter","Segoe UI",sans-serif';
                      var lx = Math.max(pL+4, Math.min(pL+cw-100, bL+4));
                      ctx.fillStyle = 'rgba(245,158,11,0.85)'; var tw2 = ctx.measureText(lb).width + 12;
-                     ctx.fillRect(lx, pT+6, tw2, 20); ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(lb, lx+6, pT+16);
+                     ctx.fillRect(lx, pT1+24, tw2, 20); ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(lb, lx+6, pT1+34);
                 }
-                // Border
-                ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.strokeRect(pL, pT, cw, ch);
-                // Hover dot
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; 
+                ctx.strokeRect(pL, pT1, cw, ch1);
+                ctx.strokeRect(pL, pT2, cw, ch2);
+                ctx.strokeRect(pL, pT3, cw, ch3);
+
                 if (ddHover) {
-                    var hx = x2p(ddHover[xK]), hy = y2p(ddHover.uw);
+                    var hx = x2p(ddHover[xK]);
+                    var hy1 = y2p1(ddHover.uw);
                     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(hx, hy1, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    
+                    var hy2 = y2p2(ddHover.effectiveLeverage);
+                    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(hx, hy2, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    
+                    var hy3 = y2p3(ddHover.openLots);
+                    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(hx, hy3, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
                 }
-                ddLayout = { pL:pL, pR:pR, pT:pT, pB:pB, cw:cw, ch:ch, xMn:xMn, xMx:xMx, xR:xR, yMn:yMn, yMx:yMx, yR:yR, xK:xK, x2p:x2p, y2p:y2p };
+
+                ddLayout = { pL:pL, pR:pR, pT1:pT1, pT2:pT2, pT3:pT3, ch1:ch1, ch2:ch2, ch3:ch3, cw:cw, xMn:xMn, xMx:xMx, xR:xR, yMn1:yMn1, yMx1:yMx1, yR1:yR1, yMn2:yMn2, yMx2:yMx2, yR2:yR2, yMn3:yMn3, yMx3:yMx3, yR3:yR3, xK:xK, x2p:x2p, y2p1:y2p1, y2p2:y2p2, y2p3:y2p3 };
             }
 
+            function ddRenderAll() { ddDraw(); ddRenderTable(); }
             function ddRenderTable() {
                 var tb = document.getElementById('dd-table-body'); if (!tb) return;
                 var arr = ddDrawdownPeriods.slice(), k = ddSortKey, dir = ddSortDir === 'asc' ? 1 : -1;
@@ -1050,7 +1354,6 @@
                 tb.innerHTML = h;
                 var rows = tb.querySelectorAll('tr');
                 for (var i = 0; i < rows.length; i++) rows[i].addEventListener('click', function() { ddToggleSel(parseInt(this.getAttribute('data-pi')), parseInt(this.getAttribute('data-ti'))); });
-                // Sort headers
                 var ths = document.querySelectorAll('table.dd-table th.dd-sortable');
                 for (var i = 0; i < ths.length; i++) { var sk = ths[i].getAttribute('data-sort'); ths[i].className = 'dd-sortable' + (sk===ddSortKey?' dd-sort-active '+(ddSortDir==='desc'?'dd-desc':'dd-asc'):''); }
             }
@@ -1066,7 +1369,6 @@
                 var near = uw[lo];
                 if (lo > 0 && Math.abs(uw[lo-1][ddLayout.xK]-xv) < Math.abs(uw[lo][ddLayout.xK]-xv)) near = uw[lo-1];
                 
-                // Only hover if cursor is reasonably close horizontally (e.g., within 40 pixels)
                 var nearPx = ddLayout.x2p(near[ddLayout.xK]);
                 if (Math.abs(nearPx - px) > 40) {
                     if (ddHover) { ddHover = null; ddHideTT(); ddDraw(); }
@@ -1074,7 +1376,7 @@
                 }
                 
                 ddHover = near;
-                var hpx = ddLayout.x2p(near[ddLayout.xK]), hpy = ddLayout.y2p(near.uw);
+                var hpx = ddLayout.x2p(near[ddLayout.xK]), hpy = ddLayout.y2p1(near.uw);
                 ddCrosshair.style.display = 'block'; ddCrosshair.style.left = hpx + 'px';
                 ddTooltip.style.display = 'block';
                 document.getElementById('dd-tt-title').textContent = '#' + near.idx + ' · ' + ddFmtDate(near.t);
@@ -1082,8 +1384,16 @@
                 document.getElementById('dd-tt-eq').textContent = ddFmtMoney(near.y) + ' ' + ACCOUNT_CURRENCY;
                 var pr = document.getElementById('dd-tt-peak-row');
                 if (near.peak !== near.y) { pr.style.display = 'flex'; document.getElementById('dd-tt-peak').textContent = ddFmtMoney(near.peak) + ' ' + ACCOUNT_CURRENCY; } else { pr.style.display = 'none'; }
+                
+                if (near.effectiveLeverage > 0) {
+                    document.getElementById('dd-tt-margin').textContent = '1:' + near.effectiveLeverage.toFixed(1) + ' (ca. ' + ddFmtMoney(near.totalNotional) + ' ' + ACCOUNT_CURRENCY + ' Vol.)';
+                } else {
+                    document.getElementById('dd-tt-margin').textContent = '0 (keine Trades)';
+                }
+                document.getElementById('dd-tt-lots').textContent = near.openLots.toFixed(2) + ' Lot';
+
                 var cW = ddChartWrap.clientWidth, ttL = hpx + 14; if (ttL + 200 > cW) ttL = hpx - 214;
-                var ttT = Math.max(ddLayout.pT+4, Math.min(hpy-30, ddLayout.pT+ddLayout.ch-94));
+                var ttT = Math.max(ddLayout.pT1+4, Math.min(hpy-30, ddLayout.pT1+ddLayout.ch1+ddLayout.ch2+ddLayout.ch3-114));
                 ddTooltip.style.left = ttL+'px'; ddTooltip.style.top = Math.max(4,ttT)+'px';
                 ddDraw();
             });
@@ -1105,7 +1415,6 @@
             function ddFmtXL(v) { if(ddXMode==='index') return '#'+Math.round(v); var d=new Date(v); if(isNaN(d.getTime())) return ''; var m=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']; return d.getDate()+'. '+m[d.getMonth()]; }
             function ddNiceScale(mn,mx,tt) { if(!isFinite(mn)||!isFinite(mx)||mn===mx){var sp=Math.abs(mx)||1; return {min:mn-sp*0.1,max:mx+sp*0.1,step:sp*0.1,count:2};} var r=mx-mn,rough=r/Math.max(1,tt),exp=Math.floor(Math.log10(rough)),base=Math.pow(10,exp),m2=rough/base,nice; if(m2<1.5)nice=1;else if(m2<3)nice=2;else if(m2<7)nice=5;else nice=10; var step=nice*base,min=Math.floor(mn/step)*step,max=Math.ceil(mx/step)*step; return {min:min,max:max,step:step,count:Math.max(1,Math.round((max-min)/step))}; }
 
-            // Time range filter integration
             window.ddApplyTimeFilter = function(timeStartTs, visualStart, visualEnd) {
                 ddSelectedTimeFilterTs = timeStartTs;
                 ddSelectedTimeStartTs = visualStart || timeStartTs || 0;

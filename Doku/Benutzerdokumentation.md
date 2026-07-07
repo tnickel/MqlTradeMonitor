@@ -132,6 +132,22 @@ Chronologische Liste aller geschlossenen Trades mit konfigurierbarem Zeitraum-Fi
 
 Der gewaehlte Filter wird pro Account im Browser gespeichert.
 
+### 5.5 Drawdown-Analyzer
+
+Der **Drawdown-Analyzer** ist ein spezialisiertes Analysetool in der Detailansicht Ihres Kontos. Es ermöglicht eine tiefgehende Untersuchung der historischen Drawdown-Perioden sowie der Hebel- und Lot-Auslastung.
+
+- **Drei synchronisierte Subplots:**
+  1. **Underwater Drawdown (Rot):** Zeigt den historischen prozentualen Drawdown bezogen auf das jeweilige Allzeithoch (HWM).
+  2. **Effektiver Hebel (Orange):** Berechnet als das gesamte offene Positionsvolumen (Notional) dividiert durch den Kontosaldo. Quote-Währungen wie JPY, CAD, CHF, GBP etc. werden hierbei automatisch anhand von Wechselkursen in die Kontowährung (EUR/USD) umgerechnet, um Skalierungsfehler zu vermeiden.
+  3. **Offene Lotsize (Cyan):** Zeigt die Summe aller offenen Kontrakte (Lots) über den Verlauf.
+- **Hebel-Limit konfigurieren:** Sie können den Hebel des Brokers manuell konfigurieren (z. B. `1:20` für Pepperstone-Konten, `1:500` für Tickmill) und persistent speichern. Das Limit wird direkt als Referenzlinie im Hebel-Diagramm angezeigt.
+- **Detaillierter Hover-Tooltip:** Beim Bewegen der Maus über das Diagramm werden die exakten Snapshot-Werte angezeigt:
+  - Exakte Drawdown-Tiefe in %
+  - Equity und Allzeithoch (Peak)
+  - Effektiver Hebel inklusive absolutem Positionsvolumen in Kontowährung (z. B. `1:2.5 (ca. 40.000 EUR Vol.)`)
+  - Offene Lotsize
+- **Drawdown-Historientabelle:** Listet alle identifizierten Drawdown-Perioden chronologisch auf, inklusive Dauer (Rückgansphase und Erholungsphase in Tagen), maximaler Tiefe in EUR und % sowie dem Status (Laufend oder Erholt). Ein Klick auf eine Periode markiert diese farblich im Diagramm.
+
 ---
 
 ## 6. Berichte
