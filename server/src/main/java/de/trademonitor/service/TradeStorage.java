@@ -236,6 +236,16 @@ public class TradeStorage {
                 entity.setMagicNumber(trade.getMagicNumber());
                 entity.setComment(trade.getComment());
                 entity.setSl(trade.getSl());
+                entity.setOpenTimeMsc(trade.getOpenTimeMsc());
+                entity.setCloseTimeMsc(trade.getCloseTimeMsc());
+                entity.setOpenAsk(trade.getOpenAsk());
+                entity.setOpenBid(trade.getOpenBid());
+                entity.setCloseAsk(trade.getCloseAsk());
+                entity.setCloseBid(trade.getCloseBid());
+                entity.setOpenOrderSetupTimeMsc(trade.getOpenOrderSetupTimeMsc());
+                entity.setCloseOrderSetupTimeMsc(trade.getCloseOrderSetupTimeMsc());
+                entity.setOpenTicks(trade.getOpenTicks());
+                entity.setCloseTicks(trade.getCloseTicks());
                 toInsert.add(entity);
                 existingTicketsSet.add(trade.getTicket());
             }
@@ -339,6 +349,16 @@ public class TradeStorage {
             trade.setMagicNumber(entity.getMagicNumber());
             trade.setComment(entity.getComment());
             trade.setSl(entity.getSl());
+            trade.setOpenTimeMsc(entity.getOpenTimeMsc());
+            trade.setCloseTimeMsc(entity.getCloseTimeMsc());
+            trade.setOpenAsk(entity.getOpenAsk());
+            trade.setOpenBid(entity.getOpenBid());
+            trade.setCloseAsk(entity.getCloseAsk());
+            trade.setCloseBid(entity.getCloseBid());
+            trade.setOpenOrderSetupTimeMsc(entity.getOpenOrderSetupTimeMsc());
+            trade.setCloseOrderSetupTimeMsc(entity.getCloseOrderSetupTimeMsc());
+            trade.setOpenTicks(entity.getOpenTicks());
+            trade.setCloseTicks(entity.getCloseTicks());
             result.add(trade);
         }
         return result;

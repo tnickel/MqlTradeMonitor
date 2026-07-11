@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.09"
+#property version   "1.12"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -24,7 +24,7 @@ bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExis
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.09"
+#define EA_VERSION "1.12"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -87,6 +87,7 @@ void UpdateStatusLabel(string text, color col);
 void SaveLastSyncTime(string closeTime);
 bool RegisterWithServer();
 bool SendInitialTradeList();
+string GetTicksJson(string symbol, long timeMsc);
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -802,6 +803,77 @@ string BuildOpenTradesJson()
 }
 
 //+------------------------------------------------------------------+
+//| Get market Bid and Ask for a symbol at a specific millisecond    |
+//+------------------------------------------------------------------+
+void GetMarketBidAsk(string symbol, long timeMsc, double &bid, double &ask)
+{
+   bid = 0.0;
+   ask = 0.0;
+   
+   MqlTick ticks[];
+   // Copy ticks in a 4-second window centered at timeMsc
+   int copied = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, timeMsc - 2000, timeMsc + 2000);
+   if(copied > 0)
+   {
+      long minDiff = 99999999;
+      int bestIdx = -1;
+      for(int k = 0; k < copied; k++)
+      {
+         long diff = MathAbs(ticks[k].time_msc - timeMsc);
+         if(diff < minDiff)
+         {
+            minDiff = diff;
+            bestIdx = k;
+         }
+      }
+      if(bestIdx != -1)
+      {
+         bid = ticks[bestIdx].bid;
+         ask = ticks[bestIdx].ask;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Get tick history around a specific millisecond as JSON           |
+//+------------------------------------------------------------------+
+string GetTicksJson(string symbol, long timeMsc)
+{
+   MqlTick ticks[];
+   // Copy ticks in a 4-second window centered at timeMsc
+   int copied = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, timeMsc - 2000, timeMsc + 2000);
+   if(copied <= 0) return "[]";
+   
+   string json = "[";
+   for(int i = 0; i < copied; i++)
+   {
+      if(i > 0) json += ",";
+      json += "[" + IntegerToString(ticks[i].time_msc) + "," + 
+              DoubleToString(ticks[i].bid, 5) + "," + 
+              DoubleToString(ticks[i].ask, 5) + "," + 
+              DoubleToString(ticks[i].volume_real, 2) + "]";
+   }
+   json += "]";
+   return json;
+}
+
+//+------------------------------------------------------------------+
+//| Get historical order setup time in milliseconds                 |
+//+------------------------------------------------------------------+
+long GetOrderSetupTimeMsc(ulong orderTicket)
+{
+   if(orderTicket > 0 && HistoryOrderSelect(orderTicket))
+   {
+      long type = HistoryOrderGetInteger(orderTicket, ORDER_TYPE);
+      if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
+      {
+         return HistoryOrderGetInteger(orderTicket, ORDER_TIME_SETUP_MSC);
+      }
+   }
+   return 0;
+}
+
+//+------------------------------------------------------------------+
 //| Build JSON array of closed trades (history)                        |
 //+------------------------------------------------------------------+
 string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
@@ -863,12 +935,17 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             
             // Determine the original trade direction and total commission by finding the ENTRY_IN deal
             // for this position via DEAL_POSITION_ID. Optimized to search backwards from i-1 to 0 (O(N) total runtime).
+            string symbol = HistoryDealGetString(ticket, DEAL_SYMBOL);
             string typeStr = "UNKNOWN";
             double openPrice = HistoryDealGetDouble(ticket, DEAL_PRICE); // fallback: OUT deal price
             string openTime = closeTime; // fallback: same as close time
+            long openTimeMsc = dealTimeVal * 1000; // fallback: close time in ms
             long magicNumber = HistoryDealGetInteger(ticket, DEAL_MAGIC); // fallback: OUT deal magic number
             double totalCommission = HistoryDealGetDouble(ticket, DEAL_COMMISSION); // start with OUT deal commission
             string tradeComment = HistoryDealGetString(ticket, DEAL_COMMENT);
+            long openOrderSetupTimeMsc = 0;
+            double openBid = 0.0;
+            double openAsk = 0.0;
             
             long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
             if(positionId > 0)
@@ -893,6 +970,10 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                         typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
                         openPrice = HistoryDealGetDouble(otherTicket, DEAL_PRICE);
                         openTime = TimeToString((datetime)HistoryDealGetInteger(otherTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                        openTimeMsc = HistoryDealGetInteger(otherTicket, DEAL_TIME_MSC);
+                        
+                        ulong openOrderTicket = HistoryDealGetInteger(otherTicket, DEAL_ORDER);
+                        openOrderSetupTimeMsc = GetOrderSetupTimeMsc(openOrderTicket);
                         
                         // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
                         long inMagic = HistoryDealGetInteger(otherTicket, DEAL_MAGIC);
@@ -912,9 +993,28 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                typeStr = (dealType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
             }
             
+            long closeTimeMsc = HistoryDealGetInteger(ticket, DEAL_TIME_MSC);
+            ulong closeOrderTicket = HistoryDealGetInteger(ticket, DEAL_ORDER);
+            long closeOrderSetupTimeMsc = GetOrderSetupTimeMsc(closeOrderTicket);
+            double closeBid = 0.0;
+            double closeAsk = 0.0;
+            
+            string openTicksJson = "[]";
+            string closeTicksJson = "[]";
+            
+            // Query market ticks for recent trades to analyze slippage (limit to last 7 days for full history scan)
+            datetime currentMqlTime = TimeCurrent();
+            if(isIncremental || dealTimeVal >= currentMqlTime - 7 * 24 * 3600)
+            {
+               GetMarketBidAsk(symbol, openTimeMsc, openBid, openAsk);
+               GetMarketBidAsk(symbol, closeTimeMsc, closeBid, closeAsk);
+               openTicksJson = GetTicksJson(symbol, openTimeMsc);
+               closeTicksJson = GetTicksJson(symbol, closeTimeMsc);
+            }
+            
             historyJson += "{";
             historyJson += "\"ticket\":" + IntegerToString(ticket) + ",";
-            historyJson += "\"symbol\":\"" + EscapeJson(HistoryDealGetString(ticket, DEAL_SYMBOL)) + "\",";
+            historyJson += "\"symbol\":\"" + EscapeJson(symbol) + "\",";
             historyJson += "\"type\":\"" + typeStr + "\",";
             historyJson += "\"volume\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_VOLUME), 2) + ",";
             historyJson += "\"openPrice\":" + DoubleToString(openPrice, 5) + ",";
@@ -925,7 +1025,17 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "\"swap\":" + DoubleToString(HistoryDealGetDouble(ticket, DEAL_SWAP), 2) + ",";
             historyJson += "\"commission\":" + DoubleToString(totalCommission, 2) + ",";
             historyJson += "\"magicNumber\":" + IntegerToString(magicNumber) + ",";
-            historyJson += "\"comment\":\"" + EscapeJson(tradeComment) + "\"";
+            historyJson += "\"comment\":\"" + EscapeJson(tradeComment) + "\",";
+            historyJson += "\"openTimeMsc\":" + IntegerToString(openTimeMsc) + ",";
+            historyJson += "\"closeTimeMsc\":" + IntegerToString(closeTimeMsc) + ",";
+            historyJson += "\"openAsk\":" + DoubleToString(openAsk, 5) + ",";
+            historyJson += "\"openBid\":" + DoubleToString(openBid, 5) + ",";
+            historyJson += "\"closeAsk\":" + DoubleToString(closeAsk, 5) + ",";
+            historyJson += "\"closeBid\":" + DoubleToString(closeBid, 5) + ",";
+            historyJson += "\"openOrderSetupTimeMsc\":" + IntegerToString(openOrderSetupTimeMsc) + ",";
+            historyJson += "\"closeOrderSetupTimeMsc\":" + IntegerToString(closeOrderSetupTimeMsc) + ",";
+            historyJson += "\"openTicks\":\"" + EscapeJson(openTicksJson) + "\",";
+            historyJson += "\"closeTicks\":\"" + EscapeJson(closeTicksJson) + "\"";
             historyJson += "}";
             
             // Progress logging every 100 closed trades

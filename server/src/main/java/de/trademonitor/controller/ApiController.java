@@ -496,9 +496,9 @@ public class ApiController {
     @GetMapping("/latest-version")
     public ResponseEntity<?> getLatestVersion() {
         return ResponseEntity.ok(Map.of(
-                "versionCode", 5,
-                "versionName", "1.4",
-                "downloadUrl", "https://monitor.tnickel-ki.de/trademonitor_v1.4.apk"
+                "versionCode", 6,
+                "versionName", "1.5",
+                "downloadUrl", "https://monitor.tnickel-ki.de/trademonitor_v1.5.apk"
         ));
     }
 }

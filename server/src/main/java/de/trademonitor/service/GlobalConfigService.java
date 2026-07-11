@@ -763,7 +763,7 @@ public class GlobalConfigService {
         String trimmed = ip.trim();
         if (!cachedFail2banWhitelistIps.contains(trimmed)) {
             cachedFail2banWhitelistIps.addFirst(trimmed);
-            while (cachedFail2banWhitelistIps.size() > 3) {
+            while (cachedFail2banWhitelistIps.size() > 50) {
                 cachedFail2banWhitelistIps.removeLast();
             }
             String joined = String.join(",", cachedFail2banWhitelistIps);

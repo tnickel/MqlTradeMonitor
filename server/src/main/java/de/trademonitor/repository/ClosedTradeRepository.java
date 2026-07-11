@@ -2,6 +2,7 @@ package de.trademonitor.repository;
 
 import de.trademonitor.entity.ClosedTradeEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +23,9 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
 
     long countByAccountId(long accountId);
 
+    @Modifying
     @Transactional
+    @Query("DELETE FROM ClosedTradeEntity c WHERE c.accountId = :accountId")
     void deleteByAccountId(long accountId);
 
     @Query("SELECT MIN(c.closeTime) FROM ClosedTradeEntity c WHERE c.accountId = ?1")

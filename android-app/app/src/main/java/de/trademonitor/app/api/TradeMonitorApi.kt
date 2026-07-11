@@ -42,6 +42,9 @@ interface TradeMonitorApi {
     @POST("admin/api/security-audit/run")
     suspend fun runSecurityAudit(): SecurityAudit
 
+    @POST("admin/api/fail2ban/unban")
+    suspend fun unbanIp(@Query("ipAddress") ipAddress: String): Response<Map<String, String>>
+
     @GET("api/latest-version")
     suspend fun getLatestVersion(): VersionResponse
 

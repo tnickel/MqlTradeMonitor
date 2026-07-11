@@ -324,7 +324,7 @@
                               th:text="${ip}">1.2.3.4</span>
                     </div>
 
-                    <h3 style="font-size: 0.95rem; color: #e1e1e1; margin: 20px 0 10px 0; border-top: 1px solid #30363d; padding-top: 15px;">🛡️ Whitelist (Max. 3 IPs)</h3>
+                    <h3 style="font-size: 0.95rem; color: #e1e1e1; margin: 20px 0 10px 0; border-top: 1px solid #30363d; padding-top: 15px;">🛡️ Whitelist (Max. 50 IPs)</h3>
                     <p style="color: #8b949e; font-size: 0.8rem; margin-bottom: 12px;">Diese IPs sind dauerhaft vor Banns geschützt. Admins werden bei Login automatisch whitelisted.</p>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
                         <span th:if="${fail2banWhitelist == null || fail2banWhitelist.isEmpty()}" style="color: #6e7681; font-size: 0.85rem;">Keine IPs whitelisted.</span>

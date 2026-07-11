@@ -45,6 +45,8 @@ object UpdateManager {
                     withContext(Dispatchers.Main) {
                         latestVersionName = response.versionName
                         downloadUrl = response.downloadUrl
+                        downloadProgress.value = 0f
+                        isDownloading.value = false
                         isUpdateAvailable.value = true
                         showUpdateDialog.value = true
                     }

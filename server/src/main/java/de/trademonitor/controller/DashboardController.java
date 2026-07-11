@@ -620,7 +620,15 @@ public class DashboardController {
     @PostMapping("/api/account/reset-trades")
     @ResponseBody
     public ResponseEntity<String> resetAccountTrades(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId) {
+        // Reset is destructive (deletes all trades + equity snapshots) and must be
+        // admin-only. Never rely on the button being hidden in the template — the
+        // endpoint can be called directly, so enforce the role here as well.
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body("Nur der Admin darf die Trades-Datenbank zurücksetzen.");
+        }
         accountManager.resetAccountTrades(accountId);
         return ResponseEntity.ok("Reset complete");
     }
@@ -817,6 +825,16 @@ public class DashboardController {
             row.put("magicNumber", ct.getMagicNumber());
             row.put("comment", magicMappingService.resolveComment(ct.getMagicNumber(), ct.getComment(), mappings));
             row.put("sl", ct.getSl());
+            row.put("openTimeMsc", ct.getOpenTimeMsc());
+            row.put("closeTimeMsc", ct.getCloseTimeMsc());
+            row.put("openAsk", ct.getOpenAsk());
+            row.put("openBid", ct.getOpenBid());
+            row.put("closeAsk", ct.getCloseAsk());
+            row.put("closeBid", ct.getCloseBid());
+            row.put("openOrderSetupTimeMsc", ct.getOpenOrderSetupTimeMsc());
+            row.put("closeOrderSetupTimeMsc", ct.getCloseOrderSetupTimeMsc());
+            row.put("openTicks", ct.getOpenTicks());
+            row.put("closeTicks", ct.getCloseTicks());
             payload.add(row);
         }
         return ResponseEntity.ok(payload);

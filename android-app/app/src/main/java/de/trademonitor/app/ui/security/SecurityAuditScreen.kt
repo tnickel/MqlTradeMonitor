@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
@@ -317,18 +318,105 @@ fun SecurityAuditScreen(
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .padding(8.dp)
+                                                .padding(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
                                             bannedIps.forEach { ip ->
-                                                Text(
-                                                    text = "🚫 $ip",
-                                                    color = NeonRed,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    fontSize = 12.sp,
-                                                    modifier = Modifier.padding(vertical = 2.dp)
-                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "🚫 $ip",
+                                                        color = NeonRed,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontSize = 12.sp,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    IconButton(
+                                                        onClick = {
+                                                            isLoading = true
+                                                            coroutineScope.launch {
+                                                                try {
+                                                                    val api = ApiClient.getService(context)
+                                                                    val res = api.unbanIp(ip)
+                                                                    if (res.isSuccessful) {
+                                                                        actionMessage = "IP $ip entsperrt!"
+                                                                        audit = api.getSecurityAudit()
+                                                                    } else {
+                                                                        errorMessage = "Fehler beim Entsperren"
+                                                                    }
+                                                                } catch (e: Exception) {
+                                                                    errorMessage = e.localizedMessage
+                                                                } finally {
+                                                                    isLoading = false
+                                                                }
+                                                            }
+                                                        },
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = "IP entsperren",
+                                                            tint = NeonRed,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
+                                    }
+                                }
+
+                                // Manual IP unban input field
+                                var manualIpToUnban by remember { mutableStateOf("") }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = manualIpToUnban,
+                                        onValueChange = { manualIpToUnban = it },
+                                        label = { Text("IP manuell entsperren", fontSize = 11.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f).height(50.dp),
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontFamily = FontFamily.Monospace),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                        )
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (manualIpToUnban.isNotBlank()) {
+                                                val ip = manualIpToUnban.trim()
+                                                isLoading = true
+                                                coroutineScope.launch {
+                                                    try {
+                                                        val api = ApiClient.getService(context)
+                                                        val res = api.unbanIp(ip)
+                                                        if (res.isSuccessful) {
+                                                            actionMessage = "IP $ip entsperrt!"
+                                                            manualIpToUnban = ""
+                                                            audit = api.getSecurityAudit()
+                                                        } else {
+                                                            errorMessage = "Fehler beim Entsperren"
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        errorMessage = e.localizedMessage
+                                                    } finally {
+                                                        isLoading = false
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.height(50.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Go", fontSize = 11.sp)
                                     }
                                 }
                             }

@@ -37,6 +37,18 @@ public class ClosedTradeEntity {
     private String comment;
     @Column(nullable = true)
     private Double sl;
+    private Long openTimeMsc;
+    private Long closeTimeMsc;
+    private Double openAsk;
+    private Double openBid;
+    private Double closeAsk;
+    private Double closeBid;
+    private Long openOrderSetupTimeMsc;
+    private Long closeOrderSetupTimeMsc;
+    @Column(columnDefinition = "TEXT")
+    private String openTicks;
+    @Column(columnDefinition = "TEXT")
+    private String closeTicks;
 
     public ClosedTradeEntity() {
     }
@@ -168,5 +180,85 @@ public class ClosedTradeEntity {
 
     public void setSl(Double sl) {
         this.sl = sl;
+    }
+
+    public Long getOpenTimeMsc() {
+        return openTimeMsc;
+    }
+
+    public void setOpenTimeMsc(Long openTimeMsc) {
+        this.openTimeMsc = openTimeMsc;
+    }
+
+    public Long getCloseTimeMsc() {
+        return closeTimeMsc;
+    }
+
+    public void setCloseTimeMsc(Long closeTimeMsc) {
+        this.closeTimeMsc = closeTimeMsc;
+    }
+
+    public Double getOpenAsk() {
+        return openAsk;
+    }
+
+    public void setOpenAsk(Double openAsk) {
+        this.openAsk = openAsk;
+    }
+
+    public Double getOpenBid() {
+        return openBid;
+    }
+
+    public void setOpenBid(Double openBid) {
+        this.openBid = openBid;
+    }
+
+    public Double getCloseAsk() {
+        return closeAsk;
+    }
+
+    public void setCloseAsk(Double closeAsk) {
+        this.closeAsk = closeAsk;
+    }
+
+    public Double getCloseBid() {
+        return closeBid;
+    }
+
+    public void setCloseBid(Double closeBid) {
+        this.closeBid = closeBid;
+    }
+
+    public Long getOpenOrderSetupTimeMsc() {
+        return openOrderSetupTimeMsc;
+    }
+
+    public void setOpenOrderSetupTimeMsc(Long openOrderSetupTimeMsc) {
+        this.openOrderSetupTimeMsc = openOrderSetupTimeMsc;
+    }
+
+    public Long getCloseOrderSetupTimeMsc() {
+        return closeOrderSetupTimeMsc;
+    }
+
+    public void setCloseOrderSetupTimeMsc(Long closeOrderSetupTimeMsc) {
+        this.closeOrderSetupTimeMsc = closeOrderSetupTimeMsc;
+    }
+
+    public String getOpenTicks() {
+        return openTicks;
+    }
+
+    public void setOpenTicks(String openTicks) {
+        this.openTicks = openTicks;
+    }
+
+    public String getCloseTicks() {
+        return closeTicks;
+    }
+
+    public void setCloseTicks(String closeTicks) {
+        this.closeTicks = closeTicks;
     }
 }

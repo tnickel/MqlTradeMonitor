@@ -1482,7 +1482,9 @@
 
         <!-- ==================== TAB: TRADES ==================== -->
         <div id="tab-trades" class="tab-content">
-            <section class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
+            <!-- Reset is destructive and admin-only: only render it for admins.
+                 (The endpoint additionally enforces the admin role server-side.) -->
+            <section th:if="${isAdmin}" class="trades-section" style="padding: 1rem 1.5rem; display: flex; justify-content: flex-end;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <span id="resetTradesFeedback" style="font-size: 0.85rem; color: #3fb950; display: none;"></span>
                     <button type="button" id="resetTradesBtn" onclick="resetAccountTrades()"
@@ -1494,6 +1496,29 @@
                     </button>
                 </div>
             </section>
+
+            <!-- Custom confirmation overlay for the reset action. A native confirm()
+                 can be silently suppressed by the browser ("prevent this page from
+                 creating additional dialogs"), which makes the button appear dead. -->
+            <div th:if="${isAdmin}" id="resetConfirmModal"
+                 style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:3000; align-items:center; justify-content:center; padding:2rem; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);"
+                 onclick="if(event.target===this)closeResetConfirm()">
+                <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; max-width:520px; width:100%; padding:1.75rem; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                    <h3 style="margin:0 0 1rem; color:#f0f6fc; font-size:1.1rem;">🗑️ Trades-Datenbank zurücksetzen?</h3>
+                    <p style="color:#c9d1d9; font-size:0.9rem; line-height:1.5; margin:0 0 0.75rem;">
+                        <strong style="color:#ef4444;">ACHTUNG:</strong> Alle Trades (offen + geschlossen) und Equity-Snapshots für diesen Account werden <strong>unwiderruflich gelöscht</strong>.
+                    </p>
+                    <p style="color:#8b949e; font-size:0.85rem; line-height:1.5; margin:0 0 1.5rem;">
+                        Danach im MetaTrader <strong>„Reconnect Server"</strong> drücken, damit die Daten neu übertragen werden.
+                    </p>
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" onclick="closeResetConfirm()"
+                                style="background:transparent; border:1px solid #30363d; color:#c9d1d9; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.85rem;">Abbrechen</button>
+                        <button type="button" id="resetConfirmBtn" onclick="confirmResetAccountTrades()"
+                                style="background:#b91c1c; border:1px solid #b91c1c; color:white; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:600;">Endgültig löschen</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- ======= OPEN TRADES ======= -->
             <section class="trades-section">
@@ -1619,16 +1644,19 @@
                                 <th>Close Time</th>
                                 <th>Duration</th>
                                 <th>Close Price</th>
+                                <th>Slippage (O/C)</th>
+                                <th>Latenz (O/C)</th>
                                 <th>Swap</th>
                                 <th>Commission</th>
                                 <th>Profit</th>
                                 <th>Magic</th>
                                 <th>Comment</th>
+                                <th>Analyse</th>
                             </tr>
                         </thead>
                         <tbody id="closed-trades-tbody">
                             <tr>
-                                <td colspan="13" style="text-align: center; padding: 2rem; color: #a0a0c0;">
+                                <td colspan="16" style="text-align: center; padding: 2rem; color: #a0a0c0;">
                                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                                         <div style="width: 20px; height: 20px; border: 3px solid rgba(99,102,241,0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                                         Lade historische Trades...
@@ -2083,7 +2111,171 @@
             </div>
         </div>
 
+        <!-- Tick Analysis Modal -->
+        <div id="tick-analysis-modal" class="chart-modal" style="display: none;">
+            <div class="chart-modal-content" style="max-width: 1600px; width: 95vw; height: 90vh; display: flex; flex-direction: column;">
+                <button class="chart-modal-close" onclick="closeTickAnalysisModal()">✕</button>
+                <h2 class="chart-modal-title" style="margin-top: 0; color: #fff; display: flex; align-items: center; gap: 10px;">
+                    <span>📊 Tick-Ausführungs-Analyse</span>
+                    <span id="tanal-ticket-badge" style="font-size: 0.85rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); padding: 2px 8px; border-radius: 6px; font-weight: normal;">Ticket #...</span>
+                </h2>
+                
+                <!-- Trade info header -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; margin-bottom: 15px;">
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Symbol</span><strong id="tanal-symbol" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Typ</span><strong id="tanal-type" style="font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Volumen</span><strong id="tanal-volume" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Entry-Preis</span><strong id="tanal-open-price" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Exit-Preis</span><strong id="tanal-close-price" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Gewinn</span><strong id="tanal-profit" style="font-size: 1.1rem;">-</strong></div>
+                </div>
 
+                <!-- Legend / Explanation banner -->
+                <div style="background: rgba(30, 41, 59, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 0.8rem; line-height: 1.4;">
+                    <strong style="color: #fff; display: block; margin-bottom: 5px;">💡 Grafik-Erklärung:</strong>
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px 25px;">
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 3px; background: #ef4444; display: inline-block; border-radius: 1.5px;"></span> <span style="color: var(--text-secondary);"><strong style="color: #ef4444;">Ask (Rot):</strong> Aktueller Kaufpreis der Liquiditätsanbieter.</span></span>
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 3px; background: #3b82f6; display: inline-block; border-radius: 1.5px;"></span> <span style="color: var(--text-secondary);"><strong style="color: #3b82f6;">Bid (Blau):</strong> Aktueller Verkaufpreis der Liquiditätsanbieter.</span></span>
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 3px; background: #10b981; border-top: 1.5px dashed #10b981; display: inline-block;"></span> <span style="color: var(--text-secondary);"><strong style="color: #10b981;">Dein Preis (Grün gestrichelt):</strong> Der tatsächliche Preis, zu dem deine Order ausgeführt wurde.</span></span>
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 2px; height: 12px; background: #e0af68; display: inline-block;"></span> <span style="color: var(--text-secondary);"><strong style="color: #e0af68;">Ausführung (Gold):</strong> Der genaue Ausführungszeitpunkt (0ms).</span></span>
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 2px; height: 12px; background: #a78bfa; border-left: 1.5px dashed #a78bfa; display: inline-block;"></span> <span style="color: var(--text-secondary);"><strong style="color: #a78bfa;">Order platziert (Lila gestrichelt):</strong> Zeitpunkt, an dem die Order von MT5 gesendet wurde.</span></span>
+                        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 8px; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.3); display: inline-block; border-radius: 2px;"></span> <span style="color: var(--text-secondary);"><strong style="color: #a78bfa;">Spread (Farbige Fläche):</strong> Differenz zwischen Ask und Bid. Je höher, desto teurer die Ausführung.</span></span>
+                    </div>
+                </div>
+
+                <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; gap: 15px; padding-right: 5px;">
+                    <!-- Grid for charts -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 15px;">
+                        <!-- Open Chart -->
+                        <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: flex; flex-direction: column;">
+                            <h3 style="margin-top: 0; color: #7dd3fc; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                                <span id="tanal-open-title-text">📥 Einstieg (Open) Tick-Verlauf</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="tanal-open-time-badge" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; margin-right: 4px;">-</span>
+                                    <button onclick="zoomChart('open')" style="background: rgba(125, 211, 252, 0.08); border: 1px solid rgba(125, 211, 252, 0.25); color: #7dd3fc; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(125, 211, 252, 0.18)'" onmouseout="this.style.background='rgba(125, 211, 252, 0.08)'" title="Grafik vergrößern">
+                                        ⛶ Vollbild
+                                    </button>
+                                </div>
+                            </h3>
+                            <div style="position: relative; height: 420px; width: 100%;">
+                                <canvas id="tanal-open-chart"></canvas>
+                            </div>
+                            
+                            <!-- Open Ticks Table -->
+                            <div style="margin-top: 10px; max-height: 150px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.75rem;">
+                                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                                    <thead style="position: sticky; top: 0; background: #1e293b; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                        <tr>
+                                            <th style="padding: 4px 8px;">Zeit</th>
+                                            <th style="padding: 4px 8px;">Bid</th>
+                                            <th style="padding: 4px 8px;">Ask</th>
+                                            <th style="padding: 4px 8px;">Spread</th>
+                                            <th style="padding: 4px 8px;">Volumen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tanal-open-ticks-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Mini stats for Open -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem;">
+                                <div><span style="color: var(--text-secondary);">Slippage:</span> <strong id="tanal-open-slippage" style="display:block;">-</strong></div>
+                                <div><span style="color: var(--text-secondary);">Latenz:</span> <strong id="tanal-open-latency" style="display:block;">-</strong></div>
+                                <div><span style="color: var(--text-secondary);">Tick-Frequenz:</span> <strong id="tanal-open-freq" style="display:block; color:#fff;">-</strong></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Close Chart -->
+                        <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: flex; flex-direction: column;">
+                            <h3 style="margin-top: 0; color: #a78bfa; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                                <span id="tanal-close-title-text">📤 Ausstieg (Close) Tick-Verlauf</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="tanal-close-time-badge" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; margin-right: 4px;">-</span>
+                                    <button onclick="zoomChart('close')" style="background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(167, 139, 250, 0.18)'" onmouseout="this.style.background='rgba(167, 139, 250, 0.08)'" title="Grafik vergrößern">
+                                        ⛶ Vollbild
+                                    </button>
+                                </div>
+                            </h3>
+                            <div style="position: relative; height: 420px; width: 100%;">
+                                <canvas id="tanal-close-chart"></canvas>
+                            </div>
+
+                            <!-- Close Ticks Table -->
+                            <div style="margin-top: 10px; max-height: 150px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.75rem;">
+                                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                                    <thead style="position: sticky; top: 0; background: #1e293b; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                        <tr>
+                                            <th style="padding: 4px 8px;">Zeit</th>
+                                            <th style="padding: 4px 8px;">Bid</th>
+                                            <th style="padding: 4px 8px;">Ask</th>
+                                            <th style="padding: 4px 8px;">Spread</th>
+                                            <th style="padding: 4px 8px;">Volumen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tanal-close-ticks-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Mini stats for Close -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem;">
+                                <div><span style="color: var(--text-secondary);">Slippage:</span> <strong id="tanal-close-slippage" style="display:block;">-</strong></div>
+                                <div><span style="color: var(--text-secondary);">Latenz:</span> <strong id="tanal-close-latency" style="display:block;">-</strong></div>
+                                <div><span style="color: var(--text-secondary);">Tick-Frequenz:</span> <strong id="tanal-close-freq" style="display:block; color:#fff;">-</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk analysis block -->
+                    <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px;">
+                        <h3 style="margin-top: 0; margin-bottom: 10px; color: var(--accent-secondary, #6366f1); font-size: 1rem; display: flex; align-items: center; gap: 8px;">🛡️ 1000 Lot Liquiditäts- & Slippage-Risikoanalyse</h3>
+                        <div style="display: flex; flex-direction: row; gap: 15px;">
+                            <!-- Risk badge / rating -->
+                            <div id="tanal-risk-card" style="padding: 12px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 220px; border: 1px solid rgba(255,255,255,0.05); background: rgba(15,23,42,0.2);">
+                                <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Risiko bei 1000 Lot</span>
+                                <strong id="tanal-risk-level" style="font-size: 1.5rem; font-weight: 800; letter-spacing: 0.5px;">-</strong>
+                                <span id="tanal-risk-status" style="font-size: 0.75rem; margin-top: 4px; color: var(--text-secondary); text-align: center;">-</span>
+                            </div>
+                            
+                            <!-- Explanatory stats -->
+                            <div style="flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.85rem; color: var(--text-secondary);">
+                                <div>
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px;">⚡ Volatilität (Tick-Frequenz)</strong>
+                                    Der Einstieg hatte <span id="tanal-risk-open-freq-text" style="color:#fff; font-weight:bold;">-</span> und der Ausstieg <span id="tanal-risk-close-freq-text" style="color:#fff; font-weight:bold;">-</span>. Eine hohe Frequenz deutet auf volatile Marktphasen (z.B. News) hin, in denen ein 1000 Lot Trade extreme Slippage erleidet.
+                                </div>
+                                <div>
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px;">📏 Spread-Stabilität</strong>
+                                    Der Spread betrug im Durchschnitt <span id="tanal-risk-spread-text" style="color:#fff; font-weight:bold;">- pips</span>. Bei weiten Spreads drohen bei großen Volumina erhebliche Kosten durch das Abgreifen des Orderbuchs.
+                                </div>
+                                <div>
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px;">💾 Ausführungsgeschwindigkeit</strong>
+                                    Die Broker-Verzögerung betrug <span id="tanal-risk-latency-text" style="color:#fff; font-weight:bold;">-</span>. Bei langsamer Ausführung und hoher Tick-Frequenz ändert sich der Preis im Broker-System noch vor der Ausführung (Latenz-Slippage).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tick Chart Fullscreen Zoom Modal -->
+        <div id="chart-zoom-modal" style="display: none; position: fixed; inset: 0; background: rgba(8, 12, 24, 0.95); z-index: 11000; align-items: center; justify-content: center; padding: 25px; backdrop-filter: blur(15px);">
+            <div style="background: #0b0f19; border: 1px solid #1e293b; border-radius: 16px; width: 100%; max-width: 1500px; height: 85vh; display: flex; flex-direction: column; padding: 25px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+                <!-- Close Button -->
+                <button onclick="closeZoomModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.15s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
+                    ✕ Schließen
+                </button>
+                <!-- Title -->
+                <h3 id="zoom-modal-title" style="margin-top: 0; margin-bottom: 20px; color: #fff; font-size: 1.25rem; font-weight: 700; padding-right: 120px;">
+                    Tick-Verlauf Detailansicht
+                </h3>
+                <!-- Chart Container -->
+                <div style="flex: 1; position: relative; width: 100%; min-height: 0; background: rgba(15, 23, 42, 0.2); border: 1px solid rgba(255,255,255,0.02); border-radius: 12px; padding: 10px;">
+                    <canvas id="tanal-zoom-chart"></canvas>
+                </div>
+            </div>
+        </div>
 
         <footer>
             <p>Letzte Aktualisierung: <span th:text="${account.lastSeen}">2026-02-09
@@ -2252,10 +2444,23 @@
                 });
         }
 
+        // Opens the custom confirmation overlay. We deliberately avoid the native
+        // confirm() here: browsers may suppress repeated confirm() dialogs
+        // ("prevent this page from creating additional dialogs"), in which case
+        // confirm() silently returns false and the button appears to do nothing.
         function resetAccountTrades() {
-            if (!confirm('⚠️ ACHTUNG: Alle Trades (offen + geschlossen) und Equity-Snapshots für diesen Account werden unwiderruflich gelöscht!\n\nDanach muss im MetaTrader "Reconnect Server" gedrückt werden, damit die Daten neu übertragen werden.\n\nFortfahren?')) {
-                return;
-            }
+            var modal = document.getElementById('resetConfirmModal');
+            if (modal) { modal.style.display = 'flex'; }
+        }
+
+        function closeResetConfirm() {
+            var modal = document.getElementById('resetConfirmModal');
+            if (modal) { modal.style.display = 'none'; }
+        }
+
+        // Performs the actual reset after the user confirmed in the overlay.
+        function confirmResetAccountTrades() {
+            closeResetConfirm();
             var feedback = document.getElementById('resetTradesFeedback');
             var btn = document.getElementById('resetTradesBtn');
 
@@ -2273,10 +2478,14 @@
                         feedback.style.color = '#3fb950';
                         feedback.textContent = '✓ Reset erfolgreich – Seite wird neu geladen...';
                         setTimeout(function () { location.reload(); }, 1200);
+                    } else if (response.status === 403) {
+                        feedback.style.display = 'inline';
+                        feedback.style.color = '#ef4444';
+                        feedback.textContent = '✗ Keine Berechtigung (nur Admin)';
                     } else {
                         feedback.style.display = 'inline';
                         feedback.style.color = '#ef4444';
-                        feedback.textContent = '✗ Fehler beim Reset';
+                        feedback.textContent = '✗ Fehler beim Reset (Status ' + response.status + ')';
                     }
                 })
                 .catch(function () {
@@ -2286,7 +2495,7 @@
                 })
                 .finally(function () {
                     btn.disabled = false;
-                    btn.textContent = '🗑️ Reset Trades';
+                    btn.textContent = '🗑️ Reset Trades Database';
                 });
         }
 
@@ -2797,6 +3006,16 @@
             return parts.join(' ') || '0s';
         }
 
+        function getPointValue(symbol) {
+            if (!symbol) return 0.0001;
+            var sym = symbol.toUpperCase();
+            if (sym.indexOf("JPY") !== -1) return 0.01;
+            if (sym.indexOf("XAU") !== -1 || sym.indexOf("GOLD") !== -1) return 0.01;
+            if (sym.indexOf("XAG") !== -1 || sym.indexOf("SILVER") !== -1) return 0.01;
+            if (sym.indexOf("BTC") !== -1 || sym.indexOf("ETH") !== -1) return 1.0;
+            return 0.0001;
+        }
+
         function TableManager(tableId, paginationId, summaryId) {
             this.table = document.getElementById(tableId);
             this.paginationBar = document.getElementById(paginationId);
@@ -2901,6 +3120,50 @@
                     }
                 }
 
+                // Calculate slippage in pips/points
+                var openSlippage = null;
+                var closeSlippage = null;
+                if (trade.openAsk > 0 && trade.openBid > 0) {
+                    var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.openPrice - trade.openAsk) : (trade.openBid - trade.openPrice);
+                    var pipVal = getPointValue(trade.symbol);
+                    openSlippage = diff / pipVal;
+                }
+                if (trade.closeAsk > 0 && trade.closeBid > 0) {
+                    var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.closeBid - trade.closePrice) : (trade.closePrice - trade.closeAsk);
+                    var pipVal = getPointValue(trade.symbol);
+                    closeSlippage = diff / pipVal;
+                }
+
+                var formatSlippage = function(val) {
+                    if (val === null) return '-';
+                    var formatted = val.toFixed(1);
+                    if (val > 0.05) {
+                        return `<span style="color: #f7768e; font-weight: 500;">+${formatted}p</span>`;
+                    } else if (val < -0.05) {
+                        return `<span style="color: #9ece6a; font-weight: 500;">${formatted}p</span>`;
+                    } else {
+                        return `<span style="color: #a0a0c0;">0.0</span>`;
+                    }
+                };
+
+                // Calculate execution delay/latency in ms
+                var openDelayMs = (trade.openTimeMsc > 0 && trade.openOrderSetupTimeMsc > 0) ? (trade.openTimeMsc - trade.openOrderSetupTimeMsc) : null;
+                var closeDelayMs = (trade.closeTimeMsc > 0 && trade.closeOrderSetupTimeMsc > 0) ? (trade.closeTimeMsc - trade.closeOrderSetupTimeMsc) : null;
+
+                var formatDelay = function(val) {
+                    if (val === null || val < 0) return '-';
+                    if (val > 500) {
+                        return `<span style="color: #f7768e; font-weight: 500;">${val}ms</span>`;
+                    } else if (val > 200) {
+                        return `<span style="color: #e0af68; font-weight: 500;">${val}ms</span>`;
+                    } else {
+                        return `<span style="color: #73daca;">${val}ms</span>`;
+                    }
+                };
+
+                var slippageHtml = `${formatSlippage(openSlippage)} / ${formatSlippage(closeSlippage)}`;
+                var latencyHtml = `${formatDelay(openDelayMs)} / ${formatDelay(closeDelayMs)}`;
+
                 html += `<tr class="${isToday}" style="${borderStyle}">
                             <td>${trade.ticket}</td>
                             <td><strong>${trade.symbol}</strong></td>
@@ -2910,11 +3173,16 @@
                             <td>${trade.closeTime}</td>
                             <td>${formatDuration(trade.openTime, trade.closeTime)}</td>
                             <td>${trade.closePrice || ''}</td>
+                            <td style="text-align: center;">${slippageHtml}</td>
+                            <td style="text-align: center;">${latencyHtml}</td>
                             <td>${fmtNum(trade.swap)}</td>
                             <td>${fmtNum(trade.commission)}</td>
                             <td class="profit-cell ${profitClass}">${trade.profit >= 0 ? '+'+fmtNum(trade.profit) : fmtNum(trade.profit)}</td>
                             <td>${trade.magicNumber}</td>
                             <td class="trade-comment" title="${trade.comment || ''}">${trade.comment || ''}</td>
+                            <td style="text-align: center; vertical-align: middle; padding: 4px 8px;">
+                                <button type="button" onclick="showTickAnalysis(${trade.ticket})" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px dashed rgba(99,102,241,0.4); padding: 4px 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-size: 0.85rem;" onmouseover="this.style.background='rgba(99, 102, 241, 0.3)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(99, 102, 241, 0.15)'; this.style.color='#818cf8';" title="Tick-Ausführungs-Analyse öffnen">📊</button>
+                            </td>
                         </tr>`;
             }
             tbody.innerHTML = html;
@@ -3189,6 +3457,590 @@
             });
             reapplyHistoryFilter();
             updateFilterSummary();
+        }
+
+        var tanalOpenChartInstance = null;
+        var tanalCloseChartInstance = null;
+        var tanalZoomChartInstance = null;
+        var currentTanalData = { open: null, close: null };
+
+        function closeZoomModal() {
+            var modal = document.getElementById('chart-zoom-modal');
+            if (modal) modal.style.display = 'none';
+            if (tanalZoomChartInstance) {
+                tanalZoomChartInstance.destroy();
+                tanalZoomChartInstance = null;
+            }
+        }
+
+        function zoomChart(type) {
+            var data = currentTanalData[type];
+            if (!data) return;
+
+            var modal = document.getElementById('chart-zoom-modal');
+            if (!modal) return;
+
+            modal.style.display = 'flex';
+            document.getElementById('zoom-modal-title').innerHTML = 
+                (type === 'open' ? '📥 Einstieg (Open) Tick-Verlauf' : '📤 Ausstieg (Close) Tick-Verlauf') + 
+                ' <span style="font-size: 0.9rem; color: var(--text-secondary); font-weight: normal; margin-left: 15px;">' + data.symbol + ' | Ticket #' + data.ticket + '</span>';
+
+            if (tanalZoomChartInstance) {
+                tanalZoomChartInstance.destroy();
+            }
+
+            tanalZoomChartInstance = renderTickChart(
+                'tanal-zoom-chart',
+                data.ticks,
+                data.execTimeMsc,
+                data.setupTimeMsc,
+                data.execPrice,
+                data.tradeType,
+                data.isOpen,
+                data.symbol,
+                true
+            );
+        }
+
+        function closeTickAnalysisModal() {
+            var modal = document.getElementById('tick-analysis-modal');
+            if (modal) modal.style.display = 'none';
+            closeZoomModal();
+        }
+
+        function showTickAnalysis(ticket) {
+            var trade = historyMgr.allRows.find(t => t.ticket === ticket);
+            if (!trade) {
+                alert("Trade not found!");
+                return;
+            }
+
+            // Populate Modal Text fields
+            document.getElementById('tanal-ticket-badge').textContent = 'Ticket #' + trade.ticket;
+            document.getElementById('tanal-symbol').textContent = trade.symbol;
+            
+            var typeEl = document.getElementById('tanal-type');
+            typeEl.textContent = trade.type;
+            if (trade.type === 'BUY' || trade.type === '0') {
+                typeEl.className = 'type-buy';
+                typeEl.style.color = '#73daca';
+            } else {
+                typeEl.className = 'type-sell';
+                typeEl.style.color = '#f7768e';
+            }
+            
+            document.getElementById('tanal-volume').textContent = trade.volume.toFixed(2);
+            document.getElementById('tanal-open-price').textContent = trade.openPrice.toFixed(5);
+            document.getElementById('tanal-close-price').textContent = trade.closePrice.toFixed(5);
+            
+            var profitEl = document.getElementById('tanal-profit');
+            var profitVal = parseFloat(trade.profit || 0);
+            profitEl.textContent = (profitVal >= 0 ? '+' : '') + profitVal.toFixed(2) + ' €';
+            profitEl.style.color = profitVal >= 0 ? '#73daca' : '#f7768e';
+            
+            document.getElementById('tanal-open-time-badge').textContent = trade.openTime || '';
+            document.getElementById('tanal-close-time-badge').textContent = trade.closeTime || '';
+
+            // Parse ticks
+            var openTicks = [];
+            var closeTicks = [];
+            try { openTicks = JSON.parse(trade.openTicks || '[]'); } catch(e) { console.error(e); }
+            try { closeTicks = JSON.parse(trade.closeTicks || '[]'); } catch(e) { console.error(e); }
+
+            currentTanalData.open = {
+                ticket: trade.ticket,
+                ticks: openTicks,
+                execTimeMsc: trade.openTimeMsc,
+                setupTimeMsc: trade.openOrderSetupTimeMsc,
+                execPrice: trade.openPrice,
+                tradeType: trade.type,
+                isOpen: true,
+                symbol: trade.symbol
+            };
+            currentTanalData.close = {
+                ticket: trade.ticket,
+                ticks: closeTicks,
+                execTimeMsc: trade.closeTimeMsc,
+                setupTimeMsc: trade.closeOrderSetupTimeMsc,
+                execPrice: trade.closePrice,
+                tradeType: trade.type,
+                isOpen: false,
+                symbol: trade.symbol
+            };
+
+            document.getElementById('tanal-open-title-text').textContent = '📥 Einstieg (Open) Tick-Verlauf (' + openTicks.length + ' Ticks)';
+            document.getElementById('tanal-close-title-text').textContent = '📤 Ausstieg (Close) Tick-Verlauf (' + closeTicks.length + ' Ticks)';
+
+            populateTicksTable('tanal-open-ticks-tbody', openTicks, trade.openTimeMsc, trade.openOrderSetupTimeMsc, trade.openPrice, getPointValue(trade.symbol));
+            populateTicksTable('tanal-close-ticks-tbody', closeTicks, trade.closeTimeMsc, trade.closeOrderSetupTimeMsc, trade.closePrice, getPointValue(trade.symbol));
+
+            // Destroy previous charts
+            if (tanalOpenChartInstance) { tanalOpenChartInstance.destroy(); tanalOpenChartInstance = null; }
+            if (tanalCloseChartInstance) { tanalCloseChartInstance.destroy(); tanalCloseChartInstance = null; }
+
+            // Render Open Chart
+            tanalOpenChartInstance = renderTickChart(
+                'tanal-open-chart',
+                openTicks,
+                trade.openTimeMsc,
+                trade.openOrderSetupTimeMsc,
+                trade.openPrice,
+                trade.type,
+                true,
+                trade.symbol
+            );
+
+            // Render Close Chart
+            tanalCloseChartInstance = renderTickChart(
+                'tanal-close-chart',
+                closeTicks,
+                trade.closeTimeMsc,
+                trade.closeOrderSetupTimeMsc,
+                trade.closePrice,
+                trade.type,
+                false,
+                trade.symbol
+            );
+
+            // Calculate mini stats
+            // Open Stats
+            var openSlippage = null;
+            if (trade.openAsk > 0 && trade.openBid > 0) {
+                var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.openPrice - trade.openAsk) : (trade.openBid - trade.openPrice);
+                openSlippage = diff / getPointValue(trade.symbol);
+            }
+            var openDelayMs = (trade.openTimeMsc > 0 && trade.openOrderSetupTimeMsc > 0) ? (trade.openTimeMsc - trade.openOrderSetupTimeMsc) : null;
+            
+            document.getElementById('tanal-open-slippage').innerHTML = formatSlippageHtml(openSlippage);
+            document.getElementById('tanal-open-latency').innerHTML = formatLatencyHtml(openDelayMs);
+            document.getElementById('tanal-open-freq').textContent = openTicks.length > 0 ? (openTicks.length / 4).toFixed(1) + ' t/s' : '-';
+
+            // Close Stats
+            var closeSlippage = null;
+            if (trade.closeAsk > 0 && trade.closeBid > 0) {
+                var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.closeBid - trade.closePrice) : (trade.closePrice - trade.closeAsk);
+                closeSlippage = diff / getPointValue(trade.symbol);
+            }
+            var closeDelayMs = (trade.closeTimeMsc > 0 && trade.closeOrderSetupTimeMsc > 0) ? (trade.closeTimeMsc - trade.closeOrderSetupTimeMsc) : null;
+            
+            document.getElementById('tanal-close-slippage').innerHTML = formatSlippageHtml(closeSlippage);
+            document.getElementById('tanal-close-latency').innerHTML = formatLatencyHtml(closeDelayMs);
+            document.getElementById('tanal-close-freq').textContent = closeTicks.length > 0 ? (closeTicks.length / 4).toFixed(1) + ' t/s' : '-';
+
+            // Heuristic Risk Analysis for 1000 Lot
+            var openFreq = openTicks.length / 4;
+            var closeFreq = closeTicks.length / 4;
+            var maxFreq = Math.max(openFreq, closeFreq);
+            
+            // Calculate average spread in pips
+            var totalSpread = 0;
+            var spreadCount = 0;
+            var allTicks = openTicks.concat(closeTicks);
+            allTicks.forEach(tick => {
+                var bid = tick[1];
+                var ask = tick[2];
+                if (ask > bid) {
+                    totalSpread += (ask - bid);
+                    spreadCount++;
+                }
+            });
+            var avgSpreadPips = spreadCount > 0 ? (totalSpread / spreadCount) / getPointValue(trade.symbol) : 0;
+
+            // Rating logic
+            var riskScore = 0;
+            if (maxFreq > 15) riskScore += 50;
+            else if (maxFreq > 5) riskScore += 25;
+            
+            if (avgSpreadPips > 3.0) riskScore += 30;
+            else if (avgSpreadPips > 1.5) riskScore += 15;
+            
+            if (openDelayMs > 300) riskScore += 20;
+            else if (openDelayMs > 150) riskScore += 10;
+
+            var riskLevel = '';
+            var riskColor = '';
+            var riskBg = '';
+            var riskBorder = '';
+            var riskStatus = '';
+
+            if (openTicks.length === 0 && closeTicks.length === 0) {
+                riskLevel = 'UNBEKANNT';
+                riskColor = '#a0a0c0';
+                riskBg = 'rgba(255,255,255,0.05)';
+                riskBorder = '1px solid rgba(255,255,255,0.1)';
+                riskStatus = 'Keine Tickdaten für Risikoanalyse vorhanden.';
+            } else if (riskScore >= 60) {
+                riskLevel = 'HOCH';
+                riskColor = '#f7768e'; // Red
+                riskBg = 'rgba(247, 118, 142, 0.1)';
+                riskBorder = '1px solid rgba(247, 118, 142, 0.3)';
+                riskStatus = 'Hohe Volatilität oder Latenz. Große Volumina (1000 Lot) würden extreme Slippage erleiden.';
+            } else if (riskScore >= 35) {
+                riskLevel = 'MITTEL';
+                riskColor = '#e0af68'; // Yellow
+                riskBg = 'rgba(224, 175, 104, 0.1)';
+                riskBorder = '1px solid rgba(224, 175, 104, 0.3)';
+                riskStatus = 'Erhöhte Aktivität. Ein 1000 Lot Trade würde spürbare Slippage verursachen.';
+            } else {
+                riskLevel = 'GERING';
+                riskColor = '#73daca'; // Green
+                riskBg = 'rgba(115, 218, 202, 0.1)';
+                riskBorder = '1px solid rgba(115, 218, 202, 0.3)';
+                riskStatus = 'Ruhiges Marktumfeld, stabiler Spread. Perfekte Bedingungen für große Orders.';
+            }
+
+            var rCard = document.getElementById('tanal-risk-card');
+            rCard.style.background = riskBg;
+            rCard.style.borderColor = riskBorder;
+            
+            var rLvl = document.getElementById('tanal-risk-level');
+            rLvl.textContent = riskLevel;
+            rLvl.style.color = riskColor;
+            
+            document.getElementById('tanal-risk-status').textContent = riskStatus;
+            document.getElementById('tanal-risk-open-freq-text').textContent = openTicks.length > 0 ? (openTicks.length + ' Ticks (' + openFreq.toFixed(1) + '/s)') : '0 Ticks';
+            document.getElementById('tanal-risk-close-freq-text').textContent = closeTicks.length > 0 ? (closeTicks.length + ' Ticks (' + closeFreq.toFixed(1) + '/s)') : '0 Ticks';
+            document.getElementById('tanal-risk-spread-text').textContent = spreadCount > 0 ? avgSpreadPips.toFixed(1) : '-';
+            document.getElementById('tanal-risk-latency-text').textContent = openDelayMs !== null ? openDelayMs + ' ms' : 'unbekannt';
+
+            // Show Modal
+            document.getElementById('tick-analysis-modal').style.display = 'flex';
+        }
+
+        function formatSlippageHtml(val) {
+            if (val === null) return '-';
+            var formatted = val.toFixed(1);
+            if (val > 0.05) {
+                return `<span style="color: #f7768e; font-weight: 600;">+${formatted}p</span>`;
+            } else if (val < -0.05) {
+                return `<span style="color: #9ece6a; font-weight: 600;">${formatted}p</span>`;
+            } else {
+                return `<span style="color: #a0a0c0;">0.0</span>`;
+            }
+        }
+
+        function formatLatencyHtml(val) {
+            if (val === null || val < 0) return '-';
+            if (val > 500) {
+                return `<span style="color: #f7768e; font-weight: 600;">${val}ms</span>`;
+            } else if (val > 200) {
+                return `<span style="color: #e0af68; font-weight: 600;">${val}ms</span>`;
+            } else {
+                return `<span style="color: #73daca; font-weight: 600;">${val}ms</span>`;
+            }
+        }
+
+        function populateTicksTable(tbodyId, ticks, execTimeMsc, setupTimeMsc, execPrice, pipVal) {
+            var tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            
+            if (ticks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 10px; color: var(--text-muted);">Keine Ticks vorhanden</td></tr>';
+                return;
+            }
+
+            var baseTimeMsc = (setupTimeMsc > 0) ? setupTimeMsc : execTimeMsc;
+
+            ticks.forEach(tick => {
+                var time = tick[0];
+                var bid = tick[1];
+                var ask = tick[2];
+                var volume = tick[3];
+                var relativeMs = time - baseTimeMsc;
+                var spread = (ask - bid) / pipVal;
+                
+                var execRelativeMs = execTimeMsc - baseTimeMsc;
+                var isExecRow = Math.abs(relativeMs - execRelativeMs) < 15;
+                var rowStyle = isExecRow ? 'background: rgba(224, 175, 104, 0.15); font-weight: bold; border-left: 3px solid #e0af68;' : 'border-bottom: 1px solid rgba(255,255,255,0.03);';
+                
+                var timeText = (relativeMs >= 0 ? '+' : '') + relativeMs + 'ms';
+                if (relativeMs === 0 && setupTimeMsc > 0) {
+                    timeText = '0ms (Order platziert)';
+                } else if (Math.abs(relativeMs - execRelativeMs) < 15) {
+                    timeText = (relativeMs >= 0 ? '+' : '') + relativeMs + 'ms (Ausführung)';
+                }
+                
+                var tr = document.createElement('tr');
+                tr.style.cssText = rowStyle;
+                tr.innerHTML = `
+                    <td style="padding: 4px 8px; color: ${isExecRow ? '#e0af68' : 'var(--text-secondary)'};">${timeText}</td>
+                    <td style="padding: 4px 8px; color: #fff;">${bid.toFixed(5)}</td>
+                    <td style="padding: 4px 8px; color: #fff;">${ask.toFixed(5)}</td>
+                    <td style="padding: 4px 8px; color: #a0a0c0;">${spread.toFixed(1)} p</td>
+                    <td style="padding: 4px 8px; color: var(--text-muted);">${volume.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderTickChart(canvasId, ticks, execTimeMsc, setupTimeMsc, execPrice, tradeType, isOpen, symbol, isZoomed) {
+            var canvas = document.getElementById(canvasId);
+            var ctx = canvas.getContext('2d');
+            
+            if (ticks.length === 0) {
+                // Clear any previous chart context
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return null;
+            }
+
+            var isZoom = !!isZoomed;
+            var scale = isZoom ? 1.6 : 1.0;
+
+            var titleFontSize = Math.round(11 * scale);
+            var axisFontSize = Math.round(10 * scale);
+            var spreadTitleFontSize = Math.round(9 * scale);
+            var legendFontSize = Math.round(10 * scale);
+            var annotationFont = isZoom ? 'bold 13px sans-serif' : 'bold 9px sans-serif';
+            
+            var lineStrokeWidth = isZoom ? 3.5 : 2;
+            var pointRadiusSize = isZoom ? 3.5 : 1.5;
+            var pointHoverSize = isZoom ? 6 : 4;
+            var spreadLineWidth = isZoom ? 2.5 : 1.5;
+
+            // Ticks format: [time_msc, bid, ask, volume]
+            // Map to relative milliseconds
+            var labels = [];
+            var bidData = [];
+            var askData = [];
+            var spreadData = [];
+            var pipVal = getPointValue(symbol);
+            
+            var minPrice = execPrice;
+            var maxPrice = execPrice;
+
+            var baseTimeMsc = (setupTimeMsc > 0) ? setupTimeMsc : execTimeMsc;
+            
+            ticks.forEach(tick => {
+                var time = tick[0];
+                var bid = tick[1];
+                var ask = tick[2];
+                var relativeMs = time - baseTimeMsc;
+                labels.push(relativeMs);
+                bidData.push(bid);
+                askData.push(ask);
+                
+                minPrice = Math.min(minPrice, bid, ask);
+                maxPrice = Math.max(maxPrice, bid, ask);
+                
+                var spread = (ask - bid) / pipVal;
+                spreadData.push(spread);
+            });
+
+            // Pad Y-axis to ensure execution price and Bid/Ask are beautifully framed
+            var priceRange = maxPrice - minPrice;
+            if (priceRange === 0) priceRange = execPrice * 0.0001;
+            var pad = priceRange * 0.15;
+            var yMin = minPrice - pad;
+            var yMax = maxPrice + pad;
+
+            // Find placement and execution relative times
+            var setupRelativeMs = (setupTimeMsc > 0) ? 0 : null;
+            var execRelativeMs = (setupTimeMsc > 0 && execTimeMsc > 0) ? (execTimeMsc - setupTimeMsc) : 0;
+
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Ask (Kaufpreis)',
+                            data: askData,
+                            borderColor: '#ef4444',
+                            borderWidth: lineStrokeWidth,
+                            pointRadius: pointRadiusSize,
+                            pointHoverRadius: pointHoverSize,
+                            tension: 0.1,
+                            fill: false,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Bid (Verkaufspreis)',
+                            data: bidData,
+                            borderColor: '#3b82f6',
+                            borderWidth: lineStrokeWidth,
+                            pointRadius: pointRadiusSize,
+                            pointHoverRadius: pointHoverSize,
+                            tension: 0.1,
+                            fill: false,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Spread (Pips)',
+                            data: spreadData,
+                            backgroundColor: 'rgba(167, 139, 250, 0.08)',
+                            borderColor: 'rgba(167, 139, 250, 0.3)',
+                            borderWidth: spreadLineWidth,
+                            fill: true,
+                            yAxisID: 'ySpread',
+                            tension: 0.2,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: (setupTimeMsc > 0) ? 'Zeit relativ zur Orderplatzierung (ms)' : 'Zeit relativ zur Ausführung (ms)',
+                                color: '#9ca3af',
+                                font: { size: titleFontSize }
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: { size: axisFontSize },
+                                callback: function(value) {
+                                    return (value >= 0 ? '+' : '') + value + 'ms';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            min: yMin,
+                            max: yMax,
+                            title: {
+                                display: true,
+                                text: 'Preis (' + symbol + ')',
+                                color: '#9ca3af',
+                                font: { size: titleFontSize }
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: { size: axisFontSize }
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            }
+                        },
+                        ySpread: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            ticks: {
+                                color: '#a78bfa',
+                                font: { size: spreadTitleFontSize },
+                                callback: function(value) {
+                                    return value.toFixed(1) + ' p';
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Spread (Pips)',
+                                color: '#a78bfa',
+                                font: { size: spreadTitleFontSize }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#fff',
+                                boxWidth: isZoom ? 14 : 10,
+                                font: { size: legendFontSize }
+                            }
+                        },
+                        tooltip: {
+                            titleFont: { size: titleFontSize },
+                            bodyFont: { size: axisFontSize },
+                            callbacks: {
+                                title: function(context) {
+                                    var val = context[0].parsed.x;
+                                    return (val >= 0 ? '+' : '') + val + 'ms';
+                                },
+                                label: function(context) {
+                                    if (context.dataset.label.indexOf('Spread') !== -1) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + ' pips';
+                                    }
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(5);
+                                }
+                            }
+                        }
+                    }
+                },
+                // Custom plugin to draw vertical execution and placement lines + horizontal execution price line
+                plugins: [{
+                    id: 'executionLines',
+                    afterDraw: function(chart) {
+                            var ctx2 = chart.ctx;
+                            var xAxis = chart.scales.x;
+                            var yAxis = chart.scales.y;
+                            
+                            // 1. Draw vertical execution line
+                            var xExecPos = xAxis.getPixelForValue(execRelativeMs);
+                            if (xExecPos >= xAxis.left && xExecPos <= xAxis.right) {
+                                ctx2.save();
+                                ctx2.strokeStyle = '#e0af68'; // Gold/Yellow
+                                ctx2.lineWidth = isZoom ? 3.5 : 2;
+                                ctx2.beginPath();
+                                ctx2.moveTo(xExecPos, yAxis.top);
+                                ctx2.lineTo(xExecPos, yAxis.bottom);
+                                ctx2.stroke();
+                                
+                                ctx2.fillStyle = '#e0af68';
+                                ctx2.font = annotationFont;
+                                ctx2.fillText(isOpen ? 'Ausführung (Open) (' + (execRelativeMs >= 0 ? '+' : '') + execRelativeMs + 'ms)' : 'Ausführung (Close) (' + (execRelativeMs >= 0 ? '+' : '') + execRelativeMs + 'ms)', xExecPos + (isZoom ? 8 : 4), yAxis.top + (isZoom ? 16 : 12));
+                                ctx2.restore();
+                            }
+
+                            // 2. Draw vertical placement line (setupTimeMsc) if valid
+                            if (setupRelativeMs !== null) {
+                                var xSetupPos = xAxis.getPixelForValue(setupRelativeMs);
+                                ctx2.save();
+                                ctx2.strokeStyle = '#a78bfa'; // Purple/Lavender
+                                ctx2.lineWidth = isZoom ? 2.5 : 1.5;
+                                ctx2.setLineDash([4, 4]);
+                                ctx2.beginPath();
+                                ctx2.moveTo(xSetupPos, yAxis.top);
+                                ctx2.lineTo(xSetupPos, yAxis.bottom);
+                                ctx2.stroke();
+                                
+                                ctx2.fillStyle = '#a78bfa';
+                                ctx2.font = annotationFont;
+                                ctx2.fillText('Order platziert (0ms)', xSetupPos + (isZoom ? 8 : 4), yAxis.top + (isZoom ? 36 : 28));
+                                ctx2.restore();
+
+                                // Highlight the latency window (shading)
+                                if (xSetupPos < xExecPos) {
+                                    ctx2.save();
+                                    ctx2.fillStyle = 'rgba(167, 139, 250, 0.05)';
+                                    ctx2.fillRect(xSetupPos, yAxis.top, xExecPos - xSetupPos, yAxis.bottom - yAxis.top);
+                                    ctx2.restore();
+                                }
+                            }
+
+                            // 3. Draw horizontal execution price line
+                            if (execPrice >= yAxis.min && execPrice <= yAxis.max) {
+                                var yPricePos = yAxis.getPixelForValue(execPrice);
+                                ctx2.save();
+                                ctx2.strokeStyle = '#10b981'; // Green
+                                ctx2.lineWidth = isZoom ? 2.5 : 1.5;
+                                ctx2.setLineDash([3, 3]);
+                                ctx2.beginPath();
+                                ctx2.moveTo(xAxis.left, yPricePos);
+                                ctx2.lineTo(xAxis.right, yPricePos);
+                                ctx2.stroke();
+                                
+                                ctx2.fillStyle = '#10b981';
+                                ctx2.font = annotationFont;
+                                ctx2.fillText(`Dein Preis: ${execPrice.toFixed(5)}`, xAxis.left + 5, yPricePos - (isZoom ? 6 : 4));
+                                ctx2.restore();
+                            }
+                        }
+                    }]
+            });
         }
 
         // ============ SYMBOL FILTER ============
