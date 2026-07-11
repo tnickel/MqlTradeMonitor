@@ -63,6 +63,7 @@ Die Plattform ueberwacht in Echtzeit mehrere MetaTrader 5 Trading-Konten, aggreg
 - **Trade-Synchronisation (REAL vs. DEMO)**: Automatischer Abgleich offener Trades zwischen Echtgeld- und Demo-Konten mit zweistufigem Matching-Algorithmus (Strict Match + Fallback Match).
 - **Open-Profit-Alarm-System**: Konfigurierbares Schwellwert-Monitoring (absolut und prozentual) mit Latch-Logik zur Vermeidung von Alarm-Fluten.
 - **Slippage- & Delay-Analyse**: Automatisierte Auswertung von Ausfuehrungsdifferenzen beim Copy-Trading.
+- **Tick-Ausfuehrungs-Analyse (Millisekundengenau)**: Hochpraezise Visualisierung von Einstiegen (Open) und Ausstiegen (Close). Das System bildet das Orderbuch (Ask/Bid) und die Spreads in einem 4-Sekunden-Fenster um den Ausfuehrungszeitpunkt ab. Es vergleicht die Latenzverzögerung relativ zur Orderplatzierung (0ms) und deckt versteckte Broker-Slippage auf. Ein professionelles Analyse-Tool, das selbst von MetaQuotes in MetaTrader 5 nicht nativ geliefert wird &mdash; vollstaendig mit KI in nur 3 Stunden realisiert!
 
 ### Umfassendes Security-Konzept
 - **Spring Security** mit BCrypt-Passwort-Hashing und rollenbasierter Zugriffskontrolle (RBAC).
@@ -201,6 +202,9 @@ Die Plattform ueberwacht in Echtzeit mehrere MetaTrader 5 Trading-Konten, aggreg
 <img width="3823" alt="AccountDetail2" src="https://github.com/user-attachments/assets/0acebcc5-c9c6-45ab-a969-4f9ad95b18a7" />
 <img width="3694" alt="AccountDetail3" src="https://github.com/user-attachments/assets/18194ae8-8fd9-451f-9284-30466231e0eb" />
 <img width="3715" alt="AccountDetailEquityDetail" src="https://github.com/user-attachments/assets/b026c5f6-9070-4679-aee9-73bb3e345294" />
+
+#### Tick-Ausführungs-Analyse (Millisekundengenaue Slippage- & Spread-Auswertung)
+<img width="3827" alt="Tick-Ausfuehrungs-Analyse" src="screenshots/trademonitor_tick_analysis.png" />
 
 ### Mobile Drawdown Monitor
 <img width="1361" alt="DrawdownMonitor" src="https://github.com/user-attachments/assets/e2e9c170-2b88-49a7-afbf-cb30a6f49019" />

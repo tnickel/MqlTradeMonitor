@@ -18,6 +18,10 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
 
     boolean existsByAccountIdAndTicket(long accountId, long ticket);
 
+    java.util.Optional<ClosedTradeEntity> findByAccountIdAndTicket(long accountId, long ticket);
+
+    List<ClosedTradeEntity> findByAccountIdAndTicketIn(long accountId, java.util.Collection<Long> tickets);
+
     @Query("SELECT c.ticket FROM ClosedTradeEntity c WHERE c.accountId = :accountId")
     List<Long> findTicketsByAccountId(@org.springframework.data.repository.query.Param("accountId") long accountId);
 

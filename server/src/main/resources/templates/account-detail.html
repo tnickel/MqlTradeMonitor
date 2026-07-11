@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.1'">Account Detail - Trade Monitor</title>
+    <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.16'">Account Detail - Trade Monitor</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script
@@ -1643,6 +1643,7 @@
                                 <th>Open Time</th>
                                 <th>Close Time</th>
                                 <th>Duration</th>
+                                <th>Open Price</th>
                                 <th>Close Price</th>
                                 <th>Slippage (O/C)</th>
                                 <th>Latenz (O/C)</th>
@@ -1656,7 +1657,7 @@
                         </thead>
                         <tbody id="closed-trades-tbody">
                             <tr>
-                                <td colspan="16" style="text-align: center; padding: 2rem; color: #a0a0c0;">
+                                <td colspan="17" style="text-align: center; padding: 2rem; color: #a0a0c0;">
                                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                                         <div style="width: 20px; height: 20px; border: 3px solid rgba(99,102,241,0.3); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                                         Lade historische Trades...
@@ -2121,13 +2122,18 @@
                 </h2>
                 
                 <!-- Trade info header -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; margin-bottom: 15px;">
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Symbol</span><strong id="tanal-symbol" style="color:#fff; font-size: 1.1rem;">-</strong></div>
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Typ</span><strong id="tanal-type" style="font-size: 1.1rem;">-</strong></div>
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Volumen</span><strong id="tanal-volume" style="color:#fff; font-size: 1.1rem;">-</strong></div>
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Entry-Preis</span><strong id="tanal-open-price" style="color:#fff; font-size: 1.1rem;">-</strong></div>
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Exit-Preis</span><strong id="tanal-close-price" style="color:#fff; font-size: 1.1rem;">-</strong></div>
                     <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Gewinn</span><strong id="tanal-profit" style="font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Dauer</span><strong id="tanal-duration" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Slippage (O/C)</span><strong id="tanal-slippage-val" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Spread (O/C)</span><strong id="tanal-spread-val" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Einstiegszeit</span><strong id="tanal-open-time-val" style="color:#fff; font-size: 1.1rem;">-</strong></div>
+                    <div style="text-align: center;"><span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Ausstiegszeit</span><strong id="tanal-close-time-val" style="color:#fff; font-size: 1.1rem;">-</strong></div>
                 </div>
 
                 <!-- Legend / Explanation banner -->
@@ -2224,6 +2230,66 @@
                                 <div><span style="color: var(--text-secondary);">Latenz:</span> <strong id="tanal-close-latency" style="display:block;">-</strong></div>
                                 <div><span style="color: var(--text-secondary);">Tick-Frequenz:</span> <strong id="tanal-close-freq" style="display:block; color:#fff;">-</strong></div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Macro Chart (M5 Candles) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; margin-top: 15px; margin-bottom: 15px;">
+                        <h3 style="margin-top: 0; color: #f59e0b; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>📊 Makro-Kursverlauf (M5 Kerzen - 2 Std. Fenster) <span id="tanal-macro-chart-range-text" style="color: #94a3b8; font-size: 0.8rem; font-weight: normal; margin-left: 10px;"></span></span>
+                        </h3>
+                        <div id="tanal-macro-chart-container" style="position: relative; height: 320px; width: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.05);">
+                            <span id="tanal-macro-chart-placeholder" style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; padding: 20px;">
+                                <i class="fas fa-chart-line" style="font-size: 1.8rem; display: block; margin-bottom: 8px; color: #f59e0b;"></i>
+                                Klicken Sie auf "Chart laden", um die M5-Kerzen der Broker-Historie für diesen Trade abzurufen.
+                            </span>
+                            <div id="tanal-macro-spinner" style="display: none; flex-direction: column; align-items: center; gap: 10px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #f59e0b;"></i>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary);">Lade historische Kursdaten...</span>
+                            </div>
+                            <canvas id="tanal-macro-chart" style="display: none; width: 100%; height: 100%;"></canvas>
+                        </div>
+                        <div id="tanal-macro-error" style="display: none; padding: 10px; margin-top: 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 0.8rem; text-align: center;">
+                        </div>
+                    </div>
+
+                    <!-- Tages-Kursverlauf (M15) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; margin-bottom: 15px;">
+                        <h3 style="margin-top: 0; color: #38bdf8; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>📊 Tages-Kursverlauf (M15 Kerzen - Ganzer Tag) <span id="tanal-daily-chart-range-text" style="color: #94a3b8; font-size: 0.8rem; font-weight: normal; margin-left: 10px;"></span></span>
+                        </h3>
+                        <div id="tanal-daily-chart-container" style="position: relative; height: 320px; width: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.05);">
+                            <span id="tanal-daily-chart-placeholder" style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; padding: 20px;">
+                                <i class="fas fa-chart-line" style="font-size: 1.8rem; display: block; margin-bottom: 8px; color: #38bdf8;"></i>
+                                Klicken Sie oben auf "Chart laden", um auch den Tagesverlauf zu laden.
+                            </span>
+                            <div id="tanal-daily-spinner" style="display: none; flex-direction: column; align-items: center; gap: 10px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #38bdf8;"></i>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary);">Lade Tages-Kursdaten...</span>
+                            </div>
+                            <canvas id="tanal-daily-chart" style="display: none; width: 100%; height: 100%;"></canvas>
+                        </div>
+                        <div id="tanal-daily-error" style="display: none; padding: 10px; margin-top: 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 0.8rem; text-align: center;">
+                        </div>
+                    </div>
+
+                    <!-- Wochen-Kursverlauf (H1) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; margin-bottom: 15px;">
+                        <h3 style="margin-top: 0; color: #a78bfa; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>📊 Wochen-Kursverlauf (H1 Kerzen - Ganze Woche) <span id="tanal-weekly-chart-range-text" style="color: #94a3b8; font-size: 0.8rem; font-weight: normal; margin-left: 10px;"></span></span>
+                        </h3>
+                        <div id="tanal-weekly-chart-container" style="position: relative; height: 320px; width: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.05);">
+                            <span id="tanal-weekly-chart-placeholder" style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; padding: 20px;">
+                                <i class="fas fa-chart-line" style="font-size: 1.8rem; display: block; margin-bottom: 8px; color: #a78bfa;"></i>
+                                Klicken Sie oben auf "Chart laden", um auch den Wochenverlauf zu laden.
+                            </span>
+                            <div id="tanal-weekly-spinner" style="display: none; flex-direction: column; align-items: center; gap: 10px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #a78bfa;"></i>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary);">Lade Wochen-Kursdaten...</span>
+                            </div>
+                            <canvas id="tanal-weekly-chart" style="display: none; width: 100%; height: 100%;"></canvas>
+                        </div>
+                        <div id="tanal-weekly-error" style="display: none; padding: 10px; margin-top: 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 0.8rem; text-align: center;">
                         </div>
                     </div>
 
@@ -3172,6 +3238,7 @@
                             <td>${trade.openTime || ''}</td>
                             <td>${trade.closeTime}</td>
                             <td>${formatDuration(trade.openTime, trade.closeTime)}</td>
+                            <td>${trade.openPrice || ''}</td>
                             <td>${trade.closePrice || ''}</td>
                             <td style="text-align: center;">${slippageHtml}</td>
                             <td style="text-align: center;">${latencyHtml}</td>
@@ -3234,6 +3301,7 @@
 
         // Storage key
         var accountId = /*[[${account.accountId}]]*/ '0';
+        var serverTimeOffsetSeconds = /*[[${account.serverTimeOffsetSeconds}]]*/ 0;
         var currentBalance = /*[[${account.balance}]]*/ 0.0;
         var currentEquity = /*[[${account.equity}]]*/ 0.0;
         var accountCurrency = /*[[${account.currency}]]*/ 'EUR';
@@ -3462,6 +3530,7 @@
         var tanalOpenChartInstance = null;
         var tanalCloseChartInstance = null;
         var tanalZoomChartInstance = null;
+        var tanalCharts = { trade: null, day: null, week: null };
         var currentTanalData = { open: null, close: null };
 
         function closeZoomModal() {
@@ -3508,12 +3577,381 @@
             closeZoomModal();
         }
 
+        function loadChartForRange(range, canvasId, placeholderId, spinnerId, errorId, titleSuffix) {
+            var trade = window.currentTanalTrade;
+            if (!trade) return;
+
+            var placeholder = document.getElementById(placeholderId);
+            var spinner = document.getElementById(spinnerId);
+            var canvas = document.getElementById(canvasId);
+            var errorDiv = document.getElementById(errorId);
+
+            placeholder.style.display = 'none';
+            spinner.style.display = 'flex';
+            canvas.style.display = 'none';
+            errorDiv.style.display = 'none';
+
+            if (tanalCharts[range]) {
+                tanalCharts[range].destroy();
+                tanalCharts[range] = null;
+            }
+
+            var url = '/api/trades/' + trade.ticket + '/macro-history?accountId=' + accountId + '&range=' + range;
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Server antwortete mit Fehler ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(candles => {
+                    spinner.style.display = 'none';
+                    
+                    if (candles && candles.length > 0) {
+                        const offsetSec = serverTimeOffsetSeconds || 0;
+                        const openUtc = trade.openTimeMsc - (offsetSec * 1000);
+                        const closeUtc = trade.closeTimeMsc - (offsetSec * 1000);
+                        
+                        let minTimeAllowed, maxTimeAllowed;
+                        if (range === 'day') {
+                            var openDate = new Date(openUtc);
+                            var startOfDay = new Date(Date.UTC(openDate.getUTCFullYear(), openDate.getUTCMonth(), openDate.getUTCDate(), 0, 0, 0));
+                            var endOfDay = new Date(Date.UTC(openDate.getUTCFullYear(), openDate.getUTCMonth(), openDate.getUTCDate() + 1, 0, 0, 0));
+                            minTimeAllowed = startOfDay.getTime();
+                            maxTimeAllowed = endOfDay.getTime();
+                        } else if (range === 'week') {
+                            var openDate = new Date(openUtc);
+                            var dayOfWeek = openDate.getUTCDay();
+                            var diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                            var startOfWeek = new Date(Date.UTC(openDate.getUTCFullYear(), openDate.getUTCMonth(), openDate.getUTCDate() + diffToMon, 0, 0, 0));
+                            var endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 3600 * 1000);
+                            minTimeAllowed = startOfWeek.getTime();
+                            maxTimeAllowed = endOfWeek.getTime();
+                        } else {
+                            minTimeAllowed = openUtc - 3600 * 1000;
+                            maxTimeAllowed = closeUtc + 3600 * 1000;
+                        }
+                        
+                        candles = candles.filter(c => c.time >= minTimeAllowed && c.time <= maxTimeAllowed);
+                        
+                        // Align curve to trade's openPrice
+                        if (candles.length > 0) {
+                            let closestCandle = candles[0];
+                            let minDiff = Math.abs(candles[0].time - openUtc);
+                            for (let i = 1; i < candles.length; i++) {
+                                let diff = Math.abs(candles[i].time - openUtc);
+                                if (diff < minDiff) {
+                                    minDiff = diff;
+                                    closestCandle = candles[i];
+                                }
+                            }
+                            const priceOffset = trade.openPrice - closestCandle.close;
+                            candles.forEach(c => {
+                                c.open += priceOffset;
+                                c.high += priceOffset;
+                                c.low += priceOffset;
+                                c.close += priceOffset;
+                            });
+                        }
+                    }
+
+                    if (!candles || candles.length === 0) {
+                        var intervalName = range === 'trade' ? 'M5' : (range === 'day' ? 'M15' : 'H1');
+                        errorDiv.textContent = 'Für dieses Symbol (' + trade.symbol + ') konnten keine ' + intervalName + '-Kerzen für den Trade-Zeitraum abgerufen werden.';
+                        errorDiv.style.display = 'block';
+                        placeholder.style.display = 'flex';
+                        return;
+                    }
+
+                    canvas.style.display = 'block';
+                    var ctx = canvas.getContext('2d');
+
+                    if (candles && candles.length > 0) {
+                        var firstTime = candles[0].time;
+                        var lastTime = candles[candles.length - 1].time;
+                        var rangeTextEl = document.getElementById('tanal-' + (range === 'trade' ? 'macro' : range) + '-chart-range-text');
+                        if (rangeTextEl) {
+                            var firstDate = new Date(firstTime);
+                            var lastDate = new Date(lastTime);
+                            if (range === 'week') {
+                                var startStr = firstDate.toLocaleDateString([], {day: '2-digit', month: '2-digit', year: 'numeric'});
+                                var endStr = lastDate.toLocaleDateString([], {day: '2-digit', month: '2-digit', year: 'numeric'});
+                                rangeTextEl.textContent = '[' + startStr + ' - ' + endStr + ']';
+                            } else {
+                                var startStr = firstDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                                var endStr = lastDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                                rangeTextEl.textContent = '[' + startStr + ' - ' + endStr + ']';
+                            }
+                        }
+                    }
+
+                    var labels = candles.map(c => c.time);
+                    var prices = candles.map(c => c.close);
+
+                    var openVal = trade.openPrice;
+                    var closeVal = trade.closePrice;
+                    var minPrice = Math.min(...prices, openVal, closeVal);
+                    var maxPrice = Math.max(...prices, openVal, closeVal);
+                    var padding = (maxPrice - minPrice) * 0.1;
+                    if (padding === 0) padding = openVal * 0.01;
+
+                    var gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+                    gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
+                    tanalCharts[range] = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Kurs (' + trade.symbol + ')',
+                                data: candles.map(c => ({ x: c.time, y: c.close })),
+                                borderColor: '#f59e0b',
+                                borderWidth: 2,
+                                backgroundColor: gradient,
+                                fill: true,
+                                tension: 0.2,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(context) {
+                                            var time = context[0].raw.x;
+                                            var date = new Date(parseInt(time));
+                                            if (range === 'week') {
+                                                return date.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                            }
+                                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                        },
+                                        label: function(context) {
+                                            return 'Preis: ' + context.raw.y.toFixed(5);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    type: 'linear',
+                                    ticks: {
+                                        callback: function(value) {
+                                            var date = new Date(parseInt(value));
+                                            if (range === 'week') {
+                                                return date.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                            }
+                                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                        },
+                                        color: '#a0a0c0',
+                                        maxTicksLimit: 8
+                                    },
+                                    grid: { color: 'rgba(255, 255, 255, 0.03)' }
+                                },
+                                y: {
+                                    min: minPrice - padding,
+                                    max: maxPrice + padding,
+                                    ticks: {
+                                        color: '#a0a0c0',
+                                        callback: function(value) {
+                                            return value.toFixed(5);
+                                        }
+                                    },
+                                    grid: { color: 'rgba(255, 255, 255, 0.03)' }
+                                }
+                            }
+                        },
+                        plugins: [{
+                            id: 'tradeDrawing',
+                            beforeDraw: (chart) => {
+                                if (!chart.scales.x) return;
+                                const chartCtx = chart.ctx;
+                                const xAxis = chart.scales.x;
+                                const yAxis = chart.scales.y;
+                                
+                                const isWeekend = (t) => {
+                                    var d = new Date(t);
+                                    var day = d.getUTCDay();
+                                    var hour = d.getUTCHours();
+                                    if (day === 5 && hour >= 22) return true;
+                                    if (day === 6) return true;
+                                    if (day === 0 && hour < 23) return true;
+                                    return false;
+                                };
+
+                                const drawWeekendBlock = (start, end) => {
+                                    const xStart = Math.max(xAxis.getPixelForValue(start), xAxis.left);
+                                    const xEnd = Math.min(xAxis.getPixelForValue(end), xAxis.right);
+                                    
+                                    if (xStart < xEnd) {
+                                        chartCtx.save();
+                                        chartCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                                        chartCtx.fillRect(xStart, yAxis.top, xEnd - xStart, yAxis.bottom - yAxis.top);
+                                        
+                                        if (xEnd - xStart > 60) {
+                                            chartCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                                            chartCtx.font = 'bold 9px sans-serif';
+                                            chartCtx.fillText('Wochenende (geschlossen)', xStart + 5, yAxis.top + 15);
+                                        }
+                                        chartCtx.restore();
+                                    }
+                                };
+
+                                const step = 3600 * 1000;
+                                let inWeekend = false;
+                                let weekendStart = null;
+                                
+                                for (let t = xAxis.min; t <= xAxis.max; t += step) {
+                                    let isW = isWeekend(t);
+                                    if (isW && !inWeekend) {
+                                        inWeekend = true;
+                                        weekendStart = t;
+                                    } else if (!isW && inWeekend) {
+                                        inWeekend = false;
+                                        drawWeekendBlock(weekendStart, t);
+                                    }
+                                }
+                                if (inWeekend) {
+                                    drawWeekendBlock(weekendStart, xAxis.max);
+                                }
+                            },
+                            afterDraw: (chart) => {
+                                if (!chart.scales.x) return;
+                                const chartCtx = chart.ctx;
+                                const xAxis = chart.scales.x;
+                                const yAxis = chart.scales.y;
+                                
+                                const drawVerticalLine = (timeMsc, price, color, label, timeStr) => {
+                                    const x = xAxis.getPixelForValue(timeMsc);
+                                    const y = yAxis.getPixelForValue(price);
+                                    
+                                    if (x >= xAxis.left && x <= xAxis.right) {
+                                        // Draw vertical line
+                                        chartCtx.save();
+                                        chartCtx.beginPath();
+                                        chartCtx.strokeStyle = color;
+                                        chartCtx.lineWidth = 1.5;
+                                        chartCtx.setLineDash([4, 4]);
+                                        chartCtx.moveTo(x, yAxis.top);
+                                        chartCtx.lineTo(x, yAxis.bottom);
+                                        chartCtx.stroke();
+                                        
+                                        // Draw glowing dot
+                                        chartCtx.beginPath();
+                                        chartCtx.arc(x, y, 6, 0, 2 * Math.PI);
+                                        chartCtx.fillStyle = color;
+                                        chartCtx.shadowColor = color;
+                                        chartCtx.shadowBlur = 8;
+                                        chartCtx.fill();
+                                        chartCtx.shadowBlur = 0;
+                                        chartCtx.strokeStyle = '#ffffff';
+                                        chartCtx.lineWidth = 1.5;
+                                        chartCtx.stroke();
+                                        
+                                        // Text Label with exact times
+                                        chartCtx.fillStyle = '#ffffff';
+                                        chartCtx.font = 'bold 9px sans-serif';
+                                        const timeOnlyStr = timeStr ? (timeStr.split(' ')[1] || timeStr) : '';
+                                        const localTimeStr = new Date(timeMsc).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                                        const text = label + ': ' + localTimeStr + ' (Broker: ' + timeOnlyStr + ')';
+                                        const textY = label === 'Einstieg' ? (yAxis.top + 15) : (yAxis.top + 28);
+                                        chartCtx.fillText(text, x + 8, textY);
+                                        chartCtx.restore();
+                                        
+                                        return { x, y };
+                                    }
+                                    return null;
+                                };
+                                
+                                if (window.currentTanalTrade) {
+                                    const offsetSec = serverTimeOffsetSeconds || 0;
+                                    const openUtc = window.currentTanalTrade.openTimeMsc - (offsetSec * 1000);
+                                    const closeUtc = window.currentTanalTrade.closeTimeMsc - (offsetSec * 1000);
+                                    
+                                    const type = (window.currentTanalTrade.type || '').toLowerCase();
+                                    const isBuy = type.includes('buy');
+                                    const tradeColor = isBuy ? '#10b981' : '#ef4444';
+                                    
+                                    const pOpen = drawVerticalLine(openUtc, window.currentTanalTrade.openPrice, tradeColor, 'Einstieg', window.currentTanalTrade.openTime);
+                                    const pClose = drawVerticalLine(closeUtc, window.currentTanalTrade.closePrice, tradeColor, 'Ausstieg', window.currentTanalTrade.closeTime);
+                                    
+                                    if (pOpen && pClose) {
+                                        chartCtx.save();
+                                        chartCtx.beginPath();
+                                        chartCtx.strokeStyle = tradeColor;
+                                        chartCtx.lineWidth = 3;
+                                        chartCtx.moveTo(pOpen.x, pOpen.y);
+                                        chartCtx.lineTo(pClose.x, pClose.y);
+                                        chartCtx.stroke();
+                                        
+                                        const angle = Math.atan2(pClose.y - pOpen.y, pClose.x - pOpen.x);
+                                        const arrowLength = 12;
+                                        chartCtx.beginPath();
+                                        chartCtx.fillStyle = tradeColor;
+                                        chartCtx.strokeStyle = '#ffffff';
+                                        chartCtx.lineWidth = 1;
+                                        chartCtx.moveTo(pClose.x, pClose.y);
+                                        chartCtx.lineTo(pClose.x - arrowLength * Math.cos(angle - Math.PI / 6), pClose.y - arrowLength * Math.sin(angle - Math.PI / 6));
+                                        chartCtx.lineTo(pClose.x - arrowLength * Math.cos(angle + Math.PI / 6), pClose.y - arrowLength * Math.sin(angle + Math.PI / 6));
+                                        chartCtx.closePath();
+                                        chartCtx.fill();
+                                        chartCtx.stroke();
+                                        chartCtx.restore();
+                                    }
+                                }
+                            }
+                        }]
+                    });
+                })
+                .catch(error => {
+                    spinner.style.display = 'none';
+                    errorDiv.textContent = 'Fehler beim Laden der Kerzen-Daten: ' + error.message;
+                    errorDiv.style.display = 'block';
+                    placeholder.style.display = 'flex';
+                });
+        }
+
+        function loadMacroChart() {
+            loadChartForRange('trade', 'tanal-macro-chart', 'tanal-macro-chart-placeholder', 'tanal-macro-spinner', 'tanal-macro-error', '2 Std. Fenster');
+            loadChartForRange('day', 'tanal-daily-chart', 'tanal-daily-chart-placeholder', 'tanal-daily-spinner', 'tanal-daily-error', 'Tagesverlauf');
+            loadChartForRange('week', 'tanal-weekly-chart', 'tanal-weekly-chart-placeholder', 'tanal-weekly-spinner', 'tanal-weekly-error', 'Wochenverlauf');
+        }
+
         function showTickAnalysis(ticket) {
             var trade = historyMgr.allRows.find(t => t.ticket === ticket);
             if (!trade) {
                 alert("Trade not found!");
                 return;
             }
+
+            window.currentTanalTrade = trade;
+            
+            // Reset Macro Chart layout
+            document.getElementById('tanal-macro-chart-placeholder').style.display = 'flex';
+            document.getElementById('tanal-macro-spinner').style.display = 'none';
+            document.getElementById('tanal-macro-chart').style.display = 'none';
+            document.getElementById('tanal-macro-error').style.display = 'none';
+            
+            // Daily Chart reset
+            document.getElementById('tanal-daily-chart-placeholder').style.display = 'flex';
+            document.getElementById('tanal-daily-spinner').style.display = 'none';
+            document.getElementById('tanal-daily-chart').style.display = 'none';
+            document.getElementById('tanal-daily-error').style.display = 'none';
+
+            // Weekly Chart reset
+            document.getElementById('tanal-weekly-chart-placeholder').style.display = 'flex';
+            document.getElementById('tanal-weekly-spinner').style.display = 'none';
+            document.getElementById('tanal-weekly-chart').style.display = 'none';
+            document.getElementById('tanal-weekly-error').style.display = 'none';
+
+            if (tanalCharts.trade) { tanalCharts.trade.destroy(); }
+            if (tanalCharts.day) { tanalCharts.day.destroy(); }
+            if (tanalCharts.week) { tanalCharts.week.destroy(); }
+            tanalCharts = { trade: null, day: null, week: null };
 
             // Populate Modal Text fields
             document.getElementById('tanal-ticket-badge').textContent = 'Ticket #' + trade.ticket;
@@ -3540,6 +3978,46 @@
             
             document.getElementById('tanal-open-time-badge').textContent = trade.openTime || '';
             document.getElementById('tanal-close-time-badge').textContent = trade.closeTime || '';
+
+            // Populate extra trade details in modal header
+            document.getElementById('tanal-duration').textContent = formatDuration(trade.openTime, trade.closeTime);
+            
+            // Calculate slippage
+            var openSlippage = null;
+            var closeSlippage = null;
+            var pipVal = getPointValue(trade.symbol);
+            if (trade.openAsk > 0 && trade.openBid > 0) {
+                var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.openPrice - trade.openAsk) : (trade.openBid - trade.openPrice);
+                openSlippage = diff / pipVal;
+            }
+            if (trade.closeAsk > 0 && trade.closeBid > 0) {
+                var diff = (trade.type === 'BUY' || trade.type === '0') ? (trade.closeBid - trade.closePrice) : (trade.closePrice - trade.closeAsk);
+                closeSlippage = diff / pipVal;
+            }
+            var formatSlippageVal = function(val) {
+                if (val === null) return '-';
+                var formatted = val.toFixed(1);
+                if (val > 0.05) {
+                    return `<span style="color: #f7768e; font-weight: bold;">+${formatted}p</span>`;
+                } else if (val < -0.05) {
+                    return `<span style="color: #9ece6a; font-weight: bold;">${formatted}p</span>`;
+                } else {
+                    return `<span style="color: #a0a0c0;">0.0</span>`;
+                }
+            };
+            document.getElementById('tanal-slippage-val').innerHTML = formatSlippageVal(openSlippage) + ' / ' + formatSlippageVal(closeSlippage);
+            
+            // Calculate spread
+            var openSpread = (trade.openAsk > 0 && trade.openBid > 0) ? ((trade.openAsk - trade.openBid) / pipVal) : null;
+            var closeSpread = (trade.closeAsk > 0 && trade.closeBid > 0) ? ((trade.closeAsk - trade.closeBid) / pipVal) : null;
+            var formatSpreadVal = function(val) {
+                if (val === null || val < 0) return '-';
+                return val.toFixed(1) + 'p';
+            };
+            document.getElementById('tanal-spread-val').textContent = formatSpreadVal(openSpread) + ' / ' + formatSpreadVal(closeSpread);
+            
+            document.getElementById('tanal-open-time-val').textContent = trade.openTime || '-';
+            document.getElementById('tanal-close-time-val').textContent = trade.closeTime || '-';
 
             // Parse ticks
             var openTicks = [];
@@ -3705,6 +4183,7 @@
 
             // Show Modal
             document.getElementById('tick-analysis-modal').style.display = 'flex';
+            loadMacroChart();
         }
 
         function formatSlippageHtml(val) {

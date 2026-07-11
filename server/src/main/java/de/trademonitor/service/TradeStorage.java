@@ -218,6 +218,16 @@ public class TradeStorage {
 
         // Collect new trades (skip duplicates via HashSet lookup)
         List<ClosedTradeEntity> toInsert = new ArrayList<>();
+        List<ClosedTradeEntity> toUpdate = new ArrayList<>();
+
+        java.util.Map<Long, ClosedTradeEntity> existingEntitiesMap = new java.util.HashMap<>();
+        if (!existingTicketsSet.isEmpty()) {
+            List<ClosedTradeEntity> existingEntities = closedTradeRepository.findByAccountIdAndTicketIn(accountId, existingTickets);
+            for (ClosedTradeEntity ext : existingEntities) {
+                existingEntitiesMap.put(ext.getTicket(), ext);
+            }
+        }
+
         for (ClosedTrade trade : closedTrades) {
             if (!existingTicketsSet.contains(trade.getTicket())) {
                 ClosedTradeEntity entity = new ClosedTradeEntity();
@@ -246,8 +256,22 @@ public class TradeStorage {
                 entity.setCloseOrderSetupTimeMsc(trade.getCloseOrderSetupTimeMsc());
                 entity.setOpenTicks(trade.getOpenTicks());
                 entity.setCloseTicks(trade.getCloseTicks());
+                entity.setCandlesM5(trade.getCandlesM5());
+                entity.setCandlesM15(trade.getCandlesM15());
+                entity.setCandlesH1(trade.getCandlesH1());
                 toInsert.add(entity);
                 existingTicketsSet.add(trade.getTicket());
+            } else {
+                ClosedTradeEntity existingEntity = existingEntitiesMap.get(trade.getTicket());
+                if (existingEntity != null && 
+                    (existingEntity.getCandlesM5() == null || existingEntity.getCandlesM5().trim().isEmpty() || existingEntity.getCandlesM5().equals("[]")) &&
+                    trade.getCandlesM5() != null && !trade.getCandlesM5().trim().isEmpty() && !trade.getCandlesM5().equals("[]")) {
+                    
+                    existingEntity.setCandlesM5(trade.getCandlesM5());
+                    existingEntity.setCandlesM15(trade.getCandlesM15());
+                    existingEntity.setCandlesH1(trade.getCandlesH1());
+                    toUpdate.add(existingEntity);
+                }
             }
         }
 
@@ -258,6 +282,10 @@ public class TradeStorage {
             for (ClosedTradeEntity e : toInsert) {
                 ticketMaxDrawdownCache.remove(accountId + "_" + e.getTicket());
             }
+        }
+        if (!toUpdate.isEmpty()) {
+            closedTradeRepository.saveAll(toUpdate);
+            LOG.info("Account " + accountId + ": " + toUpdate.size() + " existing closed trades updated with native candles");
         }
 
         LOG.info("Account " + accountId + ": " + toInsert.size() + " new closed trades inserted, "
@@ -359,6 +387,9 @@ public class TradeStorage {
             trade.setCloseOrderSetupTimeMsc(entity.getCloseOrderSetupTimeMsc());
             trade.setOpenTicks(entity.getOpenTicks());
             trade.setCloseTicks(entity.getCloseTicks());
+            trade.setCandlesM5(entity.getCandlesM5());
+            trade.setCandlesM15(entity.getCandlesM15());
+            trade.setCandlesH1(entity.getCandlesH1());
             result.add(trade);
         }
         return result;

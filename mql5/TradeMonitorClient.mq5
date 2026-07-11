@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.12"
+#property version   "1.16"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -24,7 +24,7 @@ bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExis
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.12"
+#define EA_VERSION "1.16"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -874,6 +874,37 @@ long GetOrderSetupTimeMsc(ulong orderTicket)
 }
 
 //+------------------------------------------------------------------+
+//| Get historical rates (candles) as JSON                           |
+//+------------------------------------------------------------------+
+string GetRatesAsJson(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime)
+{
+   MqlRates rates[];
+   int copied = CopyRates(symbol, period, startTime, endTime, rates);
+   if(copied <= 0)
+   {
+      return "[]";
+   }
+   
+   int limit = copied;
+   if(limit > 1500) limit = 1500;
+   
+   string json = "[";
+   for(int i = 0; i < limit; i++)
+   {
+      if(i > 0) json += ",";
+      json += "{";
+      json += "\"time\":" + IntegerToString(rates[i].time * 1000) + ",";
+      json += "\"open\":" + DoubleToString(rates[i].open, 5) + ",";
+      json += "\"high\":" + DoubleToString(rates[i].high, 5) + ",";
+      json += "\"low\":" + DoubleToString(rates[i].low, 5) + ",";
+      json += "\"close\":" + DoubleToString(rates[i].close, 5);
+      json += "}";
+   }
+   json += "]";
+   return json;
+}
+
+//+------------------------------------------------------------------+
 //| Build JSON array of closed trades (history)                        |
 //+------------------------------------------------------------------+
 string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
@@ -1001,6 +1032,9 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             
             string openTicksJson = "[]";
             string closeTicksJson = "[]";
+            string candlesM5Json = "[]";
+            string candlesM15Json = "[]";
+            string candlesH1Json = "[]";
             
             // Query market ticks for recent trades to analyze slippage (limit to last 7 days for full history scan)
             datetime currentMqlTime = TimeCurrent();
@@ -1010,6 +1044,32 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                GetMarketBidAsk(symbol, closeTimeMsc, closeBid, closeAsk);
                openTicksJson = GetTicksJson(symbol, openTimeMsc);
                closeTicksJson = GetTicksJson(symbol, closeTimeMsc);
+            }
+            
+            if(isIncremental || dealTimeVal >= currentMqlTime - 30 * 24 * 3600)
+            {
+               datetime openDt = (datetime)(openTimeMsc / 1000);
+               datetime closeDt = (datetime)(closeTimeMsc / 1000);
+               
+               // M5: From open - 1 hour to close + 1 hour
+               candlesM5Json = GetRatesAsJson(symbol, PERIOD_M5, openDt - 3600, closeDt + 3600);
+               
+               // M15: From start of trade's day to end of trade's day
+               MqlDateTime mqlOpenDt;
+               TimeToStruct(openDt, mqlOpenDt);
+               mqlOpenDt.hour = 0;
+               mqlOpenDt.min = 0;
+               mqlOpenDt.sec = 0;
+               datetime startOfDay = StructToTime(mqlOpenDt);
+               datetime endOfDay = startOfDay + 24 * 3600;
+               candlesM15Json = GetRatesAsJson(symbol, PERIOD_M15, startOfDay, endOfDay);
+               
+               // H1: From start of trade's week (Monday 00:00) to end of trade's week (Sunday 24:00)
+               int dayOfWeek = mqlOpenDt.day_of_week;
+               int diffToMon = (dayOfWeek == 0) ? -6 : 1 - dayOfWeek;
+               datetime startOfWeek = startOfDay + diffToMon * 24 * 3600;
+               datetime endOfWeek = startOfWeek + 7 * 24 * 3600;
+               candlesH1Json = GetRatesAsJson(symbol, PERIOD_H1, startOfWeek, endOfWeek);
             }
             
             historyJson += "{";
@@ -1035,7 +1095,10 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             historyJson += "\"openOrderSetupTimeMsc\":" + IntegerToString(openOrderSetupTimeMsc) + ",";
             historyJson += "\"closeOrderSetupTimeMsc\":" + IntegerToString(closeOrderSetupTimeMsc) + ",";
             historyJson += "\"openTicks\":\"" + EscapeJson(openTicksJson) + "\",";
-            historyJson += "\"closeTicks\":\"" + EscapeJson(closeTicksJson) + "\"";
+            historyJson += "\"closeTicks\":\"" + EscapeJson(closeTicksJson) + "\",";
+            historyJson += "\"candlesM5\":\"" + EscapeJson(candlesM5Json) + "\",";
+            historyJson += "\"candlesM15\":\"" + EscapeJson(candlesM15Json) + "\",";
+            historyJson += "\"candlesH1\":\"" + EscapeJson(candlesH1Json) + "\"";
             historyJson += "}";
             
             // Progress logging every 100 closed trades

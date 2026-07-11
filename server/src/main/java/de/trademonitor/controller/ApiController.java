@@ -300,8 +300,16 @@ public class ApiController {
                     java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
                     java.time.LocalDateTime brokerTime = java.time.LocalDateTime.parse(request.getTimestamp(), formatter);
                     java.time.LocalDateTime serverTime = java.time.LocalDateTime.now();
-                    long offsetSeconds = java.time.temporal.ChronoUnit.SECONDS.between(brokerTime, serverTime);
-                    accountManager.updateServerTimeOffset(request.getAccountId(), offsetSeconds);
+                    java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now();
+                    int serverOffsetSeconds = nowZoned.getOffset().getTotalSeconds();
+                    long brokerMinusServerSeconds = java.time.temporal.ChronoUnit.SECONDS.between(serverTime, brokerTime);
+                    long offsetSeconds = brokerMinusServerSeconds + serverOffsetSeconds;
+                    // Only update offset if it is a weekday and the difference is less than 12 hours (43200 seconds)
+                    java.time.DayOfWeek dayOfWeek = serverTime.getDayOfWeek();
+                    boolean isWeekend = (dayOfWeek == java.time.DayOfWeek.SATURDAY || dayOfWeek == java.time.DayOfWeek.SUNDAY);
+                    if (!isWeekend && Math.abs(offsetSeconds) < 43200) {
+                        accountManager.updateServerTimeOffset(request.getAccountId(), offsetSeconds);
+                    }
                 } catch (Exception e) {
                     LOG.log(java.util.logging.Level.WARNING, "Could not parse heartbeat timestamp: " + request.getTimestamp() + " for account " + request.getAccountId(), e);
                 }

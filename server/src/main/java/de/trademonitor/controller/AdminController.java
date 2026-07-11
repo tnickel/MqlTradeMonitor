@@ -953,10 +953,14 @@ public class AdminController {
                             colSize = 1; break;
                         case "CHARACTER VARYING":
                         case "VARCHAR":
+                            // Cap max length estimation for unlimited VARCHARs (maxLen > 10000)
+                            long len = maxLen > 10000 ? 250 : maxLen;
+                            colSize = Math.max(20, len * 2 / 5);
+                            break;
                         case "CLOB":
                         case "CHARACTER LARGE OBJECT":
-                            // Estimate average fill as 40% of max length, min 20 bytes
-                            colSize = Math.max(20, maxLen * 2 / 5);
+                            // Assume 1KB average size for CLOB/TEXT fields (ticks, candles, etc.)
+                            colSize = 1024;
                             break;
                         default:
                             colSize = 16; // general fallback

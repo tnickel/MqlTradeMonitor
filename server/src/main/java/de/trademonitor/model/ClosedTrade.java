@@ -28,6 +28,9 @@ public class ClosedTrade {
     private Long closeOrderSetupTimeMsc;
     private String openTicks;
     private String closeTicks;
+    private String candlesM5;
+    private String candlesM15;
+    private String candlesH1;
 
     public ClosedTrade() {
     }
@@ -223,5 +226,29 @@ public class ClosedTrade {
 
     public void setCloseTicks(String closeTicks) {
         this.closeTicks = closeTicks;
+    }
+
+    public String getCandlesM5() {
+        return candlesM5;
+    }
+
+    public void setCandlesM5(String candlesM5) {
+        this.candlesM5 = candlesM5;
+    }
+
+    public String getCandlesM15() {
+        return candlesM15;
+    }
+
+    public void setCandlesM15(String candlesM15) {
+        this.candlesM15 = candlesM15;
+    }
+
+    public String getCandlesH1() {
+        return candlesH1;
+    }
+
+    public void setCandlesH1(String candlesH1) {
+        this.candlesH1 = candlesH1;
     }
 }

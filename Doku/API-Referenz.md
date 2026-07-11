@@ -330,6 +330,30 @@ Aggregierte Profit-Daten für Tages-/Wochen-/Monatscharts.
 
 ---
 
+### GET `/api/trades/{ticket}/macro-history`
+
+Ruft die historischen Kurskerzen (M5, M15, H1) für einen bestimmten geschlossenen Trade ab. 
+Diese Daten werden direkt aus der Datenbank gelesen (welche vom MetaTrader EA befüllt wird).
+
+**Parameter:**
+- `accountId` (Long) - ID des Trading-Kontos
+- `range` (String) - Gewünschter Zeitraum/Auflösung (`trade` für M5 Kerzen, `day` für M15 Kerzen, `week` für H1 Kerzen)
+
+**Response:** Array von `Candle`-Objekten:
+```json
+[
+  {
+    "time": 1783326300000,
+    "open": 4107.61,
+    "high": 4108.20,
+    "low": 4106.10,
+    "close": 4107.00
+  }
+]
+```
+
+---
+
 ### POST `/api/mapping`
 
 Magic Number Mapping per AJAX aktualisieren.

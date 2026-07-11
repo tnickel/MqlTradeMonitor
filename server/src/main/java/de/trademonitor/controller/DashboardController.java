@@ -84,6 +84,9 @@ public class DashboardController {
     private de.trademonitor.service.SecurityAuditService securityAuditService;
 
     @Autowired
+    private de.trademonitor.service.HistoricalRatesService historicalRatesService;
+
+    @Autowired
     private de.trademonitor.service.ServerHealthMonitorService serverHealthMonitorService;
 
     @Autowired
@@ -2349,6 +2352,35 @@ public class DashboardController {
         response.put("accountColors", user.getNewsAccountColors());
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/api/trades/{ticket}/macro-history")
+    @ResponseBody
+    public ResponseEntity<?> getMacroHistory(
+            @PathVariable("ticket") long ticket,
+            @RequestParam("accountId") long accountId,
+            @RequestParam(value = "range", defaultValue = "trade") String range,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+        
+        de.trademonitor.entity.ClosedTradeEntity trade = closedTradeRepository.findByAccountIdAndTicket(accountId, ticket).orElse(null);
+        if (trade == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("status", "error", "message", "Trade not found"));
+        }
+        
+        try {
+            List<de.trademonitor.service.HistoricalRatesService.Candle> candles = 
+                    historicalRatesService.getHistoricalRates(accountId, trade.getSymbol(), trade.getOpenTimeMsc(), trade.getCloseTimeMsc(), range, trade);
+            return ResponseEntity.ok(candles);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
     }
 
     private static class ResultComparator {
