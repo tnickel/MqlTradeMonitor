@@ -98,7 +98,15 @@ public class GlobalConfigService {
     public static final String KEY_LLM_MODEL = "LLM_MODEL";
     public static final String KEY_LLM_SYSTEM_PROMPT = "LLM_SYSTEM_PROMPT";
 
+    // Telegram Config Keys
+    public static final String KEY_TELEGRAM_ENABLED = "TELEGRAM_ENABLED";
+    public static final String KEY_TELEGRAM_BOT_TOKEN = "TELEGRAM_BOT_TOKEN";
+    public static final String KEY_TELEGRAM_CHAT_ID = "TELEGRAM_CHAT_ID";
+
     private String cachedLlmModel = "google/gemini-2.5-flash";
+    private boolean cachedTelegramEnabled = false;
+    private String cachedTelegramBotToken = "";
+    private String cachedTelegramChatId = "";
     private String cachedLlmSystemPrompt = "Du bist ein professioneller Risiko-Analyst für algorithmische Trading-Systeme (Expert Advisor) und Forex-Märkte mit Echtzeit-Internetzugriff über Suchwerkzeuge. Deine Aufgabe ist es, den Zustand eines Handelskontos und dessen offene Positionen mathematisch, fundamental und markttechnisch unter Berücksichtigung von Echtzeit-Marktdaten zu bewerten.\n\n" +
             "Suche aktiv im Internet nach aktuellen Nachrichten, Marktmeldungen und Event-Risiken für die betroffenen Symbole (Währungspaare, Rohstoffe, Krypto-Assets). Nutze das Suchwerkzeug, um aktuelle Kurstrends, Nachrichten der letzten Stunden/Tage und relevante Wirtschaftsnachrichten (z. B. Zinsentscheidungen der Zentralbanken RBA/Fed, Wirtschaftsdaten) zu ermitteln.\n\n" +
             "Erstelle eine saubere, strukturierte Analyse auf Deutsch, die folgende Fragen präzise beantwortet:\n" +
@@ -310,6 +318,17 @@ public class GlobalConfigService {
                 repository.save(new de.trademonitor.entity.GlobalConfigEntity(KEY_LLM_SYSTEM_PROMPT, cachedLlmSystemPrompt));
             }
         );
+
+        // Load Telegram Config
+        repository.findById(KEY_TELEGRAM_ENABLED).ifPresent(entity -> {
+            cachedTelegramEnabled = Boolean.parseBoolean(entity.getConfValue());
+        });
+        repository.findById(KEY_TELEGRAM_BOT_TOKEN).ifPresent(entity -> {
+            cachedTelegramBotToken = entity.getConfValue();
+        });
+        repository.findById(KEY_TELEGRAM_CHAT_ID).ifPresent(entity -> {
+            cachedTelegramChatId = entity.getConfValue();
+        });
     }
 
     // --- Copier Verification Config ---
@@ -698,6 +717,10 @@ public class GlobalConfigService {
     public void saveSecurityConfig(boolean rateLimitEnabled, int rateLimitPerMin,
             boolean bruteForceEnabled, int bruteForceMaxAttempts, int bruteForceLockoutMins,
             boolean headersEnabled, int maxSessions, boolean h2ConsoleEnabled) {
+        if (rateLimitPerMin < 1 || bruteForceMaxAttempts < 1 || bruteForceLockoutMins < 1
+                || maxSessions < 1 || maxSessions > 50) {
+            throw new IllegalArgumentException("Sicherheitswerte liegen außerhalb des erlaubten Bereichs.");
+        }
         this.cachedSecRateLimitEnabled = rateLimitEnabled;
         this.cachedSecRateLimitPerMin = rateLimitPerMin;
         this.cachedSecBruteForceEnabled = bruteForceEnabled;
@@ -798,5 +821,28 @@ public class GlobalConfigService {
 
     public void setOpenRouterApiKey(String openRouterApiKey) {
         this.openRouterApiKey = openRouterApiKey;
+    }
+
+    // --- Telegram Configuration Methods ---
+    public boolean isTelegramEnabled() {
+        return cachedTelegramEnabled;
+    }
+
+    public String getTelegramBotToken() {
+        return cachedTelegramBotToken;
+    }
+
+    public String getTelegramChatId() {
+        return cachedTelegramChatId;
+    }
+
+    public void saveTelegramConfig(boolean enabled, String botToken, String chatId) {
+        this.cachedTelegramEnabled = enabled;
+        this.cachedTelegramBotToken = botToken != null ? botToken.trim() : "";
+        this.cachedTelegramChatId = chatId != null ? chatId.trim() : "";
+
+        repository.save(new GlobalConfigEntity(KEY_TELEGRAM_ENABLED, String.valueOf(this.cachedTelegramEnabled)));
+        repository.save(new GlobalConfigEntity(KEY_TELEGRAM_BOT_TOKEN, this.cachedTelegramBotToken));
+        repository.save(new GlobalConfigEntity(KEY_TELEGRAM_CHAT_ID, this.cachedTelegramChatId));
     }
 }

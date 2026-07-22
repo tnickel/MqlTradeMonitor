@@ -11,6 +11,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 
 import java.util.*;
 
@@ -18,10 +26,13 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.test.context.ActiveProfiles("test")
 public class ApiControllerSecurityTest {
 
     @Autowired
@@ -33,10 +44,16 @@ public class ApiControllerSecurityTest {
     @MockBean
     private UserRepository userRepository;
 
+    @Autowired
+    private SessionAuthenticationStrategy sessionAuthenticationStrategy;
+
+    @Autowired
+    private SessionRegistry sessionRegistry;
+
     @Test
     public void testGetAccountsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/accounts"))
-                .andExpect(status().is3xxRedirection()); // redirects to login since it requires authentication
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -227,5 +244,113 @@ public class ApiControllerSecurityTest {
                 .with(user(userDetails)))
                 .andExpect(status().isBadRequest());
     }
-}
 
+    @Test
+    public void testRegisterAnonymousDoesNotRedirect() throws Exception {
+        mockMvc.perform(post("/api/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"accountId\": 12345, \"broker\": \"ICMarkets\"}"))
+                .andExpect(status().isUnauthorized()); // Expect 401, not 302 redirect
+    }
+
+    @Test
+    public void testHeartbeatAnonymousDoesNotRedirect() throws Exception {
+        mockMvc.perform(post("/api/heartbeat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"accountId\": 12345, \"version\": \"1.11\"}"))
+                .andExpect(status().isUnauthorized()); // Expect 401, not 302 redirect
+    }
+
+    private CustomUserDetails regularUserWithAccounts(Long... accountIds) {
+        UserEntity userEntity = new UserEntity("regular-user", "password", "ROLE_USER");
+        userEntity.setId(42L);
+        userEntity.setAllowedAccountIds(new HashSet<>(Arrays.asList(accountIds)));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(userEntity));
+        return new CustomUserDetails(userEntity);
+    }
+
+    @Test
+    public void testRegularUserCannotTriggerSirenOrModifyGlobalLayout() throws Exception {
+        CustomUserDetails regular = regularUserWithAccounts(12345L);
+
+        mockMvc.perform(post("/api/test-siren").with(user(regular)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/section/create")
+                        .param("name", "Injected")
+                        .with(user(regular)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/account/layout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"1\":[12345]}")
+                        .with(user(regular)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testAccountMutationRequiresAccountPermission() throws Exception {
+        CustomUserDetails regular = regularUserWithAccounts(12345L);
+
+        mockMvc.perform(post("/api/account/meta-trader-info")
+                        .param("accountId", "99999")
+                        .param("metaTraderInfo", "unauthorized")
+                        .with(user(regular)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/account/meta-trader-info")
+                        .param("accountId", "12345")
+                        .param("metaTraderInfo", "authorized")
+                        .with(user(regular)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testDangerousDocumentUploadIsRejected() throws Exception {
+        CustomUserDetails regular = regularUserWithAccounts(12345L);
+        MockMultipartFile html = new MockMultipartFile(
+                "file", "payload.html", "text/html", "<script>alert(1)</script>".getBytes());
+
+        mockMvc.perform(multipart("/api/account/12345/documents")
+                        .file(html)
+                        .param("minText", "test")
+                        .with(user(regular)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testRegularUserCannotImportSharedCsvAccount() throws Exception {
+        CustomUserDetails regular = regularUserWithAccounts(12345L);
+        MockMultipartFile csv = new MockMultipartFile(
+                "file", "trades.csv", "text/csv", "Ticket,Symbol\n1,EURUSD".getBytes());
+
+        mockMvc.perform(multipart("/api/trades/upload-csv")
+                        .file(csv)
+                        .param("name", "Shared")
+                        .with(user(regular)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testConfiguredConcurrentSessionLimitIsApplied() {
+        UserEntity entity = new UserEntity("session-limit-user", "password", "ROLE_USER");
+        CustomUserDetails principal = new CustomUserDetails(entity);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+
+        for (int i = 0; i < 4; i++) {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.setSession(new MockHttpSession());
+            sessionAuthenticationStrategy.onAuthentication(
+                    authentication, request, new MockHttpServletResponse());
+        }
+
+        assertEquals(3, sessionRegistry.getAllSessions(
+                new CustomUserDetails(new UserEntity("session-limit-user", "ignored", "ROLE_USER")), false).size());
+    }
+
+    @Test
+    public void testH2ConsoleIsHiddenWhenAdminSwitchIsOff() throws Exception {
+        UserEntity admin = new UserEntity("h2-admin", "password", "ROLE_ADMIN");
+        mockMvc.perform(get("/h2-console").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isNotFound());
+    }
+}

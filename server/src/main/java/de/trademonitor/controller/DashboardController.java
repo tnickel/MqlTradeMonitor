@@ -18,6 +18,8 @@ import de.trademonitor.entity.UserEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.CharacterCodingException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -28,17 +30,78 @@ import java.util.stream.Collectors;
 public class DashboardController {
 
     private static final Logger LOG = Logger.getLogger(DashboardController.class.getName());
+    private static final long MAX_DOCUMENT_SIZE = 10L * 1024L * 1024L;
+    private static final long MAX_CSV_SIZE = 10L * 1024L * 1024L;
+
+    private boolean isAdmin(CustomUserDetails userDetails) {
+        return userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+    }
+
+    private String sanitizeFileName(String originalName) {
+        String name = originalName == null ? "document" : originalName.replace('\\', '/');
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) name = name.substring(slash + 1);
+        name = name.replaceAll("[\\r\\n\\p{Cntrl}\\\"]", "_").trim();
+        if (name.isEmpty()) name = "document";
+        return name.length() > 200 ? name.substring(name.length() - 200) : name;
+    }
+
+    /** Returns a trusted content type after extension, signature and text checks. */
+    private String detectAllowedDocumentType(String fileName, byte[] data) {
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".pdf") && startsWith(data, "%PDF-".getBytes(StandardCharsets.US_ASCII))) {
+            return "application/pdf";
+        }
+        if (lower.endsWith(".png") && data.length >= 8
+                && (data[0] & 0xff) == 0x89 && data[1] == 0x50 && data[2] == 0x4e && data[3] == 0x47) {
+            return "image/png";
+        }
+        if ((lower.endsWith(".jpg") || lower.endsWith(".jpeg")) && data.length >= 3
+                && (data[0] & 0xff) == 0xff && (data[1] & 0xff) == 0xd8 && (data[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (lower.endsWith(".gif") && data.length >= 6
+                && (startsWith(data, "GIF87a".getBytes(StandardCharsets.US_ASCII))
+                    || startsWith(data, "GIF89a".getBytes(StandardCharsets.US_ASCII)))) {
+            return "image/gif";
+        }
+        if (lower.endsWith(".webp") && data.length >= 12
+                && startsWith(data, "RIFF".getBytes(StandardCharsets.US_ASCII))
+                && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
+            return "image/webp";
+        }
+        if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".markdown")) {
+            try {
+                StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(data));
+                return lower.endsWith(".txt") ? "text/plain" : "text/markdown";
+            } catch (CharacterCodingException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private boolean startsWith(byte[] data, byte[] prefix) {
+        if (data.length < prefix.length) return false;
+        for (int i = 0; i < prefix.length; i++) {
+            if (data[i] != prefix[i]) return false;
+        }
+        return true;
+    }
+
+    private boolean isSafeInlineDocumentType(String contentType) {
+        return contentType != null && Set.of("application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+                "text/plain", "text/markdown").contains(contentType);
+    }
 
     private boolean isAllowedAccess(CustomUserDetails userDetails, long accountId) {
         if (userDetails == null)
             return false;
         if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
             return true;
-        Account acc = accountManager.getAccount(accountId);
-        if (acc != null && "CSV".equalsIgnoreCase(acc.getType())) {
-            return true;
-        }
-        return userDetails.getUserEntity().getAllowedAccountIds().contains(accountId);
+        UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+        return user.getAllowedAccountIds() != null && user.getAllowedAccountIds().contains(accountId);
     }
 
     /**
@@ -53,7 +116,9 @@ public class DashboardController {
             return Collections.emptySet();
         if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
             return null;
-        return userDetails.getUserEntity().getAllowedAccountIds();
+        UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+        return user.getAllowedAccountIds();
     }
 
     @Autowired
@@ -116,6 +181,15 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.service.UserService userService;
 
+    @Autowired
+    private de.trademonitor.repository.AccountDocumentRepository accountDocumentRepository;
+
+    @Autowired
+    private de.trademonitor.repository.AccountLinkRepository accountLinkRepository;
+
+    @Autowired
+    private de.trademonitor.repository.AccountRepository accountRepository;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -125,9 +199,12 @@ public class DashboardController {
 
     @PostMapping("/api/test-siren")
     @ResponseBody
-    public String testSiren() {
+    public ResponseEntity<String> testSiren(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Nur der Admin darf die Sirene testen.");
+        }
         homeyService.triggerSiren(true);
-        return "Siren trigger sent";
+        return ResponseEntity.ok("Siren trigger sent");
     }
 
     /**
@@ -424,8 +501,12 @@ public class DashboardController {
     @PostMapping("/api/mapping")
     @ResponseBody
     public ResponseEntity<String> updateMappingAjax(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("magicNumber") Long magicNumber,
             @RequestParam("customComment") String customComment) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Admin is allowed to modify mappings.");
+        }
         magicMappingService.saveMapping(magicNumber, customComment);
         return ResponseEntity.ok("Saved");
     }
@@ -443,10 +524,16 @@ public class DashboardController {
             @RequestParam(value = "alarmAbs", required = false) Double alarmAbs,
             @RequestParam(value = "alarmPct", required = false) Double alarmPct,
             @RequestParam(value = "monitored", defaultValue = "true") boolean monitored,
+            @RequestParam(value = "telegramTradesEnabled", defaultValue = "false") boolean telegramTradesEnabled,
             @RequestParam(value = "icon", required = false) MultipartFile icon,
-            @RequestParam(value = "removeIcon", defaultValue = "false") boolean removeIcon) {
+            @RequestParam(value = "removeIcon", defaultValue = "false") boolean removeIcon,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal de.trademonitor.security.CustomUserDetails userDetails) {
         try {
-            accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
+            boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+            if (!isAdmin) {
+                return ResponseEntity.status(403).body("Only Admin is allowed to modify accounts.");
+            }
+            accountManager.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored, telegramTradesEnabled);
             if (removeIcon) {
                 accountManager.updateAccountIcon(accountId, null);
             } else if (icon != null && !icon.isEmpty()) {
@@ -466,8 +553,12 @@ public class DashboardController {
     @PostMapping("/api/account/meta-trader-info")
     @ResponseBody
     public ResponseEntity<String> updateMetaTraderInfo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId,
             @RequestParam("metaTraderInfo") String metaTraderInfo) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
         accountManager.updateMetaTraderInfo(accountId, metaTraderInfo);
         return ResponseEntity.ok("Saved");
     }
@@ -547,8 +638,12 @@ public class DashboardController {
     @PostMapping("/api/account/timelines")
     @ResponseBody
     public ResponseEntity<String> addTimeline(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId,
             @RequestParam("timelineDate") String timelineDate) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
         
         de.trademonitor.entity.TimelineEntity timeline = new de.trademonitor.entity.TimelineEntity(accountId, timelineDate);
         timelineRepository.save(timeline);
@@ -570,8 +665,17 @@ public class DashboardController {
 
     @DeleteMapping("/api/account/timelines/{id}")
     @ResponseBody
-    public ResponseEntity<String> deleteTimeline(@PathVariable("id") Long id) {
-        timelineRepository.deleteById(id);
+    public ResponseEntity<String> deleteTimeline(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("id") Long id) {
+        de.trademonitor.entity.TimelineEntity timeline = timelineRepository.findById(id).orElse(null);
+        if (timeline == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, timeline.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        timelineRepository.delete(timeline);
         return ResponseEntity.ok("Deleted");
     }
 
@@ -582,8 +686,12 @@ public class DashboardController {
     @PostMapping("/api/account/magic-max-age")
     @ResponseBody
     public ResponseEntity<String> updateMagicMaxAge(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId,
             @RequestParam("days") int days) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
         accountManager.updateMagicNumberMaxAge(accountId, days);
         return ResponseEntity.ok("Saved");
     }
@@ -594,8 +702,12 @@ public class DashboardController {
     @PostMapping("/api/account/magic-min-trades")
     @ResponseBody
     public ResponseEntity<String> updateMagicMinTrades(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId,
             @RequestParam("minTrades") int minTrades) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
         accountManager.updateMagicMinTrades(accountId, minTrades);
         return ResponseEntity.ok("Saved");
     }
@@ -607,9 +719,13 @@ public class DashboardController {
     @PostMapping("/api/account/{accountId}/magic-preferences")
     @ResponseBody
     public ResponseEntity<String> updateMagicPreferences(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("accountId") Long accountId,
             @RequestParam("magicNumberMaxAge") int magicNumberMaxAge,
             @RequestParam("magicMinTrades") int magicMinTrades) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
         accountManager.updateMagicNumberMaxAge(accountId, magicNumberMaxAge);
         accountManager.updateMagicMinTrades(accountId, magicMinTrades);
         return ResponseEntity.ok("Saved");
@@ -644,7 +760,12 @@ public class DashboardController {
     @PostMapping("/api/account/delete")
     @ResponseBody
     public ResponseEntity<String> deleteAccount(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("accountId") Long accountId) {
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Nur der Admin darf ein Konto löschen.");
+        }
         de.trademonitor.model.Account account = accountManager.getAccount(accountId);
         if (account == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Account not found");
@@ -661,22 +782,36 @@ public class DashboardController {
 
     @PostMapping("/api/section/create")
     @ResponseBody
-    public de.trademonitor.entity.DashboardSectionEntity createSection(@RequestParam("name") String name) {
-        return accountManager.createSection(name);
+    public ResponseEntity<?> createSection(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam("name") String name) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Admin is allowed to modify sections.");
+        }
+        return ResponseEntity.ok(accountManager.createSection(name));
     }
 
     @PostMapping("/api/section/rename")
     @ResponseBody
     public ResponseEntity<String> renameSection(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("id") Long id,
             @RequestParam("name") String name) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Admin is allowed to modify sections.");
+        }
         accountManager.renameSection(id, name);
         return ResponseEntity.ok("Renamed");
     }
 
     @PostMapping("/api/section/delete")
     @ResponseBody
-    public ResponseEntity<String> deleteSection(@RequestParam("id") Long id) {
+    public ResponseEntity<String> deleteSection(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam("id") Long id) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Admin is allowed to modify sections.");
+        }
         accountManager.deleteSection(id);
         return ResponseEntity.ok("Deleted");
     }
@@ -687,7 +822,12 @@ public class DashboardController {
      */
     @PostMapping("/api/account/layout")
     @ResponseBody
-    public ResponseEntity<String> saveLayout(@RequestBody Map<String, List<Object>> layoutData) {
+    public ResponseEntity<String> saveLayout(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, List<Object>> layoutData) {
+        if (!isAdmin(userDetails)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Admin is allowed to modify the layout.");
+        }
         LOG.info("=== SAVE LAYOUT called with " + layoutData.size() + " sections ===");
         int totalSaved = 0;
         for (Map.Entry<String, List<Object>> entry : layoutData.entrySet()) {
@@ -736,7 +876,9 @@ public class DashboardController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         List<Map<String, Object>> trades = accountManager.getAllOpenTradesSorted();
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
+            Set<Long> allowed = user.getAllowedAccountIds();
             return trades.stream()
                     .filter(t -> t.get("accountId") != null
                             && allowed.contains(((Number) t.get("accountId")).longValue()))
@@ -753,11 +895,47 @@ public class DashboardController {
     public List<de.trademonitor.dto.MagicDrawdownItem> getMagicDrawdowns(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         List<de.trademonitor.dto.MagicDrawdownItem> drawdowns = accountManager.getMagicDrawdowns();
-        if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
-            return drawdowns.stream()
-                    .filter(d -> allowed.contains(d.getAccountId()))
-                    .collect(Collectors.toList());
+        if (userDetails != null) {
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
+            
+            boolean hasConfig = !user.getRealAccountIds().isEmpty() || !user.getDemoAccountIds().isEmpty();
+            
+            if ("ROLE_ADMIN".equals(user.getRole())) {
+                return drawdowns.stream()
+                        .filter(d -> !hasConfig || user.getRealAccountIds().contains(d.getAccountId()) || user.getDemoAccountIds().contains(d.getAccountId()))
+                        .map(d -> {
+                            if (user.getRealAccountIds().contains(d.getAccountId())) {
+                                d.setAccountType("REAL");
+                                d.setReal(true);
+                            } else if (user.getDemoAccountIds().contains(d.getAccountId())) {
+                                d.setAccountType("DEMO");
+                                d.setReal(false);
+                            }
+                            return d;
+                        })
+                        .collect(Collectors.toList());
+            } else {
+                Set<Long> allowed = user.getAllowedAccountIds();
+                return drawdowns.stream()
+                        .filter(d -> {
+                            boolean isAllowed = allowed.contains(d.getAccountId());
+                            if (!hasConfig) return isAllowed;
+                            boolean isExplicit = user.getRealAccountIds().contains(d.getAccountId()) || user.getDemoAccountIds().contains(d.getAccountId());
+                            return isAllowed && isExplicit;
+                        })
+                        .map(d -> {
+                            if (user.getRealAccountIds().contains(d.getAccountId())) {
+                                d.setAccountType("REAL");
+                                d.setReal(true);
+                            } else if (user.getDemoAccountIds().contains(d.getAccountId())) {
+                                d.setAccountType("DEMO");
+                                d.setReal(false);
+                            }
+                            return d;
+                        })
+                        .collect(Collectors.toList());
+            }
         }
         return drawdowns;
     }
@@ -1754,9 +1932,12 @@ public class DashboardController {
 
         // Filter by user permissions
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity currentUser = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
+            Set<Long> allowed = currentUser.getAllowedAccountIds() == null
+                    ? Collections.emptySet() : currentUser.getAllowedAccountIds();
             allAccounts = allAccounts.stream()
-                    .filter(a -> "CSV".equalsIgnoreCase(a.getType()) || allowed.contains(a.getAccountId()))
+                    .filter(a -> allowed.contains(a.getAccountId()))
                     .collect(Collectors.toList());
         }
 
@@ -1774,6 +1955,7 @@ public class DashboardController {
         model.addAttribute("selectedPeriod", period);
         model.addAttribute("selectedStartDate", startDate);
         model.addAttribute("selectedEndDate", endDate);
+        model.addAttribute("isAdmin", isAdmin(userDetails));
         model.addAttribute("matchedCount", matchedCount);
         model.addAttribute("onlyACount", onlyACount);
         model.addAttribute("onlyBCount", onlyBCount);
@@ -1841,6 +2023,10 @@ public class DashboardController {
                     rAcc.put("openTrades", acc.get("trades"));
                     rAcc.put("profit", acc.get("profit"));
                     rAcc.put("currency", acc.get("currency"));
+                    rAcc.put("computerName", acc.get("computerName"));
+                    rAcc.put("loginName", acc.get("loginName"));
+                    rAcc.put("eaVersion", acc.get("eaVersion"));
+                    rAcc.put("realAccountId", acc.get("realAccountId"));
                     
                     double dailyProfit = accountManager.getCachedDailyProfit(accountId);
                     rAcc.put("dailyProfit", dailyProfit);
@@ -1890,7 +2076,11 @@ public class DashboardController {
 
     @GetMapping("/api/login-logs")
     @ResponseBody
-    public java.util.List<java.util.Map<String, Object>> getRecentLoginLogs() {
+    public java.util.List<java.util.Map<String, Object>> getRecentLoginLogs(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null || !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            return java.util.Collections.emptyList();
+        }
         java.util.List<de.trademonitor.entity.LoginLog> all = loginLogRepository.findAllByOrderByTimestampDesc();
         int limit = Math.min(all.size(), 20);
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
@@ -2175,14 +2365,28 @@ public class DashboardController {
     @PostMapping("/api/trades/upload-csv")
     @ResponseBody
     public ResponseEntity<?> uploadCsvTradeList(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam("name") String name,
             @RequestParam("file") MultipartFile file) {
         try {
+            if (!isAdmin(userDetails)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("success", false, "message", "Nur der Admin darf CSV-Konten importieren."));
+            }
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "CSV-Datei ist leer."));
             }
             if (name == null || name.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Name darf nicht leer sein."));
+            }
+            if (file.getSize() > MAX_CSV_SIZE) {
+                return ResponseEntity.badRequest().body(Map.of("success", false,
+                        "message", "CSV-Datei ist größer als 10 MB."));
+            }
+            String csvName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+            if (!csvName.endsWith(".csv")) {
+                return ResponseEntity.badRequest().body(Map.of("success", false,
+                        "message", "Es sind nur CSV-Dateien erlaubt."));
             }
 
             // Parse trades
@@ -2395,4 +2599,446 @@ public class DashboardController {
         }
     }
 
+    @GetMapping("/api/trades/{ticket}/compare-ticks")
+    @ResponseBody
+    public ResponseEntity<?> getCompareTicks(
+            @PathVariable("ticket") long ticket,
+            @RequestParam("accountId") long accountId,
+            @RequestParam("isOpen") boolean isOpen,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+        
+        de.trademonitor.entity.ClosedTradeEntity refTrade = closedTradeRepository.findByAccountIdAndTicket(accountId, ticket).orElse(null);
+        if (refTrade == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("status", "error", "message", "Reference trade not found"));
+        }
+        
+        long timeMsc = isOpen ? refTrade.getOpenTimeMsc() : refTrade.getCloseTimeMsc();
+        String symbol = refTrade.getSymbol();
+        
+        // Find trades executed on the same symbol within +/- 2 minutes (120,000 ms)
+        List<de.trademonitor.entity.ClosedTradeEntity> matchingTrades = closedTradeRepository.findTradesForComparison(
+                symbol, isOpen, timeMsc - 120000, timeMsc + 120000);
+        
+        // Group by accountId and pick the one closest to timeMsc
+        Map<Long, de.trademonitor.entity.ClosedTradeEntity> closestTradesByAccount = new HashMap<>();
+        for (de.trademonitor.entity.ClosedTradeEntity t : matchingTrades) {
+            if (!isAllowedAccess(userDetails, t.getAccountId())) {
+                continue;
+            }
+            long tTime = isOpen ? t.getOpenTimeMsc() : t.getCloseTimeMsc();
+            long diff = Math.abs(tTime - timeMsc);
+            
+            de.trademonitor.entity.ClosedTradeEntity existing = closestTradesByAccount.get(t.getAccountId());
+            if (existing == null) {
+                closestTradesByAccount.put(t.getAccountId(), t);
+            } else {
+                long existingTime = isOpen ? existing.getOpenTimeMsc() : existing.getCloseTimeMsc();
+                if (diff < Math.abs(existingTime - timeMsc)) {
+                    closestTradesByAccount.put(t.getAccountId(), t);
+                }
+            }
+        }
+        
+        // Always include reference account in the DB trade mapping
+        if (!closestTradesByAccount.containsKey(accountId)) {
+            closestTradesByAccount.put(accountId, refTrade);
+        }
+        
+        boolean loading = false;
+        
+        // Find all allowed account IDs for the user
+        Collection<Account> allAllowedAccounts = new ArrayList<>();
+        if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
+            allAllowedAccounts = accountManager.getAllAccounts();
+        } else {
+            for (long allowedId : userDetails.getUserEntity().getAllowedAccountIds()) {
+                Account acc = accountManager.getAccount(allowedId);
+                if (acc != null) {
+                    allAllowedAccounts.add(acc);
+                }
+            }
+        }
+        
+        Account refAcc = accountManager.getAccount(accountId);
+        long refOffset = refAcc != null && refAcc.getServerTimeOffsetSeconds() != null ? refAcc.getServerTimeOffsetSeconds() : 0L;
+        
+        // Window size is 2 seconds (2000 ms) before and after, centered around timeMsc
+        long minTime = timeMsc - 2000;
+        long maxTime = timeMsc + 2000;
+
+        List<Map<String, Object>> brokersData = new ArrayList<>();
+        
+        for (Account acc : allAllowedAccounts) {
+            long accId = acc.getAccountId();
+            
+            // Check if we have a trade in DB for this account
+            de.trademonitor.entity.ClosedTradeEntity trade = closestTradesByAccount.get(accId);
+            
+            String ticksJson = "[]";
+            double execPrice = 0.0;
+            String tradeType = refTrade.getType();
+            long execTime = timeMsc;
+            boolean brokerLoading = false;
+            long bOffset = acc.getServerTimeOffsetSeconds() != null ? acc.getServerTimeOffsetSeconds() : 0L;
+            
+            if (trade != null) {
+                ticksJson = isOpen ? trade.getOpenTicks() : trade.getCloseTicks();
+                if (ticksJson == null || ticksJson.trim().isEmpty()) {
+                    ticksJson = "[]";
+                }
+                execPrice = isOpen ? trade.getOpenPrice() : trade.getClosePrice();
+                tradeType = trade.getType();
+                execTime = isOpen ? trade.getOpenTimeMsc() : trade.getCloseTimeMsc();
+            } else {
+                // No trade executed on this account around that time.
+                // Is this account active? (lastSeen within last 60 seconds)
+                boolean isActive = acc.getLastSeen() != null && 
+                                   acc.getLastSeen().isAfter(java.time.LocalDateTime.now().minusSeconds(60));
+                
+                // Filter out accounts of type "CSV" (not real terminals)
+                if ("CSV".equalsIgnoreCase(acc.getType())) {
+                    isActive = false;
+                }
+                
+                if (!isActive) {
+                    continue; // Skip inactive brokers that didn't trade
+                }
+                
+                // Active broker that didn't trade. Do we have ticks in cache?
+                if (accountManager.isRequestedTicksCached(ticket, accId, isOpen)) {
+                    ticksJson = accountManager.getCachedRequestedTicks(ticket, accId, isOpen);
+                } else {
+                    // Track when we first requested this
+                    accountManager.trackRequestStart(ticket, accId, isOpen);
+                    Long startTime = accountManager.getRequestStartTime(ticket, accId, isOpen);
+                    
+                    if (startTime != null && System.currentTimeMillis() - startTime > 15000) {
+                        // Request timed out! Cache empty ticks so we stop requesting/loading
+                        accountManager.cacheRequestedTicks(ticket, accId, isOpen, "[]");
+                        accountManager.removePendingTickRequest(accId, ticket, isOpen);
+                        accountManager.clearRequestTracking(ticket, accId, isOpen);
+                        ticksJson = "[]";
+                    } else {
+                        // Still within timeout window. Check if it's already in the queue
+                        de.trademonitor.service.AccountManager.PendingTickRequest existingReq = 
+                                accountManager.getPendingTickRequest(accId, ticket, isOpen);
+                        if (existingReq == null) {
+                            // Queue a new request
+                            accountManager.addPendingTickRequest(accId, new de.trademonitor.service.AccountManager.PendingTickRequest(
+                                    ticket, symbol, minTime, maxTime, isOpen
+                            ));
+                        }
+                        brokerLoading = true;
+                        loading = true;
+                    }
+                }
+                
+                // No trade: set execTime to reference execution time adjusted by GMT offset difference
+                long offsetDiffMs = (bOffset - refOffset) * 1000;
+                execTime = timeMsc + offsetDiffMs;
+                execPrice = refTrade.getOpenPrice(); // Use reference price as placeholder
+            }
+            
+            Map<String, Object> brokerMap = new HashMap<>();
+            brokerMap.put("accountId", accId);
+            brokerMap.put("broker", acc.getBroker() != null ? acc.getBroker() : "Unknown");
+            brokerMap.put("accountName", acc.getName() != null ? acc.getName() : "Acc #" + accId);
+            brokerMap.put("type", acc.getType() != null ? acc.getType() : "DEMO");
+            brokerMap.put("execTimeMsc", execTime);
+            brokerMap.put("execPrice", execPrice);
+            brokerMap.put("tradeType", tradeType);
+            brokerMap.put("ticksJson", ticksJson);
+            brokerMap.put("loading", brokerLoading);
+            brokerMap.put("gmtOffset", bOffset);
+            
+            brokersData.add(brokerMap);
+        }
+        
+        brokersData.sort((a, b) -> {
+            long aId = (Long) a.get("accountId");
+            long bId = (Long) b.get("accountId");
+            if (aId == accountId) return -1;
+            if (bId == accountId) return 1;
+            int brokerCmp = ((String) a.get("broker")).compareToIgnoreCase((String) b.get("broker"));
+            if (brokerCmp != 0) return brokerCmp;
+            return ((String) a.get("accountName")).compareToIgnoreCase((String) b.get("accountName"));
+        });
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        Map<String, Object> refMap = new HashMap<>();
+        refMap.put("ticket", ticket);
+        refMap.put("accountId", accountId);
+        refMap.put("broker", (refAcc != null) ? refAcc.getBroker() : "Unknown");
+        refMap.put("accountName", (refAcc != null) ? refAcc.getName() : "Acc #" + accountId);
+        refMap.put("symbol", symbol);
+        refMap.put("execTimeMsc", timeMsc);
+        refMap.put("execPrice", isOpen ? refTrade.getOpenPrice() : refTrade.getClosePrice());
+        refMap.put("tradeType", refTrade.getType());
+        refMap.put("isOpen", isOpen);
+        refMap.put("ticksJson", isOpen ? refTrade.getOpenTicks() : refTrade.getCloseTicks());
+        refMap.put("gmtOffset", refOffset);
+        
+        response.put("referenceTrade", refMap);
+        response.put("brokers", brokersData);
+        response.put("loading", loading);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/api/siren-log")
+    @ResponseBody
+    public ResponseEntity<String> getSirenLog(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Zugriff verweigert: Nur Administratoren dürfen das Sirenen-Log einsehen.");
+        }
+        
+        try {
+            java.nio.file.Path logPath = java.nio.file.Path.of("/opt/wildfly/trademonitor_data/notifications.log");
+            if (!java.nio.file.Files.exists(logPath)) {
+                return ResponseEntity.ok("Keine Log-Einträge vorhanden.");
+            }
+            String content = java.nio.file.Files.readString(logPath);
+            return ResponseEntity.ok(content);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Fehler beim Lesen der Log-Datei: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/siren-log/clear")
+    @ResponseBody
+    public ResponseEntity<String> clearSirenLog(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        boolean isAdmin = userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Zugriff verweigert.");
+        }
+        
+        try {
+            java.nio.file.Path logPath = java.nio.file.Path.of("/opt/wildfly/trademonitor_data/notifications.log");
+            if (java.nio.file.Files.exists(logPath)) {
+                java.nio.file.Files.delete(logPath);
+            }
+            return ResponseEntity.ok("Log-Datei erfolgreich gelöscht.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Fehler beim Löschen der Log-Datei: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/account/{accountId}/info-area")
+    public String getAccountInfo(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId, Model model) {
+        System.out.println("[DEBUG-INFO-AREA] Request received for account " + accountId + ". UserDetails: " + (userDetails != null ? userDetails.getUsername() : "NULL"));
+        if (!isAllowedAccess(userDetails, accountId)) {
+            System.out.println("[DEBUG-INFO-AREA] Access denied for user to account " + accountId);
+            return "redirect:/";
+        }
+        Account account = accountManager.getAccount(accountId);
+        if (account == null) {
+            System.out.println("[DEBUG-INFO-AREA] Account not found: " + accountId);
+            return "redirect:/";
+        }
+        model.addAttribute("account", account);
+        model.addAttribute("documents", accountDocumentRepository.findAllProjectedByAccountId(accountId));
+        model.addAttribute("links", accountLinkRepository.findAllByAccountId(accountId));
+        return "account-info";
+    }
+
+    @PostMapping("/api/account/{accountId}/info-text")
+    @ResponseBody
+    public ResponseEntity<?> saveAccountInfoText(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId, @RequestParam("infoText") String infoText) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        de.trademonitor.entity.AccountEntity ae = accountRepository.findById(accountId).orElse(null);
+        if (ae == null) {
+            return ResponseEntity.notFound().build();
+        }
+        ae.setInfoText(infoText);
+        accountRepository.save(ae);
+        
+        // Also update runtime domain model in AccountManager
+        Account account = accountManager.getAccount(accountId);
+        if (account != null) {
+            account.setInfoText(infoText);
+        }
+        return ResponseEntity.ok("Saved successfully");
+    }
+
+    @PostMapping("/api/account/{accountId}/resource-order")
+    @ResponseBody
+    public ResponseEntity<?> saveAccountResourceOrder(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId, @RequestParam("resourceOrder") String resourceOrder) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        de.trademonitor.entity.AccountEntity ae = accountRepository.findById(accountId).orElse(null);
+        if (ae == null) {
+            return ResponseEntity.notFound().build();
+        }
+        ae.setResourceOrder(resourceOrder);
+        accountRepository.save(ae);
+        
+        // Also update runtime domain model in AccountManager
+        Account account = accountManager.getAccount(accountId);
+        if (account != null) {
+            account.setResourceOrder(resourceOrder);
+        }
+        return ResponseEntity.ok("Resource order saved successfully");
+    }
+
+    @PostMapping("/api/account/{accountId}/documents")
+    @ResponseBody
+    public ResponseEntity<?> uploadDocument(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam("minText") String minText) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("Datei ist leer");
+        }
+        if (file.getSize() > MAX_DOCUMENT_SIZE) {
+            return ResponseEntity.badRequest().body("Datei ist größer als 10 MB");
+        }
+        try {
+            byte[] fileData = file.getBytes();
+            String fileName = sanitizeFileName(file.getOriginalFilename());
+            String contentType = detectAllowedDocumentType(fileName, fileData);
+            if (contentType == null) {
+                return ResponseEntity.badRequest().body(
+                        "Nicht erlaubter Dateityp. Erlaubt sind PDF, TXT, Markdown, PNG, JPEG, GIF und WebP.");
+            }
+            de.trademonitor.entity.AccountDocumentEntity doc = new de.trademonitor.entity.AccountDocumentEntity(
+                accountId, fileName, minText, contentType, fileData.length, fileData
+            );
+            accountDocumentRepository.save(doc);
+            return ResponseEntity.ok("Erfolgreich hochgeladen");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Upload fehlgeschlagen: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/api/account/documents/{documentId}")
+    @ResponseBody
+    public ResponseEntity<?> deleteDocument(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long documentId) {
+        de.trademonitor.entity.AccountDocumentEntity doc = accountDocumentRepository.findById(documentId).orElse(null);
+        if (doc == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, doc.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        accountDocumentRepository.delete(doc);
+        return ResponseEntity.ok("Erfolgreich gelöscht");
+    }
+
+    @GetMapping("/api/account/documents/{documentId}/view")
+    public ResponseEntity<?> viewDocument(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long documentId) {
+        de.trademonitor.entity.AccountDocumentEntity doc = accountDocumentRepository.findById(documentId).orElse(null);
+        if (doc == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, doc.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        String storedType = doc.getContentType();
+        boolean inline = isSafeInlineDocumentType(storedType);
+        String responseType = inline ? storedType : "application/octet-stream";
+        org.springframework.http.ContentDisposition disposition = (inline
+                ? org.springframework.http.ContentDisposition.inline()
+                : org.springframework.http.ContentDisposition.attachment())
+                .filename(sanitizeFileName(doc.getFileName()), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, responseType)
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .header("X-Content-Type-Options", "nosniff")
+            .body(doc.getFileData());
+    }
+
+    @PostMapping("/api/account/{accountId}/links")
+    @ResponseBody
+    public ResponseEntity<?> addLink(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long accountId, @RequestParam("url") String url, @RequestParam("minText") String minText) {
+        if (!isAllowedAccess(userDetails, accountId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        if (url == null || url.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("URL darf nicht leer sein");
+        }
+        String normalizedUrl = url.trim();
+        if (!normalizedUrl.matches("(?i)^https?://.*")) normalizedUrl = "https://" + normalizedUrl;
+        try {
+            java.net.URI parsed = java.net.URI.create(normalizedUrl);
+            if (parsed.getHost() == null || !("http".equalsIgnoreCase(parsed.getScheme())
+                    || "https".equalsIgnoreCase(parsed.getScheme()))) {
+                return ResponseEntity.badRequest().body("Es sind nur gültige HTTP- oder HTTPS-URLs erlaubt");
+            }
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body("Ungültige URL");
+        }
+        de.trademonitor.entity.AccountLinkEntity link = new de.trademonitor.entity.AccountLinkEntity(accountId, normalizedUrl, minText);
+        accountLinkRepository.save(link);
+        return ResponseEntity.ok("Link erfolgreich hinzugefügt");
+    }
+
+    @DeleteMapping("/api/account/links/{linkId}")
+    @ResponseBody
+    public ResponseEntity<?> deleteLink(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long linkId) {
+        de.trademonitor.entity.AccountLinkEntity link = accountLinkRepository.findById(linkId).orElse(null);
+        if (link == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, link.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        accountLinkRepository.delete(link);
+        return ResponseEntity.ok("Link erfolgreich gelöscht");
+    }
+
+    @PostMapping("/api/account/documents/{documentId}/description")
+    @ResponseBody
+    public ResponseEntity<?> updateDocumentDescription(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long documentId, @RequestParam("description") String description) {
+        de.trademonitor.entity.AccountDocumentEntity doc = accountDocumentRepository.findById(documentId).orElse(null);
+        if (doc == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, doc.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        doc.setMinText(description);
+        accountDocumentRepository.save(doc);
+        return ResponseEntity.ok("Beschreibung aktualisiert");
+    }
+
+    @PostMapping("/api/account/links/{linkId}/description")
+    @ResponseBody
+    public ResponseEntity<?> updateLinkDescription(@AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long linkId, @RequestParam("description") String description) {
+        de.trademonitor.entity.AccountLinkEntity link = accountLinkRepository.findById(linkId).orElse(null);
+        if (link == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAllowedAccess(userDetails, link.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+        }
+        link.setMinText(description);
+        accountLinkRepository.save(link);
+        return ResponseEntity.ok("Beschreibung aktualisiert");
+    }
+
 }
+

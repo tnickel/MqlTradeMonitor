@@ -240,6 +240,14 @@
                         (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
                         th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
                     </span>
+                    <a th:href="@{/account/{id}/info-area(id=${account.accountId})}" target="_blank"
+                       style="display: inline-flex; align-items: center; justify-content: center; margin-left: 15px; border-radius: 8px; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: rgba(30, 41, 59, 0.3); padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-decoration: none;"
+                       onmouseover="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 15px rgba(99, 102, 241, 0.4)'; this.style.transform='scale(1.08)';"
+                       onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'; this.style.transform='scale(1)';"
+                       title="Infobereich & Dokumentation öffnen">
+                        <img th:src="@{/img/infobereich_icon.png}" style="width: 32px; height: 32px; object-fit: contain;" alt="Infobereich" />
+                        <span style="font-size: 0.85rem; font-weight: 600; color: #e2e8f0; margin-left: 8px; margin-right: 8px; letter-spacing: 0.02em;">Infobereich</span>
+                    </a>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
@@ -251,6 +259,18 @@
                         (${account.lastSeenMins} &lt;= ${liveOrangeMins} ? ${liveColorOrange} : ${liveColorRed}))))"
                         th:title="(${account.lastSeenMins} &lt; 0 ? 'Kein Signal empfangen' : 'Letzter Kontakt: ' + (${account.lastSeen} != null ? ${#temporals.format(account.lastSeen, 'dd.MM.yyyy HH:mm:ss')} : '') + ' (vor ' + ${account.lastSeenMins} + ' Min)')">
                     </span>
+                </div>
+
+                <div th:if="${account.computerName != null}" style="display: flex; align-items: center; gap: 16px; margin-top: 10px; padding: 6px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 6px; width: fit-content;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #b3bac5;">
+                        <span style="color: #6366f1;">💻</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;" th:text="${account.loginName} + '@' + ${account.computerName}">user@PC</span>
+                    </div>
+                    <div style="width: 1px; height: 12px; background: rgba(255, 255, 255, 0.1);"></div>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #b3bac5;">
+                        <span style="color: #10b981;">🤖</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;" th:text="${account.platform} + ' v' + ${account.eaVersion}">MQL5 v1.00</span>
+                    </div>
                 </div>
 
                 <div style="margin-top: 15px; padding: 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -2158,6 +2178,9 @@
                                 <span id="tanal-open-title-text">📥 Einstieg (Open) Tick-Verlauf</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span id="tanal-open-time-badge" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; margin-right: 4px;">-</span>
+                                    <button onclick="openTickComparison('open')" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); color: #818cf8; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(99, 102, 241, 0.18)'" onmouseout="this.style.background='rgba(99, 102, 241, 0.08)'" title="Tickdaten über verschiedene Broker vergleichen">
+                                        ⚖️ Tick-Vergleich
+                                    </button>
                                     <button onclick="zoomChart('open')" style="background: rgba(125, 211, 252, 0.08); border: 1px solid rgba(125, 211, 252, 0.25); color: #7dd3fc; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(125, 211, 252, 0.18)'" onmouseout="this.style.background='rgba(125, 211, 252, 0.08)'" title="Grafik vergrößern">
                                         ⛶ Vollbild
                                     </button>
@@ -2198,6 +2221,9 @@
                                 <span id="tanal-close-title-text">📤 Ausstieg (Close) Tick-Verlauf</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span id="tanal-close-time-badge" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; margin-right: 4px;">-</span>
+                                    <button onclick="openTickComparison('close')" style="background: rgba(236, 72, 153, 0.08); border: 1px solid rgba(236, 72, 153, 0.25); color: #f472b6; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(236, 72, 153, 0.18)'" onmouseout="this.style.background='rgba(236, 72, 153, 0.08)'" title="Tickdaten über verschiedene Broker vergleichen">
+                                        ⚖️ Tick-Vergleich
+                                    </button>
                                     <button onclick="zoomChart('close')" style="background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s;" onmouseover="this.style.background='rgba(167, 139, 250, 0.18)'" onmouseout="this.style.background='rgba(167, 139, 250, 0.08)'" title="Grafik vergrößern">
                                         ⛶ Vollbild
                                     </button>
@@ -2339,6 +2365,82 @@
                 <!-- Chart Container -->
                 <div style="flex: 1; position: relative; width: 100%; min-height: 0; background: rgba(15, 23, 42, 0.2); border: 1px solid rgba(255,255,255,0.02); border-radius: 12px; padding: 10px;">
                     <canvas id="tanal-zoom-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tick Comparison Modal -->
+        <div id="tick-comparison-modal" style="display: none; position: fixed; inset: 0; background: rgba(8, 12, 24, 0.95); z-index: 11000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(15px);">
+            <div style="background: #0b0f19; border: 1px solid #1e293b; border-radius: 16px; width: 100%; max-width: 1750px; height: 95vh; display: flex; flex-direction: column; padding: 20px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); overflow: hidden;">
+                <!-- Close Button -->
+                <button onclick="closeTickComparisonModal()" style="position: absolute; top: 15px; right: 15px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.15s; z-index: 100;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
+                    ✕ Schließen
+                </button>
+                <!-- Title -->
+                <h3 id="tcomp-modal-title" style="margin-top: 0; margin-bottom: 15px; color: #fff; font-size: 1.25rem; font-weight: 700; padding-right: 120px; display: flex; align-items: center; gap: 10px;">
+                    <span>⚖️ Multi-Broker Tick-Vergleich</span>
+                    <span id="tcomp-info-badge" style="font-size: 0.85rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); padding: 2px 8px; border-radius: 6px; font-weight: normal;">-</span>
+                </h3>
+                
+                <!-- Main scrollable layout wrapper inside the modal -->
+                <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; gap: 20px; padding-right: 5px; min-height: 0;">
+                    
+                    <!-- Section 1: Reference Trade Chart (Top) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid #1e293b; border-radius: 12px; padding: 15px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; color: #7dd3fc; font-size: 0.9rem; font-weight: 600;">
+                            Referenz-Trade Ausführung (Originalpreis)
+                        </h4>
+                        <div style="position: relative; height: 280px; width: 100%;">
+                            <canvas id="tcomp-ref-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Section 2: Combined Comparison Chart (Middle) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid #1e293b; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <h4 style="margin-top: 0; margin-bottom: 0; color: #a78bfa; font-size: 0.9rem; font-weight: 600;">
+                                Kombinierter Tick-Vergleich (Alle Broker überlagert)
+                            </h4>
+                            <!-- Display Controls -->
+                            <div style="display: flex; align-items: center; gap: 15px; background: rgba(30, 41, 59, 0.4); padding: 4px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem;">
+                                <span style="color: var(--text-secondary); font-weight: 500;">Anzeige:</span>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: #fff;">
+                                    <input type="radio" name="tcomp-line-type" value="bid" checked onchange="updateCombinedChartDisplay()" style="accent-color: #818cf8; cursor: pointer;"> Bid
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: #fff;">
+                                    <input type="radio" name="tcomp-line-type" value="ask" onchange="updateCombinedChartDisplay()" style="accent-color: #818cf8; cursor: pointer;"> Ask
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: #fff;">
+                                    <input type="radio" name="tcomp-line-type" value="both" onchange="updateCombinedChartDisplay()" style="accent-color: #818cf8; cursor: pointer;"> Beide
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: row; gap: 15px; height: 450px; min-height: 0; flex-wrap: wrap;">
+                            <!-- Chart Area -->
+                            <div style="flex: 1; min-width: 450px; position: relative; height: 100%; background: rgba(15, 23, 42, 0.2); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.02);">
+                                <canvas id="tcomp-combined-chart"></canvas>
+                            </div>
+                            <!-- Sidebar Legend & Toggle Checkboxes -->
+                            <div style="width: 280px; min-width: 200px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;">
+                                <strong style="color: #fff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; display: block;">Beteiligte Broker</strong>
+                                <div id="tcomp-broker-toggles" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Section 3: Individual Scrollable Broker Charts (Bottom) -->
+                    <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid #1e293b; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="margin-top: 0; margin-bottom: 0; color: #38bdf8; font-size: 0.9rem; font-weight: 600;">
+                            Einzelne Broker-Verläufe
+                        </h4>
+                        <div id="tcomp-individual-list" style="display: flex; flex-direction: column; gap: 15px; overflow-y: visible;">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -2930,12 +3032,13 @@
                     var yAxis = chart.scales.y;
                     
                     ctx.save();
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'; // Red with some transparency
-                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 5;
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 1.0)'; // Red with full opacity
+                    ctx.setLineDash([]); // Solid line for maximum visibility
                     
                     timelineDates.forEach(function(dateStr) {
                         var dateObj = new Date(dateStr + "T00:00:00");
+                        dateObj.setDate(dateObj.getDate() + 1); // Shift timeline to start of next day (Option 1)
                         var ts = dateObj.getTime();
                         
                         if (ts >= xAxis.min && ts <= xAxis.max) {
@@ -3176,8 +3279,8 @@
                                 var prevDate = prevDateStr.substring(0, 10).replace(/\./g, '-');
                                 for(var t = 0; t < timelineDates.length; t++) {
                                      var tlDate = timelineDates[t];
-                                     if (prevDate >= tlDate && currentDate < tlDate) {
-                                          borderStyle = 'border-top: 3px solid #ef4444;';
+                                     if (prevDate > tlDate && currentDate <= tlDate) {
+                                          borderStyle = 'border-top: 6px solid #ef4444;';
                                           break;
                                      }
                                 }
@@ -3215,6 +3318,10 @@
                 // Calculate execution delay/latency in ms
                 var openDelayMs = (trade.openTimeMsc > 0 && trade.openOrderSetupTimeMsc > 0) ? (trade.openTimeMsc - trade.openOrderSetupTimeMsc) : null;
                 var closeDelayMs = (trade.closeTimeMsc > 0 && trade.closeOrderSetupTimeMsc > 0) ? (trade.closeTimeMsc - trade.closeOrderSetupTimeMsc) : null;
+
+                // Filter out pending orders (anything > 10 seconds is not execution latency)
+                if (openDelayMs !== null && (openDelayMs < 0 || openDelayMs > 10000)) openDelayMs = null;
+                if (closeDelayMs !== null && (closeDelayMs < 0 || closeDelayMs > 10000)) closeDelayMs = null;
 
                 var formatDelay = function(val) {
                     if (val === null || val < 0) return '-';
@@ -3569,6 +3676,464 @@
                 data.symbol,
                 true
             );
+        }
+
+        // ============ MULTI-BROKER TICK COMPARISON LOGIC ============
+        var tcompCombinedChartInstance = null;
+        var tcompRefChartInstance = null;
+        var tcompIndividualChartInstances = {}; // Keyed by accountId
+        var tcompData = null;
+        var tcompColors = {}; // Keyed by accountId
+
+        var tcompPollTimeout = null;
+
+        function closeTickComparisonModal() {
+            if (tcompPollTimeout) { clearTimeout(tcompPollTimeout); tcompPollTimeout = null; }
+            var modal = document.getElementById('tick-comparison-modal');
+            if (modal) modal.style.display = 'none';
+            if (tcompCombinedChartInstance) { tcompCombinedChartInstance.destroy(); tcompCombinedChartInstance = null; }
+            if (tcompRefChartInstance) { tcompRefChartInstance.destroy(); tcompRefChartInstance = null; }
+            Object.keys(tcompIndividualChartInstances).forEach(id => {
+                if (tcompIndividualChartInstances[id]) {
+                    tcompIndividualChartInstances[id].destroy();
+                }
+            });
+            tcompIndividualChartInstances = {};
+            tcompData = null;
+        }
+
+        function openTickComparison(type) {
+            if (tcompPollTimeout) { clearTimeout(tcompPollTimeout); tcompPollTimeout = null; }
+            var refData = currentTanalData[type];
+            if (!refData) return;
+            
+            var modal = document.getElementById('tick-comparison-modal');
+            if (!modal) return;
+            
+            modal.style.display = 'flex';
+            document.getElementById('tcomp-info-badge').textContent = refData.symbol + ' | Ticket #' + refData.ticket + ' (' + (type === 'open' ? 'Entry/Open' : 'Exit/Close') + ')';
+            
+            // Clear previous chart instances
+            if (tcompCombinedChartInstance) { tcompCombinedChartInstance.destroy(); tcompCombinedChartInstance = null; }
+            if (tcompRefChartInstance) { tcompRefChartInstance.destroy(); tcompRefChartInstance = null; }
+            Object.keys(tcompIndividualChartInstances).forEach(id => {
+                if (tcompIndividualChartInstances[id]) {
+                    tcompIndividualChartInstances[id].destroy();
+                }
+            });
+            tcompIndividualChartInstances = {};
+            
+            document.getElementById('tcomp-broker-toggles').innerHTML = '<div style="color: var(--text-secondary); font-size: 0.85rem;">Lade Daten...</div>';
+            document.getElementById('tcomp-individual-list').innerHTML = '';
+            
+            var url = '/api/trades/' + refData.ticket + '/compare-ticks?accountId=' + accountId + '&isOpen=' + (type === 'open');
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    tcompData = data;
+                    generateBrokerColors(data.brokers);
+                    renderTickComparison();
+                    
+                    if (data.loading) {
+                        var sidebarEl = document.getElementById('tcomp-broker-toggles');
+                        var loadingMsg = document.getElementById('tcomp-sidebar-loading');
+                        if (!loadingMsg) {
+                            var div = document.createElement('div');
+                            div.id = 'tcomp-sidebar-loading';
+                            div.style.cssText = 'color: #e0af68; font-size: 0.8rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center; gap: 6px;';
+                            div.innerHTML = '🔄 Lade weitere Ticks...';
+                            sidebarEl.appendChild(div);
+                        }
+                        
+                        tcompPollTimeout = setTimeout(function() {
+                            pollTickComparison(refData.ticket, type);
+                        }, 2000);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('tcomp-broker-toggles').innerHTML = '<div style="color: #f7768e; font-size: 0.85rem;">Fehler beim Laden!</div>';
+                });
+        }
+
+        function pollTickComparison(ticket, type) {
+            var modal = document.getElementById('tick-comparison-modal');
+            if (!modal || modal.style.display === 'none') return;
+            
+            var url = '/api/trades/' + ticket + '/compare-ticks?accountId=' + accountId + '&isOpen=' + (type === 'open');
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    // Cache checkbox states to prevent UI flicker/reset
+                    var checkedAccs = {};
+                    var cbEls = document.querySelectorAll('.tcomp-broker-cb');
+                    cbEls.forEach(el => {
+                        checkedAccs[el.dataset.accid] = el.checked;
+                    });
+                    
+                    tcompData = data;
+                    generateBrokerColors(data.brokers);
+                    renderTickComparison();
+                    
+                    // Restore checkbox states
+                    var newCbEls = document.querySelectorAll('.tcomp-broker-cb');
+                    newCbEls.forEach(el => {
+                        if (checkedAccs[el.dataset.accid] !== undefined) {
+                            el.checked = checkedAccs[el.dataset.accid];
+                        }
+                    });
+                    // Re-render combined chart to respect restored checkbox states
+                    updateCombinedChartDisplay();
+                    
+                    if (data.loading) {
+                        var sidebarEl = document.getElementById('tcomp-broker-toggles');
+                        var loadingMsg = document.getElementById('tcomp-sidebar-loading');
+                        if (!loadingMsg) {
+                            var div = document.createElement('div');
+                            div.id = 'tcomp-sidebar-loading';
+                            div.style.cssText = 'color: #e0af68; font-size: 0.8rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center; gap: 6px;';
+                            div.innerHTML = '🔄 Lade weitere Ticks...';
+                            sidebarEl.appendChild(div);
+                        }
+                        
+                        tcompPollTimeout = setTimeout(function() {
+                            pollTickComparison(ticket, type);
+                        }, 2000);
+                    }
+                })
+                .catch(err => console.error("Polling ticks failed:", err));
+        }
+
+        function generateBrokerColors(brokers) {
+            tcompColors = {};
+            var count = brokers.length;
+            brokers.forEach((b, index) => {
+                var hue = Math.round((360 / Math.max(count, 1)) * index);
+                tcompColors[b.accountId] = {
+                    main: `hsl(${hue}, 85%, 60%)`,
+                    light: `hsl(${hue}, 85%, 72%)`,
+                    rgba: `hsla(${hue}, 85%, 60%, 0.15)`
+                };
+            });
+        }
+
+        function renderTickComparison() {
+            if (!tcompData) return;
+            
+            // 1. Render Reference Trade Chart (Top)
+            var refTrade = tcompData.referenceTrade;
+            var refTicks = [];
+            try { refTicks = JSON.parse(refTrade.ticksJson || '[]'); } catch(e) { console.error(e); }
+            
+            tcompRefChartInstance = renderTickChart(
+                'tcomp-ref-chart',
+                refTicks,
+                refTrade.execTimeMsc,
+                0, // setupTimeMsc = 0 for relative execution time
+                refTrade.execPrice,
+                refTrade.tradeType,
+                refTrade.isOpen,
+                refTrade.symbol,
+                true
+            );
+            
+            // 2. Build Sidebar Toggles (Checkboxes)
+            var sidebarHtml = '';
+            tcompData.brokers.forEach(b => {
+                var color = tcompColors[b.accountId].main;
+                var badgeText = b.type === 'REAL' ? 'Real' : 'Demo';
+                var badgeColor = b.type === 'REAL' ? '#f7768e' : '#7aa2f7';
+                
+                var statusText = b.loading ? ' <span style="color:#e0af68; font-size:0.75rem;">(Lädt...)</span>' : '';
+                var checkboxHtml = b.loading ? 
+                    `<div class="spinner-border text-warning" role="status" style="width:12px; height:12px; border-width:2px; display:inline-block; margin-right:4px;"></div>` :
+                    `<input type="checkbox" class="tcomp-broker-cb" data-accid="${b.accountId}" checked onchange="updateCombinedChartDisplay()" style="accent-color: ${color}; width: 15px; height: 15px; cursor: pointer;">`;
+                
+                sidebarHtml += `
+                    <label style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 10px; border-radius: 6px; border-left: 4px solid ${color}; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='rgba(255,255,255,0.02)'">
+                        <span style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 500; color: #fff;">
+                            ${checkboxHtml}
+                            <span>${b.broker}${statusText} <small style="display:block; font-size:0.7rem; color:var(--text-secondary);">${b.accountName}</small></span>
+                        </span>
+                        <span style="font-size: 0.7rem; color: #fff; background: ${badgeColor}; padding: 1px 5px; border-radius: 4px; font-weight: bold;">${badgeText}</span>
+                    </label>
+                `;
+            });
+            document.getElementById('tcomp-broker-toggles').innerHTML = sidebarHtml;
+            
+            // 3. Render Combined Chart
+            updateCombinedChartDisplay();
+            
+            // 4. Build Individual Scrollable List (Bottom)
+            var individualListHtml = '';
+            tcompData.brokers.forEach(b => {
+                var color = tcompColors[b.accountId].main;
+                var badgeColor = b.type === 'REAL' ? 'rgba(247, 118, 142, 0.15)' : 'rgba(122, 162, 247, 0.15)';
+                var badgeTextColor = b.type === 'REAL' ? '#f7768e' : '#7aa2f7';
+                var ticks = [];
+                try { ticks = JSON.parse(b.ticksJson || '[]'); } catch(e) {}
+                
+                var contentHtml = b.loading ? 
+                    `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:280px; gap:10px; color:var(--text-secondary);">
+                        <div class="spinner-border text-warning" role="status" style="width:32px; height:32px; border-width:3px;"></div>
+                        <span>Warte auf Tick-Upload vom Terminal (Heartbeat-Intervall)...</span>
+                     </div>` :
+                    `<canvas id="tcomp-ind-chart-${b.accountId}"></canvas>`;
+                
+                individualListHtml += `
+                    <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 12px; height: 12px; background: ${color}; border-radius: 50%; display: inline-block;"></span>
+                                <strong style="color: #fff; font-size: 0.95rem;">${b.broker}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem;">(${b.accountName} - Acc #${b.accountId})</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 0.75rem; color: ${badgeTextColor}; background: ${badgeColor}; padding: 2px 8px; border-radius: 6px; font-weight: bold;">${b.type}</span>
+                                <span style="font-size: 0.75rem; color: var(--text-secondary);">Ausführungspreis: <strong style="color:#fff;">${b.execPrice.toFixed(5)}</strong></span>
+                                <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 10px;">Ticks: <strong style="color:#fff;">${b.loading ? 'Lädt...' : ticks.length}</strong></span>
+                            </div>
+                        </div>
+                        <div style="position: relative; height: 280px; width: 100%;">
+                            ${contentHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('tcomp-individual-list').innerHTML = individualListHtml;
+            
+            // 5. Render Individual Charts
+            tcompData.brokers.forEach(b => {
+                if (b.loading) return;
+                
+                var ticks = [];
+                try { ticks = JSON.parse(b.ticksJson || '[]'); } catch(e) {}
+                
+                tcompIndividualChartInstances[b.accountId] = renderTickChart(
+                    `tcomp-ind-chart-${b.accountId}`,
+                    ticks,
+                    b.execTimeMsc,
+                    0,
+                    b.execPrice,
+                    b.tradeType,
+                    tcompData.referenceTrade.isOpen,
+                    tcompData.referenceTrade.symbol,
+                    false
+                );
+            });
+        }
+
+        function updateCombinedChartDisplay() {
+            if (!tcompData) return;
+            
+            // Read checkboxes
+            var checkedAccs = {};
+            var cbEls = document.querySelectorAll('.tcomp-broker-cb');
+            cbEls.forEach(el => {
+                if (el.checked) {
+                    checkedAccs[el.dataset.accid] = true;
+                }
+            });
+            
+            // Read display radio (bid, ask, both)
+            var lineType = 'bid';
+            var radioEls = document.getElementsByName('tcomp-line-type');
+            for (var i = 0; i < radioEls.length; i++) {
+                if (radioEls[i].checked) {
+                    lineType = radioEls[i].value;
+                    break;
+                }
+            }
+            
+            var datasets = [];
+            var minPrice = null;
+            var maxPrice = null;
+            
+            var refExecTime = tcompData.referenceTrade.execTimeMsc;
+            
+            tcompData.brokers.forEach(b => {
+                if (!checkedAccs[b.accountId]) return;
+                
+                var colorInfo = tcompColors[b.accountId];
+                var ticks = [];
+                try { ticks = JSON.parse(b.ticksJson || '[]'); } catch(e) {}
+                
+                var bidPoints = [];
+                var askPoints = [];
+                
+                var refOffset = tcompData.referenceTrade.gmtOffset || 0;
+                var bOffset = b.gmtOffset || 0;
+                var offsetDiffMs = (bOffset - refOffset) * 1000;
+                
+                ticks.forEach(t => {
+                    var tMsc = t[0];
+                    var bid = t[1];
+                    var ask = t[2];
+                    var relMs = tMsc - refExecTime - offsetDiffMs;
+                    
+                    bidPoints.push({ x: relMs, y: bid });
+                    askPoints.push({ x: relMs, y: ask });
+                    
+                    if (minPrice === null) {
+                        minPrice = Math.min(bid, ask);
+                        maxPrice = Math.max(bid, ask);
+                    } else {
+                        minPrice = Math.min(minPrice, bid, ask);
+                        maxPrice = Math.max(maxPrice, bid, ask);
+                    }
+                });
+                
+                if (lineType === 'bid' || lineType === 'both') {
+                    datasets.push({
+                        label: `${b.broker} (Bid)`,
+                        data: bidPoints,
+                        borderColor: colorInfo.main,
+                        borderWidth: lineType === 'both' ? 2 : 2.5,
+                        pointRadius: 1.5,
+                        tension: 0.1,
+                        fill: false
+                    });
+                }
+                if (lineType === 'ask' || lineType === 'both') {
+                    datasets.push({
+                        label: `${b.broker} (Ask)`,
+                        data: askPoints,
+                        borderColor: colorInfo.light,
+                        borderDash: [4, 4],
+                        borderWidth: lineType === 'both' ? 1.5 : 2.5,
+                        pointRadius: 1.5,
+                        tension: 0.1,
+                        fill: false
+                    });
+                }
+            });
+            
+            var execPrice = tcompData.referenceTrade.execPrice;
+            if (minPrice === null) minPrice = execPrice - 0.001;
+            if (maxPrice === null) maxPrice = execPrice + 0.001;
+            
+            var pad = (maxPrice - minPrice) * 0.15;
+            if (pad === 0) pad = execPrice * 0.0001;
+            var yMin = minPrice - pad;
+            var yMax = maxPrice + pad;
+            
+            if (tcompCombinedChartInstance) {
+                tcompCombinedChartInstance.destroy();
+            }
+            
+            var canvas = document.getElementById('tcomp-combined-chart');
+            var ctx = canvas.getContext('2d');
+            
+            tcompCombinedChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Zeit relativ zur Referenz-Orderplatzierung (ms)',
+                                color: '#9ca3af',
+                                font: { size: 11 }
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: { size: 9 },
+                                callback: function(value) {
+                                    return (value >= 0 ? '+' : '') + value + 'ms';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            min: yMin,
+                            max: yMax,
+                            title: {
+                                display: true,
+                                text: 'Preis (' + tcompData.referenceTrade.symbol + ')',
+                                color: '#9ca3af',
+                                font: { size: 11 }
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: { size: 9 }
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.05)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    var val = context[0].parsed.x;
+                                    return (val >= 0 ? '+' : '') + val + 'ms';
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(5);
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'tcompLines',
+                    afterDraw: function(chart) {
+                        var ctx2 = chart.ctx;
+                        var xAxis = chart.scales.x;
+                        var yAxis = chart.scales.y;
+                        var execPriceVal = tcompData.referenceTrade.execPrice;
+                        var annotationFontVal = 'bold 9px sans-serif';
+                        
+                        // 1. Draw vertical execution line at x=0
+                        var xExecPos = xAxis.getPixelForValue(0);
+                        if (xExecPos >= xAxis.left && xExecPos <= xAxis.right) {
+                            ctx2.save();
+                            ctx2.strokeStyle = '#e0af68';
+                            ctx2.lineWidth = 2;
+                            ctx2.beginPath();
+                            ctx2.moveTo(xExecPos, yAxis.top);
+                            ctx2.lineTo(xExecPos, yAxis.bottom);
+                            ctx2.stroke();
+                            
+                            ctx2.fillStyle = '#e0af68';
+                            ctx2.font = annotationFontVal;
+                            ctx2.fillText('Referenz-Ausführung (0ms)', xExecPos + 6, yAxis.top + 12);
+                            ctx2.restore();
+                        }
+                        
+                        // 2. Draw horizontal reference execution price line
+                        if (execPriceVal >= yAxis.min && execPriceVal <= yAxis.max) {
+                            var yPricePos = yAxis.getPixelForValue(execPriceVal);
+                            ctx2.save();
+                            ctx2.strokeStyle = '#10b981';
+                            ctx2.lineWidth = 1.5;
+                            ctx2.setLineDash([4, 4]);
+                            ctx2.beginPath();
+                            ctx2.moveTo(xAxis.left, yPricePos);
+                            ctx2.lineTo(xAxis.right, yPricePos);
+                            ctx2.stroke();
+                            
+                            ctx2.fillStyle = '#10b981';
+                            ctx2.font = annotationFontVal;
+                            ctx2.fillText(`Referenz-Preis: ${execPriceVal.toFixed(5)}`, xAxis.left + 8, yPricePos - 5);
+                            ctx2.restore();
+                        }
+                    }
+                }]
+            });
         }
 
         function closeTickAnalysisModal() {
@@ -4088,6 +4653,7 @@
                 openSlippage = diff / getPointValue(trade.symbol);
             }
             var openDelayMs = (trade.openTimeMsc > 0 && trade.openOrderSetupTimeMsc > 0) ? (trade.openTimeMsc - trade.openOrderSetupTimeMsc) : null;
+            if (openDelayMs !== null && (openDelayMs < 0 || openDelayMs > 10000)) openDelayMs = null;
             
             document.getElementById('tanal-open-slippage').innerHTML = formatSlippageHtml(openSlippage);
             document.getElementById('tanal-open-latency').innerHTML = formatLatencyHtml(openDelayMs);
@@ -4100,6 +4666,7 @@
                 closeSlippage = diff / getPointValue(trade.symbol);
             }
             var closeDelayMs = (trade.closeTimeMsc > 0 && trade.closeOrderSetupTimeMsc > 0) ? (trade.closeTimeMsc - trade.closeOrderSetupTimeMsc) : null;
+            if (closeDelayMs !== null && (closeDelayMs < 0 || closeDelayMs > 10000)) closeDelayMs = null;
             
             document.getElementById('tanal-close-slippage').innerHTML = formatSlippageHtml(closeSlippage);
             document.getElementById('tanal-close-latency').innerHTML = formatLatencyHtml(closeDelayMs);

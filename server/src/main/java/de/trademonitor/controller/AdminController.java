@@ -59,6 +59,9 @@ public class AdminController {
     private de.trademonitor.service.IpGeolocationService ipGeolocationService;
 
     @Autowired
+    private de.trademonitor.service.TelegramService telegramService;
+
+    @Autowired
     private javax.sql.DataSource dataSource;
 
     @GetMapping("")
@@ -210,6 +213,11 @@ public class AdminController {
             }
         }
         model.addAttribute("openRouterApiKey", maskedKey);
+
+        // --- 9. Telegram Config ---
+        model.addAttribute("telegramEnabled", globalConfigService.isTelegramEnabled());
+        model.addAttribute("telegramBotToken", globalConfigService.getTelegramBotToken());
+        model.addAttribute("telegramChatId", globalConfigService.getTelegramChatId());
 
         return "admin";
     }
@@ -400,6 +408,45 @@ public class AdminController {
             redirectAttrs.addFlashAttribute("successMessage", "LLM-Konfiguration gespeichert.");
         } catch (Exception e) {
             redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Speichern der LLM-Konfiguration: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/telegram-config")
+    public String saveTelegramConfig(
+            @RequestParam(required = false) String telegramEnabled,
+            @RequestParam("telegramBotToken") String telegramBotToken,
+            @RequestParam("telegramChatId") String telegramChatId,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            globalConfigService.saveTelegramConfig("on".equals(telegramEnabled), telegramBotToken, telegramChatId);
+            redirectAttrs.addFlashAttribute("successMessage", "Telegram-Konfiguration gespeichert.");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
+        }
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/telegram-test")
+    public String testTelegram(
+            @RequestParam("telegramBotToken") String telegramBotToken,
+            @RequestParam("telegramChatId") String telegramChatId,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
+        try {
+            if (telegramBotToken == null || telegramBotToken.trim().isEmpty()
+                    || telegramChatId == null || telegramChatId.trim().isEmpty()) {
+                redirectAttrs.addFlashAttribute("errorMessage", "Token und Chat-ID dürfen nicht leer sein.");
+            } else {
+                boolean success = telegramService.sendRawTelegramMessageSync(
+                        telegramBotToken.trim(), telegramChatId.trim(), "🔔 *Testnachricht:* Verbindung vom TradeMonitor erfolgreich aufgebaut!");
+                if (success) {
+                    redirectAttrs.addFlashAttribute("successMessage", "Test-Telegram gesendet! Bitte prüfen Sie Ihre App.");
+                } else {
+                    redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Senden der Telegram-Testnachricht (z. B. ungültiger Token oder Chat-ID).");
+                }
+            }
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler: " + e.getMessage());
         }
         return "redirect:/admin";
     }

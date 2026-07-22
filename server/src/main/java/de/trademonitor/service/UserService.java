@@ -136,6 +136,19 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public UserEntity updateAppAccountTypes(Long id, Set<Long> realAccountIds, Set<Long> demoAccountIds) {
+        UserEntity user = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.getRealAccountIds().clear();
+        if (realAccountIds != null) {
+            user.getRealAccountIds().addAll(realAccountIds);
+        }
+        user.getDemoAccountIds().clear();
+        if (demoAccountIds != null) {
+            user.getDemoAccountIds().addAll(demoAccountIds);
+        }
+        return userRepository.save(user);
+    }
+
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
     }

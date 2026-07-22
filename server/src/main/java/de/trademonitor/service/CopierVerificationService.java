@@ -47,6 +47,12 @@ public class CopierVerificationService {
     @Autowired
     private HomeyService homeyService;
 
+    @Autowired
+    private TelegramService telegramService;
+
+    @Autowired
+    private de.trademonitor.service.AdminNotificationService adminNotificationService;
+
     private LocalDateTime lastRunTime = LocalDateTime.MIN;
 
     public Map<String, Object> getMetrics() {
@@ -189,6 +195,14 @@ public class CopierVerificationService {
                 if (!warningEmailSent && !isWeekendForCopierAlerts()) {
                     emailService.sendSyncWarningEmail("Trade Monitor Warnung",
                             "Achtung: Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten! Bitte Dashboard prüfen.");
+                    telegramService.sendNotification("⚠️ *Trade Monitor Warnung:*\n\n"
+                            + "Achtung: Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten! Bitte Dashboard prüfen.");
+                    adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                            de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                            de.trademonitor.dto.AdminNotification.Severity.CRITICAL,
+                            "🔄 Copier-Sync Fehler",
+                            "Die Copier-Map meldet Sync-Fehler (Unmatched Trades) auf Real-Konten!"
+                    ));
                     warningEmailSent = true;
                 }
 
@@ -202,6 +216,14 @@ public class CopierVerificationService {
                 }
             }
         } else {
+            if ("WARNING".equals(lastSyncStatus)) {
+                adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                        de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                        de.trademonitor.dto.AdminNotification.Severity.WARNING,
+                        "🔄 Copier-Sync wieder OK",
+                        "Alle Kopier-Verbindungen sind wieder synchron."
+                ));
+            }
             lastSyncStatus = "OK";
             syncErrorStartTime = null;
             warningEmailSent = false;

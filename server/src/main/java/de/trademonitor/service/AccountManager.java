@@ -60,7 +60,13 @@ public class AccountManager {
     private HomeyService homeyService;
 
     @Autowired
+    private de.trademonitor.service.AdminNotificationService adminNotificationService;
+
+    @Autowired
     private de.trademonitor.repository.EquitySnapshotRepository equitySnapshotRepository;
+
+    @Autowired
+    private de.trademonitor.repository.AccountRepository accountRepository;
 
     private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
 
@@ -111,17 +117,27 @@ public class AccountManager {
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
             account.setIconBase64(ae.getIconBase64());
+            account.setInfoText(ae.getInfoText());
+            account.setResourceOrder(ae.getResourceOrder());
 
             // Load alarm config
             account.setOpenProfitAlarmEnabled(ae.isOpenProfitAlarmEnabled());
             account.setOpenProfitAlarmAbs(ae.getOpenProfitAlarmAbs());
             account.setOpenProfitAlarmPct(ae.getOpenProfitAlarmPct());
             account.setMonitored(ae.getMonitored() != null ? ae.getMonitored() : true);
+            account.setTelegramTradesEnabled(ae.getTelegramTradesEnabled() != null ? ae.getTelegramTradesEnabled() : false);
 
             // Load copier state & time offset to prevent false alarms on restart
             account.setCopierError(ae.getCopierError() != null ? ae.getCopierError() : false);
             account.setCopierErrorMessage(ae.getCopierErrorMessage());
             account.setServerTimeOffsetSeconds(ae.getServerTimeOffsetSeconds() != null ? ae.getServerTimeOffsetSeconds() : 0L);
+
+            // Load new EA identification fields
+            account.setRealAccountId(ae.getRealAccountId());
+            account.setComputerName(ae.getComputerName());
+            account.setLoginName(ae.getLoginName());
+            account.setEaVersion(ae.getEaVersion());
+            account.setPlatform(ae.getPlatform());
 
             // Load lastSeen if available
             if (ae.getLastSeen() != null && !ae.getLastSeen().isEmpty()) {
@@ -251,6 +267,30 @@ public class AccountManager {
         }
     }
 
+    private void createAccountInMemoryAndDb(long accountId, Long realAccountId, String computerName, String loginName, String version, String platform, String broker, String currency, double balance) {
+        Account account = new Account(accountId, broker, currency, balance);
+        account.setRealAccountId(realAccountId);
+        account.setComputerName(computerName);
+        account.setLoginName(loginName);
+        account.setEaVersion(version);
+        account.setPlatform(platform);
+        if (!sectionsCache.isEmpty()) {
+            Long defaultSecId = sectionsCache.keySet().iterator().next();
+            Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                    .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+            if (first.isPresent()) {
+                defaultSecId = first.get().getId();
+            }
+            account.setSectionId(defaultSecId);
+        }
+        applyCommissionFactor(account);
+        accounts.put(accountId, account);
+        tradeStorage.saveAccount(accountId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+        if (account.getSectionId() != null) {
+            tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+        }
+    }
+
     /**
      * Register or update an account.
      */
@@ -271,6 +311,66 @@ public class AccountManager {
         }
     }
 
+    public synchronized long getOrCreateAssignedAccountId(long realAccountId, String computerName, String loginName) {
+        if (computerName == null || computerName.trim().isEmpty()) {
+            return realAccountId;
+        }
+        Optional<AccountEntity> existing = accountRepository.findByRealAccountIdAndComputerNameAndLoginName(
+                realAccountId, computerName, loginName);
+        if (existing.isPresent()) {
+            return existing.get().getAccountId();
+        }
+
+        // Try candidate IDs starting from physical realAccountId
+        long candidateId = realAccountId;
+        if (!accountRepository.existsById(candidateId)) {
+            return candidateId;
+        }
+
+        // Suffix candidate ID, e.g. 12345601, 12345602, etc.
+        for (int suffix = 1; suffix <= 99; suffix++) {
+            long suffixedId = realAccountId * 100 + suffix;
+            if (!accountRepository.existsById(suffixedId)) {
+                return suffixedId;
+            }
+        }
+
+        // Fallback: timestamp
+        long timestampId = System.currentTimeMillis();
+        while (accountRepository.existsById(timestampId)) {
+            timestampId++;
+        }
+        return timestampId;
+    }
+
+    /**
+     * Register or update an account with full instance tracking.
+     */
+    public long registerAccount(long realAccountId, String computerName, String loginName, String version, String platform, String broker, String currency, double balance) {
+        long assignedId = getOrCreateAssignedAccountId(realAccountId, computerName, loginName);
+        
+        synchronized (getAccountLock(assignedId)) {
+            Account account = accounts.get(assignedId);
+            if (account == null) {
+                createAccountInMemoryAndDb(assignedId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+                LOG.info("New account registered: " + assignedId + " (Real ID: " + realAccountId + ", PC: " + computerName + ", User: " + loginName + ", EA v" + version + ")");
+            } else {
+                account.setBroker(broker);
+                account.setCurrency(currency);
+                account.setBalance(balance);
+                account.setRealAccountId(realAccountId);
+                account.setComputerName(computerName);
+                account.setLoginName(loginName);
+                account.setEaVersion(version);
+                account.setPlatform(platform);
+                account.setLastSeen(LocalDateTime.now());
+                applyCommissionFactor(account);
+                tradeStorage.saveAccount(assignedId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+            }
+        }
+        return assignedId;
+    }
+
     public void reportError(long accountId, String errorMessage) {
         Account account = accounts.get(accountId);
         if (account != null) {
@@ -288,7 +388,7 @@ public class AccountManager {
      * Update account details (Method for Dashboard).
      */
     public void updateAccountDetails(long accountId, String name, String type,
-            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored) {
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored, boolean telegramTradesEnabled) {
         Account account = accounts.get(accountId);
         if (account != null) {
             account.setName(name);
@@ -297,8 +397,9 @@ public class AccountManager {
             account.setOpenProfitAlarmAbs(alarmAbs);
             account.setOpenProfitAlarmPct(alarmPct);
             account.setMonitored(monitored);
+            account.setTelegramTradesEnabled(telegramTradesEnabled);
             // Persist
-            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
+            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored, telegramTradesEnabled);
             
             // If monitoring was disabled, clear immediate alarm indicators
             if (!monitored) {
@@ -549,6 +650,12 @@ public class AccountManager {
             info.put("lastSeen", account.getLastSeen());
             info.put("eaLogAcceptedAt", account.getEaLogAcceptedAt());
 
+            info.put("realAccountId", account.getRealAccountId());
+            info.put("computerName", account.getComputerName());
+            info.put("loginName", account.getLoginName());
+            info.put("eaVersion", account.getEaVersion());
+            info.put("platform", account.getPlatform());
+
             long lastSeenMins = -1;
             if (account.getLastSeen() != null) {
                 lastSeenMins = java.time.Duration.between(account.getLastSeen(), java.time.LocalDateTime.now())
@@ -573,6 +680,7 @@ public class AccountManager {
             info.put("copierErrorMessage", account.getCopierErrorMessage());
             info.put("worstCopierStage", account.getWorstCopierStage());
             info.put("monitored", account.isMonitored());
+            info.put("telegramTradesEnabled", account.isTelegramTradesEnabled());
             info.put("iconBase64", account.getIconBase64());
 
             double dailyProfitVal = getCachedDailyProfit(account.getAccountId());
@@ -744,6 +852,12 @@ public class AccountManager {
                     LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
                             + ") went OFFLINE.");
+                    adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                            de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                            de.trademonitor.dto.AdminNotification.Severity.CRITICAL,
+                            "🔌 Account offline: " + (account.getName() != null ? account.getName() : String.valueOf(account.getAccountId())),
+                            "Konto " + account.getAccountId() + " (" + (account.getName() != null ? account.getName() : "unnamed") + ") ist seit " + account.getLastSeen() + " offline."
+                    ));
                     if (!isWeekendForAccount(account)) {
                         LOG.info("Triggering Homey siren for offline account.");
                         homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
@@ -752,6 +866,12 @@ public class AccountManager {
             } else if (isOnline) {
                 // Account is back online — reset the latch
                 if (offlineSirenLatch.remove(account.getAccountId())) {
+                    adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                            de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                            de.trademonitor.dto.AdminNotification.Severity.WARNING,
+                            "🔌 Account wieder online: " + (account.getName() != null ? account.getName() : String.valueOf(account.getAccountId())),
+                            "Konto " + account.getAccountId() + " (" + (account.getName() != null ? account.getName() : "unnamed") + ") ist wieder online."
+                    ));
                     homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), false);
                 }
             }
@@ -1187,7 +1307,7 @@ public class AccountManager {
         
         // Save/Update in DB via tradeStorage
         tradeStorage.saveAccount(accountId, "CSV Import", "EUR", 0.0);
-        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null, true);
+        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null, true, false);
         
         // Save closed trades to DB (retains older trades by checking tickets)
         tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, trades);
@@ -1201,5 +1321,110 @@ public class AccountManager {
         cachedMaxDrawdownPct.put(accountId, 0.0);
         refreshDailyProfitForAccount(accountId);
     }
+
+    public static class PendingTickRequest {
+        private final long ticket;
+        private final String symbol;
+        private final long minTime;
+        private final long maxTime;
+        private final boolean isOpen;
+        private final long createdAt;
+
+        public PendingTickRequest(long ticket, String symbol, long minTime, long maxTime, boolean isOpen) {
+            this.ticket = ticket;
+            this.symbol = symbol;
+            this.minTime = minTime;
+            this.maxTime = maxTime;
+            this.isOpen = isOpen;
+            this.createdAt = System.currentTimeMillis();
+        }
+
+        public long getTicket() { return ticket; }
+        public String getSymbol() { return symbol; }
+        public long getMinTime() { return minTime; }
+        public long getMaxTime() { return maxTime; }
+        public boolean isOpen() { return isOpen; }
+        public long getCreatedAt() { return createdAt; }
+    }
+
+    private final Map<Long, List<PendingTickRequest>> pendingTickRequests = new ConcurrentHashMap<>();
+    private final Map<String, String> requestedTicksCache = new ConcurrentHashMap<>();
+
+    public void addPendingTickRequest(long accountId, PendingTickRequest request) {
+        pendingTickRequests.computeIfAbsent(accountId, k -> Collections.synchronizedList(new ArrayList<>())).add(request);
+    }
+
+    public PendingTickRequest pollPendingTickRequest(long accountId) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null && !list.isEmpty()) {
+            return list.remove(0);
+        }
+        return null;
+    }
+
+    public PendingTickRequest getPendingTickRequest(long accountId, long ticket, boolean isOpen) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null) {
+            synchronized (list) {
+                for (PendingTickRequest req : list) {
+                    if (req.getTicket() == ticket && req.isOpen() == isOpen) {
+                        return req;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public void removePendingTickRequest(long accountId, long ticket, boolean isOpen) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null) {
+            synchronized (list) {
+                list.removeIf(req -> req.getTicket() == ticket && req.isOpen() == isOpen);
+            }
+        }
+    }
+
+    public boolean hasPendingTickRequests(long accountId) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        return list != null && !list.isEmpty();
+    }
+
+    public void cacheRequestedTicks(long ticket, long accountId, boolean isOpen, String ticksJson) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestedTicksCache.put(key, ticksJson);
+    }
+
+    public String getCachedRequestedTicks(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestedTicksCache.get(key);
+    }
+
+    public boolean isRequestedTicksCached(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestedTicksCache.containsKey(key);
+    }
+
+    private final Map<String, Long> requestStartTimes = new ConcurrentHashMap<>();
+
+    public void trackRequestStart(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestStartTimes.putIfAbsent(key, System.currentTimeMillis());
+    }
+
+    public Long getRequestStartTime(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestStartTimes.get(key);
+    }
+
+    public void clearRequestTracking(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestStartTimes.remove(key);
+    }
+
+    public Map<Long, Account> getAccounts() {
+        return accounts;
+    }
 }
+
 

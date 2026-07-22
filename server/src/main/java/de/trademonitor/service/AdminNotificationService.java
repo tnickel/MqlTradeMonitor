@@ -26,9 +26,20 @@ public class AdminNotificationService {
         while (notifications.size() > MAX_NOTIFICATIONS) {
             notifications.removeLast();
         }
-        System.out.println("[AdminNotification] " + notification.getSeverity()
+        String logLine = java.time.LocalDateTime.now() + " | [AdminNotification] " + notification.getSeverity()
                 + " | " + notification.getCategory()
-                + " | " + notification.getTitle());
+                + " | " + notification.getTitle() + " | " + notification.getMessage();
+        System.out.println(logLine);
+        try {
+            java.nio.file.Files.writeString(
+                java.nio.file.Path.of("/opt/wildfly/trademonitor_data/notifications.log"),
+                logLine + "\n",
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.APPEND
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to write admin notification to file: " + e.getMessage());
+        }
     }
 
     /**

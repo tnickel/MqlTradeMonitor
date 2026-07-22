@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.16"
+#property version   "1.20"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -20,11 +20,12 @@ input int      DebugMode = 0;                          // Debug Logging (0=Off, 
 //--- DLL imports
 #import "kernel32.dll"
 bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
+uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 #import
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.16"
+#define EA_VERSION "1.20"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -68,6 +69,7 @@ datetime g_nextRetryTime = 0;            // Timestamp for next retry attempt
 int g_lastError = 0;                     // Last web request error
 bool g_authFailed = false;               // Flag when API key is invalid/unauthorized (HTTP 401/403)
 bool g_invalidConfig = false;            // Flag when ServerURL or config is invalid
+long g_assignedAccountId = 0;            // Server-assigned virtual account ID
 
 //--- Constants
 #define LONG_RETRY_INTERVAL 900          // 15 minutes (900 seconds) for long retry mode
@@ -88,6 +90,15 @@ void SaveLastSyncTime(string closeTime);
 bool RegisterWithServer();
 bool SendInitialTradeList();
 string GetTicksJson(string symbol, long timeMsc);
+string SendHttpPostWithResponse(string url, string json, int timeout);
+void UploadRequestedTicks(long ticket, string symbol, long minTime, long maxTime, bool isOpen, string ticksJson);
+string GetJsonValue(string json, string key);
+string GetEnvVar(string name);
+void SaveAssignedAccountId(long assignedId);
+long LoadAssignedAccountId();
+bool DownloadUpdateFile(string url, string tempFileName);
+bool ApplyUpdate(string tempFileName);
+
 
 //+------------------------------------------------------------------+
 //| Load configuration from file. Returns true if file was found.     |
@@ -280,6 +291,17 @@ int OnInit()
    g_invalidConfig = false;
    // Load or initialize configuration
    InitConfig();
+   
+   // Load server-assigned virtual account ID
+   g_assignedAccountId = LoadAssignedAccountId();
+   if(g_assignedAccountId > 0)
+   {
+      Print("Loaded server-assigned accountId: ", g_assignedAccountId);
+   }
+   else
+   {
+      Print("No server-assigned accountId found, will register with physical account ID.");
+   }
    
    // Build unique GlobalVariable names per account
    string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
@@ -700,16 +722,40 @@ bool RegisterWithServer()
    }
    string url = cfg_ServerURL + "/api/register";
    
+   string compName = GetEnvVar("COMPUTERNAME");
+   string userName = GetEnvVar("USERNAME");
+   
    // Build JSON payload
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(login) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId) + ",";
+   json += "\"realAccountId\":" + IntegerToString(login) + ",";
    json += "\"broker\":\"" + EscapeJson(AccountInfoString(ACCOUNT_COMPANY)) + "\",";
    json += "\"currency\":\"" + EscapeJson(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
    json += "\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
+   json += "\"computerName\":\"" + EscapeJson(compName) + "\",";
+   json += "\"loginName\":\"" + EscapeJson(userName) + "\",";
+   json += "\"version\":\"" + EA_VERSION + "\",";
+   json += "\"platform\":\"MQL5\",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
    
-   return SendHttpPost(url, json);
+   string response = SendHttpPostWithResponse(url, json, httpTimeout);
+   if(response != "")
+   {
+      string assignedIdStr = GetJsonValue(response, "accountId");
+      if(assignedIdStr != "")
+      {
+         long assignedId = StringToInteger(assignedIdStr);
+         if(assignedId > 0)
+         {
+            g_assignedAccountId = assignedId;
+            SaveAssignedAccountId(assignedId);
+            Print("Successfully registered with server-assigned accountId: ", assignedId);
+            return true;
+         }
+      }
+   }
+   return false;
 }
 
 //+------------------------------------------------------------------+
@@ -736,7 +782,7 @@ bool SendInitialTradeList()
    
    // Build main JSON payload
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
    json += "\"trades\":" + tradesJson + ",";
    json += "\"closedTrades\":" + historyJson + ",";
    json += "\"equity\":" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + ",";
@@ -865,6 +911,7 @@ long GetOrderSetupTimeMsc(ulong orderTicket)
    if(orderTicket > 0 && HistoryOrderSelect(orderTicket))
    {
       long type = HistoryOrderGetInteger(orderTicket, ORDER_TYPE);
+      // Only return setup time for market orders (BUY and SELL) to avoid displaying pending order duration as execution latency
       if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
       {
          return HistoryOrderGetInteger(orderTicket, ORDER_TIME_SETUP_MSC);
@@ -944,7 +991,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
       if(ticket > 0)
       {
          ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(ticket, DEAL_ENTRY);
-         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY || entry == DEAL_ENTRY_INOUT)
          {
             datetime dealTimeVal = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
             string closeTime = TimeToString(dealTimeVal, TIME_DATE|TIME_SECONDS);
@@ -1134,7 +1181,7 @@ void SendTradeUpdate()
    
    // Build main JSON payload
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
    json += "\"trades\":" + tradesJson + ",";
    json += "\"equity\":" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + ",";
    json += "\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
@@ -1178,7 +1225,7 @@ void SendHistoryUpdate()
    
    // Build main JSON payload
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
    json += "\"closedTrades\":" + historyJson + ",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
@@ -1204,16 +1251,177 @@ void SendHeartbeat()
    string url = cfg_ServerURL + "/api/heartbeat";
    
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"version\":\"" + EA_VERSION + "\",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
    
-   if(!SendHttpPost(url, json))
+   string response = SendHttpPostWithResponse(url, json, httpTimeout);
+   if(response != "")
+   {
+      // Check if update is available
+      string updateAvailStr = GetJsonValue(response, "updateAvailable");
+      if(updateAvailStr == "true" || updateAvailStr == "1")
+      {
+         string updateUrl = GetJsonValue(response, "updateUrl");
+         string targetVersion = GetJsonValue(response, "targetVersion");
+         if(updateUrl != "")
+         {
+            Print("Software update available: Version ", targetVersion, ". Downloading...");
+            string fullUpdateUrl = updateUrl;
+            if(StringFind(updateUrl, "http") != 0)
+            {
+               fullUpdateUrl = cfg_ServerURL + updateUrl;
+            }
+            string tempFileName = "TradeMonitorClient_temp.dat";
+            if(DownloadUpdateFile(fullUpdateUrl, tempFileName))
+            {
+               ApplyUpdate(tempFileName);
+            }
+         }
+      }
+
+      int reqPos = StringFind(response, "\"pendingRequest\"");
+      if(reqPos >= 0)
+      {
+         string sym = GetJsonValue(response, "symbol");
+         long minT = (long)StringToInteger(GetJsonValue(response, "minTime"));
+         long maxT = (long)StringToInteger(GetJsonValue(response, "maxTime"));
+         long ticket = StringToInteger(GetJsonValue(response, "ticket"));
+         string isOpenStr = GetJsonValue(response, "isOpen");
+         bool isOpen = (isOpenStr == "true" || isOpenStr == "1");
+         
+         if(sym != "" && minT > 0 && maxT > 0)
+         {
+            Print("Received tick request for ", sym, " from ", IntegerToString(minT), " to ", IntegerToString(maxT));
+            MqlTick ticks[];
+            int copied = CopyTicksRange(sym, ticks, COPY_TICKS_ALL, minT, maxT);
+            if(copied > 0)
+            {
+               string ticksJson = "[";
+               for(int i = 0; i < copied; i++)
+               {
+                  if(i > 0) ticksJson += ",";
+                  ticksJson += "[" + IntegerToString(ticks[i].time_msc) + "," + 
+                               DoubleToString(ticks[i].bid, 5) + "," + 
+                               DoubleToString(ticks[i].ask, 5) + "," + 
+                               DoubleToString(ticks[i].volume_real, 2) + "]";
+               }
+               ticksJson += "]";
+               
+               UploadRequestedTicks(ticket, sym, minT, maxT, isOpen, ticksJson);
+            }
+            else
+            {
+               Print("No ticks found for ", sym, " in requested range");
+               UploadRequestedTicks(ticket, sym, minT, maxT, isOpen, "[]");
+            }
+         }
+      }
+   }
+   else
    {
       g_nextRetryTime = TimeCurrent() + cfg_ReconnectIntervalSeconds;
       isRegistered = false;  // Will trigger re-registration with backoff
    }
 }
+
+//+------------------------------------------------------------------+
+//| Get JSON string/number value by key (simple parser)              |
+//+------------------------------------------------------------------+
+string GetJsonValue(string json, string key)
+{
+   int keyPos = StringFind(json, "\"" + key + "\"");
+   if(keyPos < 0) return "";
+   int colonPos = StringFind(json, ":", keyPos);
+   if(colonPos < 0) return "";
+   
+   int valStart = colonPos + 1;
+   while(valStart < StringLen(json) && (StringGetCharacter(json, valStart) == ' ' || StringGetCharacter(json, valStart) == '\t')) {
+       valStart++;
+   }
+   if(valStart >= StringLen(json)) return "";
+   
+   if(StringGetCharacter(json, valStart) == '"') {
+       valStart++;
+       int valEnd = StringFind(json, "\"", valStart);
+       if(valEnd < 0) return "";
+       return StringSubstr(json, valStart, valEnd - valStart);
+   } else {
+       int valEnd = valStart;
+       while(valEnd < StringLen(json) && 
+             StringGetCharacter(json, valEnd) != ',' && 
+             StringGetCharacter(json, valEnd) != '}' && 
+             StringGetCharacter(json, valEnd) != ' ' && 
+             StringGetCharacter(json, valEnd) != '\r' && 
+             StringGetCharacter(json, valEnd) != '\n') {
+           valEnd++;
+       }
+       return StringSubstr(json, valStart, valEnd - valStart);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Send HTTP POST request and return response body                  |
+//+------------------------------------------------------------------+
+string SendHttpPostWithResponse(string url, string json, int timeout)
+{
+   char postData[];
+   char result[];
+   string resultHeaders;
+   
+   StringToCharArray(json, postData, 0, WHOLE_ARRAY, CP_UTF8);
+   int postSize = ArraySize(postData);
+   if(postSize > 0 && postData[postSize - 1] == 0)
+      ArrayResize(postData, postSize - 1);
+   
+   string headers = "Content-Type: application/json\r\n";
+   if (StringLen(cfg_UserKey) > 0) {
+       headers += "X-User-Key: " + cfg_UserKey + "\r\n";
+   }
+   
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, timeout, postData, result, resultHeaders);
+   
+   if(res == 200 || res == 201)
+   {
+      return CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   }
+   else
+   {
+      if(res == -1)
+      {
+         int error = GetLastError();
+         Print("HTTP POST failed, error: ", error, " URL: ", url);
+      }
+      else
+      {
+         Print("HTTP POST returned status: ", res, " URL: ", url);
+      }
+   }
+   return "";
+}
+
+//+------------------------------------------------------------------+
+//| Upload requested ticks to server                                  |
+//+------------------------------------------------------------------+
+void UploadRequestedTicks(long ticket, string symbol, long minTime, long maxTime, bool isOpen, string ticksJson)
+{
+   string url = cfg_ServerURL + "/api/upload-requested-ticks";
+   
+   string json = "{";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"ticket\":" + IntegerToString(ticket) + ",";
+   json += "\"symbol\":\"" + EscapeJson(symbol) + "\",";
+   json += "\"minTime\":" + IntegerToString(minTime) + ",";
+   json += "\"maxTime\":" + IntegerToString(maxTime) + ",";
+   json += "\"isOpen\":" + (isOpen ? "true" : "false") + ",";
+   json += "\"ticks\":\"" + EscapeJson(ticksJson) + "\"";
+   json += "}";
+   
+   SendHttpPost(url, json);
+}
+
 
 //+------------------------------------------------------------------+
 //| Send HTTP POST request                                             |
@@ -1344,8 +1552,8 @@ string EscapeJson(string text)
       else if(c == '\n') result += "\\n";
       else if(c == '\r') result += "\\r";
       else if(c == '\t') result += "\\t";
-      else if(c == '\b') result += "\\b";
-      else if(c == '\f') result += "\\f";
+      else if(c == 8)    result += "\\b";
+      else if(c == 12)   result += "\\f";
       else if(c < 32)
       {
          // Escape control chars < 32 as \u00xx
@@ -1465,7 +1673,7 @@ bool SendLogLinesChunk(string &lines[], int startIdx, int count)
    logsJson += "]";
    
    string json = "{";
-   json += "\"accountId\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
+   json += "\"accountId\":" + IntegerToString(g_assignedAccountId > 0 ? g_assignedAccountId : AccountInfoInteger(ACCOUNT_LOGIN)) + ",";
    json += "\"logEntries\":" + logsJson + ",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    json += "}";
@@ -1526,5 +1734,121 @@ void FlushRemainingLogs(string srcPath)
       {
          break;
       }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Get OS Environment Variable value                                |
+//+------------------------------------------------------------------+
+string GetEnvVar(string name)
+{
+   ushort buffer[512];
+   uint res = GetEnvironmentVariableW(name, buffer, 512);
+   if(res > 0)
+   {
+      return ShortArrayToString(buffer, 0, (int)res);
+   }
+   return "";
+}
+
+//+------------------------------------------------------------------+
+//| Save assigned account ID to local file                           |
+//+------------------------------------------------------------------+
+void SaveAssignedAccountId(long assignedId)
+{
+   string filename = "TM_AssignedId_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ".dat";
+   int handle = FileOpen(filename, FILE_WRITE|FILE_TXT|FILE_ANSI);
+   if(handle != INVALID_HANDLE)
+   {
+      FileWriteString(handle, IntegerToString(assignedId));
+      FileClose(handle);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Load assigned account ID from local file                         |
+//+------------------------------------------------------------------+
+long LoadAssignedAccountId()
+{
+   string filename = "TM_AssignedId_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ".dat";
+   if(!FileIsExist(filename))
+      return 0;
+   
+   int handle = FileOpen(filename, FILE_READ|FILE_TXT|FILE_ANSI);
+   if(handle != INVALID_HANDLE)
+   {
+      string idStr = FileReadString(handle);
+      FileClose(handle);
+      return StringToInteger(idStr);
+   }
+   return 0;
+}
+
+//+------------------------------------------------------------------+
+//| Download binary update file from server to sandboxed directory   |
+//+------------------------------------------------------------------+
+bool DownloadUpdateFile(string url, string tempFileName)
+{
+   char postData[];
+   char result[];
+   string resultHeaders;
+   
+   string headers = "";
+   if (StringLen(cfg_UserKey) > 0) {
+       headers += "X-User-Key: " + cfg_UserKey + "\r\n";
+   }
+   
+   ResetLastError();
+   int res = WebRequest("GET", url, headers, httpTimeout, postData, result, resultHeaders);
+   
+   if(res == 200)
+   {
+      int handle = FileOpen(tempFileName, FILE_WRITE|FILE_BIN);
+      if(handle != INVALID_HANDLE)
+      {
+         uint bytesWritten = FileWriteArray(handle, result, 0, WHOLE_ARRAY);
+         FileClose(handle);
+         if(bytesWritten > 0)
+         {
+            return true;
+         }
+         else
+         {
+            Print("Error: Downloaded 0 bytes or failed to write update file array");
+         }
+      }
+      else
+      {
+         Print("Error: Failed to open temp update file for writing, error: ", GetLastError());
+      }
+   }
+   else
+   {
+      Print("HTTP GET update failed with status: ", res, " error code: ", GetLastError());
+   }
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Apply downloaded update by overwriting the running EA program    |
+//+------------------------------------------------------------------+
+bool ApplyUpdate(string tempFileName)
+{
+   string sandboxPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + tempFileName;
+   string expertsPath = MQLInfoString(MQL_PROGRAM_PATH);
+   
+   Print("Applying software update. Overwriting running EA file at: ", expertsPath);
+   
+   bool success = CopyFileW(sandboxPath, expertsPath, false);
+   if(success)
+   {
+      Print("Update applied successfully! MetaTrader will now restart the EA.");
+      FileDelete(tempFileName);
+      return true;
+   }
+   else
+   {
+      Print("Error: Failed to copy update file. Win32 error code: ", GetLastError());
+      return false;
    }
 }

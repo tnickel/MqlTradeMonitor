@@ -36,6 +36,9 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
 
         // Brute-force check for login endpoints (Web and API)
         String uri = request.getRequestURI();
+        if (uri.contains("/account/")) {
+            System.out.println("[DEBUG-COOKIE-CHECK] URI: " + uri + ", Cookie: " + request.getHeader("Cookie"));
+        }
         if (("POST".equalsIgnoreCase(request.getMethod())
                 && (uri.equals("/login") || uri.equals("/api/login") || uri.equals("/api/demo-login")))) {
             String ip = getClientIP(request);

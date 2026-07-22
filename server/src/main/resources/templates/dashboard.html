@@ -47,6 +47,9 @@
                     <a th:if="${currentUser != null}" href="/profile" class="nav-item">
                         <span style="font-size: 1.2rem;">👤</span> Profil
                     </a>
+                    <a th:if="${currentUser != null}" href="/profile/app-config" class="nav-item">
+                        <span style="font-size: 1.2rem;">📱</span> App Config
+                    </a>
                     <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0; padding: 0;">
                         <button type="submit" class="nav-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
                             <span style="font-size: 1.2rem;">🚪</span> Logout
@@ -505,6 +508,11 @@
                                 </tr>
                             </table>
                             <div id="sys-health-problems" style="margin-top: 10px; color: #ef4444; font-size: 0.85rem;"></div>
+                            <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                                <button onclick="openSirenLogModal()" style="width: 100%; padding: 8px 12px; background: rgba(247, 118, 142, 0.1); border: 1px solid rgba(247, 118, 142, 0.3); border-radius: 4px; color: #f7768e; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.background='rgba(247, 118, 142, 0.2)'" onmouseout="this.style.background='rgba(247, 118, 142, 0.1)'">
+                                    📢 Sirenen-Logbuch
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Real Accounts Column -->
@@ -525,6 +533,48 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Siren Log Modal -->
+            <div id="sirenLogModal" class="modal">
+                <div class="modal-content" style="max-width: 1000px; width: 95%; background: #1e1e2e; border: 1px solid #3f3f5f; border-radius: 8px;">
+                    <span class="close-modal" onclick="closeSirenLogModal()">×</span>
+                    <h2 style="margin-top: 0; color: #f7768e; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                        📢 Sirenen- & Alarm-Logbuch
+                    </h2>
+                    
+                    <p style="color: #8b949e; font-size: 0.9rem; margin-bottom: 15px;">
+                        Dieses Logbuch zeigt die letzten kritischen Systemereignisse, die zu einer Alarmierung (z.B. per E-Mail, Telegram oder Homey-Sirene) geführt haben.
+                    </p>
+                    
+                    <div style="margin-top: 15px; max-height: 450px; overflow-y: auto; border: 1px solid #2a2e3d; border-radius: 6px; background: #0f0f16;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; color: #a9b1d6; text-align: left;">
+                            <thead style="position: sticky; top: 0; background: #1a1a24; z-index: 10; border-bottom: 1px solid #3f3f5f; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                                <tr>
+                                    <th style="padding: 10px; width: 140px;">Zeitstempel</th>
+                                    <th style="padding: 10px; width: 90px; text-align: center;">Priorität</th>
+                                    <th style="padding: 10px; width: 100px; text-align: center;">Kategorie</th>
+                                    <th style="padding: 10px; width: 180px;">Ereignis</th>
+                                    <th style="padding: 10px;">Beschreibung</th>
+                                </tr>
+                            </thead>
+                            <tbody id="siren-log-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Lade Log-Daten...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                        <button onclick="clearSirenLog()" class="view-details-btn" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444; padding: 8px 15px;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
+                            Log löschen
+                        </button>
+                        <button onclick="closeSirenLogModal()" class="view-details-btn" style="padding: 8px 15px;">
+                            Schließen
+                        </button>
                     </div>
                 </div>
             </div>
@@ -628,6 +678,115 @@
             
             function closeSystemStatusModal() {
                 document.getElementById('systemStatusModal').style.display = 'none';
+            }
+
+            function openSirenLogModal() {
+                document.getElementById('systemStatusModal').style.display = 'none';
+                document.getElementById('sirenLogModal').style.display = 'block';
+                fetchSirenLog();
+            }
+            
+            function closeSirenLogModal() {
+                document.getElementById('sirenLogModal').style.display = 'none';
+                document.getElementById('systemStatusModal').style.display = 'block';
+            }
+            
+            function fetchSirenLog() {
+                const tbody = document.getElementById('siren-log-table-body');
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Lade Log-Daten...</td></tr>';
+                
+                fetch('/api/siren-log')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP status ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        if (!text || text.trim() === '' || text.startsWith('Keine Log-Einträge')) {
+                            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Keine Log-Einträge vorhanden.</td></tr>';
+                            return;
+                        }
+                        
+                        const lines = text.trim().split('\n');
+                        const rowsHtml = lines.map(line => {
+                            const parts = line.split(' | ');
+                            if (parts.length < 5) return '';
+                            
+                            let timeStr = parts[0];
+                            try {
+                                const dt = new Date(parts[0]);
+                                if (!isNaN(dt.getTime())) {
+                                    const day = String(dt.getDate()).padStart(2, '0');
+                                    const month = String(dt.getMonth() + 1).padStart(2, '0');
+                                    const year = dt.getFullYear();
+                                    const hours = String(dt.getHours()).padStart(2, '0');
+                                    const minutes = String(dt.getMinutes()).padStart(2, '0');
+                                    const seconds = String(dt.getSeconds()).padStart(2, '0');
+                                    timeStr = `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+                                } else {
+                                    timeStr = parts[0].split('.')[0].replace('T', ' ');
+                                }
+                            } catch (e) {
+                                timeStr = parts[0];
+                            }
+                            
+                            const sevRaw = parts[1].replace('[AdminNotification]', '').trim();
+                            let sevBadge = '';
+                            if (sevRaw === 'CRITICAL') {
+                                sevBadge = '<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block;">CRITICAL</span>';
+                            } else {
+                                sevBadge = '<span style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block;">WARNING</span>';
+                            }
+                            
+                            const category = parts[2].trim();
+                            const categoryIcon = category === 'SECURITY' ? '🛡️ SECURITY' : '🩺 HEALTH';
+                            
+                            const title = parts[3].trim();
+                            const message = parts[4].trim();
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #2a2e3d; transition: background 0.2s;" onmouseover="this.style.background='#161722'" onmouseout="this.style.background='transparent'">
+                                    <td style="padding: 10px; font-family: monospace; white-space: nowrap;">${timeStr}</td>
+                                    <td style="padding: 10px; text-align: center;">${sevBadge}</td>
+                                    <td style="padding: 10px; text-align: center; font-size: 0.75rem; color: #a0a0c0; white-space: nowrap;">${categoryIcon}</td>
+                                    <td style="padding: 10px; font-weight: bold; color: #e2e2e9;">${title}</td>
+                                    <td style="padding: 10px; font-size: 0.8rem; color: #a9b1d6;">${message}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                        
+                        tbody.innerHTML = rowsHtml || '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Keine gültigen Log-Einträge vorhanden.</td></tr>';
+                        
+                        const container = tbody.closest('div');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    })
+                    .catch(err => {
+                        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #f87171;">Fehler beim Laden des Logs: ${err.message}</td></tr>`;
+                    });
+            }
+            
+            function clearSirenLog() {
+                if (!confirm('Möchten Sie das Sirenen-Logbuch wirklich löschen?')) {
+                    return;
+                }
+                
+                fetch('/api/siren-log/clear', { method: 'POST' })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP status ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(msg => {
+                        alert(msg);
+                        fetchSirenLog();
+                    })
+                    .catch(err => {
+                        alert('Fehler beim Löschen des Logs: ' + err.message);
+                    });
             }
 
             // ===================== Report Generator =====================
@@ -1040,7 +1199,11 @@
                                 return `
                                     <tr style="border-bottom: 1px solid #2a2e39;">
                                         <td style="padding: 10px 0;">
-                                            <strong>${acc.name || acc.accountId}</strong>
+                                            <strong>
+                                                ${acc.name || (acc.realAccountId || acc.accountId)}
+                                                ${acc.realAccountId && acc.realAccountId !== acc.accountId ? `<span style="font-size: 0.75rem; font-weight: normal; color: #848e9c; margin-left: 2px;">${String(acc.accountId - (acc.realAccountId * 100)).padStart(2, '0')}</span>` : ''}
+                                            </strong>
+                                            ${acc.computerName ? `<br><span style="font-size: 0.7rem; color: #848e9c;">${acc.loginName}@${acc.computerName} v${acc.eaVersion}</span>` : ''}
                                         </td>
                                         <td style="padding: 10px 0; text-align: center;">
                                             ${getAccountDot(acc)}
@@ -1100,27 +1263,39 @@
                             style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="display: flex; flex-direction: column;">
                                 <!-- Name First (Larger) -->
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;" th:if="${acc.name != null && !acc.name.isEmpty()}">
                                     <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 24px; max-height: 24px; border-radius: 4px; object-fit: contain;" class="account-tile-icon" />
-                                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
-                                        th:text="${acc.name}"
+                                    <span class="account-name" th:text="${acc.name}"
                                         style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">(Name)</span>
                                 </div>
 
                                 <!-- ID Below (Smaller) -->
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="account-id" th:text="${acc.accountId}"
-                                        style="font-size: 0.9rem; color: #a0a0c0; font-family: 'JetBrains Mono';">12345</span>
+                                    <span class="account-id" style="font-family: 'JetBrains Mono';">
+                                        <strong style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);" 
+                                                th:text="${acc.realAccountId != null && acc.realAccountId != acc.accountId ? acc.realAccountId : acc.accountId}">55616423</strong><span 
+                                                th:if="${acc.realAccountId != null && acc.realAccountId != acc.accountId}" 
+                                                style="font-size: 0.75rem; font-weight: normal; color: #848e9c;" 
+                                                th:text="${#numbers.formatInteger(acc.accountId - (acc.realAccountId * 100), 2)}">01</span>
+                                    </span>
                                     <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
                                     <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
-                                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                    <span th:if="${isAdmin}" class="edit-icon" th:data-id="${acc.accountId}" 
+                                        th:data-name="${acc.name != null && !acc.name.isEmpty() ? acc.name : (acc.realAccountId != null ? acc.realAccountId : acc.accountId)}"
                                         th:data-type="${acc.type}" th:data-alarm-enabled="${acc.openProfitAlarmEnabled}"
                                         th:data-alarm-abs="${acc.openProfitAlarmAbs}"
                                         th:data-alarm-pct="${acc.openProfitAlarmPct}"
                                         th:data-monitored="${acc.monitored}"
+                                        th:data-telegram-trades-enabled="${acc.telegramTradesEnabled}"
                                         th:data-icon-base64="${acc.iconBase64}"
                                         onclick="event.stopPropagation(); openEditModal(this)"
                                         title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">⚙️</span>
+                                </div>
+
+                                <!-- Client Details (PC, User, Version) in free area -->
+                                <div th:if="${acc.computerName != null}" style="font-size: 0.75rem; color: #848e9c; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <span th:text="${acc.loginName} + '@' + ${acc.computerName}">user@PC</span>
+                                    <span style="padding: 1px 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;" th:text="'v' + ${acc.eaVersion}">v1.17</span>
                                 </div>
                             </div>
 
@@ -1272,11 +1447,22 @@
                     <tbody>
                         <tr th:each="acc : ${accountsBySection.get(section.id)}"
                             th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
-                            <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
+                            <td style="font-family: 'JetBrains Mono';">
+                                <strong style="font-weight: bold; color: var(--text-primary);" 
+                                        th:text="${acc.realAccountId != null && acc.realAccountId != acc.accountId ? acc.realAccountId : acc.accountId}">55616423</strong><span 
+                                        th:if="${acc.realAccountId != null && acc.realAccountId != acc.accountId}" 
+                                        style="font-size: 0.85em; font-weight: normal; color: #848e9c;" 
+                                        th:text="${#numbers.formatInteger(acc.accountId - (acc.realAccountId * 100), 2)}">01</span>
+                            </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 16px; max-height: 16px; border-radius: 2px; object-fit: contain;" />
-                                    <span th:text="${acc.name}">Name</span>
+                                    <div>
+                                        <span th:text="${acc.name}">Name</span>
+                                        <div th:if="${acc.computerName != null}" style="font-size: 0.7rem; color: #848e9c; margin-top: 2px;">
+                                            <span th:text="${acc.loginName} + '@' + ${acc.computerName} + ' v' + ${acc.eaVersion}">user@PC v1.17</span>
+                                        </div>
+                                    </div>
                                     <span th:if="${acc.lastSeenMins != null}"
                                         th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
                                                 (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
@@ -1514,6 +1700,11 @@
             <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
                 <input type="checkbox" id="editAccountMonitored" style="width: 18px; height: 18px; accent-color: #6366f1;">
                 <label for="editAccountMonitored" style="margin: 0; cursor: pointer; font-weight: bold;">Überwachung aktiv (Alarme & Status)</label>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <input type="checkbox" id="editTelegramTradesEnabled" style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="editTelegramTradesEnabled" style="margin: 0; cursor: pointer; font-weight: bold;">Trades an Telegram senden (Neueröffnungen & Schließungen)</label>
             </div>
 
             <hr style="border-color: #333; margin: 15px 0;">
@@ -2081,6 +2272,10 @@
             var monitored = el.getAttribute('data-monitored') !== 'false';
             document.getElementById('editAccountMonitored').checked = monitored;
 
+            // Telegram trades status
+            var telegramTradesEnabled = el.getAttribute('data-telegram-trades-enabled') === 'true';
+            document.getElementById('editTelegramTradesEnabled').checked = telegramTradesEnabled;
+
             // Icon handling
             var iconBase64 = el.getAttribute('data-icon-base64');
             var imgPreview = document.getElementById('editAccountIconPreview');
@@ -2137,6 +2332,7 @@
             const alarmAbs = document.getElementById('editAlarmAbs').value;
             const alarmPct = document.getElementById('editAlarmPct').value;
             const monitored = document.getElementById('editAccountMonitored').checked;
+            const telegramTradesEnabled = document.getElementById('editTelegramTradesEnabled').checked;
             const removeIcon = window.removeIconClicked || false;
             const iconInput = document.getElementById('editAccountIcon');
 
@@ -2148,6 +2344,7 @@
             if (alarmAbs) formData.append('alarmAbs', alarmAbs);
             if (alarmPct) formData.append('alarmPct', alarmPct);
             formData.append('monitored', monitored);
+            formData.append('telegramTradesEnabled', telegramTradesEnabled);
             formData.append('removeIcon', removeIcon);
             if (iconInput.files && iconInput.files[0]) {
                 formData.append('icon', iconInput.files[0]);

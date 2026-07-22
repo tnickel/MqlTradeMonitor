@@ -639,6 +639,57 @@
             </form>
         </div>
 
+        <!-- Telegram Notification Config -->
+        <div class="config-section"
+            style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: #e1e1e1;">💬 Telegram Benachrichtigungen</h2>
+            <p style="color: #8b949e; margin-bottom: 1.5rem; line-height: 1.5;">
+                Erhalte sofortige Push-Nachrichten bei kritischen Alarmen auf dein Smartphone.
+                <br><br>
+                <strong>Schritt-für-Schritt Anleitung:</strong>
+                <br>
+                1. Suche in Telegram nach dem <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">@BotFather</a> und erstelle einen Bot mit <code>/newbot</code>.
+                <br>
+                2. Kopiere das ausgegebene <strong>Bot Token</strong> und füge es unten ein.
+                <br>
+                3. Suche deinen neuen Bot in Telegram und starte den Chat mit <strong>Start</strong>.
+                <br>
+                4. Suche in Telegram nach dem Bot <a href="https://t.me/userinfobot" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">@userinfobot</a> und starte ihn. Er sendet dir sofort deine persönliche <strong>Chat-ID</strong>, die du unten einträgst.
+            </p>
+            <form th:action="@{/admin/telegram-config}" method="post"
+                style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="telegramEnabled" name="telegramEnabled" th:checked="${telegramEnabled}"
+                        style="cursor: pointer; width: 18px; height: 18px;">
+                    <label for="telegramEnabled" style="color: #c9d1d9; cursor: pointer; font-weight: bold;">
+                        Telegram Benachrichtigungen aktivieren
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="telegramBotToken" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Telegram Bot Token
+                    </label>
+                    <input type="password" id="telegramBotToken" name="telegramBotToken" th:value="${telegramBotToken}"
+                        placeholder="z.B. 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label for="telegramChatId" style="color: #8b949e; display: block; margin-bottom: 5px;">
+                        Telegram Chat-ID
+                    </label>
+                    <input type="text" id="telegramChatId" name="telegramChatId" th:value="${telegramChatId}"
+                        placeholder="z.B. 987654321"
+                        style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <button type="submit"
+                        style="background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Speichern</button>
+                    <button type="button" onclick="sendTestTelegram()"
+                        style="background-color: #1f6feb; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Testnachricht senden</button>
+                </div>
+            </form>
+        </div>
+
         <!-- Sync Exemptions -->
         <div class="config-section"
             style="background-color: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2e39;">
@@ -1124,6 +1175,44 @@
         </div>
 
         <script>
+            function sendTestTelegram() {
+                const token = document.getElementById('telegramBotToken').value;
+                const chatId = document.getElementById('telegramChatId').value;
+                
+                if (!token || !chatId) {
+                    alert('Bitte geben Sie erst Token und Chat-ID ein.');
+                    return;
+                }
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/telegram-test';
+                
+                const csrfInputFromPage = document.querySelector('input[name="_csrf"]');
+                if (csrfInputFromPage) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = '_csrf';
+                    csrfInput.value = csrfInputFromPage.value;
+                    form.appendChild(csrfInput);
+                }
+                
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = 'telegramBotToken';
+                tokenInput.value = token;
+                form.appendChild(tokenInput);
+                
+                const chatInput = document.createElement('input');
+                chatInput.type = 'hidden';
+                chatInput.name = 'telegramChatId';
+                chatInput.value = chatId;
+                form.appendChild(chatInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+
             function openAccountModal() {
                 updateSelectAllState(); // To ensure master checkbox matches child checks
                 document.getElementById('accountSelectionModal').style.display = 'flex';

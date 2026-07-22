@@ -661,7 +661,7 @@
                     <label>MetaTrader B</label>
                     <select name="accountB" id="selectB">
                         <option value="">-- Account wählen --</option>
-                        <option value="upload-csv" style="color: var(--accent); font-weight: 600;">➕ CSV-Tradeliste hochladen...</option>
+                        <option th:if="${isAdmin}" value="upload-csv" style="color: var(--accent); font-weight: 600;">➕ CSV-Tradeliste hochladen...</option>
                         <option th:each="acc : ${allAccounts}"
                                 th:value="${acc.accountId}"
                                 th:text="${acc.name + ' (' + acc.type + ')'}"

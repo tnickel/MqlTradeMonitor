@@ -34,6 +34,16 @@ public class UserEntity {
     @Column(name = "account_id")
     private Set<Long> newsAccountIds = new HashSet<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_app_real_accounts", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "account_id")
+    private Set<Long> realAccountIds = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_app_demo_accounts", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "account_id")
+    private Set<Long> demoAccountIds = new HashSet<>();
+
     public UserEntity() {
     }
 
@@ -89,6 +99,22 @@ public class UserEntity {
 
     public void setNewsAccountIds(Set<Long> newsAccountIds) {
         this.newsAccountIds = newsAccountIds;
+    }
+
+    public Set<Long> getRealAccountIds() {
+        return realAccountIds;
+    }
+
+    public void setRealAccountIds(Set<Long> realAccountIds) {
+        this.realAccountIds = realAccountIds;
+    }
+
+    public Set<Long> getDemoAccountIds() {
+        return demoAccountIds;
+    }
+
+    public void setDemoAccountIds(Set<Long> demoAccountIds) {
+        this.demoAccountIds = demoAccountIds;
     }
 
     public String getApiKey() {

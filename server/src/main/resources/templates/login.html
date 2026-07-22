@@ -313,7 +313,7 @@
                 <button type="button" class="btn-submit" onclick="submitDemoLogin()" style="background: linear-gradient(135deg, #475569, #334155); margin-top: 0.75rem;">
                     Try Demo &nbsp;🚀
                 </button>
-                <a href="/trademonitor_v1.5.apk?v=1.5" download style="text-decoration: none; display: block; width: 100%;">
+                <a href="/trademonitor_v1.7.apk?v=1.7" download style="text-decoration: none; display: block; width: 100%;">
                     <button type="button" class="btn-submit" style="background: linear-gradient(135deg, #059669, #047857); margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; width: 100%;">
                         Download Android App &nbsp;📱
                     </button>
@@ -328,7 +328,7 @@
 
                 // APK Progress Download Modal
                 document.addEventListener('DOMContentLoaded', () => {
-                    const downloadLink = document.querySelector('a[href*="trademonitor_v1.5.apk"]');
+                    const downloadLink = document.querySelector('a[href*="trademonitor_v1.7.apk"]');
                     if (downloadLink) {
                         downloadLink.addEventListener('click', (e) => {
                             e.preventDefault();
@@ -517,7 +517,7 @@
 
                                 const downloadLink = document.createElement('a');
                                 downloadLink.href = URL.createObjectURL(blob);
-                                downloadLink.download = 'trademonitor_v1.5.apk';
+                                downloadLink.download = 'trademonitor_v1.7.apk';
                                 document.body.appendChild(downloadLink);
                                 downloadLink.click();
                                 document.body.removeChild(downloadLink);

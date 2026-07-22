@@ -35,6 +35,9 @@ public class ServerHealthMonitorService {
     @Autowired
     private GlobalConfigService globalConfigService;
 
+    @Autowired
+    private TelegramService telegramService;
+
     private LocalDateTime lastCheckTime;
     private String lastStatus = "OK";
     private List<String> lastProblems = new ArrayList<>();
@@ -176,6 +179,14 @@ public class ServerHealthMonitorService {
             emailService.sendSyncWarningEmail("⚠️ Server Health Alert", body.toString());
         } catch (Exception e) {
             System.err.println("[HealthMonitor] Failed to send health alert email: " + e.getMessage());
+        }
+
+        try {
+            telegramService.sendNotification("⚠️ *Server Health Alert — Trade Monitor*\n\n"
+                    + String.join("\n", lastProblems)
+                    + "\n\nBitte prüfe den Server unter: /admin/health");
+        } catch (Exception e) {
+            System.err.println("[HealthMonitor] Failed to send health alert Telegram: " + e.getMessage());
         }
 
         // Trigger Homey Siren if enabled for health alerts

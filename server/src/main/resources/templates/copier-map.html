@@ -204,6 +204,9 @@
                     <a th:if="${currentUser != null}" href="/profile" class="nav-item">
                         <span style="font-size: 1.2rem;">👤</span> Profil
                     </a>
+                    <a th:if="${currentUser != null}" href="/profile/app-config" class="nav-item">
+                        <span style="font-size: 1.2rem;">📱</span> App Config
+                    </a>
                     <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0; padding: 0;">
                         <button type="submit" class="nav-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
                             <span style="font-size: 1.2rem;">🚪</span> Logout

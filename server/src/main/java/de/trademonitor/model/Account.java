@@ -57,6 +57,15 @@ public class Account {
     private LocalDateTime lastPromptAnalysisTime;
     private boolean monitored = true;
     private String iconBase64;
+    private boolean telegramTradesEnabled = false;
+
+    private Long realAccountId;
+    private String computerName;
+    private String loginName;
+    private String eaVersion;
+    private String platform;
+    private String infoText;
+    private String resourceOrder;
 
     public boolean isSyncWarning() {
         return syncWarning;
@@ -884,11 +893,75 @@ public class Account {
         this.monitored = monitored;
     }
 
+    public boolean isTelegramTradesEnabled() {
+        return telegramTradesEnabled;
+    }
+
+    public void setTelegramTradesEnabled(boolean telegramTradesEnabled) {
+        this.telegramTradesEnabled = telegramTradesEnabled;
+    }
+
     public String getIconBase64() {
         return iconBase64;
     }
 
     public void setIconBase64(String iconBase64) {
         this.iconBase64 = iconBase64;
+    }
+
+    public Long getRealAccountId() {
+        return realAccountId;
+    }
+
+    public void setRealAccountId(Long realAccountId) {
+        this.realAccountId = realAccountId;
+    }
+
+    public String getComputerName() {
+        return computerName;
+    }
+
+    public void setComputerName(String computerName) {
+        this.computerName = computerName;
+    }
+
+    public String getLoginName() {
+        return loginName;
+    }
+
+    public void setLoginName(String loginName) {
+        this.loginName = loginName;
+    }
+
+    public String getEaVersion() {
+        return eaVersion;
+    }
+
+    public void setEaVersion(String eaVersion) {
+        this.eaVersion = eaVersion;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getInfoText() {
+        return infoText;
+    }
+
+    public void setInfoText(String infoText) {
+        this.infoText = infoText;
+    }
+
+    public String getResourceOrder() {
+        return resourceOrder;
+    }
+
+    public void setResourceOrder(String resourceOrder) {
+        this.resourceOrder = resourceOrder;
     }
 }

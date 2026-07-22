@@ -24,6 +24,14 @@ public class ExportService {
         return generateCsv(trades);
     }
 
+    public String exportUserTradesToCsv(java.util.Collection<Long> allowedAccountIds) {
+        if (allowedAccountIds == null || allowedAccountIds.isEmpty()) {
+            return generateCsv(java.util.Collections.emptyList());
+        }
+        List<ClosedTradeEntity> trades = closedTradeRepository.findByAccountIdIn(allowedAccountIds);
+        return generateCsv(trades);
+    }
+
     public String exportAccountTradesToCsv(long accountId) {
         List<ClosedTradeEntity> trades = closedTradeRepository.findByAccountIdOrderByCloseTimeDesc(accountId);
         return generateCsv(trades);
