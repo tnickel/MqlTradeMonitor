@@ -37,6 +37,8 @@ public class AccountManager {
     // === PERFORMANCE CACHES ===
     /** Cached max drawdown % per account (computed from equity snapshots). */
     private final Map<Long, Double> cachedMaxDrawdownPct = new ConcurrentHashMap<>();
+    /** Cached account-level balance/equity drawdowns from a shared snapshot timeline. */
+    private final Map<Long, AccountDrawdownMetrics> cachedAccountDrawdowns = new ConcurrentHashMap<>();
     /** Cached performance metrics per account (profitPct, monthlyProfitPct, m1/m2/m3, mpdd3 etc.). */
     private final Map<Long, Map<String, Object>> cachedPerformanceMetrics = new ConcurrentHashMap<>();
     /** Cached today's closed profit per account. */
@@ -490,6 +492,7 @@ public class AccountManager {
             // Remove from in-memory caches.
             accounts.remove(accountId);
             cachedMaxDrawdownPct.remove(accountId);
+            cachedAccountDrawdowns.remove(accountId);
             cachedPerformanceMetrics.remove(accountId);
             cachedDailyProfit.remove(accountId);
 
@@ -1057,11 +1060,15 @@ public class AccountManager {
             Map<Long, String> magicLastComment = new HashMap<>();
 
             for (Trade t : account.getOpenTrades()) {
-                magicOpenPL.merge(t.getMagicNumber(), t.getProfit(), (a, b) -> a + b);
+                magicOpenPL.merge(t.getMagicNumber(), t.getProfit() + t.getSwap(), Double::sum);
                 if (t.getComment() != null && !t.getComment().isEmpty()) {
                     magicLastComment.putIfAbsent(t.getMagicNumber(), t.getComment());
                 }
             }
+
+            AccountDrawdownMetrics accountMetrics = cachedAccountDrawdowns.getOrDefault(
+                    account.getAccountId(),
+                    calculateAccountDrawdownMetrics(Collections.emptyList(), account.getBalance(), account.getEquity()));
 
             Map<Long, de.trademonitor.dto.MagicProfitEntry> drawdownMetricsByMagic = new HashMap<>();
             for (de.trademonitor.dto.MagicProfitEntry metrics : account.getMagicProfitEntries(0, 0, null)) {
@@ -1100,6 +1107,11 @@ public class AccountManager {
                         openPL);
                 item.setCurrentMagicEquity(openPL);
                 item.setOpenProfit(openPL);
+                item.setAccountDrawdownEur(accountMetrics.drawdownEur());
+                item.setAccountDrawdownPercent(accountMetrics.drawdownPercent());
+                item.setAccountEquityDrawdownEur(accountMetrics.equityDrawdownEur());
+                item.setAccountEquityDrawdownPercent(accountMetrics.equityDrawdownPercent());
+                item.setAccountOpenProfit(account.getTotalProfit());
 
                 de.trademonitor.dto.MagicProfitEntry metrics = drawdownMetricsByMagic.get(magic);
                 if (metrics != null) {
@@ -1181,26 +1193,109 @@ public class AccountManager {
         try {
             List<de.trademonitor.entity.EquitySnapshotEntity> snapshots =
                 equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
-            double equityDDPct = 0.0;
-            if (snapshots != null && snapshots.size() > 10) {
-                double hwm = 0.0;
-                for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
-                    double eq = snap.getEquity();
-                    if (eq > hwm) {
-                        hwm = eq;
-                    }
-                    if (hwm > 0) {
-                        double dd = (hwm - eq) / hwm * 100.0;
-                        if (dd > equityDDPct) {
-                            equityDDPct = dd;
-                        }
-                    }
-                }
-            }
-            cachedMaxDrawdownPct.put(accountId, equityDDPct);
+            Account account = accounts.get(accountId);
+            double currentBalance = account != null ? account.getBalance() : 0.0;
+            double currentEquity = account != null ? account.getEquity() : 0.0;
+            AccountDrawdownMetrics metrics =
+                    calculateAccountDrawdownMetrics(snapshots, currentBalance, currentEquity);
+            cachedAccountDrawdowns.put(accountId, metrics);
+            cachedMaxDrawdownPct.put(accountId, metrics.equityDrawdownPercent());
         } catch (Exception e) {
             cachedMaxDrawdownPct.put(accountId, 0.0);
+            cachedAccountDrawdowns.put(accountId, AccountDrawdownMetrics.ZERO);
         }
+    }
+
+    static AccountDrawdownMetrics calculateAccountDrawdownMetrics(
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots,
+            double currentBalance,
+            double currentEquity) {
+        double balanceHwm = 0.0;
+        double equityHwm = 0.0;
+        double maxBalanceDrawdownEur = 0.0;
+        double maxBalanceDrawdownPercent = 0.0;
+        double maxEquityDrawdownEur = 0.0;
+        double maxEquityDrawdownPercent = 0.0;
+
+        List<de.trademonitor.entity.EquitySnapshotEntity> safeSnapshots =
+                snapshots != null ? snapshots : Collections.emptyList();
+        for (de.trademonitor.entity.EquitySnapshotEntity snapshot : safeSnapshots) {
+            double[] updated = updateAccountDrawdownMetrics(
+                    snapshot.getBalance(), snapshot.getEquity(),
+                    balanceHwm, equityHwm,
+                    maxBalanceDrawdownEur, maxBalanceDrawdownPercent,
+                    maxEquityDrawdownEur, maxEquityDrawdownPercent);
+            balanceHwm = updated[0];
+            equityHwm = updated[1];
+            maxBalanceDrawdownEur = updated[2];
+            maxBalanceDrawdownPercent = updated[3];
+            maxEquityDrawdownEur = updated[4];
+            maxEquityDrawdownPercent = updated[5];
+        }
+
+        if (currentBalance > 0.0 || currentEquity > 0.0) {
+            double[] updated = updateAccountDrawdownMetrics(
+                    currentBalance, currentEquity,
+                    balanceHwm, equityHwm,
+                    maxBalanceDrawdownEur, maxBalanceDrawdownPercent,
+                    maxEquityDrawdownEur, maxEquityDrawdownPercent);
+            maxBalanceDrawdownEur = updated[2];
+            maxBalanceDrawdownPercent = updated[3];
+            maxEquityDrawdownEur = updated[4];
+            maxEquityDrawdownPercent = updated[5];
+        }
+
+        return new AccountDrawdownMetrics(
+                maxBalanceDrawdownEur,
+                maxBalanceDrawdownPercent,
+                maxEquityDrawdownEur,
+                maxEquityDrawdownPercent);
+    }
+
+    private static double[] updateAccountDrawdownMetrics(
+            double balance,
+            double equity,
+            double balanceHwm,
+            double equityHwm,
+            double maxBalanceDrawdownEur,
+            double maxBalanceDrawdownPercent,
+            double maxEquityDrawdownEur,
+            double maxEquityDrawdownPercent) {
+        double nextBalanceHwm = Math.max(balanceHwm, balance);
+        double nextEquityHwm = Math.max(equityHwm, equity);
+
+        if (nextBalanceHwm > 0.0) {
+            double drawdownEur = Math.max(0.0, nextBalanceHwm - balance);
+            if (drawdownEur > maxBalanceDrawdownEur) {
+                maxBalanceDrawdownEur = drawdownEur;
+                maxBalanceDrawdownPercent = drawdownEur / nextBalanceHwm * 100.0;
+            }
+        }
+        if (nextEquityHwm > 0.0) {
+            double drawdownEur = Math.max(0.0, nextEquityHwm - equity);
+            if (drawdownEur > maxEquityDrawdownEur) {
+                maxEquityDrawdownEur = drawdownEur;
+                maxEquityDrawdownPercent = drawdownEur / nextEquityHwm * 100.0;
+            }
+        }
+
+        return new double[] {
+                nextBalanceHwm,
+                nextEquityHwm,
+                maxBalanceDrawdownEur,
+                maxBalanceDrawdownPercent,
+                maxEquityDrawdownEur,
+                maxEquityDrawdownPercent
+        };
+    }
+
+    static record AccountDrawdownMetrics(
+            double drawdownEur,
+            double drawdownPercent,
+            double equityDrawdownEur,
+            double equityDrawdownPercent) {
+        private static final AccountDrawdownMetrics ZERO =
+                new AccountDrawdownMetrics(0.0, 0.0, 0.0, 0.0);
     }
 
     private final Object dailyProfitLock = new Object();
@@ -1333,6 +1428,7 @@ public class AccountManager {
         // Initialize/update caches
         cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
         cachedMaxDrawdownPct.put(accountId, 0.0);
+        cachedAccountDrawdowns.put(accountId, AccountDrawdownMetrics.ZERO);
         refreshDailyProfitForAccount(accountId);
     }
 

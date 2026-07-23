@@ -463,27 +463,27 @@
 
             <!-- Drawdown Details Modal -->
             <div id="drawdownModal" class="modal">
-                <div class="modal-content" style="max-width: 1400px; width: calc(100% - 48px); margin: 3vh auto;">
+                <div class="modal-content" style="max-width: 1600px; width: calc(100% - 48px); margin: 3vh auto;">
                     <span class="close-modal" onclick="closeDrawdownModal()">×</span>
                     <h2>📉 Drawdown Detail-Monitor (Alle Accounts)</h2>
                     <div style="margin-top: 20px; overflow: auto; max-height: 78vh;">
-                        <table style="width: 100%; min-width: 1120px; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums;">
+                        <table style="width: 100%; min-width: 1450px; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums;">
                             <colgroup>
-                                <col style="width: 35%;">
-                                <col style="width: 13%;">
-                                <col style="width: 13%;">
-                                <col style="width: 13%;">
-                                <col style="width: 13%;">
-                                <col style="width: 13%;">
+                                <col style="width: 30%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
                             </colgroup>
                             <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
                                 <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444;">
                                     <th style="padding: 10px;">Account / Magic</th>
-                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Drawdown €</th>
-                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Drawdown %</th>
-                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Equity-Drawdown €</th>
-                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Equity-Drawdown %</th>
-                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Open Profit</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler historischer Rückgang der realisierten Balance vom jeweiligen High-Water-Mark">Max. realisierter DD €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler historischer Rückgang der realisierten Balance in Prozent">Max. realisierter DD %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Account-Zeile: aus der historischen Equity-Kurve. Magic-Zeile: Maximum aus realisiertem Drawdown und aktuellem Equity-Drawdown">Max. Equity-DD €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler Equity-Drawdown in Prozent des zugehörigen High-Water-Marks">Max. Equity-DD %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Aktueller offener Gewinn/Verlust inklusive Open Swap">Floating P/L inkl. Swap</th>
                                 </tr>
                             </thead>
                             <tbody id="drawdown-modal-body">
@@ -2077,7 +2077,7 @@
 
                 Object.values(groups).forEach(groupItems => {
                     const first = groupItems[0];
-                    const totals = groupItems.reduce((sum, item) => {
+                    const fallbackTotals = groupItems.reduce((sum, item) => {
                         const values = itemValues(item);
                         sum.drawdownEur += values.drawdownEur;
                         sum.drawdownPercent += values.drawdownPercent;
@@ -2086,6 +2086,13 @@
                         sum.openProfit += values.openProfit;
                         return sum;
                     }, { drawdownEur: 0, drawdownPercent: 0, equityDrawdownEur: 0, equityDrawdownPercent: 0, openProfit: 0 });
+                    const totals = {
+                        drawdownEur: numberValue(first.accountDrawdownEur ?? fallbackTotals.drawdownEur),
+                        drawdownPercent: numberValue(first.accountDrawdownPercent ?? fallbackTotals.drawdownPercent),
+                        equityDrawdownEur: numberValue(first.accountEquityDrawdownEur ?? fallbackTotals.equityDrawdownEur),
+                        equityDrawdownPercent: numberValue(first.accountEquityDrawdownPercent ?? fallbackTotals.equityDrawdownPercent),
+                        openProfit: numberValue(first.accountOpenProfit ?? fallbackTotals.openProfit)
+                    };
 
                     sectionHtml += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
                         <td style="padding: 12px 15px;">
@@ -2096,7 +2103,7 @@
                                 </a>
                                 ${getLiveDotHtml(first.lastSeenMins, first.lastSeenString, first.worstCopierStage)}
                             </div>
-                            <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Summe der Magic-Strategien</div>
+                            <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Account-HWM aus gemeinsamem Balance-/Equity-Verlauf</div>
                         </td>
                         <td style="padding: 12px 15px; text-align: right; color: ${lossColor(totals.drawdownEur)}; font-weight: bold; font-size: 1.05rem;">${lossText(totals.drawdownEur)}</td>
                         <td style="padding: 12px 15px; text-align: right; color: ${percentColor(totals.drawdownPercent)}; font-weight: bold; font-size: 1.05rem;">${totals.drawdownPercent.toFixed(2)}%</td>

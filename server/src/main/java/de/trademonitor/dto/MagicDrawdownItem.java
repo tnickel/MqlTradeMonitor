@@ -18,6 +18,12 @@ public class MagicDrawdownItem {
     private double equityDrawdownPercent;
     private double openProfit;
 
+    private double accountDrawdownEur;
+    private double accountDrawdownPercent;
+    private double accountEquityDrawdownEur;
+    private double accountEquityDrawdownPercent;
+    private double accountOpenProfit;
+
     private double balanceHigh;
     private double currentMagicEquity; // balance + open profit for this magic
 
@@ -150,6 +156,46 @@ public class MagicDrawdownItem {
 
     public void setOpenProfit(double openProfit) {
         this.openProfit = openProfit;
+    }
+
+    public double getAccountDrawdownEur() {
+        return accountDrawdownEur;
+    }
+
+    public void setAccountDrawdownEur(double accountDrawdownEur) {
+        this.accountDrawdownEur = accountDrawdownEur;
+    }
+
+    public double getAccountDrawdownPercent() {
+        return accountDrawdownPercent;
+    }
+
+    public void setAccountDrawdownPercent(double accountDrawdownPercent) {
+        this.accountDrawdownPercent = accountDrawdownPercent;
+    }
+
+    public double getAccountEquityDrawdownEur() {
+        return accountEquityDrawdownEur;
+    }
+
+    public void setAccountEquityDrawdownEur(double accountEquityDrawdownEur) {
+        this.accountEquityDrawdownEur = accountEquityDrawdownEur;
+    }
+
+    public double getAccountEquityDrawdownPercent() {
+        return accountEquityDrawdownPercent;
+    }
+
+    public void setAccountEquityDrawdownPercent(double accountEquityDrawdownPercent) {
+        this.accountEquityDrawdownPercent = accountEquityDrawdownPercent;
+    }
+
+    public double getAccountOpenProfit() {
+        return accountOpenProfit;
+    }
+
+    public void setAccountOpenProfit(double accountOpenProfit) {
+        this.accountOpenProfit = accountOpenProfit;
     }
 
     public double getBalanceHigh() {

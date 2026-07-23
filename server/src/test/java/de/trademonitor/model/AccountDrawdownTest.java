@@ -21,6 +21,7 @@ class AccountDrawdownTest {
         openTrade.setTicket(3L);
         openTrade.setMagicNumber(42L);
         openTrade.setProfit(-100.0);
+        openTrade.setSwap(-12.26);
         openTrade.setComment("Strategy 42");
         account.setOpenTrades(List.of(openTrade));
 
@@ -28,9 +29,10 @@ class AccountDrawdownTest {
 
         assertEquals(40.0, result.getMaxDrawdownEur(), 0.001);
         assertEquals(40.0 / 1100.0 * 100.0, result.getMaxDrawdownPercent(), 0.001);
-        assertEquals(140.0, result.getMaxEquityDrawdownEur(), 0.001);
-        assertEquals(140.0 / 1100.0 * 100.0, result.getMaxEquityDrawdownPercent(), 0.001);
+        assertEquals(152.26, result.getMaxEquityDrawdownEur(), 0.001);
+        assertEquals(152.26 / 1100.0 * 100.0, result.getMaxEquityDrawdownPercent(), 0.001);
         assertEquals(-100.0, result.getOpenProfit(), 0.001);
+        assertEquals(-12.26, result.getOpenSwap(), 0.001);
     }
 
     private static ClosedTrade closedTrade(long ticket, long magicNumber, String closeTime, double profit) {
