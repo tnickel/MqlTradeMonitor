@@ -1063,6 +1063,11 @@ public class AccountManager {
                 }
             }
 
+            Map<Long, de.trademonitor.dto.MagicProfitEntry> drawdownMetricsByMagic = new HashMap<>();
+            for (de.trademonitor.dto.MagicProfitEntry metrics : account.getMagicProfitEntries(0, 0, null)) {
+                drawdownMetricsByMagic.put(metrics.getMagicNumber(), metrics);
+            }
+
             // 3. Create Items
             for (Map.Entry<Long, Double> entry : magicOpenPL.entrySet()) {
                 Long magic = entry.getKey();
@@ -1094,6 +1099,15 @@ public class AccountManager {
                         referenceBalance,
                         openPL);
                 item.setCurrentMagicEquity(openPL);
+                item.setOpenProfit(openPL);
+
+                de.trademonitor.dto.MagicProfitEntry metrics = drawdownMetricsByMagic.get(magic);
+                if (metrics != null) {
+                    item.setDrawdownEur(metrics.getMaxDrawdownEur());
+                    item.setDrawdownPercent(metrics.getMaxDrawdownPercent());
+                    item.setEquityDrawdownEur(metrics.getMaxEquityDrawdownEur());
+                    item.setEquityDrawdownPercent(metrics.getMaxEquityDrawdownPercent());
+                }
 
                 Long lastSeenMins = null;
                 if (account.getLastSeen() != null) {

@@ -463,17 +463,27 @@
 
             <!-- Drawdown Details Modal -->
             <div id="drawdownModal" class="modal">
-                <div class="modal-content" style="max-width: 800px; width: 90%;">
+                <div class="modal-content" style="max-width: 1400px; width: calc(100% - 48px); margin: 3vh auto;">
                     <span class="close-modal" onclick="closeDrawdownModal()">×</span>
                     <h2>📉 Drawdown Detail-Monitor (Alle Accounts)</h2>
-                    <div style="margin-top: 20px; overflow-y: auto; max-height: 70vh;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <div style="margin-top: 20px; overflow: auto; max-height: 78vh;">
+                        <table style="width: 100%; min-width: 1120px; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums;">
+                            <colgroup>
+                                <col style="width: 35%;">
+                                <col style="width: 13%;">
+                                <col style="width: 13%;">
+                                <col style="width: 13%;">
+                                <col style="width: 13%;">
+                                <col style="width: 13%;">
+                            </colgroup>
                             <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
                                 <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444;">
                                     <th style="padding: 10px;">Account / Magic</th>
-                                    <th style="padding: 10px; text-align: right;">Drawdown €</th>
-                                    <th style="padding: 10px; text-align: right;">Drawdown %</th>
-                                    <th style="padding: 10px; text-align: right;">Open Profit</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Drawdown €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Drawdown %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Equity-Drawdown €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Equity-Drawdown %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;">Open Profit</th>
                                 </tr>
                             </thead>
                             <tbody id="drawdown-modal-body">
@@ -2002,238 +2012,121 @@
             if (!tbody) return;
 
             if (currentDrawdownItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
                 return;
             }
 
-            let html = '';
-
             const realItems = currentDrawdownItems.filter(i => i.real);
             const demoItems = currentDrawdownItems.filter(i => !i.real);
-
-            // Group REAL items by accountName
-            const realGroups = {};
-            realItems.forEach(item => {
-                if (!realGroups[item.accountName]) {
-                    realGroups[item.accountName] = [];
-                }
-                realGroups[item.accountName].push(item);
+            const numberValue = value => {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+            const itemValues = item => ({
+                drawdownEur: numberValue(item.drawdownEur ?? item.currentDrawdownEur),
+                drawdownPercent: numberValue(item.drawdownPercent ?? item.currentDrawdownPercent),
+                equityDrawdownEur: numberValue(item.equityDrawdownEur ?? item.currentDrawdownEur),
+                equityDrawdownPercent: numberValue(item.equityDrawdownPercent ?? item.currentDrawdownPercent),
+                openProfit: numberValue(item.openProfit ?? item.currentMagicEquity)
             });
+            const escapeDrawdownText = value => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+            const lossText = value => `${value > 0 ? '-' : ''}${Math.abs(value).toFixed(2)} €`;
+            const percentColor = value => value > 10 ? '#ef4444' : (value > 5 ? '#e0af68' : '#bbb');
+            const lossColor = value => value > 0 ? '#ef4444' : '#ccc';
+            const profitText = value => `${value > 0 ? '+' : ''}${value.toFixed(2)} €`;
 
-            // Render REAL groups
-            if (realItems.length > 0) {
-                html += `
-                        <!-- Real Header -->
-                        <tr>
-                            <td colspan="4" style="padding: 0; border-bottom: none;">
-                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #10b981; border-bottom: 1px solid rgba(16,185,129,0.2);">
-                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(16,185,129,0.5));">🛡️</span>
-                                    <span style="font-weight: 800; color: #34d399; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(16,185,129,0.3);">REAL ACCOUNTS</span>
-                                </div>
-                            </td>
-                        </tr>`;
+            function renderSection(items, isReal, showSeparator) {
+                if (items.length === 0) return '';
 
-                for (const accountName in realGroups) {
-                    const groupItems = realGroups[accountName];
-
-                    // Calculate sums
-                    let sumDdEur = 0;
-                    let sumProfit = 0;
-                    let refBalance = 0;
-
-                    groupItems.forEach(item => {
-                        sumDdEur += item.currentDrawdownEur || 0;
-                        sumProfit += item.currentMagicEquity || 0;
-                        // Grab the balance from the first item (should be the same for all on the same account)
-                        if (refBalance === 0 && item.referenceBalance) {
-                            refBalance = item.referenceBalance;
-                        }
-                    });
-
-                    // Calculate correct overall percentage
-                    let sumDdPct = 0;
-                    if (refBalance > 0 && sumDdEur > 0) {
-                        sumDdPct = (sumDdEur / refBalance) * 100;
-                    }
-
-                    // Render Group Header
-                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
-                                <td style="padding: 12px 15px;">
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span class="account-type-badge real" style="padding: 2px 5px;">REAL</span>
-                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
-                                            ${accountName}
-                                        </a>
-                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString, groupItems[0].worstCopierStage) : ''}
-                                    </div>
-                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
-                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
-                                        ${sumDdPct.toFixed(2)}%
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
-                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
-                                </td>
-                            </tr>`;
-
-                    // Render items in this group
-                    groupItems.forEach(item => {
-                        const ddEur = item.currentDrawdownEur;
-                        const ddPct = item.currentDrawdownPercent;
-                        const equity = item.currentMagicEquity;
-
-                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
-                                    <td style="padding: 8px 10px 8px 30px;">
-                                        <div style="font-size:0.9rem; color: #ccc;">
-                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
-                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
-                                            ${ddPct.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
-                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
-                                        </div>
-                                    </td>
-                                </tr>`;
-                    });
-                }
-            }
-
-            // Render DEMO items normally -> now grouped as well
-            if (demoItems.length > 0) {
-                html += `
-                        <!-- Visual Separator -->
-                        <tr>
-                            <td colspan="4" style="padding: 30px 0 20px 0; border: none;">
-                                <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
-                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);"></div>
-                                    <div style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;"></div>
-                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);"></div>
-                                </div>
-                            </td>
-                        </tr>
-                        <!-- Demo Header -->
-                        <tr>
-                            <td colspan="4" style="padding: 0; border-bottom: none;">
-                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(148,163,184,0.1) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.2);">
-                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(148,163,184,0.5));">📉</span>
-                                    <span style="font-weight: 800; color: #94a3b8; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(148,163,184,0.3);">DEMO ACCOUNTS</span>
-                                </div>
-                            </td>
-                        </tr>`;
-
-                // Group DEMO items by accountName
-                const demoGroups = {};
-                demoItems.forEach(item => {
-                    if (!demoGroups[item.accountName]) {
-                        demoGroups[item.accountName] = [];
-                    }
-                    demoGroups[item.accountName].push(item);
+                const groups = {};
+                items.forEach(item => {
+                    const key = `${item.accountId}:${item.accountName}`;
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
                 });
 
-                for (const accountName in demoGroups) {
-                    const groupItems = demoGroups[accountName];
+                const accent = isReal ? '#10b981' : '#94a3b8';
+                const accentText = isReal ? '#34d399' : '#94a3b8';
+                const label = isReal ? 'REAL ACCOUNTS' : 'DEMO ACCOUNTS';
+                const icon = isReal ? '🛡️' : '📉';
+                let sectionHtml = showSeparator ? `
+                    <tr>
+                        <td colspan="6" style="padding: 30px 0 20px 0; border: none;">
+                            <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                                <div style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);"></div>
+                                <div style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;"></div>
+                                <div style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);"></div>
+                            </div>
+                        </td>
+                    </tr>` : '';
 
-                    // Calculate sums
-                    let sumDdEur = 0;
-                    let sumProfit = 0;
-                    let refBalance = 0;
+                sectionHtml += `
+                    <tr>
+                        <td colspan="6" style="padding: 0; border-bottom: none;">
+                            <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, ${isReal ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.1)'} 0%, rgba(30,30,46,0) 100%); border-left: 4px solid ${accent}; border-bottom: 1px solid ${isReal ? 'rgba(16,185,129,0.2)' : 'rgba(148,163,184,0.2)'};">
+                                <span style="font-size: 1.2rem; margin-right: 12px;">${icon}</span>
+                                <span style="font-weight: 800; color: ${accentText}; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase;">${label}</span>
+                            </div>
+                        </td>
+                    </tr>`;
+
+                Object.values(groups).forEach(groupItems => {
+                    const first = groupItems[0];
+                    const totals = groupItems.reduce((sum, item) => {
+                        const values = itemValues(item);
+                        sum.drawdownEur += values.drawdownEur;
+                        sum.drawdownPercent += values.drawdownPercent;
+                        sum.equityDrawdownEur += values.equityDrawdownEur;
+                        sum.equityDrawdownPercent += values.equityDrawdownPercent;
+                        sum.openProfit += values.openProfit;
+                        return sum;
+                    }, { drawdownEur: 0, drawdownPercent: 0, equityDrawdownEur: 0, equityDrawdownPercent: 0, openProfit: 0 });
+
+                    sectionHtml += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
+                        <td style="padding: 12px 15px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="account-type-badge ${isReal ? 'real' : 'demo'}" style="padding: 2px 5px;">${isReal ? 'REAL' : 'DEMO'}</span>
+                                <a href="/account/${encodeURIComponent(first.accountId)}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5);">
+                                    ${escapeDrawdownText(first.accountName)}
+                                </a>
+                                ${getLiveDotHtml(first.lastSeenMins, first.lastSeenString, first.worstCopierStage)}
+                            </div>
+                            <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Summe der Magic-Strategien</div>
+                        </td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${lossColor(totals.drawdownEur)}; font-weight: bold; font-size: 1.05rem;">${lossText(totals.drawdownEur)}</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${percentColor(totals.drawdownPercent)}; font-weight: bold; font-size: 1.05rem;">${totals.drawdownPercent.toFixed(2)}%</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${lossColor(totals.equityDrawdownEur)}; font-weight: bold; font-size: 1.05rem;">${lossText(totals.equityDrawdownEur)}</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${percentColor(totals.equityDrawdownPercent)}; font-weight: bold; font-size: 1.05rem;">${totals.equityDrawdownPercent.toFixed(2)}%</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${totals.openProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.05rem;">${profitText(totals.openProfit)}</td>
+                    </tr>`;
 
                     groupItems.forEach(item => {
-                        sumDdEur += item.currentDrawdownEur || 0;
-                        sumProfit += item.currentMagicEquity || 0;
-                        if (refBalance === 0 && item.referenceBalance) {
-                            refBalance = item.referenceBalance;
-                        }
+                        const values = itemValues(item);
+                        sectionHtml += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
+                            <td style="padding: 8px 10px 8px 30px;">
+                                <div style="font-size:0.9rem; color: #ccc;">
+                                    Magic <b>${escapeDrawdownText(item.magicNumber)}</b> <span style="color:#888;">&mdash; ${escapeDrawdownText(item.magicName)}</span>
+                                </div>
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${lossColor(values.drawdownEur)};">${lossText(values.drawdownEur)}</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${percentColor(values.drawdownPercent)};">${values.drawdownPercent.toFixed(2)}%</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${lossColor(values.equityDrawdownEur)};">${lossText(values.equityDrawdownEur)}</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${percentColor(values.equityDrawdownPercent)};">${values.equityDrawdownPercent.toFixed(2)}%</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${values.openProfit >= 0 ? '#10b981' : '#ef4444'};">${profitText(values.openProfit)}</td>
+                        </tr>`;
                     });
+                });
 
-                    let sumDdPct = 0;
-                    if (refBalance > 0 && sumDdEur > 0) {
-                        sumDdPct = (sumDdEur / refBalance) * 100;
-                    }
-
-                    // Render Group Header
-                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
-                                <td style="padding: 12px 15px;">
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span class="account-type-badge demo" style="padding: 2px 5px;">DEMO</span>
-                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
-                                            ${accountName}
-                                        </a>
-                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString) : ''}
-                                    </div>
-                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
-                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
-                                        ${sumDdPct.toFixed(2)}%
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
-                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
-                                </td>
-                            </tr>`;
-
-                    // Render items in this group
-                    groupItems.forEach(item => {
-                        const ddEur = item.currentDrawdownEur;
-                        const ddPct = item.currentDrawdownPercent;
-                        const equity = item.currentMagicEquity;
-
-                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
-                                    <td style="padding: 8px 10px 8px 30px;">
-                                        <div style="font-size:0.9rem; color: #ccc;">
-                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
-                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
-                                            ${ddPct.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
-                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
-                                        </div>
-                                    </td>
-                                </tr>`;
-                    });
-                }
+                return sectionHtml;
             }
 
-            tbody.innerHTML = html;
+            tbody.innerHTML = renderSection(realItems, true, false)
+                + renderSection(demoItems, false, realItems.length > 0);
         }
 
         // Close modal when clicking outside

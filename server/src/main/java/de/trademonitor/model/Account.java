@@ -535,20 +535,19 @@ public class Account {
                 }
             }
 
-            // Prevent double-counting of single loss in max equity drawdown.
-            // Since we don't have true MAE, realized max drawdown is currently
-            // the most accurate baseline without inflating the values artificially.
+            // Balance drawdown only uses realized trades. Equity drawdown starts with
+            // that realized baseline and may additionally include the current floating
+            // result. Keeping the two peaks separate prevents an open loss from being
+            // reported as realized drawdown as well.
             double estimatedMaxEquityDrawdownEur = maxDrawdownEur;
+            double peakAtMaxEquityDrawdown = peakAtMaxDrawdown;
 
             // Include currently open net profit in max drawdown consideration if applicable
             double currentTotalMagicProfit = cumulativeProfit + openProfit + openSwap;
             double currentOpenDrawdown = highWaterMark - currentTotalMagicProfit;
-            if (currentOpenDrawdown > maxDrawdownEur) {
-                maxDrawdownEur = currentOpenDrawdown;
-                peakAtMaxDrawdown = highWaterMark;
-            }
             if (currentOpenDrawdown > estimatedMaxEquityDrawdownEur) {
                 estimatedMaxEquityDrawdownEur = currentOpenDrawdown;
+                peakAtMaxEquityDrawdown = highWaterMark;
             }
 
             // Calculate % relative to peak equity at the time of the max drawdown
@@ -557,11 +556,14 @@ public class Account {
             double maxEquityDrawdownPercent = 0.0;
             double doublePnl = localClosedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
             double netDeposits = this.balance - doublePnl;
-            double denominator = netDeposits + peakAtMaxDrawdown;
+            double drawdownDenominator = netDeposits + peakAtMaxDrawdown;
+            double equityDrawdownDenominator = netDeposits + peakAtMaxEquityDrawdown;
 
-            if (denominator > 0) {
-                maxDrawdownPercent = (maxDrawdownEur / denominator) * 100.0;
-                maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / denominator) * 100.0;
+            if (drawdownDenominator > 0) {
+                maxDrawdownPercent = (maxDrawdownEur / drawdownDenominator) * 100.0;
+            }
+            if (equityDrawdownDenominator > 0) {
+                maxEquityDrawdownPercent = (estimatedMaxEquityDrawdownEur / equityDrawdownDenominator) * 100.0;
             }
             
             double magicTotalProfit = openProfit + closedProfit + totalSwap + totalCommission;

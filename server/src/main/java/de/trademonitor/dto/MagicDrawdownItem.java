@@ -12,6 +12,12 @@ public class MagicDrawdownItem {
     private double currentDrawdownEur;
     private double currentDrawdownPercent;
 
+    private double drawdownEur;
+    private double drawdownPercent;
+    private double equityDrawdownEur;
+    private double equityDrawdownPercent;
+    private double openProfit;
+
     private double balanceHigh;
     private double currentMagicEquity; // balance + open profit for this magic
 
@@ -31,6 +37,11 @@ public class MagicDrawdownItem {
         this.magicName = magicName;
         this.currentDrawdownEur = ddEur;
         this.currentDrawdownPercent = ddPercent;
+        this.drawdownEur = ddEur;
+        this.drawdownPercent = ddPercent;
+        this.equityDrawdownEur = ddEur;
+        this.equityDrawdownPercent = ddPercent;
+        this.openProfit = currentMagicEq;
         this.balanceHigh = balanceHigh;
         this.currentMagicEquity = currentMagicEq;
     }
@@ -99,6 +110,46 @@ public class MagicDrawdownItem {
 
     public void setCurrentDrawdownPercent(double currentDrawdownPercent) {
         this.currentDrawdownPercent = currentDrawdownPercent;
+    }
+
+    public double getDrawdownEur() {
+        return drawdownEur;
+    }
+
+    public void setDrawdownEur(double drawdownEur) {
+        this.drawdownEur = drawdownEur;
+    }
+
+    public double getDrawdownPercent() {
+        return drawdownPercent;
+    }
+
+    public void setDrawdownPercent(double drawdownPercent) {
+        this.drawdownPercent = drawdownPercent;
+    }
+
+    public double getEquityDrawdownEur() {
+        return equityDrawdownEur;
+    }
+
+    public void setEquityDrawdownEur(double equityDrawdownEur) {
+        this.equityDrawdownEur = equityDrawdownEur;
+    }
+
+    public double getEquityDrawdownPercent() {
+        return equityDrawdownPercent;
+    }
+
+    public void setEquityDrawdownPercent(double equityDrawdownPercent) {
+        this.equityDrawdownPercent = equityDrawdownPercent;
+    }
+
+    public double getOpenProfit() {
+        return openProfit;
+    }
+
+    public void setOpenProfit(double openProfit) {
+        this.openProfit = openProfit;
     }
 
     public double getBalanceHigh() {
