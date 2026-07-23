@@ -21,9 +21,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 public class TradeController {
 
     private final ExportService exportService;
+    private final de.trademonitor.service.AccountAccessService accountAccessService;
 
-    public TradeController(ExportService exportService) {
+    public TradeController(ExportService exportService,
+            de.trademonitor.service.AccountAccessService accountAccessService) {
         this.exportService = exportService;
+        this.accountAccessService = accountAccessService;
     }
 
     @GetMapping("/export/csv")
@@ -36,7 +39,8 @@ public class TradeController {
         if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             csv = exportService.exportAllTradesToCsv();
         } else {
-            java.util.Set<Long> allowedIds = userDetails.getUserEntity().getAllowedAccountIds();
+            java.util.Set<Long> allowedIds =
+                    accountAccessService.getAccessibleAccountIds(userDetails.getUserEntity());
             csv = exportService.exportUserTradesToCsv(allowedIds);
         }
 
@@ -58,9 +62,7 @@ public class TradeController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        boolean isAdmin = "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
-        java.util.Set<Long> allowedIds = userDetails.getUserEntity().getAllowedAccountIds();
-        if (!isAdmin && (allowedIds == null || !allowedIds.contains(accountId))) {
+        if (!accountAccessService.canAccess(userDetails.getUserEntity(), accountId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 

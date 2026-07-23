@@ -14,6 +14,8 @@ object ApiClient {
     private var retrofit: Retrofit? = null
     private var apiService: TradeMonitorApi? = null
     private var currentUrl: String = ""
+    @Volatile private var csrfToken: String? = null
+    @Volatile private var csrfHeader: String = "X-CSRF-TOKEN"
 
     // In-memory cookie jar that stores and sends cookies automatically
     private val cookieJar = object : CookieJar {
@@ -61,22 +63,42 @@ object ApiClient {
             .apply()
         
         cookieJar.clear() // Clear old cookies when switching server
+        csrfToken = null
         initialize(formattedUrl)
     }
 
     fun clearSession() {
         cookieJar.clear()
+        csrfToken = null
+    }
+
+    fun updateCsrfToken(loginResponse: de.trademonitor.app.model.LoginResponse?) {
+        csrfToken = loginResponse?.csrfToken
+        csrfHeader = loginResponse?.csrfHeader ?: "X-CSRF-TOKEN"
     }
 
     private fun initialize(baseUrl: String) {
         currentUrl = baseUrl
         
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS
+            redactHeader("Cookie")
+            redactHeader("Set-Cookie")
+            redactHeader("X-CSRF-TOKEN")
+            level = HttpLoggingInterceptor.Level.NONE
         }
 
         val okHttpClient = OkHttpClient.Builder()
             .cookieJar(cookieJar)
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val method = request.method.uppercase()
+                val token = csrfToken
+                if (token != null && method !in setOf("GET", "HEAD", "OPTIONS", "TRACE")) {
+                    chain.proceed(request.newBuilder().header(csrfHeader, token).build())
+                } else {
+                    chain.proceed(request)
+                }
+            }
             .addInterceptor(loggingInterceptor)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)

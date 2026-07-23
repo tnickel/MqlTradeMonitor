@@ -6,7 +6,9 @@ data class LoginRequest(
 )
 
 data class LoginResponse(
-    val message: String
+    val message: String,
+    val csrfToken: String? = null,
+    val csrfHeader: String? = null
 )
 
 data class Account(
@@ -154,4 +156,3 @@ data class IpCount(
     val ip: String?,
     val count: Int
 )
-

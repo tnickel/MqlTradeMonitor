@@ -71,6 +71,9 @@ public class UserController {
     @Autowired
     private de.trademonitor.service.AccountManager accountManager;
 
+    @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
+
     @GetMapping("/app-config")
     public String showAppConfig(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails == null) {
@@ -87,15 +90,9 @@ public class UserController {
         if ("ROLE_ADMIN".equals(user.getRole())) {
             allowedAccounts.addAll(accountManager.getAllAccounts());
         } else {
-            java.util.Set<Long> allowedIds = user.getAllowedAccountIds();
-            if (allowedIds != null) {
-                for (Long id : allowedIds) {
-                    de.trademonitor.model.Account acc = accountManager.getAccount(id);
-                    if (acc != null) {
-                        allowedAccounts.add(acc);
-                    }
-                }
-            }
+            accountManager.getAllAccounts().stream()
+                    .filter(acc -> accountAccessService.canAccess(user, acc.getAccountId()))
+                    .forEach(allowedAccounts::add);
         }
         
         // Sort accounts by account ID or name
@@ -128,7 +125,10 @@ public class UserController {
                     allowedIds.add(acc.getAccountId());
                 }
             } else if (user.getAllowedAccountIds() != null) {
-                allowedIds.addAll(user.getAllowedAccountIds());
+                java.util.Set<Long> accessible = accountAccessService.getAccessibleAccountIds(user);
+                if (accessible != null) {
+                    allowedIds.addAll(accessible);
+                }
             }
             
             java.util.Set<Long> forcedReal = new java.util.HashSet<>();

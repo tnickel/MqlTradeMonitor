@@ -97,11 +97,9 @@ public class DashboardController {
     private boolean isAllowedAccess(CustomUserDetails userDetails, long accountId) {
         if (userDetails == null)
             return false;
-        if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole()))
-            return true;
         UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
                 .orElse(userDetails.getUserEntity());
-        return user.getAllowedAccountIds() != null && user.getAllowedAccountIds().contains(accountId);
+        return accountAccessService.canAccess(user, accountId);
     }
 
     /**
@@ -118,11 +116,14 @@ public class DashboardController {
             return null;
         UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
                 .orElse(userDetails.getUserEntity());
-        return user.getAllowedAccountIds();
+        return accountAccessService.getAccessibleAccountIds(user);
     }
 
     @Autowired
     private AccountManager accountManager;
+
+    @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
 
     @Autowired
     private ClosedTradeRepository closedTradeRepository;
@@ -243,11 +244,12 @@ public class DashboardController {
 
         // Filter by user permissions
         if (userDetails != null && !isAdmin) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             allAccounts = allAccounts.stream()
                     .filter(acc -> {
                         Long id = (Long) acc.get("accountId");
-                        return id != null && allowed.contains(id);
+                        return id != null && accountAccessService.canAccess(user, id);
                     })
                     .collect(Collectors.toList());
         }
@@ -389,9 +391,10 @@ public class DashboardController {
 
         // Filter by user permissions
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             sortedAccounts = sortedAccounts.stream()
-                    .filter(acc -> allowed.contains(acc.getAccountId()))
+                    .filter(acc -> accountAccessService.canAccess(user, acc.getAccountId()))
                     .collect(Collectors.toList());
         }
 
@@ -878,10 +881,10 @@ public class DashboardController {
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
                     .orElse(userDetails.getUserEntity());
-            Set<Long> allowed = user.getAllowedAccountIds();
             return trades.stream()
                     .filter(t -> t.get("accountId") != null
-                            && allowed.contains(((Number) t.get("accountId")).longValue()))
+                            && accountAccessService.canAccess(
+                                    user, ((Number) t.get("accountId")).longValue()))
                     .collect(Collectors.toList());
         }
         return trades;
@@ -903,12 +906,22 @@ public class DashboardController {
             
             if ("ROLE_ADMIN".equals(user.getRole())) {
                 return drawdowns.stream()
-                        .filter(d -> !hasConfig || user.getRealAccountIds().contains(d.getAccountId()) || user.getDemoAccountIds().contains(d.getAccountId()))
+                        .filter(d -> {
+                            long physicalId = accountAccessService.getPhysicalAccountId(d.getAccountId());
+                            return !hasConfig
+                                    || user.getRealAccountIds().contains(d.getAccountId())
+                                    || user.getRealAccountIds().contains(physicalId)
+                                    || user.getDemoAccountIds().contains(d.getAccountId())
+                                    || user.getDemoAccountIds().contains(physicalId);
+                        })
                         .map(d -> {
-                            if (user.getRealAccountIds().contains(d.getAccountId())) {
+                            long physicalId = accountAccessService.getPhysicalAccountId(d.getAccountId());
+                            if (user.getRealAccountIds().contains(d.getAccountId())
+                                    || user.getRealAccountIds().contains(physicalId)) {
                                 d.setAccountType("REAL");
                                 d.setReal(true);
-                            } else if (user.getDemoAccountIds().contains(d.getAccountId())) {
+                            } else if (user.getDemoAccountIds().contains(d.getAccountId())
+                                    || user.getDemoAccountIds().contains(physicalId)) {
                                 d.setAccountType("DEMO");
                                 d.setReal(false);
                             }
@@ -916,19 +929,25 @@ public class DashboardController {
                         })
                         .collect(Collectors.toList());
             } else {
-                Set<Long> allowed = user.getAllowedAccountIds();
                 return drawdowns.stream()
                         .filter(d -> {
-                            boolean isAllowed = allowed.contains(d.getAccountId());
+                            boolean isAllowed = accountAccessService.canAccess(user, d.getAccountId());
                             if (!hasConfig) return isAllowed;
-                            boolean isExplicit = user.getRealAccountIds().contains(d.getAccountId()) || user.getDemoAccountIds().contains(d.getAccountId());
+                            long physicalId = accountAccessService.getPhysicalAccountId(d.getAccountId());
+                            boolean isExplicit = user.getRealAccountIds().contains(d.getAccountId())
+                                    || user.getRealAccountIds().contains(physicalId)
+                                    || user.getDemoAccountIds().contains(d.getAccountId())
+                                    || user.getDemoAccountIds().contains(physicalId);
                             return isAllowed && isExplicit;
                         })
                         .map(d -> {
-                            if (user.getRealAccountIds().contains(d.getAccountId())) {
+                            long physicalId = accountAccessService.getPhysicalAccountId(d.getAccountId());
+                            if (user.getRealAccountIds().contains(d.getAccountId())
+                                    || user.getRealAccountIds().contains(physicalId)) {
                                 d.setAccountType("REAL");
                                 d.setReal(true);
-                            } else if (user.getDemoAccountIds().contains(d.getAccountId())) {
+                            } else if (user.getDemoAccountIds().contains(d.getAccountId())
+                                    || user.getDemoAccountIds().contains(physicalId)) {
                                 d.setAccountType("DEMO");
                                 d.setReal(false);
                             }
@@ -1438,11 +1457,12 @@ public class DashboardController {
         List<Map<String, Object>> accounts = accountManager.getAccountsWithStatus();
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             accounts = accounts.stream()
                     .filter(acc -> {
                         Long id = (Long) acc.get("accountId");
-                        return id != null && allowed.contains(id);
+                        return id != null && accountAccessService.canAccess(user, id);
                     })
                     .collect(Collectors.toList());
         }
@@ -1676,11 +1696,12 @@ public class DashboardController {
                 .collect(Collectors.toList());
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             accounts = accounts.stream()
                     .filter(acc -> {
                         Long id = (Long) acc.get("accountId");
-                        return id != null && allowed.contains(id);
+                        return id != null && accountAccessService.canAccess(user, id);
                     })
                     .collect(Collectors.toList());
         }
@@ -1801,11 +1822,12 @@ public class DashboardController {
                 .collect(Collectors.toList());
 
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             accounts = accounts.stream()
                     .filter(acc -> {
                         Long id = (Long) acc.get("accountId");
-                        return id != null && allowed.contains(id);
+                        return id != null && accountAccessService.canAccess(user, id);
                     })
                     .collect(Collectors.toList());
         }
@@ -1934,10 +1956,8 @@ public class DashboardController {
         if (userDetails != null && !"ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             UserEntity currentUser = userService.getUserById(userDetails.getUserEntity().getId())
                     .orElse(userDetails.getUserEntity());
-            Set<Long> allowed = currentUser.getAllowedAccountIds() == null
-                    ? Collections.emptySet() : currentUser.getAllowedAccountIds();
             allAccounts = allAccounts.stream()
-                    .filter(a -> allowed.contains(a.getAccountId()))
+                    .filter(a -> accountAccessService.canAccess(currentUser, a.getAccountId()))
                     .collect(Collectors.toList());
         }
 
@@ -1978,11 +1998,12 @@ public class DashboardController {
                 .filter(acc -> !"CSV".equalsIgnoreCase((String) acc.get("type")))
                 .collect(Collectors.toList());
         if (!isAdmin && userDetails != null) {
-            Set<Long> allowed = userDetails.getUserEntity().getAllowedAccountIds();
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
             accounts = accounts.stream()
                     .filter(acc -> {
                         Long id = (Long) acc.get("accountId");
-                        return id != null && allowed.contains(id);
+                        return id != null && accountAccessService.canAccess(user, id);
                     })
                     .collect(Collectors.toList());
         }
@@ -2461,18 +2482,16 @@ public class DashboardController {
 
         Set<Long> selectedIds = user.getNewsAccountIds();
         boolean isAdmin = "ROLE_ADMIN".equals(user.getRole());
-        Set<Long> allowedIds = user.getAllowedAccountIds();
-
         List<Long> targetAccountIds = new ArrayList<>();
         if (selectedIds == null || selectedIds.isEmpty()) {
             for (de.trademonitor.model.Account acc : accountManager.getAllAccounts()) {
-                if (acc.isMonitored() && (isAdmin || allowedIds.contains(acc.getAccountId()))) {
+                if (acc.isMonitored() && (isAdmin || accountAccessService.canAccess(user, acc.getAccountId()))) {
                     targetAccountIds.add(acc.getAccountId());
                 }
             }
         } else {
             for (Long id : selectedIds) {
-                if (isAdmin || allowedIds.contains(id)) {
+                if (isAdmin || accountAccessService.canAccess(user, id)) {
                     targetAccountIds.add(id);
                 }
             }
@@ -2657,12 +2676,11 @@ public class DashboardController {
         if ("ROLE_ADMIN".equals(userDetails.getUserEntity().getRole())) {
             allAllowedAccounts = accountManager.getAllAccounts();
         } else {
-            for (long allowedId : userDetails.getUserEntity().getAllowedAccountIds()) {
-                Account acc = accountManager.getAccount(allowedId);
-                if (acc != null) {
-                    allAllowedAccounts.add(acc);
-                }
-            }
+            UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                    .orElse(userDetails.getUserEntity());
+            allAllowedAccounts = accountManager.getAllAccounts().stream()
+                    .filter(acc -> accountAccessService.canAccess(user, acc.getAccountId()))
+                    .collect(Collectors.toList());
         }
         
         Account refAcc = accountManager.getAccount(accountId);
@@ -2834,14 +2852,11 @@ public class DashboardController {
     @GetMapping("/account/{accountId}/info-area")
     public String getAccountInfo(@AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable long accountId, Model model) {
-        System.out.println("[DEBUG-INFO-AREA] Request received for account " + accountId + ". UserDetails: " + (userDetails != null ? userDetails.getUsername() : "NULL"));
         if (!isAllowedAccess(userDetails, accountId)) {
-            System.out.println("[DEBUG-INFO-AREA] Access denied for user to account " + accountId);
             return "redirect:/";
         }
         Account account = accountManager.getAccount(accountId);
         if (account == null) {
-            System.out.println("[DEBUG-INFO-AREA] Account not found: " + accountId);
             return "redirect:/";
         }
         model.addAttribute("account", account);

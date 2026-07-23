@@ -838,7 +838,9 @@ public class GlobalConfigService {
 
     public void saveTelegramConfig(boolean enabled, String botToken, String chatId) {
         this.cachedTelegramEnabled = enabled;
-        this.cachedTelegramBotToken = botToken != null ? botToken.trim() : "";
+        if (botToken != null && !botToken.trim().isEmpty()) {
+            this.cachedTelegramBotToken = botToken.trim();
+        }
         this.cachedTelegramChatId = chatId != null ? chatId.trim() : "";
 
         repository.save(new GlobalConfigEntity(KEY_TELEGRAM_ENABLED, String.valueOf(this.cachedTelegramEnabled)));

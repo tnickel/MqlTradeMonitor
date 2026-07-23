@@ -3,6 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <script th:src="@{/js/csrf-fetch.js}"></script>
     <title>Admin Dashboard - Trade Monitor</title>
     <style>
         body {
@@ -669,8 +672,9 @@
                     <label for="telegramBotToken" style="color: #8b949e; display: block; margin-bottom: 5px;">
                         Telegram Bot Token
                     </label>
-                    <input type="password" id="telegramBotToken" name="telegramBotToken" th:value="${telegramBotToken}"
-                        placeholder="z.B. 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                    <input type="password" id="telegramBotToken" name="telegramBotToken" value=""
+                        th:placeholder="${telegramBotTokenConfigured} ? 'Token ist gespeichert – leer lassen zum Beibehalten' : 'z.B. 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ'"
+                        autocomplete="new-password"
                         style="width: 100%; background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; box-sizing: border-box;">
                 </div>
                 <div class="form-group">
@@ -840,6 +844,10 @@
                                             th:style="${secH2ConsoleEnabled} ? 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#2ea043;transition:.3s;border-radius:26px;' : 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#30363d;transition:.3s;border-radius:26px;'"></span>
                                     </label>
                                 </div>
+                                <p style="color: #8b949e; font-size: 0.78rem; margin-top: 8px;">
+                                    Zusätzlich müssen Servlet und Datenbankpasswort beim Serverstart per
+                                    Umgebungsvariable aktiviert sein.
+                                </p>
                             </div>
                         </div>
 
@@ -1179,8 +1187,8 @@
                 const token = document.getElementById('telegramBotToken').value;
                 const chatId = document.getElementById('telegramChatId').value;
                 
-                if (!token || !chatId) {
-                    alert('Bitte geben Sie erst Token und Chat-ID ein.');
+                if (!chatId) {
+                    alert('Bitte geben Sie erst eine Chat-ID ein.');
                     return;
                 }
                 

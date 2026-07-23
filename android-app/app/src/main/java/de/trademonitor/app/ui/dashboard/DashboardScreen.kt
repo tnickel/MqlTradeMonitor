@@ -261,7 +261,11 @@ fun DashboardScreen(
                     // Ignore silent errors
                 }
             } catch (e: Exception) {
-                // Ignore silent errors during background refresh
+                if (e is retrofit2.HttpException && e.code() == 401) {
+                    performLogout()
+                    return@LaunchedEffect
+                }
+                // Keep the current data for transient background refresh errors.
             }
         }
     }

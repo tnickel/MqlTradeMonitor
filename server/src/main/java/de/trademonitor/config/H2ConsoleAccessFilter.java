@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -15,9 +16,12 @@ import java.io.IOException;
 public class H2ConsoleAccessFilter extends OncePerRequestFilter {
 
     private final GlobalConfigService configService;
+    private final String databasePassword;
 
-    public H2ConsoleAccessFilter(GlobalConfigService configService) {
+    public H2ConsoleAccessFilter(GlobalConfigService configService,
+            @Value("${spring.datasource.password:}") String databasePassword) {
         this.configService = configService;
+        this.databasePassword = databasePassword;
     }
 
     @Override
@@ -28,7 +32,8 @@ public class H2ConsoleAccessFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        if (!configService.isSecH2ConsoleEnabled()) {
+        if (!configService.isSecH2ConsoleEnabled()
+                || databasePassword == null || databasePassword.isBlank()) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }

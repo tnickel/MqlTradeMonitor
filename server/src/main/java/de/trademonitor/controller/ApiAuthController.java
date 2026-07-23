@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashSet;
@@ -44,7 +45,7 @@ public class ApiAuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials,
-            HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response, CsrfToken csrfToken) {
         if (credentials == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Request body required"));
         }
@@ -71,7 +72,10 @@ public class ApiAuthController {
 
             eventPublisher.publishEvent(new AuthenticationSuccessEvent(auth));
             
-            return ResponseEntity.ok(Map.of("message", "Login successful"));
+            return ResponseEntity.ok(Map.of(
+                    "message", "Login successful",
+                    "csrfToken", csrfToken.getToken(),
+                    "csrfHeader", csrfToken.getHeaderName()));
         } catch (AuthenticationException e) {
             eventPublisher.publishEvent(new AuthenticationFailureBadCredentialsEvent(authReq, e));
             return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
@@ -82,7 +86,8 @@ public class ApiAuthController {
     }
 
     @PostMapping("/demo-login")
-    public ResponseEntity<?> demoLogin(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> demoLogin(HttpServletRequest request, HttpServletResponse response,
+            CsrfToken csrfToken) {
         try {
             String demoUsername = "demouser";
 
@@ -109,7 +114,10 @@ public class ApiAuthController {
             HttpSession session = request.getSession(true);
             session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
 
-            return ResponseEntity.ok(Map.of("message", "Demo login successful"));
+            return ResponseEntity.ok(Map.of(
+                    "message", "Demo login successful",
+                    "csrfToken", csrfToken.getToken(),
+                    "csrfHeader", csrfToken.getHeaderName()));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Demo login failed: " + e.getMessage()));
         }

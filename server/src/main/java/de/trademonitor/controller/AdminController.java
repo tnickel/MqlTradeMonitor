@@ -216,7 +216,8 @@ public class AdminController {
 
         // --- 9. Telegram Config ---
         model.addAttribute("telegramEnabled", globalConfigService.isTelegramEnabled());
-        model.addAttribute("telegramBotToken", globalConfigService.getTelegramBotToken());
+        model.addAttribute("telegramBotTokenConfigured",
+                !globalConfigService.getTelegramBotToken().isBlank());
         model.addAttribute("telegramChatId", globalConfigService.getTelegramChatId());
 
         return "admin";
@@ -415,7 +416,7 @@ public class AdminController {
     @PostMapping("/telegram-config")
     public String saveTelegramConfig(
             @RequestParam(required = false) String telegramEnabled,
-            @RequestParam("telegramBotToken") String telegramBotToken,
+            @RequestParam(value = "telegramBotToken", required = false) String telegramBotToken,
             @RequestParam("telegramChatId") String telegramChatId,
             org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
         try {
@@ -429,16 +430,19 @@ public class AdminController {
 
     @PostMapping("/telegram-test")
     public String testTelegram(
-            @RequestParam("telegramBotToken") String telegramBotToken,
+            @RequestParam(value = "telegramBotToken", required = false) String telegramBotToken,
             @RequestParam("telegramChatId") String telegramChatId,
             org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttrs) {
         try {
-            if (telegramBotToken == null || telegramBotToken.trim().isEmpty()
+            String effectiveToken = telegramBotToken == null || telegramBotToken.trim().isEmpty()
+                    ? globalConfigService.getTelegramBotToken()
+                    : telegramBotToken.trim();
+            if (effectiveToken.isEmpty()
                     || telegramChatId == null || telegramChatId.trim().isEmpty()) {
                 redirectAttrs.addFlashAttribute("errorMessage", "Token und Chat-ID dürfen nicht leer sein.");
             } else {
                 boolean success = telegramService.sendRawTelegramMessageSync(
-                        telegramBotToken.trim(), telegramChatId.trim(), "🔔 *Testnachricht:* Verbindung vom TradeMonitor erfolgreich aufgebaut!");
+                        effectiveToken, telegramChatId.trim(), "🔔 *Testnachricht:* Verbindung vom TradeMonitor erfolgreich aufgebaut!");
                 if (success) {
                     redirectAttrs.addFlashAttribute("successMessage", "Test-Telegram gesendet! Bitte prüfen Sie Ihre App.");
                 } else {

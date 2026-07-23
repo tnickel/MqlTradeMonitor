@@ -70,6 +70,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val api = ApiClient.getService(context)
                     val response = api.login(LoginRequest(username, password))
                     if (response.isSuccessful) {
+                        ApiClient.updateCsrfToken(response.body())
                         onLoginSuccess()
                     } else {
                         errorMessage = "Auto-Login fehlgeschlagen. Bitte Daten prüfen."
@@ -95,6 +96,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val api = ApiClient.getService(context)
                     val response = api.login(LoginRequest(username, password))
                     if (response.isSuccessful) {
+                        ApiClient.updateCsrfToken(response.body())
                         // Save credentials securely for auto-login
                         encryptedPrefs.edit()
                             .putString("username", username)
@@ -126,6 +128,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val api = ApiClient.getService(context)
                     val response = api.demoLogin()
                     if (response.isSuccessful) {
+                        ApiClient.updateCsrfToken(response.body())
                         onLoginSuccess()
                     } else {
                         errorMessage = "Demo-Login fehlgeschlagen"

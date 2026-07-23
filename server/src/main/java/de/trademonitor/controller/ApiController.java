@@ -29,6 +29,9 @@ public class ApiController {
     private AccountManager accountManager;
 
     @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -85,29 +88,11 @@ public class ApiController {
     }
 
     private boolean isAuthorized(String userKey, Long accountId) {
-        if (userKey == null || userKey.trim().isEmpty()) {
+        if (userKey == null || userKey.trim().isEmpty() || accountId == null || accountId <= 0) {
             return false;
         }
         UserEntity user = userRepository.findByApiKey(userKey).orElse(null);
-        if (user == null) {
-            return false;
-        }
-        // Admins see everything, normal users must have the account allowed
-        if ("ROLE_ADMIN".equals(user.getRole())) {
-            return true;
-        }
-        if (user.getAllowedAccountIds() == null) {
-            return false;
-        }
-        if (user.getAllowedAccountIds().contains(accountId)) {
-            return true;
-        }
-        // Check if this is a virtual account ID whose physical account is allowed
-        de.trademonitor.model.Account account = accountManager.getAccounts().get(accountId);
-        if (account != null && account.getRealAccountId() != null) {
-            return user.getAllowedAccountIds().contains(account.getRealAccountId());
-        }
-        return false;
+        return accountAccessService.canAccess(user, accountId);
     }
 
     private boolean isValidTradeMetrics(double equity, double balance) {
@@ -150,23 +135,36 @@ public class ApiController {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid registration payload"));
         }
         
-        long authId = request.getAccountId() > 0 ? request.getAccountId() : 
-                      (request.getRealAccountId() != null ? request.getRealAccountId() : 0L);
-        if (authId <= 0) {
+        long physicalAccountId = request.getRealAccountId() != null
+                ? request.getRealAccountId()
+                : request.getAccountId();
+        if (physicalAccountId <= 0) {
             return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid accountId or realAccountId"));
         }
 
-        if (!isAuthorized(userKey, authId)) {
+        UserEntity apiUser = userKey == null ? null : userRepository.findByApiKey(userKey).orElse(null);
+        if (!accountAccessService.canAccessPhysicalAccount(apiUser, physicalAccountId)) {
             logClientAction(request.getAccountId(), "AUTH_FAILED", "Invalid or missing User Key during register",
                     httpRequest);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("status", "error", "message", "Unauthorized"));
         }
 
+        if (request.getAccountId() > 0
+                && !accountAccessService.belongsToPhysicalAccount(request.getAccountId(), physicalAccountId)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error", "message", "accountId does not belong to realAccountId"));
+        }
+        if (request.getRealAccountId() != null
+                && (request.getComputerName() == null || request.getComputerName().isBlank())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error", "message", "computerName is required for multi-PC registration"));
+        }
+
         try {
             logClientAction(request.getAccountId(), "REGISTER", "Broker: " + request.getBroker(), httpRequest);
             long assignedId = accountManager.registerAccount(
-                    request.getRealAccountId() != null ? request.getRealAccountId() : request.getAccountId(),
+                    physicalAccountId,
                     request.getComputerName(),
                     request.getLoginName(),
                     request.getVersion(),
@@ -398,14 +396,22 @@ public class ApiController {
                 .filter(acc -> {
                     if (!hasConfig) return true;
                     Long accountId = (Long) acc.get("accountId");
-                    return user.getRealAccountIds().contains(accountId) || user.getDemoAccountIds().contains(accountId);
+                    if (accountId == null) return false;
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    return user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)
+                            || user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId);
                 })
                 .map(acc -> {
                     Long accountId = (Long) acc.get("accountId");
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
                     java.util.Map<String, Object> copy = new java.util.HashMap<>(acc);
-                    if (user.getRealAccountIds().contains(accountId)) {
+                    if (user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)) {
                         copy.put("type", "REAL");
-                    } else if (user.getDemoAccountIds().contains(accountId)) {
+                    } else if (user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId)) {
                         copy.put("type", "DEMO");
                     }
                     return copy;
@@ -413,21 +419,28 @@ public class ApiController {
                 .collect(java.util.stream.Collectors.toList());
             return ResponseEntity.ok(overridden);
         } else {
-            java.util.Set<Long> allowedIds = user.getAllowedAccountIds();
             java.util.List<java.util.Map<String, Object>> filtered = allAccounts.stream()
                 .filter(acc -> {
                     Long accountId = (Long) acc.get("accountId");
-                    boolean isAllowed = allowedIds != null && allowedIds.contains(accountId);
+                    if (accountId == null) return false;
+                    boolean isAllowed = accountAccessService.canAccess(user, accountId);
                     if (!hasConfig) return isAllowed;
-                    boolean isExplicit = user.getRealAccountIds().contains(accountId) || user.getDemoAccountIds().contains(accountId);
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    boolean isExplicit = user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)
+                            || user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId);
                     return isAllowed && isExplicit;
                 })
                 .map(acc -> {
                     Long accountId = (Long) acc.get("accountId");
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
                     java.util.Map<String, Object> copy = new java.util.HashMap<>(acc);
-                    if (user.getRealAccountIds().contains(accountId)) {
+                    if (user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)) {
                         copy.put("type", "REAL");
-                    } else if (user.getDemoAccountIds().contains(accountId)) {
+                    } else if (user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId)) {
                         copy.put("type", "DEMO");
                     }
                     return copy;

@@ -3,6 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <script th:src="@{/js/csrf-fetch.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="'Account ' + ${account.accountId} + ' - Trade Monitor v1.16'">Account Detail - Trade Monitor</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">

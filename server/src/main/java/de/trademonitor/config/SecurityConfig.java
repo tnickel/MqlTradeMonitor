@@ -83,10 +83,19 @@ public class SecurityConfig {
             SessionAuthenticationStrategy sessionAuthenticationStrategy) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Disable CSRF for API endpoints used by EA and Admin AJAX
+                // Only non-browser clients that authenticate independently of the
+                // session cookie are exempt. Browser and Android session mutations
+                // must send the CSRF token issued at login/page rendering.
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        AntPathRequestMatcher.antMatcher("/api/**"),
-                        AntPathRequestMatcher.antMatcher("/admin/api/**"),
+                        AntPathRequestMatcher.antMatcher("/api/login"),
+                        AntPathRequestMatcher.antMatcher("/api/demo-login"),
+                        AntPathRequestMatcher.antMatcher("/api/register"),
+                        AntPathRequestMatcher.antMatcher("/api/trades-init"),
+                        AntPathRequestMatcher.antMatcher("/api/trades"),
+                        AntPathRequestMatcher.antMatcher("/api/heartbeat"),
+                        AntPathRequestMatcher.antMatcher("/api/history"),
+                        AntPathRequestMatcher.antMatcher("/api/ea-logs"),
+                        AntPathRequestMatcher.antMatcher("/api/upload-requested-ticks"),
                         AntPathRequestMatcher.antMatcher("/h2-console/**")
                 ))
                 .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
@@ -155,9 +164,7 @@ public class SecurityConfig {
         // must stay tight — never use broad third-party wildcards here.
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
-            "https://monitor.tnickel-ki.de",
-            "http://monitor.tnickel-ki.de",
-            "https://*.tnickel-ki.de"
+            "https://monitor.tnickel-ki.de"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
