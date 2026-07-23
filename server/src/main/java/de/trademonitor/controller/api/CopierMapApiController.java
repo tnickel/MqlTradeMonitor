@@ -30,6 +30,9 @@ public class CopierMapApiController {
     @Autowired
     private de.trademonitor.service.CopierVerificationService copierVerificationService;
 
+    @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
+
     private boolean isAdmin(CustomUserDetails userDetails) {
         return userDetails != null && "ROLE_ADMIN".equals(userDetails.getUserEntity().getRole());
     }
@@ -39,7 +42,8 @@ public class CopierMapApiController {
         if (userDetails == null || acc == null) return false;
         if (isAdmin(userDetails)) return true;
         if ("CSV".equalsIgnoreCase(acc.getType())) return true;
-        return userDetails.getUserEntity().getAllowedAccountIds().contains(acc.getAccountId());
+        return accountAccessService.canAccess(
+                userDetails.getUserEntity(), acc.getAccountId(), acc.getRealAccountId());
     }
 
     @GetMapping("/data")

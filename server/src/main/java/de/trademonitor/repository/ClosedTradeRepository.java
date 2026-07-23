@@ -14,6 +14,8 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
 
     List<ClosedTradeEntity> findByAccountId(long accountId);
 
+    List<ClosedTradeEntity> findByAccountIdIn(java.util.Collection<Long> accountIds);
+
     List<ClosedTradeEntity> findByAccountIdOrderByCloseTimeDesc(long accountId);
 
     boolean existsByAccountIdAndTicket(long accountId, long ticket);
@@ -77,4 +79,13 @@ public interface ClosedTradeRepository extends JpaRepository<ClosedTradeEntity, 
 
     @Query("SELECT c FROM ClosedTradeEntity c WHERE c.accountId = ?1 AND c.closeTime >= ?2 AND c.closeTime <= ?3")
     List<ClosedTradeEntity> findByAccountIdAndDateRange(long accountId, String startCloseTime, String endCloseTime);
+
+    @Query("SELECT c FROM ClosedTradeEntity c WHERE c.symbol = :symbol AND " +
+           "((:isOpen = true AND c.openTimeMsc >= :minTime AND c.openTimeMsc <= :maxTime) OR " +
+           " (:isOpen = false AND c.closeTimeMsc >= :minTime AND c.closeTimeMsc <= :maxTime))")
+    List<ClosedTradeEntity> findTradesForComparison(
+            @org.springframework.data.repository.query.Param("symbol") String symbol,
+            @org.springframework.data.repository.query.Param("isOpen") boolean isOpen,
+            @org.springframework.data.repository.query.Param("minTime") long minTime,
+            @org.springframework.data.repository.query.Param("maxTime") long maxTime);
 }

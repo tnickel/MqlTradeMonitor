@@ -11,10 +11,21 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.session.ConcurrentSessionFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.ConcurrentSessionControlAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -25,6 +36,12 @@ public class SecurityConfig {
 
     @Autowired
     private ReadOnlyFilter readOnlyFilter;
+
+    @Autowired
+    private H2ConsoleAccessFilter h2ConsoleAccessFilter;
+
+    @Autowired
+    private de.trademonitor.service.GlobalConfigService globalConfigService;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,31 +57,100 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    public SessionAuthenticationStrategy sessionAuthenticationStrategy(SessionRegistry sessionRegistry) {
+        ConcurrentSessionControlAuthenticationStrategy concurrent =
+                new ConcurrentSessionControlAuthenticationStrategy(sessionRegistry) {
+                    @Override
+                    protected int getMaximumSessionsForThisUser(org.springframework.security.core.Authentication authentication) {
+                        return Math.max(1, Math.min(50, globalConfigService.getSecMaxSessions()));
+                    }
+                };
+        concurrent.setExceptionIfMaximumExceeded(false);
+        return new CompositeSessionAuthenticationStrategy(List.of(
+                concurrent,
+                new ChangeSessionIdAuthenticationStrategy(),
+                new RegisterSessionAuthenticationStrategy(sessionRegistry)));
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+            SessionRegistry sessionRegistry,
+            SessionAuthenticationStrategy sessionAuthenticationStrategy) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Disable CSRF for API endpoints used by EA and Admin AJAX
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/admin/api/**"))
+                // Only non-browser clients that authenticate independently of the
+                // session cookie are exempt. Browser and Android session mutations
+                // must send the CSRF token issued at login/page rendering.
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        AntPathRequestMatcher.antMatcher("/api/login"),
+                        AntPathRequestMatcher.antMatcher("/api/demo-login"),
+                        AntPathRequestMatcher.antMatcher("/api/register"),
+                        AntPathRequestMatcher.antMatcher("/api/trades-init"),
+                        AntPathRequestMatcher.antMatcher("/api/trades"),
+                        AntPathRequestMatcher.antMatcher("/api/heartbeat"),
+                        AntPathRequestMatcher.antMatcher("/api/history"),
+                        AntPathRequestMatcher.antMatcher("/api/ea-logs"),
+                        AntPathRequestMatcher.antMatcher("/api/upload-requested-ticks"),
+                        AntPathRequestMatcher.antMatcher("/h2-console/**")
+                ))
                 .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(h2ConsoleAccessFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new ConcurrentSessionFilter(sessionRegistry), SecurityContextHolderFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/register", "/api/trades-init", "/api/trades",
-                                "/api/heartbeat", "/api/history", "/api/ea-logs", "/css/**", "/js/**",
-                                "/img/**", "/login", "/demo-login", "/impressum", "/privacy",
-                                "/mobile/**", "/api/login", "/api/demo-login", "/api/logout",
-                                "/api/latest-version", "/trademonitor*.apk")
-                        .permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/h2-console/**")).hasRole("ADMIN")
+                        .requestMatchers(
+                                AntPathRequestMatcher.antMatcher("/api/register"),
+                                AntPathRequestMatcher.antMatcher("/api/trades-init"),
+                                AntPathRequestMatcher.antMatcher("/api/trades"),
+                                AntPathRequestMatcher.antMatcher("/api/heartbeat"),
+                                AntPathRequestMatcher.antMatcher("/api/history"),
+                                AntPathRequestMatcher.antMatcher("/api/ea-logs"),
+                                AntPathRequestMatcher.antMatcher("/api/upload-requested-ticks"),
+                                AntPathRequestMatcher.antMatcher("/api/update/download"),
+                                AntPathRequestMatcher.antMatcher("/css/**"),
+                                AntPathRequestMatcher.antMatcher("/js/**"),
+                                AntPathRequestMatcher.antMatcher("/img/**"),
+                                AntPathRequestMatcher.antMatcher("/login"),
+                                AntPathRequestMatcher.antMatcher("/demo-login"),
+                                AntPathRequestMatcher.antMatcher("/impressum"),
+                                AntPathRequestMatcher.antMatcher("/privacy"),
+                                AntPathRequestMatcher.antMatcher("/mobile/**"),
+                                AntPathRequestMatcher.antMatcher("/api/login"),
+                                AntPathRequestMatcher.antMatcher("/api/demo-login"),
+                                AntPathRequestMatcher.antMatcher("/api/logout"),
+                                AntPathRequestMatcher.antMatcher("/api/latest-version"),
+                                AntPathRequestMatcher.antMatcher("/trademonitor*.apk"),
+                                AntPathRequestMatcher.antMatcher("/error")
+                        ).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/admin/**")).hasRole("ADMIN")
                         .anyRequest().authenticated())
+                .sessionManagement(session -> session
+                        .sessionAuthenticationStrategy(sessionAuthenticationStrategy))
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/", true)
                         .permitAll())
                 .logout(logout -> logout
-                        .logoutRequestMatcher(
-                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                        "/logout"))
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
                         .logoutSuccessUrl("/login?logout")
                         .permitAll())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            if (request.getRequestURI().startsWith("/api/")) {
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"status\":\"error\",\"message\":\"Unauthorized\"}");
+                            } else {
+                                response.sendRedirect("/login");
+                            }
+                        })
+                )
                 .authenticationProvider(authenticationProvider());
 
         return http.build();
@@ -78,9 +164,7 @@ public class SecurityConfig {
         // must stay tight — never use broad third-party wildcards here.
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
-            "https://monitor.tnickel-ki.de",
-            "http://monitor.tnickel-ki.de",
-            "https://*.tnickel-ki.de"
+            "https://monitor.tnickel-ki.de"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("*"));

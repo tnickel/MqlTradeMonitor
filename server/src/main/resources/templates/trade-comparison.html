@@ -3,6 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <script th:src="@{/js/csrf-fetch.js}"></script>
     <title>Trade Vergleich (A ↔ B)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -661,7 +664,7 @@
                     <label>MetaTrader B</label>
                     <select name="accountB" id="selectB">
                         <option value="">-- Account wählen --</option>
-                        <option value="upload-csv" style="color: var(--accent); font-weight: 600;">➕ CSV-Tradeliste hochladen...</option>
+                        <option th:if="${isAdmin}" value="upload-csv" style="color: var(--accent); font-weight: 600;">➕ CSV-Tradeliste hochladen...</option>
                         <option th:each="acc : ${allAccounts}"
                                 th:value="${acc.accountId}"
                                 th:text="${acc.name + ' (' + acc.type + ')'}"

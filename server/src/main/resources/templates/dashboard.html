@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script th:src="@{/js/csrf-fetch.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trade Monitor - Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css(v=3)}">
@@ -46,6 +47,9 @@
                     </a>
                     <a th:if="${currentUser != null}" href="/profile" class="nav-item">
                         <span style="font-size: 1.2rem;">👤</span> Profil
+                    </a>
+                    <a th:if="${currentUser != null}" href="/profile/app-config" class="nav-item">
+                        <span style="font-size: 1.2rem;">📱</span> App Config
                     </a>
                     <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" style="margin: 0; padding: 0;">
                         <button type="submit" class="nav-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
@@ -459,17 +463,27 @@
 
             <!-- Drawdown Details Modal -->
             <div id="drawdownModal" class="modal">
-                <div class="modal-content" style="max-width: 800px; width: 90%;">
+                <div class="modal-content" style="max-width: 1600px; width: calc(100% - 48px); margin: 3vh auto;">
                     <span class="close-modal" onclick="closeDrawdownModal()">×</span>
                     <h2>📉 Drawdown Detail-Monitor (Alle Accounts)</h2>
-                    <div style="margin-top: 20px; overflow-y: auto; max-height: 70vh;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <div style="margin-top: 20px; overflow: auto; max-height: 78vh;">
+                        <table style="width: 100%; min-width: 1450px; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums;">
+                            <colgroup>
+                                <col style="width: 30%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                                <col style="width: 14%;">
+                            </colgroup>
                             <thead style="position: sticky; top: 0; background: #1e1e2e; z-index: 1;">
                                 <tr style="color: #a0a0c0; text-align: left; border-bottom: 1px solid #444;">
                                     <th style="padding: 10px;">Account / Magic</th>
-                                    <th style="padding: 10px; text-align: right;">Drawdown €</th>
-                                    <th style="padding: 10px; text-align: right;">Drawdown %</th>
-                                    <th style="padding: 10px; text-align: right;">Open Profit</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler historischer Rückgang der realisierten Balance vom jeweiligen High-Water-Mark">Max. realisierter DD €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler historischer Rückgang der realisierten Balance in Prozent">Max. realisierter DD %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Account-Zeile: aus der historischen Equity-Kurve. Magic-Zeile: Maximum aus realisiertem Drawdown und aktuellem Equity-Drawdown">Max. Equity-DD €</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Maximaler Equity-Drawdown in Prozent des zugehörigen High-Water-Marks">Max. Equity-DD %</th>
+                                    <th style="padding: 10px; text-align: right; white-space: nowrap;" title="Aktueller offener Gewinn/Verlust inklusive Open Swap">Floating P/L inkl. Swap</th>
                                 </tr>
                             </thead>
                             <tbody id="drawdown-modal-body">
@@ -505,6 +519,11 @@
                                 </tr>
                             </table>
                             <div id="sys-health-problems" style="margin-top: 10px; color: #ef4444; font-size: 0.85rem;"></div>
+                            <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                                <button onclick="openSirenLogModal()" style="width: 100%; padding: 8px 12px; background: rgba(247, 118, 142, 0.1); border: 1px solid rgba(247, 118, 142, 0.3); border-radius: 4px; color: #f7768e; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.background='rgba(247, 118, 142, 0.2)'" onmouseout="this.style.background='rgba(247, 118, 142, 0.1)'">
+                                    📢 Sirenen-Logbuch
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Real Accounts Column -->
@@ -525,6 +544,48 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Siren Log Modal -->
+            <div id="sirenLogModal" class="modal">
+                <div class="modal-content" style="max-width: 1000px; width: 95%; background: #1e1e2e; border: 1px solid #3f3f5f; border-radius: 8px;">
+                    <span class="close-modal" onclick="closeSirenLogModal()">×</span>
+                    <h2 style="margin-top: 0; color: #f7768e; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                        📢 Sirenen- & Alarm-Logbuch
+                    </h2>
+                    
+                    <p style="color: #8b949e; font-size: 0.9rem; margin-bottom: 15px;">
+                        Dieses Logbuch zeigt die letzten kritischen Systemereignisse, die zu einer Alarmierung (z.B. per E-Mail, Telegram oder Homey-Sirene) geführt haben.
+                    </p>
+                    
+                    <div style="margin-top: 15px; max-height: 450px; overflow-y: auto; border: 1px solid #2a2e3d; border-radius: 6px; background: #0f0f16;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; color: #a9b1d6; text-align: left;">
+                            <thead style="position: sticky; top: 0; background: #1a1a24; z-index: 10; border-bottom: 1px solid #3f3f5f; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                                <tr>
+                                    <th style="padding: 10px; width: 140px;">Zeitstempel</th>
+                                    <th style="padding: 10px; width: 90px; text-align: center;">Priorität</th>
+                                    <th style="padding: 10px; width: 100px; text-align: center;">Kategorie</th>
+                                    <th style="padding: 10px; width: 180px;">Ereignis</th>
+                                    <th style="padding: 10px;">Beschreibung</th>
+                                </tr>
+                            </thead>
+                            <tbody id="siren-log-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Lade Log-Daten...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                        <button onclick="clearSirenLog()" class="view-details-btn" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444; padding: 8px 15px;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
+                            Log löschen
+                        </button>
+                        <button onclick="closeSirenLogModal()" class="view-details-btn" style="padding: 8px 15px;">
+                            Schließen
+                        </button>
                     </div>
                 </div>
             </div>
@@ -628,6 +689,115 @@
             
             function closeSystemStatusModal() {
                 document.getElementById('systemStatusModal').style.display = 'none';
+            }
+
+            function openSirenLogModal() {
+                document.getElementById('systemStatusModal').style.display = 'none';
+                document.getElementById('sirenLogModal').style.display = 'block';
+                fetchSirenLog();
+            }
+            
+            function closeSirenLogModal() {
+                document.getElementById('sirenLogModal').style.display = 'none';
+                document.getElementById('systemStatusModal').style.display = 'block';
+            }
+            
+            function fetchSirenLog() {
+                const tbody = document.getElementById('siren-log-table-body');
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Lade Log-Daten...</td></tr>';
+                
+                fetch('/api/siren-log')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP status ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        if (!text || text.trim() === '' || text.startsWith('Keine Log-Einträge')) {
+                            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Keine Log-Einträge vorhanden.</td></tr>';
+                            return;
+                        }
+                        
+                        const lines = text.trim().split('\n');
+                        const rowsHtml = lines.map(line => {
+                            const parts = line.split(' | ');
+                            if (parts.length < 5) return '';
+                            
+                            let timeStr = parts[0];
+                            try {
+                                const dt = new Date(parts[0]);
+                                if (!isNaN(dt.getTime())) {
+                                    const day = String(dt.getDate()).padStart(2, '0');
+                                    const month = String(dt.getMonth() + 1).padStart(2, '0');
+                                    const year = dt.getFullYear();
+                                    const hours = String(dt.getHours()).padStart(2, '0');
+                                    const minutes = String(dt.getMinutes()).padStart(2, '0');
+                                    const seconds = String(dt.getSeconds()).padStart(2, '0');
+                                    timeStr = `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+                                } else {
+                                    timeStr = parts[0].split('.')[0].replace('T', ' ');
+                                }
+                            } catch (e) {
+                                timeStr = parts[0];
+                            }
+                            
+                            const sevRaw = parts[1].replace('[AdminNotification]', '').trim();
+                            let sevBadge = '';
+                            if (sevRaw === 'CRITICAL') {
+                                sevBadge = '<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block;">CRITICAL</span>';
+                            } else {
+                                sevBadge = '<span style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block;">WARNING</span>';
+                            }
+                            
+                            const category = parts[2].trim();
+                            const categoryIcon = category === 'SECURITY' ? '🛡️ SECURITY' : '🩺 HEALTH';
+                            
+                            const title = parts[3].trim();
+                            const message = parts[4].trim();
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #2a2e3d; transition: background 0.2s;" onmouseover="this.style.background='#161722'" onmouseout="this.style.background='transparent'">
+                                    <td style="padding: 10px; font-family: monospace; white-space: nowrap;">${timeStr}</td>
+                                    <td style="padding: 10px; text-align: center;">${sevBadge}</td>
+                                    <td style="padding: 10px; text-align: center; font-size: 0.75rem; color: #a0a0c0; white-space: nowrap;">${categoryIcon}</td>
+                                    <td style="padding: 10px; font-weight: bold; color: #e2e2e9;">${title}</td>
+                                    <td style="padding: 10px; font-size: 0.8rem; color: #a9b1d6;">${message}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                        
+                        tbody.innerHTML = rowsHtml || '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #8b949e;">Keine gültigen Log-Einträge vorhanden.</td></tr>';
+                        
+                        const container = tbody.closest('div');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    })
+                    .catch(err => {
+                        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #f87171;">Fehler beim Laden des Logs: ${err.message}</td></tr>`;
+                    });
+            }
+            
+            function clearSirenLog() {
+                if (!confirm('Möchten Sie das Sirenen-Logbuch wirklich löschen?')) {
+                    return;
+                }
+                
+                fetch('/api/siren-log/clear', { method: 'POST' })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP status ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(msg => {
+                        alert(msg);
+                        fetchSirenLog();
+                    })
+                    .catch(err => {
+                        alert('Fehler beim Löschen des Logs: ' + err.message);
+                    });
             }
 
             // ===================== Report Generator =====================
@@ -1040,7 +1210,11 @@
                                 return `
                                     <tr style="border-bottom: 1px solid #2a2e39;">
                                         <td style="padding: 10px 0;">
-                                            <strong>${acc.name || acc.accountId}</strong>
+                                            <strong>
+                                                ${acc.name || (acc.realAccountId || acc.accountId)}
+                                                ${acc.realAccountId && acc.realAccountId !== acc.accountId ? `<span style="font-size: 0.75rem; font-weight: normal; color: #848e9c; margin-left: 2px;">${String(acc.accountId - (acc.realAccountId * 100)).padStart(2, '0')}</span>` : ''}
+                                            </strong>
+                                            ${acc.computerName ? `<br><span style="font-size: 0.7rem; color: #848e9c;">${acc.loginName}@${acc.computerName} v${acc.eaVersion}</span>` : ''}
                                         </td>
                                         <td style="padding: 10px 0; text-align: center;">
                                             ${getAccountDot(acc)}
@@ -1100,27 +1274,39 @@
                             style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="display: flex; flex-direction: column;">
                                 <!-- Name First (Larger) -->
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;" th:if="${acc.name != null && !acc.name.isEmpty()}">
                                     <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 24px; max-height: 24px; border-radius: 4px; object-fit: contain;" class="account-tile-icon" />
-                                    <span class="account-name" th:if="${acc.name != null && !acc.name.isEmpty()}"
-                                        th:text="${acc.name}"
+                                    <span class="account-name" th:text="${acc.name}"
                                         style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">(Name)</span>
                                 </div>
 
                                 <!-- ID Below (Smaller) -->
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="account-id" th:text="${acc.accountId}"
-                                        style="font-size: 0.9rem; color: #a0a0c0; font-family: 'JetBrains Mono';">12345</span>
+                                    <span class="account-id" style="font-family: 'JetBrains Mono';">
+                                        <strong style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);" 
+                                                th:text="${acc.realAccountId != null && acc.realAccountId != acc.accountId ? acc.realAccountId : acc.accountId}">55616423</strong><span 
+                                                th:if="${acc.realAccountId != null && acc.realAccountId != acc.accountId}" 
+                                                style="font-size: 0.75rem; font-weight: normal; color: #848e9c;" 
+                                                th:text="${#numbers.formatInteger(acc.accountId - (acc.realAccountId * 100), 2)}">01</span>
+                                    </span>
                                     <span class="account-type-badge demo" th:if="${acc.type == 'DEMO'}">DEMO</span>
                                     <span class="account-type-badge real" th:if="${acc.type == 'REAL'}">REAL</span>
-                                    <span class="edit-icon" th:data-id="${acc.accountId}" th:data-name="${acc.name}"
+                                    <span th:if="${isAdmin}" class="edit-icon" th:data-id="${acc.accountId}" 
+                                        th:data-name="${acc.name != null && !acc.name.isEmpty() ? acc.name : (acc.realAccountId != null ? acc.realAccountId : acc.accountId)}"
                                         th:data-type="${acc.type}" th:data-alarm-enabled="${acc.openProfitAlarmEnabled}"
                                         th:data-alarm-abs="${acc.openProfitAlarmAbs}"
                                         th:data-alarm-pct="${acc.openProfitAlarmPct}"
                                         th:data-monitored="${acc.monitored}"
+                                        th:data-telegram-trades-enabled="${acc.telegramTradesEnabled}"
                                         th:data-icon-base64="${acc.iconBase64}"
                                         onclick="event.stopPropagation(); openEditModal(this)"
                                         title="Account bearbeiten" style="cursor: pointer; margin-left: 5px;">⚙️</span>
+                                </div>
+
+                                <!-- Client Details (PC, User, Version) in free area -->
+                                <div th:if="${acc.computerName != null}" style="font-size: 0.75rem; color: #848e9c; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <span th:text="${acc.loginName} + '@' + ${acc.computerName}">user@PC</span>
+                                    <span style="padding: 1px 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;" th:text="'v' + ${acc.eaVersion}">v1.17</span>
                                 </div>
                             </div>
 
@@ -1272,11 +1458,22 @@
                     <tbody>
                         <tr th:each="acc : ${accountsBySection.get(section.id)}"
                             th:onclick="'navigateToAccount(\'/account/' + ${acc.accountId} + '\')'">
-                            <td th:text="${acc.accountId}" style="font-weight:bold;">12345</td>
+                            <td style="font-family: 'JetBrains Mono';">
+                                <strong style="font-weight: bold; color: var(--text-primary);" 
+                                        th:text="${acc.realAccountId != null && acc.realAccountId != acc.accountId ? acc.realAccountId : acc.accountId}">55616423</strong><span 
+                                        th:if="${acc.realAccountId != null && acc.realAccountId != acc.accountId}" 
+                                        style="font-size: 0.85em; font-weight: normal; color: #848e9c;" 
+                                        th:text="${#numbers.formatInteger(acc.accountId - (acc.realAccountId * 100), 2)}">01</span>
+                            </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <img th:if="${acc.iconBase64 != null && !acc.iconBase64.isEmpty()}" th:src="${acc.iconBase64}" style="max-width: 16px; max-height: 16px; border-radius: 2px; object-fit: contain;" />
-                                    <span th:text="${acc.name}">Name</span>
+                                    <div>
+                                        <span th:text="${acc.name}">Name</span>
+                                        <div th:if="${acc.computerName != null}" style="font-size: 0.7rem; color: #848e9c; margin-top: 2px;">
+                                            <span th:text="${acc.loginName} + '@' + ${acc.computerName} + ' v' + ${acc.eaVersion}">user@PC v1.17</span>
+                                        </div>
+                                    </div>
                                     <span th:if="${acc.lastSeenMins != null}"
                                         th:style="'width: 10px; height: 10px; border-radius: 50%; display: inline-block; background-color: ' + 
                                                 (${acc.lastSeenMins} &lt; 0 ? ${liveColorRed} : 
@@ -1514,6 +1711,11 @@
             <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
                 <input type="checkbox" id="editAccountMonitored" style="width: 18px; height: 18px; accent-color: #6366f1;">
                 <label for="editAccountMonitored" style="margin: 0; cursor: pointer; font-weight: bold;">Überwachung aktiv (Alarme & Status)</label>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <input type="checkbox" id="editTelegramTradesEnabled" style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="editTelegramTradesEnabled" style="margin: 0; cursor: pointer; font-weight: bold;">Trades an Telegram senden (Neueröffnungen & Schließungen)</label>
             </div>
 
             <hr style="border-color: #333; margin: 15px 0;">
@@ -1810,238 +2012,128 @@
             if (!tbody) return;
 
             if (currentDrawdownItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 15px;">Keine offenen Trades vorhanden.</td></tr>';
                 return;
             }
 
-            let html = '';
-
             const realItems = currentDrawdownItems.filter(i => i.real);
             const demoItems = currentDrawdownItems.filter(i => !i.real);
-
-            // Group REAL items by accountName
-            const realGroups = {};
-            realItems.forEach(item => {
-                if (!realGroups[item.accountName]) {
-                    realGroups[item.accountName] = [];
-                }
-                realGroups[item.accountName].push(item);
+            const numberValue = value => {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+            const itemValues = item => ({
+                drawdownEur: numberValue(item.drawdownEur ?? item.currentDrawdownEur),
+                drawdownPercent: numberValue(item.drawdownPercent ?? item.currentDrawdownPercent),
+                equityDrawdownEur: numberValue(item.equityDrawdownEur ?? item.currentDrawdownEur),
+                equityDrawdownPercent: numberValue(item.equityDrawdownPercent ?? item.currentDrawdownPercent),
+                openProfit: numberValue(item.openProfit ?? item.currentMagicEquity)
             });
+            const escapeDrawdownText = value => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+            const lossText = value => `${value > 0 ? '-' : ''}${Math.abs(value).toFixed(2)} €`;
+            const percentColor = value => value > 10 ? '#ef4444' : (value > 5 ? '#e0af68' : '#bbb');
+            const lossColor = value => value > 0 ? '#ef4444' : '#ccc';
+            const profitText = value => `${value > 0 ? '+' : ''}${value.toFixed(2)} €`;
 
-            // Render REAL groups
-            if (realItems.length > 0) {
-                html += `
-                        <!-- Real Header -->
-                        <tr>
-                            <td colspan="4" style="padding: 0; border-bottom: none;">
-                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #10b981; border-bottom: 1px solid rgba(16,185,129,0.2);">
-                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(16,185,129,0.5));">🛡️</span>
-                                    <span style="font-weight: 800; color: #34d399; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(16,185,129,0.3);">REAL ACCOUNTS</span>
-                                </div>
-                            </td>
-                        </tr>`;
+            function renderSection(items, isReal, showSeparator) {
+                if (items.length === 0) return '';
 
-                for (const accountName in realGroups) {
-                    const groupItems = realGroups[accountName];
-
-                    // Calculate sums
-                    let sumDdEur = 0;
-                    let sumProfit = 0;
-                    let refBalance = 0;
-
-                    groupItems.forEach(item => {
-                        sumDdEur += item.currentDrawdownEur || 0;
-                        sumProfit += item.currentMagicEquity || 0;
-                        // Grab the balance from the first item (should be the same for all on the same account)
-                        if (refBalance === 0 && item.referenceBalance) {
-                            refBalance = item.referenceBalance;
-                        }
-                    });
-
-                    // Calculate correct overall percentage
-                    let sumDdPct = 0;
-                    if (refBalance > 0 && sumDdEur > 0) {
-                        sumDdPct = (sumDdEur / refBalance) * 100;
-                    }
-
-                    // Render Group Header
-                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
-                                <td style="padding: 12px 15px;">
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span class="account-type-badge real" style="padding: 2px 5px;">REAL</span>
-                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
-                                            ${accountName}
-                                        </a>
-                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString, groupItems[0].worstCopierStage) : ''}
-                                    </div>
-                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
-                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
-                                        ${sumDdPct.toFixed(2)}%
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
-                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
-                                </td>
-                            </tr>`;
-
-                    // Render items in this group
-                    groupItems.forEach(item => {
-                        const ddEur = item.currentDrawdownEur;
-                        const ddPct = item.currentDrawdownPercent;
-                        const equity = item.currentMagicEquity;
-
-                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
-                                    <td style="padding: 8px 10px 8px 30px;">
-                                        <div style="font-size:0.9rem; color: #ccc;">
-                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
-                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
-                                            ${ddPct.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
-                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
-                                        </div>
-                                    </td>
-                                </tr>`;
-                    });
-                }
-            }
-
-            // Render DEMO items normally -> now grouped as well
-            if (demoItems.length > 0) {
-                html += `
-                        <!-- Visual Separator -->
-                        <tr>
-                            <td colspan="4" style="padding: 30px 0 20px 0; border: none;">
-                                <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
-                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);"></div>
-                                    <div style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;"></div>
-                                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);"></div>
-                                </div>
-                            </td>
-                        </tr>
-                        <!-- Demo Header -->
-                        <tr>
-                            <td colspan="4" style="padding: 0; border-bottom: none;">
-                                <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, rgba(148,163,184,0.1) 0%, rgba(30,30,46,0) 100%); border-left: 4px solid #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.2);">
-                                    <span style="font-size: 1.2rem; margin-right: 12px; filter: drop-shadow(0 0 4px rgba(148,163,184,0.5));">📉</span>
-                                    <span style="font-weight: 800; color: #94a3b8; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 8px rgba(148,163,184,0.3);">DEMO ACCOUNTS</span>
-                                </div>
-                            </td>
-                        </tr>`;
-
-                // Group DEMO items by accountName
-                const demoGroups = {};
-                demoItems.forEach(item => {
-                    if (!demoGroups[item.accountName]) {
-                        demoGroups[item.accountName] = [];
-                    }
-                    demoGroups[item.accountName].push(item);
+                const groups = {};
+                items.forEach(item => {
+                    const key = `${item.accountId}:${item.accountName}`;
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
                 });
 
-                for (const accountName in demoGroups) {
-                    const groupItems = demoGroups[accountName];
+                const accent = isReal ? '#10b981' : '#94a3b8';
+                const accentText = isReal ? '#34d399' : '#94a3b8';
+                const label = isReal ? 'REAL ACCOUNTS' : 'DEMO ACCOUNTS';
+                const icon = isReal ? '🛡️' : '📉';
+                let sectionHtml = showSeparator ? `
+                    <tr>
+                        <td colspan="6" style="padding: 30px 0 20px 0; border: none;">
+                            <div style="display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+                                <div style="flex-grow: 1; height: 1px; background: linear-gradient(to right, transparent, #6b6b8f);"></div>
+                                <div style="width: 8px; height: 8px; transform: rotate(45deg); background: #6b6b8f; margin: 0 15px; box-shadow: 0 0 5px #6b6b8f;"></div>
+                                <div style="flex-grow: 1; height: 1px; background: linear-gradient(to left, transparent, #6b6b8f);"></div>
+                            </div>
+                        </td>
+                    </tr>` : '';
 
-                    // Calculate sums
-                    let sumDdEur = 0;
-                    let sumProfit = 0;
-                    let refBalance = 0;
+                sectionHtml += `
+                    <tr>
+                        <td colspan="6" style="padding: 0; border-bottom: none;">
+                            <div style="display: flex; align-items: center; padding: 12px 20px; background: linear-gradient(90deg, ${isReal ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.1)'} 0%, rgba(30,30,46,0) 100%); border-left: 4px solid ${accent}; border-bottom: 1px solid ${isReal ? 'rgba(16,185,129,0.2)' : 'rgba(148,163,184,0.2)'};">
+                                <span style="font-size: 1.2rem; margin-right: 12px;">${icon}</span>
+                                <span style="font-weight: 800; color: ${accentText}; font-size: 0.95rem; letter-spacing: 3px; text-transform: uppercase;">${label}</span>
+                            </div>
+                        </td>
+                    </tr>`;
+
+                Object.values(groups).forEach(groupItems => {
+                    const first = groupItems[0];
+                    const fallbackTotals = groupItems.reduce((sum, item) => {
+                        const values = itemValues(item);
+                        sum.drawdownEur += values.drawdownEur;
+                        sum.drawdownPercent += values.drawdownPercent;
+                        sum.equityDrawdownEur += values.equityDrawdownEur;
+                        sum.equityDrawdownPercent += values.equityDrawdownPercent;
+                        sum.openProfit += values.openProfit;
+                        return sum;
+                    }, { drawdownEur: 0, drawdownPercent: 0, equityDrawdownEur: 0, equityDrawdownPercent: 0, openProfit: 0 });
+                    const totals = {
+                        drawdownEur: numberValue(first.accountDrawdownEur ?? fallbackTotals.drawdownEur),
+                        drawdownPercent: numberValue(first.accountDrawdownPercent ?? fallbackTotals.drawdownPercent),
+                        equityDrawdownEur: numberValue(first.accountEquityDrawdownEur ?? fallbackTotals.equityDrawdownEur),
+                        equityDrawdownPercent: numberValue(first.accountEquityDrawdownPercent ?? fallbackTotals.equityDrawdownPercent),
+                        openProfit: numberValue(first.accountOpenProfit ?? fallbackTotals.openProfit)
+                    };
+
+                    sectionHtml += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
+                        <td style="padding: 12px 15px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="account-type-badge ${isReal ? 'real' : 'demo'}" style="padding: 2px 5px;">${isReal ? 'REAL' : 'DEMO'}</span>
+                                <a href="/account/${encodeURIComponent(first.accountId)}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5);">
+                                    ${escapeDrawdownText(first.accountName)}
+                                </a>
+                                ${getLiveDotHtml(first.lastSeenMins, first.lastSeenString, first.worstCopierStage)}
+                            </div>
+                            <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Account-HWM aus gemeinsamem Balance-/Equity-Verlauf</div>
+                        </td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${lossColor(totals.drawdownEur)}; font-weight: bold; font-size: 1.05rem;">${lossText(totals.drawdownEur)}</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${percentColor(totals.drawdownPercent)}; font-weight: bold; font-size: 1.05rem;">${totals.drawdownPercent.toFixed(2)}%</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${lossColor(totals.equityDrawdownEur)}; font-weight: bold; font-size: 1.05rem;">${lossText(totals.equityDrawdownEur)}</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${percentColor(totals.equityDrawdownPercent)}; font-weight: bold; font-size: 1.05rem;">${totals.equityDrawdownPercent.toFixed(2)}%</td>
+                        <td style="padding: 12px 15px; text-align: right; color: ${totals.openProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.05rem;">${profitText(totals.openProfit)}</td>
+                    </tr>`;
 
                     groupItems.forEach(item => {
-                        sumDdEur += item.currentDrawdownEur || 0;
-                        sumProfit += item.currentMagicEquity || 0;
-                        if (refBalance === 0 && item.referenceBalance) {
-                            refBalance = item.referenceBalance;
-                        }
+                        const values = itemValues(item);
+                        sectionHtml += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
+                            <td style="padding: 8px 10px 8px 30px;">
+                                <div style="font-size:0.9rem; color: #ccc;">
+                                    Magic <b>${escapeDrawdownText(item.magicNumber)}</b> <span style="color:#888;">&mdash; ${escapeDrawdownText(item.magicName)}</span>
+                                </div>
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${lossColor(values.drawdownEur)};">${lossText(values.drawdownEur)}</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${percentColor(values.drawdownPercent)};">${values.drawdownPercent.toFixed(2)}%</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${lossColor(values.equityDrawdownEur)};">${lossText(values.equityDrawdownEur)}</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${percentColor(values.equityDrawdownPercent)};">${values.equityDrawdownPercent.toFixed(2)}%</td>
+                            <td style="padding: 8px 10px; text-align: right; color: ${values.openProfit >= 0 ? '#10b981' : '#ef4444'};">${profitText(values.openProfit)}</td>
+                        </tr>`;
                     });
+                });
 
-                    let sumDdPct = 0;
-                    if (refBalance > 0 && sumDdEur > 0) {
-                        sumDdPct = (sumDdEur / refBalance) * 100;
-                    }
-
-                    // Render Group Header
-                    html += `<tr style="background: rgba(42, 46, 57, 0.8); border-bottom: 2px solid #333; border-top: 1px solid #444;">
-                                <td style="padding: 12px 15px;">
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span class="account-type-badge demo" style="padding: 2px 5px;">DEMO</span>
-                                        <a href="/account/${groupItems.length > 0 ? groupItems[0].accountId : ''}" target="_blank" style="font-weight:700; font-size: 1.1rem; color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.5); transition: border-bottom-color 0.2s;">
-                                            ${accountName}
-                                        </a>
-                                        ${groupItems.length > 0 ? getLiveDotHtml(groupItems[0].lastSeenMins, groupItems[0].lastSeenString) : ''}
-                                    </div>
-                                    <div style="font-size: 0.75rem; color: #a0a0c0; margin-top: 2px;">Gesamt Summary</div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdEur > 0 ? '#ef4444' : '#ccc'};">
-                                        ${sumDdEur > 0 ? '-' : ''}${sumDdEur.toFixed(2)} €
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="font-size: 1.1rem; font-weight: bold; color: ${sumDdPct > 10 ? '#ef4444' : (sumDdPct > 5 ? '#e0af68' : '#bbb')};">
-                                        ${sumDdPct.toFixed(2)}%
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 15px; text-align: right; vertical-align: middle;">
-                                    <div style="color: ${sumProfit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold; font-size: 1.1rem;">
-                                        ${sumProfit > 0 ? '+' : ''}${sumProfit.toFixed(2)}
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #666;">Open Profit</div>
-                                </td>
-                            </tr>`;
-
-                    // Render items in this group
-                    groupItems.forEach(item => {
-                        const ddEur = item.currentDrawdownEur;
-                        const ddPct = item.currentDrawdownPercent;
-                        const equity = item.currentMagicEquity;
-
-                        html += `<tr style="border-bottom: 1px solid #333; background: rgba(0,0,0,0.1);">
-                                    <td style="padding: 8px 10px 8px 30px;">
-                                        <div style="font-size:0.9rem; color: #ccc;">
-                                            Magic <b>${item.magicNumber}</b> <span style="color:#888;">&mdash; ${item.magicName}</span>
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddEur > 0 ? '#ef4444' : '#ccc'};">
-                                            ${ddEur > 0 ? '-' : ''}${ddEur.toFixed(2)} €
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="font-size: 0.95rem; color: ${ddPct > 10 ? '#ef4444' : (ddPct > 5 ? '#e0af68' : '#bbb')};">
-                                            ${ddPct.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td style="padding: 8px 10px; text-align: right;">
-                                        <div style="color: ${equity >= 0 ? '#10b981' : '#ef4444'};">
-                                            ${equity > 0 ? '+' : ''}${equity.toFixed(2)}
-                                        </div>
-                                    </td>
-                                </tr>`;
-                    });
-                }
+                return sectionHtml;
             }
 
-            tbody.innerHTML = html;
+            tbody.innerHTML = renderSection(realItems, true, false)
+                + renderSection(demoItems, false, realItems.length > 0);
         }
 
         // Close modal when clicking outside
@@ -2080,6 +2172,10 @@
             // Monitored status
             var monitored = el.getAttribute('data-monitored') !== 'false';
             document.getElementById('editAccountMonitored').checked = monitored;
+
+            // Telegram trades status
+            var telegramTradesEnabled = el.getAttribute('data-telegram-trades-enabled') === 'true';
+            document.getElementById('editTelegramTradesEnabled').checked = telegramTradesEnabled;
 
             // Icon handling
             var iconBase64 = el.getAttribute('data-icon-base64');
@@ -2137,6 +2233,7 @@
             const alarmAbs = document.getElementById('editAlarmAbs').value;
             const alarmPct = document.getElementById('editAlarmPct').value;
             const monitored = document.getElementById('editAccountMonitored').checked;
+            const telegramTradesEnabled = document.getElementById('editTelegramTradesEnabled').checked;
             const removeIcon = window.removeIconClicked || false;
             const iconInput = document.getElementById('editAccountIcon');
 
@@ -2148,6 +2245,7 @@
             if (alarmAbs) formData.append('alarmAbs', alarmAbs);
             if (alarmPct) formData.append('alarmPct', alarmPct);
             formData.append('monitored', monitored);
+            formData.append('telegramTradesEnabled', telegramTradesEnabled);
             formData.append('removeIcon', removeIcon);
             if (iconInput.files && iconInput.files[0]) {
                 formData.append('icon', iconInput.files[0]);

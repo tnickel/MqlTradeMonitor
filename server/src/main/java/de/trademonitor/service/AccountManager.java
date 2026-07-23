@@ -37,6 +37,8 @@ public class AccountManager {
     // === PERFORMANCE CACHES ===
     /** Cached max drawdown % per account (computed from equity snapshots). */
     private final Map<Long, Double> cachedMaxDrawdownPct = new ConcurrentHashMap<>();
+    /** Cached account-level balance/equity drawdowns from a shared snapshot timeline. */
+    private final Map<Long, AccountDrawdownMetrics> cachedAccountDrawdowns = new ConcurrentHashMap<>();
     /** Cached performance metrics per account (profitPct, monthlyProfitPct, m1/m2/m3, mpdd3 etc.). */
     private final Map<Long, Map<String, Object>> cachedPerformanceMetrics = new ConcurrentHashMap<>();
     /** Cached today's closed profit per account. */
@@ -60,7 +62,13 @@ public class AccountManager {
     private HomeyService homeyService;
 
     @Autowired
+    private de.trademonitor.service.AdminNotificationService adminNotificationService;
+
+    @Autowired
     private de.trademonitor.repository.EquitySnapshotRepository equitySnapshotRepository;
+
+    @Autowired
+    private de.trademonitor.repository.AccountRepository accountRepository;
 
     private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
 
@@ -111,17 +119,27 @@ public class AccountManager {
             account.setMagicMinTrades(ae.getMagicMinTrades() != null ? ae.getMagicMinTrades() : 5);
             account.setDisplayOrder(ae.getDisplayOrder() != null ? ae.getDisplayOrder() : 0);
             account.setIconBase64(ae.getIconBase64());
+            account.setInfoText(ae.getInfoText());
+            account.setResourceOrder(ae.getResourceOrder());
 
             // Load alarm config
             account.setOpenProfitAlarmEnabled(ae.isOpenProfitAlarmEnabled());
             account.setOpenProfitAlarmAbs(ae.getOpenProfitAlarmAbs());
             account.setOpenProfitAlarmPct(ae.getOpenProfitAlarmPct());
             account.setMonitored(ae.getMonitored() != null ? ae.getMonitored() : true);
+            account.setTelegramTradesEnabled(ae.getTelegramTradesEnabled() != null ? ae.getTelegramTradesEnabled() : false);
 
             // Load copier state & time offset to prevent false alarms on restart
             account.setCopierError(ae.getCopierError() != null ? ae.getCopierError() : false);
             account.setCopierErrorMessage(ae.getCopierErrorMessage());
             account.setServerTimeOffsetSeconds(ae.getServerTimeOffsetSeconds() != null ? ae.getServerTimeOffsetSeconds() : 0L);
+
+            // Load new EA identification fields
+            account.setRealAccountId(ae.getRealAccountId());
+            account.setComputerName(ae.getComputerName());
+            account.setLoginName(ae.getLoginName());
+            account.setEaVersion(ae.getEaVersion());
+            account.setPlatform(ae.getPlatform());
 
             // Load lastSeen if available
             if (ae.getLastSeen() != null && !ae.getLastSeen().isEmpty()) {
@@ -251,6 +269,30 @@ public class AccountManager {
         }
     }
 
+    private void createAccountInMemoryAndDb(long accountId, Long realAccountId, String computerName, String loginName, String version, String platform, String broker, String currency, double balance) {
+        Account account = new Account(accountId, broker, currency, balance);
+        account.setRealAccountId(realAccountId);
+        account.setComputerName(computerName);
+        account.setLoginName(loginName);
+        account.setEaVersion(version);
+        account.setPlatform(platform);
+        if (!sectionsCache.isEmpty()) {
+            Long defaultSecId = sectionsCache.keySet().iterator().next();
+            Optional<de.trademonitor.entity.DashboardSectionEntity> first = sectionsCache.values().stream()
+                    .min(Comparator.comparingInt(de.trademonitor.entity.DashboardSectionEntity::getDisplayOrder));
+            if (first.isPresent()) {
+                defaultSecId = first.get().getId();
+            }
+            account.setSectionId(defaultSecId);
+        }
+        applyCommissionFactor(account);
+        accounts.put(accountId, account);
+        tradeStorage.saveAccount(accountId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+        if (account.getSectionId() != null) {
+            tradeStorage.updateAccountLayout(accountId, null, account.getDisplayOrder(), account.getSectionId());
+        }
+    }
+
     /**
      * Register or update an account.
      */
@@ -271,6 +313,66 @@ public class AccountManager {
         }
     }
 
+    public synchronized long getOrCreateAssignedAccountId(long realAccountId, String computerName, String loginName) {
+        if (computerName == null || computerName.trim().isEmpty()) {
+            return realAccountId;
+        }
+        Optional<AccountEntity> existing = accountRepository.findByRealAccountIdAndComputerNameAndLoginName(
+                realAccountId, computerName, loginName);
+        if (existing.isPresent()) {
+            return existing.get().getAccountId();
+        }
+
+        // Try candidate IDs starting from physical realAccountId
+        long candidateId = realAccountId;
+        if (!accountRepository.existsById(candidateId)) {
+            return candidateId;
+        }
+
+        // Suffix candidate ID, e.g. 12345601, 12345602, etc.
+        for (int suffix = 1; suffix <= 99; suffix++) {
+            long suffixedId = realAccountId * 100 + suffix;
+            if (!accountRepository.existsById(suffixedId)) {
+                return suffixedId;
+            }
+        }
+
+        // Fallback: timestamp
+        long timestampId = System.currentTimeMillis();
+        while (accountRepository.existsById(timestampId)) {
+            timestampId++;
+        }
+        return timestampId;
+    }
+
+    /**
+     * Register or update an account with full instance tracking.
+     */
+    public long registerAccount(long realAccountId, String computerName, String loginName, String version, String platform, String broker, String currency, double balance) {
+        long assignedId = getOrCreateAssignedAccountId(realAccountId, computerName, loginName);
+        
+        synchronized (getAccountLock(assignedId)) {
+            Account account = accounts.get(assignedId);
+            if (account == null) {
+                createAccountInMemoryAndDb(assignedId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+                LOG.info("New account registered: " + assignedId + " (Real ID: " + realAccountId + ", PC: " + computerName + ", User: " + loginName + ", EA v" + version + ")");
+            } else {
+                account.setBroker(broker);
+                account.setCurrency(currency);
+                account.setBalance(balance);
+                account.setRealAccountId(realAccountId);
+                account.setComputerName(computerName);
+                account.setLoginName(loginName);
+                account.setEaVersion(version);
+                account.setPlatform(platform);
+                account.setLastSeen(LocalDateTime.now());
+                applyCommissionFactor(account);
+                tradeStorage.saveAccount(assignedId, realAccountId, computerName, loginName, version, platform, broker, currency, balance);
+            }
+        }
+        return assignedId;
+    }
+
     public void reportError(long accountId, String errorMessage) {
         Account account = accounts.get(accountId);
         if (account != null) {
@@ -288,7 +390,7 @@ public class AccountManager {
      * Update account details (Method for Dashboard).
      */
     public void updateAccountDetails(long accountId, String name, String type,
-            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored) {
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored, boolean telegramTradesEnabled) {
         Account account = accounts.get(accountId);
         if (account != null) {
             account.setName(name);
@@ -297,8 +399,9 @@ public class AccountManager {
             account.setOpenProfitAlarmAbs(alarmAbs);
             account.setOpenProfitAlarmPct(alarmPct);
             account.setMonitored(monitored);
+            account.setTelegramTradesEnabled(telegramTradesEnabled);
             // Persist
-            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored);
+            tradeStorage.updateAccountDetails(accountId, name, type, alarmEnabled, alarmAbs, alarmPct, monitored, telegramTradesEnabled);
             
             // If monitoring was disabled, clear immediate alarm indicators
             if (!monitored) {
@@ -389,6 +492,7 @@ public class AccountManager {
             // Remove from in-memory caches.
             accounts.remove(accountId);
             cachedMaxDrawdownPct.remove(accountId);
+            cachedAccountDrawdowns.remove(accountId);
             cachedPerformanceMetrics.remove(accountId);
             cachedDailyProfit.remove(accountId);
 
@@ -549,6 +653,12 @@ public class AccountManager {
             info.put("lastSeen", account.getLastSeen());
             info.put("eaLogAcceptedAt", account.getEaLogAcceptedAt());
 
+            info.put("realAccountId", account.getRealAccountId());
+            info.put("computerName", account.getComputerName());
+            info.put("loginName", account.getLoginName());
+            info.put("eaVersion", account.getEaVersion());
+            info.put("platform", account.getPlatform());
+
             long lastSeenMins = -1;
             if (account.getLastSeen() != null) {
                 lastSeenMins = java.time.Duration.between(account.getLastSeen(), java.time.LocalDateTime.now())
@@ -573,6 +683,7 @@ public class AccountManager {
             info.put("copierErrorMessage", account.getCopierErrorMessage());
             info.put("worstCopierStage", account.getWorstCopierStage());
             info.put("monitored", account.isMonitored());
+            info.put("telegramTradesEnabled", account.isTelegramTradesEnabled());
             info.put("iconBase64", account.getIconBase64());
 
             double dailyProfitVal = getCachedDailyProfit(account.getAccountId());
@@ -744,6 +855,12 @@ public class AccountManager {
                     LOG.info("[AccountManager] REAL account " + account.getAccountId()
                             + " (" + (account.getName() != null ? account.getName() : "unnamed")
                             + ") went OFFLINE.");
+                    adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                            de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                            de.trademonitor.dto.AdminNotification.Severity.CRITICAL,
+                            "🔌 Account offline: " + (account.getName() != null ? account.getName() : String.valueOf(account.getAccountId())),
+                            "Konto " + account.getAccountId() + " (" + (account.getName() != null ? account.getName() : "unnamed") + ") ist seit " + account.getLastSeen() + " offline."
+                    ));
                     if (!isWeekendForAccount(account)) {
                         LOG.info("Triggering Homey siren for offline account.");
                         homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), true);
@@ -752,6 +869,12 @@ public class AccountManager {
             } else if (isOnline) {
                 // Account is back online — reset the latch
                 if (offlineSirenLatch.remove(account.getAccountId())) {
+                    adminNotificationService.addNotification(new de.trademonitor.dto.AdminNotification(
+                            de.trademonitor.dto.AdminNotification.Category.HEALTH,
+                            de.trademonitor.dto.AdminNotification.Severity.WARNING,
+                            "🔌 Account wieder online: " + (account.getName() != null ? account.getName() : String.valueOf(account.getAccountId())),
+                            "Konto " + account.getAccountId() + " (" + (account.getName() != null ? account.getName() : "unnamed") + ") ist wieder online."
+                    ));
                     homeyService.setAlarmState("OFFLINE_" + account.getAccountId(), false);
                 }
             }
@@ -937,10 +1060,19 @@ public class AccountManager {
             Map<Long, String> magicLastComment = new HashMap<>();
 
             for (Trade t : account.getOpenTrades()) {
-                magicOpenPL.merge(t.getMagicNumber(), t.getProfit(), (a, b) -> a + b);
+                magicOpenPL.merge(t.getMagicNumber(), t.getProfit() + t.getSwap(), Double::sum);
                 if (t.getComment() != null && !t.getComment().isEmpty()) {
                     magicLastComment.putIfAbsent(t.getMagicNumber(), t.getComment());
                 }
+            }
+
+            AccountDrawdownMetrics accountMetrics = cachedAccountDrawdowns.getOrDefault(
+                    account.getAccountId(),
+                    calculateAccountDrawdownMetrics(Collections.emptyList(), account.getBalance(), account.getEquity()));
+
+            Map<Long, de.trademonitor.dto.MagicProfitEntry> drawdownMetricsByMagic = new HashMap<>();
+            for (de.trademonitor.dto.MagicProfitEntry metrics : account.getMagicProfitEntries(0, 0, null)) {
+                drawdownMetricsByMagic.put(metrics.getMagicNumber(), metrics);
             }
 
             // 3. Create Items
@@ -974,6 +1106,20 @@ public class AccountManager {
                         referenceBalance,
                         openPL);
                 item.setCurrentMagicEquity(openPL);
+                item.setOpenProfit(openPL);
+                item.setAccountDrawdownEur(accountMetrics.drawdownEur());
+                item.setAccountDrawdownPercent(accountMetrics.drawdownPercent());
+                item.setAccountEquityDrawdownEur(accountMetrics.equityDrawdownEur());
+                item.setAccountEquityDrawdownPercent(accountMetrics.equityDrawdownPercent());
+                item.setAccountOpenProfit(account.getTotalProfit());
+
+                de.trademonitor.dto.MagicProfitEntry metrics = drawdownMetricsByMagic.get(magic);
+                if (metrics != null) {
+                    item.setDrawdownEur(metrics.getMaxDrawdownEur());
+                    item.setDrawdownPercent(metrics.getMaxDrawdownPercent());
+                    item.setEquityDrawdownEur(metrics.getMaxEquityDrawdownEur());
+                    item.setEquityDrawdownPercent(metrics.getMaxEquityDrawdownPercent());
+                }
 
                 Long lastSeenMins = null;
                 if (account.getLastSeen() != null) {
@@ -1047,26 +1193,109 @@ public class AccountManager {
         try {
             List<de.trademonitor.entity.EquitySnapshotEntity> snapshots =
                 equitySnapshotRepository.findByAccountIdOrderByTimestampAsc(accountId);
-            double equityDDPct = 0.0;
-            if (snapshots != null && snapshots.size() > 10) {
-                double hwm = 0.0;
-                for (de.trademonitor.entity.EquitySnapshotEntity snap : snapshots) {
-                    double eq = snap.getEquity();
-                    if (eq > hwm) {
-                        hwm = eq;
-                    }
-                    if (hwm > 0) {
-                        double dd = (hwm - eq) / hwm * 100.0;
-                        if (dd > equityDDPct) {
-                            equityDDPct = dd;
-                        }
-                    }
-                }
-            }
-            cachedMaxDrawdownPct.put(accountId, equityDDPct);
+            Account account = accounts.get(accountId);
+            double currentBalance = account != null ? account.getBalance() : 0.0;
+            double currentEquity = account != null ? account.getEquity() : 0.0;
+            AccountDrawdownMetrics metrics =
+                    calculateAccountDrawdownMetrics(snapshots, currentBalance, currentEquity);
+            cachedAccountDrawdowns.put(accountId, metrics);
+            cachedMaxDrawdownPct.put(accountId, metrics.equityDrawdownPercent());
         } catch (Exception e) {
             cachedMaxDrawdownPct.put(accountId, 0.0);
+            cachedAccountDrawdowns.put(accountId, AccountDrawdownMetrics.ZERO);
         }
+    }
+
+    static AccountDrawdownMetrics calculateAccountDrawdownMetrics(
+            List<de.trademonitor.entity.EquitySnapshotEntity> snapshots,
+            double currentBalance,
+            double currentEquity) {
+        double balanceHwm = 0.0;
+        double equityHwm = 0.0;
+        double maxBalanceDrawdownEur = 0.0;
+        double maxBalanceDrawdownPercent = 0.0;
+        double maxEquityDrawdownEur = 0.0;
+        double maxEquityDrawdownPercent = 0.0;
+
+        List<de.trademonitor.entity.EquitySnapshotEntity> safeSnapshots =
+                snapshots != null ? snapshots : Collections.emptyList();
+        for (de.trademonitor.entity.EquitySnapshotEntity snapshot : safeSnapshots) {
+            double[] updated = updateAccountDrawdownMetrics(
+                    snapshot.getBalance(), snapshot.getEquity(),
+                    balanceHwm, equityHwm,
+                    maxBalanceDrawdownEur, maxBalanceDrawdownPercent,
+                    maxEquityDrawdownEur, maxEquityDrawdownPercent);
+            balanceHwm = updated[0];
+            equityHwm = updated[1];
+            maxBalanceDrawdownEur = updated[2];
+            maxBalanceDrawdownPercent = updated[3];
+            maxEquityDrawdownEur = updated[4];
+            maxEquityDrawdownPercent = updated[5];
+        }
+
+        if (currentBalance > 0.0 || currentEquity > 0.0) {
+            double[] updated = updateAccountDrawdownMetrics(
+                    currentBalance, currentEquity,
+                    balanceHwm, equityHwm,
+                    maxBalanceDrawdownEur, maxBalanceDrawdownPercent,
+                    maxEquityDrawdownEur, maxEquityDrawdownPercent);
+            maxBalanceDrawdownEur = updated[2];
+            maxBalanceDrawdownPercent = updated[3];
+            maxEquityDrawdownEur = updated[4];
+            maxEquityDrawdownPercent = updated[5];
+        }
+
+        return new AccountDrawdownMetrics(
+                maxBalanceDrawdownEur,
+                maxBalanceDrawdownPercent,
+                maxEquityDrawdownEur,
+                maxEquityDrawdownPercent);
+    }
+
+    private static double[] updateAccountDrawdownMetrics(
+            double balance,
+            double equity,
+            double balanceHwm,
+            double equityHwm,
+            double maxBalanceDrawdownEur,
+            double maxBalanceDrawdownPercent,
+            double maxEquityDrawdownEur,
+            double maxEquityDrawdownPercent) {
+        double nextBalanceHwm = Math.max(balanceHwm, balance);
+        double nextEquityHwm = Math.max(equityHwm, equity);
+
+        if (nextBalanceHwm > 0.0) {
+            double drawdownEur = Math.max(0.0, nextBalanceHwm - balance);
+            if (drawdownEur > maxBalanceDrawdownEur) {
+                maxBalanceDrawdownEur = drawdownEur;
+                maxBalanceDrawdownPercent = drawdownEur / nextBalanceHwm * 100.0;
+            }
+        }
+        if (nextEquityHwm > 0.0) {
+            double drawdownEur = Math.max(0.0, nextEquityHwm - equity);
+            if (drawdownEur > maxEquityDrawdownEur) {
+                maxEquityDrawdownEur = drawdownEur;
+                maxEquityDrawdownPercent = drawdownEur / nextEquityHwm * 100.0;
+            }
+        }
+
+        return new double[] {
+                nextBalanceHwm,
+                nextEquityHwm,
+                maxBalanceDrawdownEur,
+                maxBalanceDrawdownPercent,
+                maxEquityDrawdownEur,
+                maxEquityDrawdownPercent
+        };
+    }
+
+    static record AccountDrawdownMetrics(
+            double drawdownEur,
+            double drawdownPercent,
+            double equityDrawdownEur,
+            double equityDrawdownPercent) {
+        private static final AccountDrawdownMetrics ZERO =
+                new AccountDrawdownMetrics(0.0, 0.0, 0.0, 0.0);
     }
 
     private final Object dailyProfitLock = new Object();
@@ -1187,7 +1416,7 @@ public class AccountManager {
         
         // Save/Update in DB via tradeStorage
         tradeStorage.saveAccount(accountId, "CSV Import", "EUR", 0.0);
-        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null, true);
+        tradeStorage.updateAccountDetails(accountId, name, "CSV", false, null, null, true, false);
         
         // Save closed trades to DB (retains older trades by checking tickets)
         tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, trades);
@@ -1199,7 +1428,113 @@ public class AccountManager {
         // Initialize/update caches
         cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
         cachedMaxDrawdownPct.put(accountId, 0.0);
+        cachedAccountDrawdowns.put(accountId, AccountDrawdownMetrics.ZERO);
         refreshDailyProfitForAccount(accountId);
     }
+
+    public static class PendingTickRequest {
+        private final long ticket;
+        private final String symbol;
+        private final long minTime;
+        private final long maxTime;
+        private final boolean isOpen;
+        private final long createdAt;
+
+        public PendingTickRequest(long ticket, String symbol, long minTime, long maxTime, boolean isOpen) {
+            this.ticket = ticket;
+            this.symbol = symbol;
+            this.minTime = minTime;
+            this.maxTime = maxTime;
+            this.isOpen = isOpen;
+            this.createdAt = System.currentTimeMillis();
+        }
+
+        public long getTicket() { return ticket; }
+        public String getSymbol() { return symbol; }
+        public long getMinTime() { return minTime; }
+        public long getMaxTime() { return maxTime; }
+        public boolean isOpen() { return isOpen; }
+        public long getCreatedAt() { return createdAt; }
+    }
+
+    private final Map<Long, List<PendingTickRequest>> pendingTickRequests = new ConcurrentHashMap<>();
+    private final Map<String, String> requestedTicksCache = new ConcurrentHashMap<>();
+
+    public void addPendingTickRequest(long accountId, PendingTickRequest request) {
+        pendingTickRequests.computeIfAbsent(accountId, k -> Collections.synchronizedList(new ArrayList<>())).add(request);
+    }
+
+    public PendingTickRequest pollPendingTickRequest(long accountId) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null && !list.isEmpty()) {
+            return list.remove(0);
+        }
+        return null;
+    }
+
+    public PendingTickRequest getPendingTickRequest(long accountId, long ticket, boolean isOpen) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null) {
+            synchronized (list) {
+                for (PendingTickRequest req : list) {
+                    if (req.getTicket() == ticket && req.isOpen() == isOpen) {
+                        return req;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public void removePendingTickRequest(long accountId, long ticket, boolean isOpen) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        if (list != null) {
+            synchronized (list) {
+                list.removeIf(req -> req.getTicket() == ticket && req.isOpen() == isOpen);
+            }
+        }
+    }
+
+    public boolean hasPendingTickRequests(long accountId) {
+        List<PendingTickRequest> list = pendingTickRequests.get(accountId);
+        return list != null && !list.isEmpty();
+    }
+
+    public void cacheRequestedTicks(long ticket, long accountId, boolean isOpen, String ticksJson) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestedTicksCache.put(key, ticksJson);
+    }
+
+    public String getCachedRequestedTicks(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestedTicksCache.get(key);
+    }
+
+    public boolean isRequestedTicksCached(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestedTicksCache.containsKey(key);
+    }
+
+    private final Map<String, Long> requestStartTimes = new ConcurrentHashMap<>();
+
+    public void trackRequestStart(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestStartTimes.putIfAbsent(key, System.currentTimeMillis());
+    }
+
+    public Long getRequestStartTime(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        return requestStartTimes.get(key);
+    }
+
+    public void clearRequestTracking(long ticket, long accountId, boolean isOpen) {
+        String key = ticket + "_" + accountId + "_" + isOpen;
+        requestStartTimes.remove(key);
+    }
+
+    public Map<Long, Account> getAccounts() {
+        return accounts;
+    }
 }
+
 

@@ -22,6 +22,21 @@ public class AccountEntity {
     private String lastSeen;
     private String eaLogAcceptedAt; // ISO timestamp string
 
+    @Column(name = "real_account_id")
+    private Long realAccountId;
+
+    @Column(name = "computer_name")
+    private String computerName;
+
+    @Column(name = "login_name")
+    private String loginName;
+
+    @Column(name = "ea_version")
+    private String eaVersion;
+
+    @Column(name = "platform")
+    private String platform;
+
     private String section; // "TOP" or "BOTTOM" (Deprecated, use sectionId)
 
     @Column(name = "section_id")
@@ -65,6 +80,9 @@ public class AccountEntity {
     @Column(name = "prompt_analysis_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean promptAnalysisEnabled = false;
 
+    @Column(name = "telegram_trades_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean telegramTradesEnabled = false;
+
     @Column(name = "monitored", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean monitored = true;
 
@@ -73,6 +91,12 @@ public class AccountEntity {
 
     @Column(name = "icon_base64", columnDefinition = "TEXT")
     private String iconBase64;
+
+    @Column(name = "info_text", columnDefinition = "TEXT")
+    private String infoText;
+
+    @Column(name = "resource_order", length = 2000)
+    private String resourceOrder;
 
     @Column(name = "last_prompt_analysis_result", columnDefinition = "TEXT")
     private String lastPromptAnalysisResult;
@@ -329,5 +353,69 @@ public class AccountEntity {
 
     public void setIconBase64(String iconBase64) {
         this.iconBase64 = iconBase64;
+    }
+
+    public Long getRealAccountId() {
+        return realAccountId;
+    }
+
+    public void setRealAccountId(Long realAccountId) {
+        this.realAccountId = realAccountId;
+    }
+
+    public String getComputerName() {
+        return computerName;
+    }
+
+    public void setComputerName(String computerName) {
+        this.computerName = computerName;
+    }
+
+    public String getLoginName() {
+        return loginName;
+    }
+
+    public void setLoginName(String loginName) {
+        this.loginName = loginName;
+    }
+
+    public String getEaVersion() {
+        return eaVersion;
+    }
+
+    public void setEaVersion(String eaVersion) {
+        this.eaVersion = eaVersion;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public Boolean getTelegramTradesEnabled() {
+        return telegramTradesEnabled != null ? telegramTradesEnabled : false;
+    }
+
+    public void setTelegramTradesEnabled(Boolean telegramTradesEnabled) {
+        this.telegramTradesEnabled = telegramTradesEnabled;
+    }
+
+    public String getInfoText() {
+        return infoText;
+    }
+
+    public void setInfoText(String infoText) {
+        this.infoText = infoText;
+    }
+
+    public String getResourceOrder() {
+        return resourceOrder;
+    }
+
+    public void setResourceOrder(String resourceOrder) {
+        this.resourceOrder = resourceOrder;
     }
 }

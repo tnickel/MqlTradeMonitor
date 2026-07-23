@@ -34,7 +34,18 @@ public class CustomErrorController implements ErrorController {
             return ResponseEntity.status(statusCode).body(errorDetails);
         }
 
-        // Web Requests: Redirect to Login Page
+        Throwable throwable = (Throwable) request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
+        if (throwable != null) {
+            System.err.println("[DEBUG-ERROR] Exception occurred for URI " + originalUri + ":");
+            throwable.printStackTrace();
+        } else {
+            System.err.println("[DEBUG-ERROR] Error occurred for URI " + originalUri + " with status code " + status);
+        }
+
+        // Web Requests: Redirect to Login Page or Home depending on status
+        if (status != null && "404".equals(status.toString())) {
+            return "redirect:/?error=404";
+        }
         return "redirect:/login";
     }
 }

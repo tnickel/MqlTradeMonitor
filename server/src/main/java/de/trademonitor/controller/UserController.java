@@ -67,4 +67,89 @@ public class UserController {
             return "redirect:/profile";
         }
     }
+
+    @Autowired
+    private de.trademonitor.service.AccountManager accountManager;
+
+    @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
+
+    @GetMapping("/app-config")
+    public String showAppConfig(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
+        if (userDetails == null) {
+            return "redirect:/login";
+        }
+        
+        de.trademonitor.entity.UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+        
+        model.addAttribute("currentUser", user);
+        
+        // Find allowed accounts
+        java.util.List<de.trademonitor.model.Account> allowedAccounts = new java.util.ArrayList<>();
+        if ("ROLE_ADMIN".equals(user.getRole())) {
+            allowedAccounts.addAll(accountManager.getAllAccounts());
+        } else {
+            accountManager.getAllAccounts().stream()
+                    .filter(acc -> accountAccessService.canAccess(user, acc.getAccountId()))
+                    .forEach(allowedAccounts::add);
+        }
+        
+        // Sort accounts by account ID or name
+        allowedAccounts.sort(java.util.Comparator.comparing(de.trademonitor.model.Account::getAccountId));
+        
+        model.addAttribute("accounts", allowedAccounts);
+        model.addAttribute("realAccountIds", user.getRealAccountIds());
+        model.addAttribute("demoAccountIds", user.getDemoAccountIds());
+        
+        return "app-config";
+    }
+
+    @PostMapping("/app-config/save")
+    public String saveAppConfig(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            jakarta.servlet.http.HttpServletRequest request,
+            RedirectAttributes redirectAttrs) {
+        
+        if (userDetails == null) {
+            return "redirect:/login";
+        }
+        
+        de.trademonitor.entity.UserEntity user = userService.getUserById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+        
+        try {
+            java.util.Set<Long> allowedIds = new java.util.HashSet<>();
+            if ("ROLE_ADMIN".equals(user.getRole())) {
+                for (de.trademonitor.model.Account acc : accountManager.getAllAccounts()) {
+                    allowedIds.add(acc.getAccountId());
+                }
+            } else if (user.getAllowedAccountIds() != null) {
+                java.util.Set<Long> accessible = accountAccessService.getAccessibleAccountIds(user);
+                if (accessible != null) {
+                    allowedIds.addAll(accessible);
+                }
+            }
+            
+            java.util.Set<Long> forcedReal = new java.util.HashSet<>();
+            java.util.Set<Long> forcedDemo = new java.util.HashSet<>();
+            
+            for (Long accountId : allowedIds) {
+                String val = request.getParameter("account_" + accountId);
+                if ("REAL".equals(val)) {
+                    forcedReal.add(accountId);
+                } else if ("DEMO".equals(val)) {
+                    forcedDemo.add(accountId);
+                }
+            }
+            
+            userService.updateAppAccountTypes(user.getId(), forcedReal, forcedDemo);
+            
+            redirectAttrs.addFlashAttribute("successMessage", "Konfiguration erfolgreich gespeichert!");
+        } catch (Exception e) {
+            redirectAttrs.addFlashAttribute("errorMessage", "Fehler beim Speichern: " + e.getMessage());
+        }
+        
+        return "redirect:/profile/app-config";
+    }
 }

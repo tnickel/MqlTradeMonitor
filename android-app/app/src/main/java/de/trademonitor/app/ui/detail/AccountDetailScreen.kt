@@ -429,6 +429,14 @@ fun ClosedTradesList(trades: List<ClosedTrade>, currency: String) {
                             fontSize = 10.sp,
                             color = TextSecondary
                         )
+                        if (!trade.comment.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Comment: ${trade.comment}",
+                                fontSize = 10.sp,
+                                color = TextSecondary
+                            )
+                        }
                     }
                     
                     Column(horizontalAlignment = Alignment.End) {

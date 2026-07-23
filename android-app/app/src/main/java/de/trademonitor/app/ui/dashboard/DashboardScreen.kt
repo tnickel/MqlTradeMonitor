@@ -36,6 +36,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -61,7 +64,7 @@ fun DashboardScreen(
     val sharedPrefs = remember { context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE) }
     
     var selectedPeriodReal by remember { 
-        mutableStateOf(sharedPrefs.getString("summary_period_real", "gesamt") ?: "gesamt") 
+        mutableStateOf(sharedPrefs.getString("summary_period_real", "daily") ?: "daily") 
     }
     var selectedAccountIdsReal by remember {
         mutableStateOf(
@@ -74,7 +77,7 @@ fun DashboardScreen(
     }
 
     var selectedPeriodDemo by remember { 
-        mutableStateOf(sharedPrefs.getString("summary_period_demo", "gesamt") ?: "gesamt") 
+        mutableStateOf(sharedPrefs.getString("summary_period_demo", "daily") ?: "daily") 
     }
     var selectedAccountIdsDemo by remember {
         mutableStateOf(
@@ -124,17 +127,34 @@ fun DashboardScreen(
 
         for (account in newAccounts) {
             val idStr = account.accountId.toString()
+            val isDemo = "DEMO".equals(account.type, ignoreCase = true)
+            
             if (idStr !in knownIds) {
                 newKnownIds.add(idStr)
                 changed = true
                 
                 // Select new accounts by default
-                if ("DEMO".equals(account.type, ignoreCase = true)) {
+                if (isDemo) {
                     currentSelectedDemo.add(idStr)
                     demoChanged = true
                 } else {
                     currentSelectedReal.add(idStr)
                     realChanged = true
+                }
+            } else {
+                // If already known but its type changed, move its selection so it doesn't disappear
+                if (isDemo && idStr in currentSelectedReal) {
+                    currentSelectedReal.remove(idStr)
+                    currentSelectedDemo.add(idStr)
+                    realChanged = true
+                    demoChanged = true
+                    changed = true
+                } else if (!isDemo && idStr in currentSelectedDemo) {
+                    currentSelectedDemo.remove(idStr)
+                    currentSelectedReal.add(idStr)
+                    realChanged = true
+                    demoChanged = true
+                    changed = true
                 }
             }
         }
@@ -168,6 +188,35 @@ fun DashboardScreen(
         }
     }
 
+    val performLogout = {
+        coroutineScope.launch {
+            try {
+                val api = ApiClient.getService(context)
+                api.logout()
+            } catch (e: Exception) {
+                // Ignore network errors on logout
+            } finally {
+                ApiClient.clearSession()
+                val sharedPrefs = context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE)
+                sharedPrefs.edit().clear().apply()
+                try {
+                    val masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC)
+                    val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "TradeMonitorPrefsSecure",
+                        masterKeyAlias,
+                        context,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                    securePrefs.edit().clear().apply()
+                } catch (e: Exception) {
+                    // Ignore preference decryption errors during logout
+                }
+                onLogout()
+            }
+        }
+    }
+
     val fetchAccounts = {
         isLoading = true
         errorMessage = null
@@ -184,7 +233,11 @@ fun DashboardScreen(
                     isAdmin = false
                 }
             } catch (e: Exception) {
-                errorMessage = "Fehler beim Laden: ${e.localizedMessage}"
+                if (e is retrofit2.HttpException && e.code() == 401) {
+                    performLogout()
+                } else {
+                    errorMessage = "Fehler beim Laden: ${e.localizedMessage}"
+                }
             } finally {
                 isLoading = false
             }
@@ -208,29 +261,15 @@ fun DashboardScreen(
                     // Ignore silent errors
                 }
             } catch (e: Exception) {
-                // Ignore silent errors during background refresh
+                if (e is retrofit2.HttpException && e.code() == 401) {
+                    performLogout()
+                    return@LaunchedEffect
+                }
+                // Keep the current data for transient background refresh errors.
             }
         }
     }
     
-    val performLogout = {
-        coroutineScope.launch {
-            try {
-                val api = ApiClient.getService(context)
-                api.logout()
-            } catch (e: Exception) {
-                // Ignore network errors on logout
-            } finally {
-                ApiClient.clearSession()
-                val sharedPrefs = context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE)
-                sharedPrefs.edit()
-                    .remove("password") // Remove password so auto-login doesn't trigger again
-                    .apply()
-                onLogout()
-            }
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -350,10 +389,25 @@ fun DashboardScreen(
             )
         }
     ) { paddingValues ->
+        val pullToRefreshState = rememberPullToRefreshState()
+
+        LaunchedEffect(pullToRefreshState.isRefreshing) {
+            if (pullToRefreshState.isRefreshing) {
+                fetchAccounts()
+            }
+        }
+
+        LaunchedEffect(isLoading) {
+            if (!isLoading) {
+                pullToRefreshState.endRefresh()
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
             val pagerState = rememberPagerState(pageCount = { 2 })
 
@@ -405,111 +459,110 @@ fun DashboardScreen(
                         "daily" -> filteredPageAccounts.sumOf { it.dailyProfit }
                         "weekly" -> filteredPageAccounts.sumOf { it.weeklyProfit }
                         "monthly" -> filteredPageAccounts.sumOf { it.monthlyProfit }
-                        else -> filteredPageAccounts.sumOf { it.profit } // "gesamt" is open profit
+                        else -> filteredPageAccounts.sumOf { it.totalHistoryProfit } // "gesamt" is total closed history profit
                     }
                     val activeTradesCount = filteredPageAccounts.sumOf { it.trades }
                     val profitLabel = when (selectedPeriod) {
                         "daily" -> "Tages-Profit"
                         "weekly" -> "Wochen-Profit"
                         "monthly" -> "Monats-Profit"
-                        else -> "Offener Profit"
+                        else -> "Gesamt-Profit"
                     }
                     val currency = filteredPageAccounts.firstOrNull()?.currency ?: "EUR"
 
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Summary Header Card
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .combinedClickable(
-                                    onDoubleClick = {
-                                        configType = if (isRealPage) "REAL" else "DEMO"
-                                        showConfigDialog = true
-                                    },
-                                    onClick = { /* No-op */ }
-                                ),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = if (isRealPage) "GESAMTSTATISTIK REAL" else "GESAMTSTATISTIK DEMO",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text("Gesamt-Balance", fontSize = 13.sp, color = TextSecondary)
-                                        Text(
-                                            text = String.format(Locale.GERMANY, "%,.2f %s", totalBalance, currency),
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        item {
+                            // Summary Header Card
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .combinedClickable(
+                                        onDoubleClick = {
+                                            configType = if (isRealPage) "REAL" else "DEMO"
+                                            showConfigDialog = true
+                                        },
+                                        onClick = { /* No-op */ }
+                                    ),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        text = if (isRealPage) "GESAMTSTATISTIK REAL" else "GESAMTSTATISTIK DEMO",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text("Gesamt-Balance", fontSize = 13.sp, color = TextSecondary)
+                                            Text(
+                                                text = String.format(Locale.GERMANY, "%,.2f %s", totalBalance, currency),
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("Open Profit", fontSize = 13.sp, color = TextSecondary)
+                                            Text(
+                                                text = String.format(Locale.GERMANY, "%+.2f %s", totalOpenProfit, currency),
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (totalOpenProfit >= 0) NeonGreen else NeonRed
+                                            )
+                                        }
                                     }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("Open Profit", fontSize = 13.sp, color = TextSecondary)
-                                        Text(
-                                            text = String.format(Locale.GERMANY, "%+.2f %s", totalOpenProfit, currency),
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (totalOpenProfit >= 0) NeonGreen else NeonRed
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text(profitLabel, fontSize = 13.sp, color = TextSecondary)
-                                        Text(
-                                            text = String.format(Locale.GERMANY, "%+.2f %s", totalProfit, currency),
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (totalProfit >= 0) NeonGreen else NeonRed
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("Aktive Positionen", fontSize = 13.sp, color = TextSecondary)
-                                        Text(
-                                            text = "$activeTradesCount",
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(profitLabel, fontSize = 13.sp, color = TextSecondary)
+                                            Text(
+                                                text = String.format(Locale.GERMANY, "%+.2f %s", totalProfit, currency),
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (totalProfit >= 0) NeonGreen else NeonRed
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("Aktive Positionen", fontSize = 13.sp, color = TextSecondary)
+                                            Text(
+                                                text = "$activeTradesCount",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        // Accounts List
                         if (filteredPageAccounts.isEmpty() && !isLoading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Keine Konten ausgewählt oder gefunden", color = TextSecondary)
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Keine Konten ausgewählt oder gefunden", color = TextSecondary)
+                                }
                             }
                         } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .weight(1f),
-                                contentPadding = PaddingValues(bottom = 16.dp)
-                            ) {
-                                items(filteredPageAccounts) { account ->
-                                    AccountItem(account = account, onClick = { onAccountClick(account.accountId) })
-                                }
+                            items(filteredPageAccounts) { account ->
+                                AccountItem(account = account, onClick = { onAccountClick(account.accountId) })
                             }
                         }
                     }
@@ -539,10 +592,10 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Column {
                                     listOf(
-                                        "gesamt" to "Gesamt (Offener Profit)",
-                                        "daily" to "Tagesstatistik",
+                                        "daily" to "Tagesstatistik (Heute)",
                                         "weekly" to "Wochenstatistik",
-                                        "monthly" to "Ganzer Monat"
+                                        "monthly" to "Ganzer Monat",
+                                        "gesamt" to "Gesamt (Geschlossener Profit)"
                                     ).forEach { (value, label) ->
                                         Row(
                                             modifier = Modifier
@@ -659,6 +712,10 @@ fun DashboardScreen(
                 )
             }
 
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 }

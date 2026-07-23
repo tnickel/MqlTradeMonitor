@@ -364,7 +364,10 @@
                         <td>
                             <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
                                 th:text="${acc.name}">(Name)</a>
-                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                            <span class="account-id" th:text="'#' + (acc.realAccountId != null ? acc.realAccountId : acc.accountId)">#12345</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 5px;"
+                                  th:if="${acc.computerName != null}"
+                                  th:text="'(' + ${acc.loginName} + '@' + ${acc.computerName} + ' v' + ${acc.eaVersion} + ')'">(user@PC v1.00)</span>
                         </td>
                         <td class="text-center">
                             <span class="badge real">REAL</span>
@@ -431,7 +434,10 @@
                         <td>
                             <a class="account-name" th:href="@{/account/{id}(id=${acc.accountId})}" target="_blank"
                                 th:text="${acc.name}">(Name)</a>
-                            <span class="account-id" th:text="'#' + ${acc.accountId}">#12345</span>
+                            <span class="account-id" th:text="'#' + (acc.realAccountId != null ? acc.realAccountId : acc.accountId)">#12345</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 5px;"
+                                  th:if="${acc.computerName != null}"
+                                  th:text="'(' + ${acc.loginName} + '@' + ${acc.computerName} + ' v' + ${acc.eaVersion} + ')'">(user@PC v1.00)</span>
                         </td>
                         <td class="text-center">
                             <span class="badge demo">DEMO</span>

@@ -6,6 +6,7 @@ package de.trademonitor.dto;
 public class HeartbeatRequest {
     private long accountId;
     private String timestamp;
+    private String version;
 
     // Getters and Setters
     public long getAccountId() {
@@ -22,5 +23,13 @@ public class HeartbeatRequest {
 
     public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }

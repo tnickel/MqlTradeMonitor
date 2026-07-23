@@ -42,6 +42,9 @@ public class TradeStorage {
     private OpenTradeRepository openTradeRepository;
 
     @Autowired
+    private TelegramService telegramService;
+
+    @Autowired
     private EquitySnapshotRepository equitySnapshotRepository;
 
     @Autowired
@@ -87,11 +90,30 @@ public class TradeStorage {
         accountRepository.save(entity);
     }
 
+    public void saveAccount(long accountId, Long realAccountId, String computerName, String loginName, String eaVersion, String platform, String broker, String currency, double balance) {
+        AccountEntity entity = accountRepository.findById(accountId).orElse(null);
+        if (entity == null) {
+            entity = new AccountEntity(accountId, broker, currency, balance);
+            entity.setRegisteredAt(java.time.LocalDateTime.now().toString());
+        } else {
+            entity.setBroker(broker);
+            entity.setCurrency(currency);
+            entity.setBalance(balance);
+        }
+        entity.setRealAccountId(realAccountId);
+        entity.setComputerName(computerName);
+        entity.setLoginName(loginName);
+        entity.setEaVersion(eaVersion);
+        entity.setPlatform(platform);
+        entity.setLastSeen(java.time.LocalDateTime.now().toString());
+        accountRepository.save(entity);
+    }
+
     /**
      * Update account name, type, and alarm config.
      */
     public void updateAccountDetails(long accountId, String name, String type,
-            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored) {
+            boolean alarmEnabled, Double alarmAbs, Double alarmPct, boolean monitored, boolean telegramTradesEnabled) {
         AccountEntity entity = accountRepository.findById(accountId).orElse(null);
         if (entity != null) {
             entity.setName(name);
@@ -100,6 +122,7 @@ public class TradeStorage {
             entity.setOpenProfitAlarmAbs(alarmAbs);
             entity.setOpenProfitAlarmPct(alarmPct);
             entity.setMonitored(monitored);
+            entity.setTelegramTradesEnabled(telegramTradesEnabled);
             accountRepository.save(entity);
         }
     }
@@ -220,6 +243,9 @@ public class TradeStorage {
         List<ClosedTradeEntity> toInsert = new ArrayList<>();
         List<ClosedTradeEntity> toUpdate = new ArrayList<>();
 
+        AccountEntity ae = accountRepository.findById(accountId).orElse(null);
+        boolean telegramEnabled = ae != null && Boolean.TRUE.equals(ae.getTelegramTradesEnabled());
+
         java.util.Map<Long, ClosedTradeEntity> existingEntitiesMap = new java.util.HashMap<>();
         if (!existingTicketsSet.isEmpty()) {
             List<ClosedTradeEntity> existingEntities = closedTradeRepository.findByAccountIdAndTicketIn(accountId, existingTickets);
@@ -261,6 +287,26 @@ public class TradeStorage {
                 entity.setCandlesH1(trade.getCandlesH1());
                 toInsert.add(entity);
                 existingTicketsSet.add(trade.getTicket());
+
+                if (telegramEnabled) {
+                    try {
+                        String accountName = ae.getName() != null ? ae.getName() : String.valueOf(accountId);
+                        String typeStr = trade.getType();
+                        String profitSign = trade.getProfit() >= 0 ? "+" : "";
+                        String currencyStr = ae.getCurrency() != null ? " " + ae.getCurrency() : "";
+                        telegramService.sendNotification("✅ *Trade geschlossen (" + accountName + ")*:\n"
+                                + "Ticket: #" + trade.getTicket() + "\n"
+                                + "Symbol: " + trade.getSymbol() + "\n"
+                                + "Typ: " + typeStr + "\n"
+                                + "Volumen: " + String.format("%.2f", trade.getVolume()) + " Lot\n"
+                                + "Einstieg: " + String.format("%.5f", trade.getOpenPrice()) + "\n"
+                                + "Ausstieg: " + String.format("%.5f", trade.getClosePrice()) + "\n"
+                                + "Gewinn: " + profitSign + String.format("%.2f", trade.getProfit()) + currencyStr + "\n"
+                                + (trade.getComment() != null && !trade.getComment().trim().isEmpty() ? "Comment: " + trade.getComment() : ""));
+                    } catch (Exception ex) {
+                        LOG.warning("Failed to send Telegram for closed trade: " + ex.getMessage());
+                    }
+                }
             } else {
                 ClosedTradeEntity existingEntity = existingEntitiesMap.get(trade.getTicket());
                 if (existingEntity != null && 
@@ -302,8 +348,10 @@ public class TradeStorage {
         // Load existing open trades to preserve maxDrawdown
         List<OpenTradeEntity> existingEntities = openTradeRepository.findByAccountId(accountId);
         Map<Long, Double> existingDrawdowns = new java.util.HashMap<>();
+        java.util.Set<Long> existingTickets = new java.util.HashSet<>();
         for (OpenTradeEntity e : existingEntities) {
             existingDrawdowns.put(e.getTicket(), e.getMaxDrawdown());
+            existingTickets.add(e.getTicket());
         }
 
         openTradeRepository.deleteByAccountId(accountId);
@@ -312,12 +360,36 @@ public class TradeStorage {
         if (trades != null) {
             List<OpenTradeEntity> entities = new ArrayList<>();
             java.util.Set<Long> seenTickets = new java.util.HashSet<>();
+            
+            AccountEntity ae = accountRepository.findById(accountId).orElse(null);
+            boolean telegramEnabled = ae != null && Boolean.TRUE.equals(ae.getTelegramTradesEnabled());
+
             for (Trade trade : trades) {
                 if (trade == null) continue;
                 if (!seenTickets.add(trade.getTicket())) {
                     LOG.warning("Duplicate open trade ticket " + trade.getTicket() + " for account " + accountId + " skipped.");
                     continue;
                 }
+
+                if (!existingTickets.contains(trade.getTicket())) {
+                    if (telegramEnabled) {
+                        try {
+                            String accountName = ae.getName() != null ? ae.getName() : String.valueOf(accountId);
+                            String typeStr = trade.getType();
+                            telegramService.sendNotification("🆕 *Neuer Trade geöffnet (" + accountName + ")*:\n"
+                                    + "Ticket: #" + trade.getTicket() + "\n"
+                                    + "Symbol: " + trade.getSymbol() + "\n"
+                                    + "Typ: " + typeStr + "\n"
+                                    + "Volumen: " + String.format("%.2f", trade.getVolume()) + " Lot\n"
+                                    + "Preis: " + String.format("%.5f", trade.getOpenPrice()) + "\n"
+                                    + (trade.getMagicNumber() > 0 ? "Magic: " + trade.getMagicNumber() + "\n" : "")
+                                    + (trade.getComment() != null && !trade.getComment().trim().isEmpty() ? "Comment: " + trade.getComment() : ""));
+                        } catch (Exception ex) {
+                            LOG.warning("Failed to send Telegram for new trade: " + ex.getMessage());
+                        }
+                    }
+                }
+
                 OpenTradeEntity entity = new OpenTradeEntity();
                 entity.setAccountId(accountId);
                 entity.setTicket(trade.getTicket());
@@ -516,9 +588,15 @@ public class TradeStorage {
         ticketMaxDrawdownCache.entrySet().removeIf(e -> e.getKey().startsWith(accountId + "_"));
     }
 
+    @Autowired
+    private de.trademonitor.repository.AccountDocumentRepository accountDocumentRepository;
+
+    @Autowired
+    private de.trademonitor.repository.AccountLinkRepository accountLinkRepository;
+
     /**
      * Permanently delete an account and ALL associated data (open/closed trades,
-     * equity snapshots, EA logs, timelines, LLM analysis logs and the account
+     * equity snapshots, EA logs, timelines, LLM analysis logs, documents, links and the account
      * entity itself). Used by the "Delete Robot" feature.
      */
     @Transactional
@@ -532,6 +610,8 @@ public class TradeStorage {
         try { eaLogEntryRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete EA logs for " + accountId + ": " + e.getMessage()); }
         try { timelineRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete timelines for " + accountId + ": " + e.getMessage()); }
         try { llmAnalysisLogRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete LLM logs for " + accountId + ": " + e.getMessage()); }
+        try { accountDocumentRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete documents for " + accountId + ": " + e.getMessage()); }
+        try { accountLinkRepository.deleteByAccountId(accountId); } catch (Exception e) { LOG.warning("deleteAccount: failed to delete links for " + accountId + ": " + e.getMessage()); }
         accountRepository.deleteById(accountId);
     }
 

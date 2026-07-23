@@ -29,6 +29,9 @@ public class ApiController {
     private AccountManager accountManager;
 
     @Autowired
+    private de.trademonitor.service.AccountAccessService accountAccessService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -85,18 +88,11 @@ public class ApiController {
     }
 
     private boolean isAuthorized(String userKey, Long accountId) {
-        if (userKey == null || userKey.trim().isEmpty()) {
+        if (userKey == null || userKey.trim().isEmpty() || accountId == null || accountId <= 0) {
             return false;
         }
         UserEntity user = userRepository.findByApiKey(userKey).orElse(null);
-        if (user == null) {
-            return false;
-        }
-        // Admins see everything, normal users must have the account allowed
-        if ("ROLE_ADMIN".equals(user.getRole())) {
-            return true;
-        }
-        return user.getAllowedAccountIds().contains(accountId);
+        return accountAccessService.canAccess(user, accountId);
     }
 
     private boolean isValidTradeMetrics(double equity, double balance) {
@@ -135,26 +131,50 @@ public class ApiController {
             @RequestBody RegisterRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
 
-        if (request == null || request.getAccountId() <= 0 || !Double.isFinite(request.getBalance())) {
-            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid accountId or balance"));
+        if (request == null || !Double.isFinite(request.getBalance())) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid registration payload"));
+        }
+        
+        long physicalAccountId = request.getRealAccountId() != null
+                ? request.getRealAccountId()
+                : request.getAccountId();
+        if (physicalAccountId <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid accountId or realAccountId"));
         }
 
-        if (!isAuthorized(userKey, request.getAccountId())) {
+        UserEntity apiUser = userKey == null ? null : userRepository.findByApiKey(userKey).orElse(null);
+        if (!accountAccessService.canAccessPhysicalAccount(apiUser, physicalAccountId)) {
             logClientAction(request.getAccountId(), "AUTH_FAILED", "Invalid or missing User Key during register",
                     httpRequest);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("status", "error", "message", "Unauthorized"));
         }
 
+        if (request.getAccountId() > 0
+                && !accountAccessService.belongsToPhysicalAccount(request.getAccountId(), physicalAccountId)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error", "message", "accountId does not belong to realAccountId"));
+        }
+        if (request.getRealAccountId() != null
+                && (request.getComputerName() == null || request.getComputerName().isBlank())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error", "message", "computerName is required for multi-PC registration"));
+        }
+
         try {
             logClientAction(request.getAccountId(), "REGISTER", "Broker: " + request.getBroker(), httpRequest);
-            accountManager.registerAccount(
-                    request.getAccountId(),
+            long assignedId = accountManager.registerAccount(
+                    physicalAccountId,
+                    request.getComputerName(),
+                    request.getLoginName(),
+                    request.getVersion(),
+                    request.getPlatform() != null ? request.getPlatform() : "MQL5",
                     request.getBroker(),
                     request.getCurrency(),
                     request.getBalance());
             return ResponseEntity.ok(Map.of(
                     "status", "ok",
+                    "accountId", assignedId,
                     "message", "Account registered successfully"));
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
@@ -315,7 +335,37 @@ public class ApiController {
                 }
             }
 
-            return ResponseEntity.ok(Map.of("status", "ok"));
+            Map<String, Object> responseMap = new java.util.HashMap<>();
+            responseMap.put("status", "ok");
+
+            // Check for updates
+            de.trademonitor.model.Account account = accountManager.getAccounts().get(request.getAccountId());
+            if (account != null) {
+                if (request.getVersion() != null && !request.getVersion().isEmpty()) {
+                    account.setEaVersion(request.getVersion());
+                }
+                
+                String currentVersion = request.getVersion() != null ? request.getVersion() : account.getEaVersion();
+                String platform = account.getPlatform() != null ? account.getPlatform() : "MQL5";
+                
+                Map<String, Object> updateInfo = new java.util.HashMap<>();
+                if (isUpdateAvailable(platform, currentVersion, updateInfo)) {
+                    responseMap.putAll(updateInfo);
+                }
+            }
+
+            de.trademonitor.service.AccountManager.PendingTickRequest pendingReq = accountManager.pollPendingTickRequest(request.getAccountId());
+            if (pendingReq != null) {
+                responseMap.put("pendingRequest", Map.of(
+                        "ticket", pendingReq.getTicket(),
+                        "symbol", pendingReq.getSymbol(),
+                        "minTime", pendingReq.getMinTime(),
+                        "maxTime", pendingReq.getMaxTime(),
+                        "isOpen", pendingReq.isOpen()
+                ));
+            }
+
+            return ResponseEntity.ok(responseMap);
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             logClientAction(request.getAccountId(), "HEARTBEAT_ERROR", msg, httpRequest);
@@ -334,15 +384,66 @@ public class ApiController {
         if (userDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("status", "error", "message", "Unauthorized"));
         }
-        UserEntity user = userDetails.getUserEntity();
+        UserEntity user = userRepository.findById(userDetails.getUserEntity().getId())
+                .orElse(userDetails.getUserEntity());
+        
+        java.util.List<java.util.Map<String, Object>> allAccounts = accountManager.getAccountsWithStatus();
+        
+        boolean hasConfig = !user.getRealAccountIds().isEmpty() || !user.getDemoAccountIds().isEmpty();
+        
         if ("ROLE_ADMIN".equals(user.getRole())) {
-            return ResponseEntity.ok(accountManager.getAccountsWithStatus());
+            java.util.List<java.util.Map<String, Object>> overridden = allAccounts.stream()
+                .filter(acc -> {
+                    if (!hasConfig) return true;
+                    Long accountId = (Long) acc.get("accountId");
+                    if (accountId == null) return false;
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    return user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)
+                            || user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId);
+                })
+                .map(acc -> {
+                    Long accountId = (Long) acc.get("accountId");
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    java.util.Map<String, Object> copy = new java.util.HashMap<>(acc);
+                    if (user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)) {
+                        copy.put("type", "REAL");
+                    } else if (user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId)) {
+                        copy.put("type", "DEMO");
+                    }
+                    return copy;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            return ResponseEntity.ok(overridden);
         } else {
-            java.util.Set<Long> allowedIds = user.getAllowedAccountIds();
-            java.util.List<java.util.Map<String, Object>> filtered = accountManager.getAccountsWithStatus().stream()
+            java.util.List<java.util.Map<String, Object>> filtered = allAccounts.stream()
                 .filter(acc -> {
                     Long accountId = (Long) acc.get("accountId");
-                    return allowedIds != null && allowedIds.contains(accountId);
+                    if (accountId == null) return false;
+                    boolean isAllowed = accountAccessService.canAccess(user, accountId);
+                    if (!hasConfig) return isAllowed;
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    boolean isExplicit = user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)
+                            || user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId);
+                    return isAllowed && isExplicit;
+                })
+                .map(acc -> {
+                    Long accountId = (Long) acc.get("accountId");
+                    long physicalId = accountAccessService.getPhysicalAccountId(accountId);
+                    java.util.Map<String, Object> copy = new java.util.HashMap<>(acc);
+                    if (user.getRealAccountIds().contains(accountId)
+                            || user.getRealAccountIds().contains(physicalId)) {
+                        copy.put("type", "REAL");
+                    } else if (user.getDemoAccountIds().contains(accountId)
+                            || user.getDemoAccountIds().contains(physicalId)) {
+                        copy.put("type", "DEMO");
+                    }
+                    return copy;
                 })
                 .collect(java.util.stream.Collectors.toList());
             return ResponseEntity.ok(filtered);
@@ -504,9 +605,129 @@ public class ApiController {
     @GetMapping("/latest-version")
     public ResponseEntity<?> getLatestVersion() {
         return ResponseEntity.ok(Map.of(
-                "versionCode", 6,
-                "versionName", "1.5",
-                "downloadUrl", "https://monitor.tnickel-ki.de/trademonitor_v1.5.apk"
+                 "versionCode", 11,
+                 "versionName", "2.0",
+                 "downloadUrl", "https://monitor.tnickel-ki.de/trademonitor_v2.0.apk"
         ));
     }
+
+    public static class UploadTicksRequest {
+        private long accountId;
+        private long ticket;
+        private String symbol;
+        private long minTime;
+        private long maxTime;
+        private boolean isOpen;
+        private String ticks;
+
+        public long getAccountId() { return accountId; }
+        public void setAccountId(long accountId) { this.accountId = accountId; }
+        public long getTicket() { return ticket; }
+        public void setTicket(long ticket) { this.ticket = ticket; }
+        public String getSymbol() { return symbol; }
+        public void setSymbol(String symbol) { this.symbol = symbol; }
+        public long getMinTime() { return minTime; }
+        public void setMinTime(long minTime) { this.minTime = minTime; }
+        public long getMaxTime() { return maxTime; }
+        public void setMaxTime(long maxTime) { this.maxTime = maxTime; }
+        public boolean isOpen() { return isOpen; }
+        public void setOpen(boolean isOpen) { this.isOpen = isOpen; }
+        public String getTicks() { return ticks; }
+        public void setTicks(String ticks) { this.ticks = ticks; }
+    }
+
+    @PostMapping("/upload-requested-ticks")
+    public ResponseEntity<?> uploadRequestedTicks(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestBody UploadTicksRequest request) {
+        
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "message", "Invalid request"));
+        }
+        
+        if (!isAuthorized(userKey, request.getAccountId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("status", "error", "message", "Unauthorized"));
+        }
+        
+        accountManager.cacheRequestedTicks(
+                request.getTicket(),
+                request.getAccountId(),
+                request.isOpen(),
+                request.getTicks()
+        );
+        accountManager.clearRequestTracking(
+                request.getTicket(),
+                request.getAccountId(),
+                request.isOpen()
+        );
+        
+        return ResponseEntity.ok(Map.of("status", "ok"));
+    }
+
+    private boolean isUpdateAvailable(String platform, String currentVersion, Map<String, Object> updateInfo) {
+        if (currentVersion == null || currentVersion.isEmpty()) {
+            return false;
+        }
+        String ext = "MQL5".equalsIgnoreCase(platform) ? "ex5" : "ex4";
+        java.io.File versionFile = new java.io.File("updates/TradeMonitorClient." + ext + ".version");
+        if (versionFile.exists()) {
+            try {
+                String targetVersion = java.nio.file.Files.readString(versionFile.toPath()).trim();
+                if (isVersionNewer(currentVersion, targetVersion)) {
+                    updateInfo.put("updateAvailable", true);
+                    updateInfo.put("updateUrl", "/api/update/download?platform=" + platform);
+                    updateInfo.put("targetVersion", targetVersion);
+                    return true;
+                }
+            } catch (Exception e) {
+                LOG.warning("Failed to read version file for platform " + platform + ": " + e.getMessage());
+            }
+        }
+        return false;
+    }
+
+    private boolean isVersionNewer(String current, String target) {
+        try {
+            String[] currentParts = current.split("\\.");
+            String[] targetParts = target.split("\\.");
+            int length = Math.max(currentParts.length, targetParts.length);
+            for (int i = 0; i < length; i++) {
+                int c = i < currentParts.length ? Integer.parseInt(currentParts[i]) : 0;
+                int t = i < targetParts.length ? Integer.parseInt(targetParts[i]) : 0;
+                if (t > c) return true;
+                if (c > t) return false;
+            }
+        } catch (Exception e) {
+            return !current.equals(target);
+        }
+        return false;
+    }
+
+    @GetMapping("/update/download")
+    public ResponseEntity<?> downloadUpdate(
+            @RequestHeader(value = "X-User-Key", required = false) String userKey,
+            @RequestParam("platform") String platform) {
+        
+        if (userKey == null || userKey.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing API Key");
+        }
+        UserEntity user = userRepository.findByApiKey(userKey).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid API Key");
+        }
+
+        String fileName = "MQL5".equalsIgnoreCase(platform) ? "TradeMonitorClient.ex5" : "TradeMonitorClient.ex4";
+        java.io.File file = new java.io.File("updates/" + fileName);
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.FileSystemResource(file);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
 }
+
