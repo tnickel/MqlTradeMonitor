@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.20"
+#property version   "1.21"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,7 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.20"
+#define EA_VERSION "1.21"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -1591,9 +1591,15 @@ void SendEaLogs()
          string oldLogDateStr = IntegerToString((long)lastDate);
          if(StringLen(oldLogDateStr) == 8)
          {
-            string oldLogFileDate = StringSubstr(oldLogDateStr, 0, 4) + "." + StringSubstr(oldLogDateStr, 4, 2) + "." + StringSubstr(oldLogDateStr, 6, 2);
-            string oldSrcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\" + oldLogFileDate + ".log";
-            FlushRemainingLogs(oldSrcPath);
+            string logDir = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\";
+            string destFile = "ea_log_copy.txt";
+            string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + destFile;
+            string oldDotted = StringSubstr(oldLogDateStr, 0, 4) + "." + StringSubstr(oldLogDateStr, 4, 2) + "." + StringSubstr(oldLogDateStr, 6, 2);
+            
+            if(CopyFileW(logDir + oldLogDateStr + ".log", destPath, false) || CopyFileW(logDir + oldDotted + ".log", destPath, false))
+            {
+               FlushRemainingLogsFromDest(destFile);
+            }
          }
          
          // Day has changed! Reset line count.
@@ -1608,13 +1614,20 @@ void SendEaLogs()
       GlobalVariableSet(GV_LAST_LOG_DATE, currentDateNumeric);
    }
    
-   string srcPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\" + logDate + ".log";
+   string logDir = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Logs\\";
    string destFile = "ea_log_copy.txt";
    string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + destFile;
+   string dottedDate = StringSubstr(logDate, 0, 4) + "." + StringSubstr(logDate, 4, 2) + "." + StringSubstr(logDate, 6, 2);
    
-   if(!CopyFileW(srcPath, destPath, false))
+   bool copied = CopyFileW(logDir + logDate + ".log", destPath, false);
+   if(!copied && StringLen(logDate) == 8)
    {
-      Print("EA Logs Sync: Failed to copy log file. Ensure 'Allow DLL imports' is enabled.");
+      copied = CopyFileW(logDir + dottedDate + ".log", destPath, false);
+   }
+   
+   if(!copied)
+   {
+      Print("EA Logs Sync: Note - Log file is currently locked or not found for date ", logDate);
       return;
    }
    
@@ -1685,17 +1698,8 @@ bool SendLogLinesChunk(string &lines[], int startIdx, int count)
 //+------------------------------------------------------------------+
 //| Flush remaining logs of the old day before rollover             |
 //+------------------------------------------------------------------+
-void FlushRemainingLogs(string srcPath)
+void FlushRemainingLogsFromDest(string destFile)
 {
-   string destFile = "ea_log_copy.txt";
-   string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + destFile;
-   
-   if(!CopyFileW(srcPath, destPath, false))
-   {
-      Print("Warning: Could not copy old log file: ", srcPath);
-      return;
-   }
-   
    int handle = FileOpen(destFile, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
    if(handle == INVALID_HANDLE)
    {
@@ -1720,20 +1724,22 @@ void FlushRemainingLogs(string srcPath)
    }
    FileClose(handle);
    
-   int totalNewLines = ArraySize(lines);
-   int sentIdx = 0;
-   while(sentIdx < totalNewLines)
+   int newLines = ArraySize(lines);
+   if(newLines > 0)
    {
-      int maxLines = MathMin(totalNewLines - sentIdx, 500);
-      if(SendLogLinesChunk(lines, sentIdx, maxLines))
-      {
-         g_lastLogLinesSent += maxLines;
-         sentIdx += maxLines;
-      }
-      else
-      {
-         break;
-      }
+      int maxLines = MathMin(newLines, 500);
+      SendLogLinesChunk(lines, 0, maxLines);
+   }
+}
+
+void FlushRemainingLogs(string srcPath)
+{
+   string destFile = "ea_log_copy.txt";
+   string destPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + destFile;
+   
+   if(CopyFileW(srcPath, destPath, false))
+   {
+      FlushRemainingLogsFromDest(destFile);
    }
 }
 

@@ -56,6 +56,24 @@
             border-top: 3px solid var(--accent-secondary);
         }
 
+        .map-node.copier-error-shadow {
+            border: 2px solid #ef4444 !important;
+            border-top: 4px solid #ef4444 !important;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), inset 0 0 10px rgba(239, 68, 68, 0.3) !important;
+            animation: card-red-pulse 1.5s infinite alternate !important;
+        }
+
+        @keyframes card-red-pulse {
+            0% {
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.5), inset 0 0 5px rgba(239, 68, 68, 0.2);
+                border-color: #ef4444;
+            }
+            100% {
+                box-shadow: 0 0 25px rgba(239, 68, 68, 0.95), inset 0 0 15px rgba(239, 68, 68, 0.5);
+                border-color: #f87171;
+            }
+        }
+
         .node-header {
             font-weight: bold;
             font-size: 1.1rem;
@@ -515,7 +533,10 @@
 
                 nodeEl.innerHTML = `
                     <div class="input-anchor"></div>
-                    <div class="node-header">${acc.name || acc.accountId}</div>
+                    <div class="node-header">
+                        ${acc.name || acc.accountId}
+                        ${acc.copierError ? '<span style="font-size:0.65rem; background:#ef4444; color:#fff; padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:bold; vertical-align:middle; display:inline-block;">⚠️ SYNC FEHLER</span>' : ''}
+                    </div>
                     <div class="node-id">${acc.broker || 'Broker'} | ${acc.accountId}</div>
                     <div class="connect-anchor" data-id="${acc.accountId}" title="Ziehen um zu verbinden"></div>
                 `;
@@ -605,8 +626,12 @@
             oldMarkers.forEach(p => p.remove());
 
             links.forEach(link => {
-                const color = getColorForTarget(link.targetAccountId);
-                const markerId = 'arrowhead-' + link.targetAccountId;
+                const srcAcc = accounts.find(a => a.accountId === link.sourceAccountId);
+                const tgtAcc = accounts.find(a => a.accountId === link.targetAccountId);
+                const hasErr = (srcAcc && srcAcc.copierError) || (tgtAcc && tgtAcc.copierError);
+                
+                const color = hasErr ? '#ef4444' : getColorForTarget(link.targetAccountId);
+                const markerId = 'arrowhead-' + (hasErr ? ('err-' + link.id) : link.targetAccountId);
 
                 // Make sure defs and specific marker exist
                 let defs = svgLayer.querySelector('defs');
