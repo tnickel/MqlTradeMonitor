@@ -24,7 +24,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServerHealthScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onViewVisitors: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -179,6 +180,28 @@ fun ServerHealthScreen(
                                 HealthRow(label = "Server Logfile", value = health?.logFileSize ?: "N/A")
                                 HealthRow(label = "ROOT.war", value = health?.rootWarSize ?: "N/A")
                                 HealthRow(label = "AI Task Manager", value = health?.aiTaskManagerWarSize ?: "N/A")
+                            }
+                        }
+
+                        if (onViewVisitors != null) {
+                            item {
+                                HealthCard(title = "🌐 Web Analytics & Besucher") {
+                                    Text(
+                                        text = "Besucher-Statistik von tnickel-ki.de/analytics/visitors.html",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = { onViewVisitors.invoke() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Text("Besucher-Statistik anzeigen")
+                                    }
+                                }
                             }
                         }
                     }

@@ -28,10 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.trademonitor.app.api.ApiClient
 import de.trademonitor.app.model.Account
-import de.trademonitor.app.ui.theme.NeonGreen
-import de.trademonitor.app.ui.theme.NeonOrange
-import de.trademonitor.app.ui.theme.NeonRed
-import de.trademonitor.app.ui.theme.TextSecondary
+import de.trademonitor.app.ui.theme.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.pager.HorizontalPager
@@ -49,6 +46,7 @@ fun DashboardScreen(
     onAccountClick: (Long) -> Unit,
     onViewDrawdowns: () -> Unit,
     onViewHealth: () -> Unit,
+    onViewVisitors: () -> Unit,
     onViewSecurityAudit: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -197,20 +195,8 @@ fun DashboardScreen(
                 // Ignore network errors on logout
             } finally {
                 ApiClient.clearSession()
-                val sharedPrefs = context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE)
-                sharedPrefs.edit().clear().apply()
-                try {
-                    val masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC)
-                    val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                        "TradeMonitorPrefsSecure",
-                        masterKeyAlias,
-                        context,
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    )
-                    securePrefs.edit().clear().apply()
-                } catch (e: Exception) {
-                    // Ignore preference decryption errors during logout
+                if (!de.trademonitor.app.util.SecurePrefsManager.isRememberEnabled(context)) {
+                    de.trademonitor.app.util.SecurePrefsManager.clearSavedCredentials(context)
                 }
                 onLogout()
             }
@@ -315,6 +301,20 @@ fun DashboardScreen(
                                             imageVector = Icons.Default.Favorite,
                                             contentDescription = null,
                                             tint = NeonGreen
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Besucher Analytics") },
+                                    onClick = {
+                                        showMenu = false
+                                        onViewVisitors()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 )

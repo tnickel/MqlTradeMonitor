@@ -1,6 +1,6 @@
 package de.trademonitor.app.ui.login
 
-import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -13,6 +13,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import de.trademonitor.app.api.ApiClient
 import de.trademonitor.app.model.LoginRequest
+import de.trademonitor.app.util.SecurePrefsManager
 import kotlinx.coroutines.launch
 
 @Composable
@@ -20,49 +21,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
-    val sharedPrefs = remember { context.getSharedPreferences("TradeMonitorPrefs", Context.MODE_PRIVATE) }
-    val encryptedPrefs = remember {
-        val masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC)
-        val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-            "TradeMonitorPrefsSecure",
-            masterKeyAlias,
-            context,
-            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-        
-        // Migrate old plaintext credentials if they exist
-        if (sharedPrefs.contains("username") || sharedPrefs.contains("password")) {
-            val oldUser = sharedPrefs.getString("username", "") ?: ""
-            val oldPass = sharedPrefs.getString("password", "") ?: ""
-            
-            securePrefs.edit()
-                .putString("username", oldUser)
-                .putString("password", oldPass)
-                .apply()
-                
-            sharedPrefs.edit()
-                .remove("username")
-                .remove("password")
-                .apply()
-        }
-        
-        securePrefs
-    }
-    
-    var serverUrl by remember {
-        val saved = sharedPrefs.getString("server_url", "") ?: ""
-        mutableStateOf(if (saved.isEmpty()) "https://monitor.tnickel-ki.de" else saved)
-    }
-    var username by remember { mutableStateOf(encryptedPrefs.getString("username", "") ?: "") }
-    var password by remember { mutableStateOf(encryptedPrefs.getString("password", "") ?: "") }
+    val savedCredentials = remember { SecurePrefsManager.getCredentials(context) }
+    var serverUrl by remember { mutableStateOf(SecurePrefsManager.getServerUrl(context)) }
+    var username by remember { mutableStateOf(savedCredentials.first) }
+    var password by remember { mutableStateOf(savedCredentials.second) }
+    var rememberCredentials by remember { mutableStateOf(SecurePrefsManager.isRememberEnabled(context)) }
     
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
     // Auto-login trigger
     LaunchedEffect(Unit) {
-        if (serverUrl.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
+        if (rememberCredentials && serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
             isLoading = true
             coroutineScope.launch {
                 try {
@@ -71,9 +41,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val response = api.login(LoginRequest(username, password))
                     if (response.isSuccessful) {
                         ApiClient.updateCsrfToken(response.body())
+                        SecurePrefsManager.saveCredentials(context, username, password, rememberCredentials)
                         onLoginSuccess()
                     } else {
-                        errorMessage = "Auto-Login fehlgeschlagen. Bitte Daten prüfen."
+                        errorMessage = "Auto-Login fehlgeschlagen. Bitte Zugangsdaten prüfen."
                     }
                 } catch (e: Exception) {
                     errorMessage = "Verbindungsfehler: ${e.localizedMessage}"
@@ -97,11 +68,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     val response = api.login(LoginRequest(username, password))
                     if (response.isSuccessful) {
                         ApiClient.updateCsrfToken(response.body())
-                        // Save credentials securely for auto-login
-                        encryptedPrefs.edit()
-                            .putString("username", username)
-                            .putString("password", password)
-                            .apply()
+                        SecurePrefsManager.saveServerUrl(context, serverUrl)
+                        SecurePrefsManager.saveCredentials(context, username, password, rememberCredentials)
                         onLoginSuccess()
                     } else {
                         errorMessage = "Ungültige Anmeldedaten"
@@ -160,7 +128,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         OutlinedTextField(
             value = serverUrl,
             onValueChange = { serverUrl = it },
-            label = { Text("Server URL (z.B. http://192.168.0.50:8080)") },
+            label = { Text("Server URL (z.B. https://monitor.tnickel-ki.de)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
@@ -187,9 +155,28 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { rememberCredentials = !rememberCredentials },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = rememberCredentials,
+                onCheckedChange = { rememberCredentials = it }
+            )
+            Text(
+                text = "Zugangsdaten merken & Auto-Login",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
         
         if (errorMessage != null) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
@@ -197,7 +184,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             )
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         if (isLoading) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -234,3 +221,4 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         )
     }
 }
+

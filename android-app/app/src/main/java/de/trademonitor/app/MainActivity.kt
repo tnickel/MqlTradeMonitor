@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import de.trademonitor.app.api.ApiClient
+import de.trademonitor.app.ui.analytics.VisitorAnalyticsScreen
 import de.trademonitor.app.ui.dashboard.DashboardScreen
 import de.trademonitor.app.ui.detail.AccountDetailScreen
 import de.trademonitor.app.ui.health.ServerHealthScreen
@@ -141,6 +142,9 @@ fun UpdateDialog(
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // Navigation starts at login, LoginScreen handles automatic background login seamlessly
     val startDestination = "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -164,6 +168,9 @@ fun AppNavigation() {
                 },
                 onViewHealth = {
                     navController.navigate("health")
+                },
+                onViewVisitors = {
+                    navController.navigate("visitors")
                 },
                 onViewSecurityAudit = {
                     navController.navigate("security_audit")
@@ -201,6 +208,17 @@ fun AppNavigation() {
             ServerHealthScreen(
                 onBackClick = {
                     navController.popBackStack()
+                },
+                onViewVisitors = {
+                    navController.navigate("visitors")
+                }
+            )
+        }
+
+        composable("visitors") {
+            VisitorAnalyticsScreen(
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -214,4 +232,3 @@ fun AppNavigation() {
         }
     }
 }
-
