@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.12"
+#property version   "1.13"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,7 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.12"
+#define EA_VERSION "1.13"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";

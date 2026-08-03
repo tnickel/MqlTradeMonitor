@@ -1348,7 +1348,7 @@
                                     USD</span>
                             </div>
                             <div class="metric">
-                                <span class="metric-label" title="Gesamter Profit inkl. % zur Start-Balance">Profit <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
+                                <span class="metric-label" th:title="${acc.hasTimeline != null && acc.hasTimeline ? 'Profit seit der letzten Timeline (' + acc.latestTimelineDate + ') inkl. % zur Start-Balance' : 'Gesamter Profit inkl. % zur Start-Balance'}">Profit <span th:if="${acc.hasTimeline != null && acc.hasTimeline}" style="color: #a5b4fc; font-size: 0.85em;" th:title="'Timeline: ' + ${acc.latestTimelineDate}">📅</span> <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
                                 <span th:class="${acc.totalHistoryProfit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
                                     th:text="(${acc.totalHistoryProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.totalHistoryProfit, 1, 2)} + ' ' + ${acc.currency} + ' (' + (${acc.profitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profitPct, 1, 1)} + '%)'">
                                     +120 EUR (+12%)
@@ -1378,15 +1378,11 @@
                             <div class="metric">
                                 <span class="metric-label">Open Profit</span>
                                 <span th:class="${acc.profit >= 0 ? 'metric-value profit-positive' : 'metric-value profit-negative'}"
-                                      th:text="${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}"></span>
+                                      th:text="(${acc.profit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency} + ' (' + (${acc.profit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.balance != null && acc.balance > 0 ? (acc.profit / acc.balance * 100.0) : 0.0, 1, 1)} + '%)'"></span>
                             </div>
                             <div class="metric">
                                 <span class="metric-label">Trades (Offen/Hist)</span>
                                 <span class="metric-value" th:text="${acc.openTradesCount} + ' / ' + ${acc.closedTradesCount}"></span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label" title="All-Time Max Drawdown % (Close-to-Close)">Closed DD <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
-                                <span class="metric-value profit-negative" th:text="'-' + ${#numbers.formatDecimal(acc.maxDrawdownPct, 1, 2)} + '%'">-12.40%</span>
                             </div>
                             <div class="metric">
                                 <span class="metric-label" title="M-PDD3 = (Ø 3M-Rendite) / (3M Max Drawdown)">M-PDD <span style="font-size: 0.8em; cursor: help; color: var(--accent-primary);">ⓘ</span></span>
@@ -1486,7 +1482,8 @@
                             </td>
                             <td th:text="${#numbers.formatDecimal(acc.balance, 1, 2)}" style="text-align: right;">1000.00</td>
                             <td style="text-align: right;" th:classappend="${acc.totalHistoryProfit >= 0 ? ' profit-positive' : ' profit-negative'}"
-                                th:text="(${acc.totalHistoryProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.totalHistoryProfit, 1, 2)} + ' (' + (${acc.profitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profitPct, 1, 1)} + '%)'">+120 (+12%)</td>
+                                th:title="${acc.hasTimeline != null && acc.hasTimeline ? 'Profit seit der letzten Timeline (' + acc.latestTimelineDate + ')' : 'Gesamter Profit'}"
+                                th:text="(${acc.totalHistoryProfit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.totalHistoryProfit, 1, 2)} + ' (' + (${acc.profitPct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profitPct, 1, 1)} + '%)' + (${acc.hasTimeline != null && acc.hasTimeline ? ' 📅' : ''})">+120 (+12%)</td>
                             <td style="text-align: right;" th:classappend="${acc.m1Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m1Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m1Pct, 1, 1)} + '%'"></td>
                             <td style="text-align: right;" th:classappend="${acc.m2Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m2Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m2Pct, 1, 1)} + '%'"></td>
                             <td style="text-align: right;" th:classappend="${acc.m3Pct >= 0 ? ' profit-positive' : ' profit-negative'}" th:text="(${acc.m3Pct > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.m3Pct, 1, 1)} + '%'"></td>

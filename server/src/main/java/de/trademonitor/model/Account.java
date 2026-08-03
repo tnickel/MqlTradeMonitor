@@ -623,11 +623,30 @@ public class Account {
      * @return Map containing the calculated metrics.
      */
     public Map<String, Object> getPerformanceMetrics() {
+        return getPerformanceMetrics(null);
+    }
+
+    public Map<String, Object> getPerformanceMetrics(String latestTimelineDate) {
         Map<String, Object> metrics = new HashMap<>();
         List<ClosedTrade> localClosedTrades = this.closedTrades; // Thread-safe snapshot
         List<Trade> localOpenTrades = this.openTrades;           // Thread-safe snapshot
 
-        double totalHistoryProfit = localClosedTrades.stream().mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor).sum();
+        double totalHistoryProfit;
+        boolean hasTimeline = false;
+
+        if (latestTimelineDate != null && !latestTimelineDate.trim().isEmpty()) {
+            hasTimeline = true;
+            String cutoffStr = latestTimelineDate.replace("-", ".") + " 00:00:00";
+            totalHistoryProfit = localClosedTrades != null ? localClosedTrades.stream()
+                    .filter(t -> t.getCloseTime() != null && t.getCloseTime().replace("-", ".").compareTo(cutoffStr) >= 0)
+                    .mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor)
+                    .sum() : 0.0;
+        } else {
+            totalHistoryProfit = localClosedTrades != null ? localClosedTrades.stream()
+                    .mapToDouble(t -> t.getProfit() + t.getSwap() + t.getCommission() * commissionFactor)
+                    .sum() : 0.0;
+        }
+
         double initialBalance = balance - totalHistoryProfit;
         if (initialBalance <= 0) {
             initialBalance = balance > 0 ? balance : 1.0; // Fallback
@@ -636,6 +655,9 @@ public class Account {
         // 1. Profit %
         double profitPct = (totalHistoryProfit / initialBalance) * 100.0;
         metrics.put("profitPct", profitPct);
+        metrics.put("totalHistoryProfit", totalHistoryProfit);
+        metrics.put("hasTimeline", hasTimeline);
+        metrics.put("latestTimelineDate", latestTimelineDate);
 
         // 2. Account Age & Monthly Profit %
         double accountAgeMonths = 1.0;

@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.21"
+#property version   "1.22"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,7 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.21"
+#define EA_VERSION "1.22"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -1083,9 +1083,10 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             string candlesM15Json = "[]";
             string candlesH1Json = "[]";
             
-            // Query market ticks for recent trades to analyze slippage (limit to last 7 days for full history scan)
+            // Query market ticks for recent trades to analyze slippage (limit to last 3 days during full init to prevent UI freeze)
             datetime currentMqlTime = TimeCurrent();
-            if(isIncremental || dealTimeVal >= currentMqlTime - 7 * 24 * 3600)
+            int maxTickDays = isIncremental ? 7 : 3;
+            if(dealTimeVal >= currentMqlTime - maxTickDays * 24 * 3600)
             {
                GetMarketBidAsk(symbol, openTimeMsc, openBid, openAsk);
                GetMarketBidAsk(symbol, closeTimeMsc, closeBid, closeAsk);
@@ -1093,7 +1094,8 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                closeTicksJson = GetTicksJson(symbol, closeTimeMsc);
             }
             
-            if(isIncremental || dealTimeVal >= currentMqlTime - 30 * 24 * 3600)
+            int maxCandleDays = isIncremental ? 30 : 3;
+            if(dealTimeVal >= currentMqlTime - maxCandleDays * 24 * 3600)
             {
                datetime openDt = (datetime)(openTimeMsc / 1000);
                datetime closeDt = (datetime)(closeTimeMsc / 1000);

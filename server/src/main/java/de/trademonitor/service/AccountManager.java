@@ -70,6 +70,9 @@ public class AccountManager {
     @Autowired
     private de.trademonitor.repository.AccountRepository accountRepository;
 
+    @Autowired
+    private de.trademonitor.repository.TimelineRepository timelineRepository;
+
     private final Map<Long, de.trademonitor.entity.DashboardSectionEntity> sectionsCache = new ConcurrentHashMap<>();
 
     /**
@@ -569,7 +572,7 @@ public class AccountManager {
 
         tradeStorage.saveEquitySnapshot(accountId, equity, balance);
         if (inserted > 0) {
-            cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+            getOrCalculatePerformanceMetrics(accountId);
             refreshDailyProfitForAccount(accountId);
         }
         return inserted;
@@ -633,6 +636,36 @@ public class AccountManager {
      */
     public Collection<Account> getAllAccounts() {
         return accounts.values();
+    }
+
+    public void invalidatePerformanceMetrics(long accountId) {
+        cachedPerformanceMetrics.remove(accountId);
+    }
+
+    public String getLatestTimelineDate(long accountId) {
+        if (timelineRepository == null) return null;
+        try {
+            List<de.trademonitor.entity.TimelineEntity> timelines = timelineRepository.findByAccountIdOrderByTimelineDateAsc(accountId);
+            if (timelines == null || timelines.isEmpty()) return null;
+            return timelines.stream()
+                    .map(de.trademonitor.entity.TimelineEntity::getTimelineDate)
+                    .filter(Objects::nonNull)
+                    .max(String::compareTo)
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public Map<String, Object> getOrCalculatePerformanceMetrics(long accountId) {
+        Account account = accounts.get(accountId);
+        if (account == null) {
+            return Collections.emptyMap();
+        }
+        String latestTimelineDate = getLatestTimelineDate(accountId);
+        Map<String, Object> perfMetrics = account.getPerformanceMetrics(latestTimelineDate);
+        cachedPerformanceMetrics.put(accountId, perfMetrics);
+        return perfMetrics;
     }
 
     /**
@@ -717,8 +750,7 @@ public class AccountManager {
             Map<String, Object> perfMetrics = cachedPerformanceMetrics.get(account.getAccountId());
             if (perfMetrics == null) {
                 // Fallback: calculate and cache on first access
-                perfMetrics = account.getPerformanceMetrics();
-                cachedPerformanceMetrics.put(account.getAccountId(), perfMetrics);
+                perfMetrics = getOrCalculatePerformanceMetrics(account.getAccountId());
             }
             info.put("profitPct", perfMetrics.get("profitPct"));
             info.put("monthlyProfitPct", perfMetrics.get("monthlyProfitPct"));
@@ -732,7 +764,9 @@ public class AccountManager {
             info.put("maxDrawdownPct", equityDDPct);
             info.put("openTradesCount", perfMetrics.get("openTradesCount"));
             info.put("closedTradesCount", perfMetrics.get("closedTradesCount"));
-            info.put("totalHistoryProfit", account.getTotalHistoryProfit());
+            info.put("totalHistoryProfit", perfMetrics.get("totalHistoryProfit") != null ? perfMetrics.get("totalHistoryProfit") : account.getTotalHistoryProfit());
+            info.put("hasTimeline", perfMetrics.getOrDefault("hasTimeline", false));
+            info.put("latestTimelineDate", perfMetrics.get("latestTimelineDate"));
 
             result.add(info);
         }
@@ -897,7 +931,7 @@ public class AccountManager {
 
             // Invalidate caches for this account since trades changed
             if (inserted > 0) {
-                cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+                getOrCalculatePerformanceMetrics(accountId);
                 refreshDailyProfitForAccount(accountId);
             }
             return inserted;
@@ -1175,8 +1209,8 @@ public class AccountManager {
         long start = System.currentTimeMillis();
         for (Account account : accounts.values()) {
             long accId = account.getAccountId();
-            // Cache performance metrics
-            cachedPerformanceMetrics.put(accId, account.getPerformanceMetrics());
+            // Cache performance metrics (incorporating latest timeline date if present)
+            getOrCalculatePerformanceMetrics(accId);
             // Cache max drawdown from equity snapshots
             refreshDrawdownCacheForAccount(accId);
             // Cache daily profit
@@ -1426,7 +1460,7 @@ public class AccountManager {
         account.setClosedTrades(allTrades);
 
         // Initialize/update caches
-        cachedPerformanceMetrics.put(accountId, account.getPerformanceMetrics());
+        getOrCalculatePerformanceMetrics(accountId);
         cachedMaxDrawdownPct.put(accountId, 0.0);
         cachedAccountDrawdowns.put(accountId, AccountDrawdownMetrics.ZERO);
         refreshDailyProfitForAccount(accountId);

@@ -650,6 +650,7 @@ public class DashboardController {
         
         de.trademonitor.entity.TimelineEntity timeline = new de.trademonitor.entity.TimelineEntity(accountId, timelineDate);
         timelineRepository.save(timeline);
+        accountManager.invalidatePerformanceMetrics(accountId);
         
         Account account = accountManager.getAccount(accountId);
         if (account != null) {
@@ -679,9 +680,9 @@ public class DashboardController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
         }
         timelineRepository.delete(timeline);
+        accountManager.invalidatePerformanceMetrics(timeline.getAccountId());
         return ResponseEntity.ok("Deleted");
     }
-
 
     /**
      * AJAX Endpoint to update magic number max age for a specific account.

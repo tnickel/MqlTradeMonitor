@@ -93,7 +93,7 @@
                     <div class="metric-item">
                         <div class="metric-label">Open Profit</div>
                         <div class="profit-value" th:classappend="${acc.profit >= 0 ? 'profit-positive' : 'profit-negative'}"
-                             th:text="(${acc.profit >= 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency}">+500 EUR</div>
+                             th:text="(${acc.profit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.profit, 1, 2)} + ' ' + ${acc.currency} + ' (' + (${acc.profit > 0 ? '+' : ''}) + ${#numbers.formatDecimal(acc.balance != null && acc.balance > 0 ? (acc.profit / acc.balance * 100.0) : 0.0, 1, 1)} + '%)'">+500 EUR</div>
                     </div>
                 </div>
 
