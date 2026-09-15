@@ -2,6 +2,15 @@
 
 Dieses Dokument beschreibt den vollständigen Prozess zur Versionsverwaltung, Kompilierung, Server-Bereitstellung und Verteilung des **TradeMonitorClient** EAs auf MQL4 und MQL5.
 
+## Release 2026-09-15: MT5 1.23 / Server 0.12.1
+
+- Behebt falsche BUY/SELL- und Öffnungsdaten, wenn der Eröffnungsdeal außerhalb des inkrementellen Zeitfensters liegt.
+- Zuerst den Server bereitstellen: Er kann bestehende Fallback-Datensätze mit vollständigen Öffnungsdaten reparieren. Danach MT5 1.23 veröffentlichen.
+- MT5 1.23 führt pro Konto einmal einen vollständigen Historienabgleich aus. Die GlobalVariable `TM_HistoryRevision_<account>` wird erst nach erfolgreichem Upload auf Revision 1 gesetzt; fehlgeschlagene Historienauswahl oder Uploads bleiben wiederholbar.
+- **Am 2026-09-15 verifiziert:** Die produktive JVM hat `user.dir=/`. Der tatsächlich verwendete Updatepfad ist daher **`/updates/`**. Die unten dokumentierten WildFly-Verzeichnisse allein reichen nicht aus. Bei jedem Deployment `user.dir` prüfen und Binary sowie Versionsdatei im aktiven Pfad aktualisieren.
+- Repository-Kopien für MT5: `mql5/`, `updates/`, `server/updates/`. Binary und `.version` müssen übereinstimmen; zuerst das Binary atomar ersetzen, zuletzt die Versionsdatei veröffentlichen.
+- Client-Regressionsprüfung: `node mql5/tests/run-history-tests.cjs`; Server-Build: `mvn.cmd -f server/pom.xml package` mit JDK 21. Der Server bleibt auf Java-17-Bytecode eingestellt.
+
 ---
 
 ## 1. Versionsnummern anpassen (WICHTIG!)

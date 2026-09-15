@@ -231,8 +231,19 @@ public class TradeStorage {
      */
     @Transactional
     public int saveClosedTradesWithDuplicateCheck(long accountId, List<ClosedTrade> closedTrades) {
+        return saveClosedTradesWithResult(accountId, closedTrades).inserted();
+    }
+
+    public record ClosedTradeSaveResult(int inserted, int updated) {
+        public boolean hasChanges() {
+            return inserted > 0 || updated > 0;
+        }
+    }
+
+    @Transactional
+    public ClosedTradeSaveResult saveClosedTradesWithResult(long accountId, List<ClosedTrade> closedTrades) {
         if (closedTrades == null || closedTrades.isEmpty()) {
-            return 0;
+            return new ClosedTradeSaveResult(0, 0);
         }
 
         // Load only the existing tickets for this account in ONE query (fast)
@@ -309,13 +320,39 @@ public class TradeStorage {
                 }
             } else {
                 ClosedTradeEntity existingEntity = existingEntitiesMap.get(trade.getTicket());
-                if (existingEntity != null && 
-                    (existingEntity.getCandlesM5() == null || existingEntity.getCandlesM5().trim().isEmpty() || existingEntity.getCandlesM5().equals("[]")) &&
-                    trade.getCandlesM5() != null && !trade.getCandlesM5().trim().isEmpty() && !trade.getCandlesM5().equals("[]")) {
-                    
+                boolean updated = false;
+                boolean repaired = existingEntity != null && canRepairMissingEntry(existingEntity, trade);
+                if (repaired) {
+                    existingEntity.setType(trade.getType());
+                    existingEntity.setOpenPrice(trade.getOpenPrice());
+                    existingEntity.setOpenTime(trade.getOpenTime());
+                    existingEntity.setOpenTimeMsc(trade.getOpenTimeMsc());
+                    existingEntity.setCommission(trade.getCommission());
+                    existingEntity.setMagicNumber(trade.getMagicNumber());
+                    existingEntity.setComment(trade.getComment());
+                    existingEntity.setOpenOrderSetupTimeMsc(trade.getOpenOrderSetupTimeMsc());
+                    existingEntity.setOpenAsk(trade.getOpenAsk());
+                    existingEntity.setOpenBid(trade.getOpenBid());
+                    // Old entry ticks belong to the closing event and must not survive a repair.
+                    existingEntity.setOpenTicks(trade.getOpenTicks());
+                    updated = true;
+                }
+                if (existingEntity != null && hasCandles(trade.getCandlesM5())
+                        && (repaired || !hasCandles(existingEntity.getCandlesM5()))) {
                     existingEntity.setCandlesM5(trade.getCandlesM5());
+                    updated = true;
+                }
+                if (existingEntity != null && hasCandles(trade.getCandlesM15())
+                        && (repaired || !hasCandles(existingEntity.getCandlesM15()))) {
                     existingEntity.setCandlesM15(trade.getCandlesM15());
+                    updated = true;
+                }
+                if (existingEntity != null && hasCandles(trade.getCandlesH1())
+                        && (repaired || !hasCandles(existingEntity.getCandlesH1()))) {
                     existingEntity.setCandlesH1(trade.getCandlesH1());
+                    updated = true;
+                }
+                if (updated && !toUpdate.contains(existingEntity)) {
                     toUpdate.add(existingEntity);
                 }
             }
@@ -331,13 +368,41 @@ public class TradeStorage {
         }
         if (!toUpdate.isEmpty()) {
             closedTradeRepository.saveAll(toUpdate);
-            LOG.info("Account " + accountId + ": " + toUpdate.size() + " existing closed trades updated with native candles");
+            LOG.info("Account " + accountId + ": " + toUpdate.size() + " existing closed trades repaired or enriched");
         }
 
         LOG.info("Account " + accountId + ": " + toInsert.size() + " new closed trades inserted, "
                 + (closedTrades.size() - toInsert.size()) + " duplicates skipped (from " + closedTrades.size()
                 + " received)");
-        return toInsert.size();
+        return new ClosedTradeSaveResult(toInsert.size(), toUpdate.size());
+    }
+
+    private boolean canRepairMissingEntry(ClosedTradeEntity existing, ClosedTrade incoming) {
+        // Limit repairs to the MT5 fallback signature and an unchanged closing deal.
+        if (existing.getOpenTime() == null || !existing.getOpenTime().equals(existing.getCloseTime())
+                || Double.compare(existing.getOpenPrice(), existing.getClosePrice()) != 0
+                || !java.util.Objects.equals(existing.getSymbol(), incoming.getSymbol())
+                || !java.util.Objects.equals(existing.getCloseTime(), incoming.getCloseTime())
+                || Double.compare(existing.getClosePrice(), incoming.getClosePrice()) != 0
+                || Double.compare(existing.getVolume(), incoming.getVolume()) != 0
+                || !("BUY".equals(incoming.getType()) || "SELL".equals(incoming.getType()))
+                || !Double.isFinite(incoming.getOpenPrice()) || incoming.getOpenPrice() <= 0
+                || !Double.isFinite(incoming.getCommission())
+                || incoming.getOpenTime() == null || incoming.getCloseTime() == null) {
+            return false;
+        }
+        try {
+            DateTimeFormatter format = DateTimeFormatter.ofPattern("uuuu.MM.dd HH:mm:ss")
+                    .withResolverStyle(java.time.format.ResolverStyle.STRICT);
+            return LocalDateTime.parse(incoming.getOpenTime(), format)
+                    .isBefore(LocalDateTime.parse(incoming.getCloseTime(), format));
+        } catch (java.time.format.DateTimeParseException ex) {
+            return false;
+        }
+    }
+
+    private boolean hasCandles(String candles) {
+        return candles != null && !candles.isBlank() && !"[]".equals(candles.trim());
     }
 
     /**

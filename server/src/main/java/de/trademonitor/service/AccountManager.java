@@ -555,27 +555,27 @@ public class AccountManager {
         if (account == null) {
             return 0;
         }
-        int inserted;
+        TradeStorage.ClosedTradeSaveResult saved;
         synchronized (getAccountLock(accountId)) {
             tradeStorage.replaceOpenTrades(accountId, trades);
             tradeStorage.updateAccountMetrics(accountId, equity, balance);
-            inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
+            saved = tradeStorage.saveClosedTradesWithResult(accountId, closedTrades);
 
             account.setOpenTrades(trades != null ? trades : new ArrayList<>());
             account.setEquity(equity);
             account.setBalance(balance);
             account.setLastSeen(LocalDateTime.now());
-            if (inserted > 0) {
+            if (saved.hasChanges()) {
                 account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
             }
         }
 
         tradeStorage.saveEquitySnapshot(accountId, equity, balance);
-        if (inserted > 0) {
+        if (saved.hasChanges()) {
             getOrCalculatePerformanceMetrics(accountId);
             refreshDailyProfitForAccount(accountId);
         }
-        return inserted;
+        return saved.inserted();
     }
 
     /**
@@ -919,10 +919,10 @@ public class AccountManager {
         ensureAccountExists(accountId, null, null, null);
         Account account = accounts.get(accountId);
         if (account != null && closedTrades != null) {
-            int inserted;
+            TradeStorage.ClosedTradeSaveResult saved;
             synchronized (getAccountLock(accountId)) {
                 // Save to DB with duplicate check
-                inserted = tradeStorage.saveClosedTradesWithDuplicateCheck(accountId, closedTrades);
+                saved = tradeStorage.saveClosedTradesWithResult(accountId, closedTrades);
 
                 // Reload from DB to keep in-memory cache consistent
                 account.setClosedTrades(tradeStorage.loadClosedTrades(accountId));
@@ -930,11 +930,11 @@ public class AccountManager {
             account.setLastSeen(LocalDateTime.now());
 
             // Invalidate caches for this account since trades changed
-            if (inserted > 0) {
+            if (saved.hasChanges()) {
                 getOrCalculatePerformanceMetrics(accountId);
                 refreshDailyProfitForAccount(accountId);
             }
-            return inserted;
+            return saved.inserted();
         }
         return 0;
     }

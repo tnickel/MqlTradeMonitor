@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.22"
+#property version   "1.23"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,8 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.22"
+#define EA_VERSION "1.23"
+#define HISTORY_SYNC_REVISION 1
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -59,6 +60,7 @@ string g_lastSyncedCloseTime = "";       // Last close time successfully synced 
 //--- EA Log tracking
 int g_lastLogLinesSent = 0;              // Number of log lines already sent to server
 string GV_TRADELIST_SENT = "";           // GlobalVariable name for persisting trade list sync status
+string GV_HISTORY_REVISION = "";         // Completed history repair revision per account
 string GV_LAST_LOG_LINES = "";           // GlobalVariable name for persisting log position
 string GV_LAST_LOG_DATE = "";            // GlobalVariable name for persisting the log date format YYYYMMDD
 
@@ -306,6 +308,7 @@ int OnInit()
    // Build unique GlobalVariable names per account
    string accStr = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    GV_TRADELIST_SENT = "TM_Trade_Sent_" + accStr;
+   GV_HISTORY_REVISION = "TM_HistoryRevision_" + accStr;
    GV_LAST_LOG_LINES = "TM_LastLogLines_" + accStr;
    GV_LAST_LOG_DATE  = "TM_LastLogDate_" + accStr;
     
@@ -329,6 +332,7 @@ int OnInit()
    
    // Load last synced close time from config file
    LoadLastSyncTime();
+   PrepareHistoryRevision();
    
    Print("Server URL: ", cfg_ServerURL);
    Print("Account ID: ", AccountInfoInteger(ACCOUNT_LOGIN));
@@ -777,6 +781,7 @@ bool SendInitialTradeList()
    UpdateStatusLabel("Syncing Trade History...", clrWhite);
    string latestCloseTime = "";
    string historyJson = BuildClosedTradesJson("", latestCloseTime);
+   if(historyJson == "") return false; // Selection failure must not complete the repair revision.
    
    UpdateStatusLabel("Uploading Data to Server...", clrWhite);
    
@@ -804,6 +809,7 @@ bool SendInitialTradeList()
          latestCloseTime = TimeToString(TimeCurrent() - 1, TIME_DATE|TIME_SECONDS);
       g_lastSyncedCloseTime = latestCloseTime;
       SaveLastSyncTime(latestCloseTime);
+      GlobalVariableSet(GV_HISTORY_REVISION, HISTORY_SYNC_REVISION);
       Print("Last synced close time: ", latestCloseTime);
       return true;
    }
@@ -952,10 +958,29 @@ string GetRatesAsJson(string symbol, ENUM_TIMEFRAMES period, datetime startTime,
 }
 
 //+------------------------------------------------------------------+
+//| Re-upload history once after a history reconstruction fix         |
+//+------------------------------------------------------------------+
+void PrepareHistoryRevision()
+{
+   if(!GlobalVariableCheck(GV_HISTORY_REVISION) ||
+      GlobalVariableGet(GV_HISTORY_REVISION) < HISTORY_SYNC_REVISION)
+   {
+      g_tradeListSent = false;
+      g_tradeListSentTime = 0;
+      g_lastSyncedCloseTime = "";
+      GlobalVariableSet(GV_TRADELIST_SENT, 0);
+      SaveLastSyncTime("");
+      Print("History repair revision ", HISTORY_SYNC_REVISION, ": scheduling full history sync");
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Build JSON array of closed trades (history)                        |
+//| Empty string signals selection failure; [] means valid no trades. |
 //+------------------------------------------------------------------+
 string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
 {
+   outLatestCloseTime = "";
    // Determine incremental vs full sync BEFORE selecting history
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
    datetime sinceTimeVal = 0;
@@ -972,7 +997,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    if(!HistorySelect(fromDate, toDate))
    {
       Print("Failed to select history");
-      return "[]";
+      return "";
    }
    
    string historyJson = "[";
@@ -1012,7 +1037,8 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                outLatestCloseTime = closeTime;
             
             // Determine the original trade direction and total commission by finding the ENTRY_IN deal
-            // for this position via DEAL_POSITION_ID. Optimized to search backwards from i-1 to 0 (O(N) total runtime).
+            // for this position via DEAL_POSITION_ID. The incremental window can
+            // exclude the opening deal, so retry against the full position history.
             string symbol = HistoryDealGetString(ticket, DEAL_SYMBOL);
             string typeStr = "UNKNOWN";
             double openPrice = HistoryDealGetDouble(ticket, DEAL_PRICE); // fallback: OUT deal price
@@ -1026,6 +1052,8 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             double openAsk = 0.0;
             
             long positionId = (long)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
+            ulong openingTicket = 0;
+            bool restoreHistoryWindow = false;
             if(positionId > 0)
             {
                for(int j = i - 1; j >= 0; j--)
@@ -1037,38 +1065,79 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                      // Find the IN deal for open data and its commission
                      if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(otherTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
                      {
-                        // Proportional allocation of IN deal commission to avoid double-counting on partial closes
-                        double inVol = HistoryDealGetDouble(otherTicket, DEAL_VOLUME);
-                        double outVol = HistoryDealGetDouble(ticket, DEAL_VOLUME);
-                        double proportion = (inVol > 0) ? (outVol / inVol) : 1.0;
-                        if(proportion > 1.0) proportion = 1.0;
-                        totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION) * proportion;
-                        
-                        ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(otherTicket, DEAL_TYPE);
-                        typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
-                        openPrice = HistoryDealGetDouble(otherTicket, DEAL_PRICE);
-                        openTime = TimeToString((datetime)HistoryDealGetInteger(otherTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
-                        openTimeMsc = HistoryDealGetInteger(otherTicket, DEAL_TIME_MSC);
-                        
-                        ulong openOrderTicket = HistoryDealGetInteger(otherTicket, DEAL_ORDER);
-                        openOrderSetupTimeMsc = GetOrderSetupTimeMsc(openOrderTicket);
-                        
-                        // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
-                        long inMagic = HistoryDealGetInteger(otherTicket, DEAL_MAGIC);
-                        if(inMagic > 0) magicNumber = inMagic;
-                        
-                        string inComment = HistoryDealGetString(otherTicket, DEAL_COMMENT);
-                        if(StringLen(inComment) > 0) tradeComment = inComment;
-                        break; // Found matching IN deal, exit loop
+                        openingTicket = otherTicket;
+                        break;
                      }
                   }
                }
+
+               if(openingTicket == 0)
+               {
+                  // This replaces the selected deal list. Restore the original
+                  // window below before the outer loop uses its next index.
+                  restoreHistoryWindow = true;
+                  if(HistorySelectByPosition((ulong)positionId))
+                  {
+                     bool beforeClose = false;
+                     for(int j = HistoryDealsTotal() - 1; j >= 0; j--)
+                     {
+                        ulong otherTicket = HistoryDealGetTicket(j);
+                        if(otherTicket == ticket)
+                        {
+                           beforeClose = true;
+                           continue;
+                        }
+                        if(beforeClose && otherTicket > 0 &&
+                           (ENUM_DEAL_ENTRY)HistoryDealGetInteger(otherTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                        {
+                           openingTicket = otherTicket;
+                           break;
+                        }
+                     }
+                  }
+               }
+
+               if(openingTicket > 0)
+               {
+                  ulong otherTicket = openingTicket;
+                  // Proportional allocation of IN deal commission to avoid double-counting on partial closes
+                  double inVol = HistoryDealGetDouble(otherTicket, DEAL_VOLUME);
+                  double outVol = HistoryDealGetDouble(ticket, DEAL_VOLUME);
+                  double proportion = (inVol > 0) ? (outVol / inVol) : 1.0;
+                  if(proportion > 1.0) proportion = 1.0;
+                  totalCommission += HistoryDealGetDouble(otherTicket, DEAL_COMMISSION) * proportion;
+
+                  ENUM_DEAL_TYPE entryType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(otherTicket, DEAL_TYPE);
+                  typeStr = (entryType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                  openPrice = HistoryDealGetDouble(otherTicket, DEAL_PRICE);
+                  openTime = TimeToString((datetime)HistoryDealGetInteger(otherTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                  openTimeMsc = HistoryDealGetInteger(otherTicket, DEAL_TIME_MSC);
+
+                  ulong openOrderTicket = HistoryDealGetInteger(otherTicket, DEAL_ORDER);
+                  openOrderSetupTimeMsc = GetOrderSetupTimeMsc(openOrderTicket);
+
+                  // Get magic number from the IN deal, as OUT deals (TP/SL) often have magic = 0
+                  long inMagic = HistoryDealGetInteger(otherTicket, DEAL_MAGIC);
+                  if(inMagic > 0) magicNumber = inMagic;
+
+                  string inComment = HistoryDealGetString(otherTicket, DEAL_COMMENT);
+                  if(StringLen(inComment) > 0) tradeComment = inComment;
+               }
             }
-             // Fallback: if no IN deal found, use the OUT deal type directly
+            if(restoreHistoryWindow && !HistorySelect(fromDate, toDate))
+            {
+               Print("Failed to restore history window after position lookup; history sync will retry");
+               outLatestCloseTime = "";
+               return "";
+            }
+            // An exit BUY closes a SELL position and vice versa. Never report
+            // the closing transaction's direction as the original trade type.
             if(typeStr == "UNKNOWN")
             {
                ENUM_DEAL_TYPE dealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(ticket, DEAL_TYPE);
-               typeStr = (dealType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+               typeStr = (dealType == DEAL_TYPE_BUY) ? "SELL" : "BUY";
+               Print("Opening deal unavailable for closed deal ", ticket,
+                     " (position ", positionId, "); opening price/time are fallback values");
             }
             
             long closeTimeMsc = HistoryDealGetInteger(ticket, DEAL_TIME_MSC);
@@ -1222,7 +1291,7 @@ void SendHistoryUpdate()
    string historyJson = BuildClosedTradesJson(g_lastSyncedCloseTime, latestCloseTime);
    
    // Skip if no new trades
-   if(historyJson == "[]")
+   if(historyJson == "" || historyJson == "[]")
       return;
    
    // Build main JSON payload
