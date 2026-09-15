@@ -9,6 +9,7 @@ Dieses Dokument beschreibt den vollständigen Prozess zur Versionsverwaltung, Ko
 - MT5 1.23 führt pro Konto einmal einen vollständigen Historienabgleich aus. Die GlobalVariable `TM_HistoryRevision_<account>` wird erst nach erfolgreichem Upload auf Revision 1 gesetzt; fehlgeschlagene Historienauswahl oder Uploads bleiben wiederholbar.
 - **Am 2026-09-15 verifiziert:** Die produktive JVM hat `user.dir=/`. Der tatsächlich verwendete Updatepfad ist daher **`/updates/`**. Die unten dokumentierten WildFly-Verzeichnisse allein reichen nicht aus. Bei jedem Deployment `user.dir` prüfen und Binary sowie Versionsdatei im aktiven Pfad aktualisieren.
 - Repository-Kopien für MT5: `mql5/`, `updates/`, `server/updates/`. Binary und `.version` müssen übereinstimmen; zuerst das Binary atomar ersetzen, zuletzt die Versionsdatei veröffentlichen.
+- **Aktivierung prüfen:** Beim beobachteten Client 1.21 ersetzt das Auto-Update zwar die Datei, lädt den laufenden EA aber nicht neu. Eine Erfolgsmeldung im Download-Log reicht deshalb nicht aus. Nach gezieltem, geordnetem Neustart der betroffenen Terminal-Instanz meldete Konto `5590276401` Version 1.23; der Full Sync korrigierte die beiden falschen BUY-Zeilen zu SELL samt Öffnungsdaten und Einstiegskommission. Andere Terminals benötigen ebenfalls einen bestätigten EA-Neustart, bevor die neue Datei als aktiv gelten darf.
 - Client-Regressionsprüfung: `node mql5/tests/run-history-tests.cjs`; Server-Build: `mvn.cmd -f server/pom.xml package` mit JDK 21. Der Server bleibt auf Java-17-Bytecode eingestellt.
 
 ---
