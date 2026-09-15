@@ -439,6 +439,7 @@
             <button class="tab-btn active" onclick="switchTab('heatmap')">🔥 Heatmap</button>
             <button class="tab-btn" onclick="switchTab('leaderboard')">🏆 Strategy Leaderboard</button>
             <button class="tab-btn" onclick="switchTab('portfolio')">📊 Portfolio Analytics</button>
+            <button class="tab-btn" onclick="switchTab('timemap')">🗺️ Portfolio TimeMap</button>
         </div>
 
         <!-- ==================== TAB 1: HEATMAP ==================== -->
@@ -588,6 +589,100 @@
 
     <!-- Heatmap Tooltip -->
     <div id="heatmap-tooltip" class="heatmap-tooltip"></div>
+
+        <!-- ==================== TAB 4: PORTFOLIO TIMEMAP ==================== -->
+        <div id="tab-timemap" class="tab-panel">
+            <div class="info-box">
+                <div class="info-title">ℹ️ Was zeigt das Portfolio TimeMap?</div>
+                Das <strong>Portfolio TimeMap</strong> visualisiert die genaue zeitliche Abfolge aller Trades über alle Strategien und Accounts hinweg.
+                <ul>
+                    <li><strong>Y-Achse</strong> = Strategien / Magics / Accounts (sortiert nach Markt-Präsenz).</li>
+                    <li><strong>X-Achse</strong> = Zeitleiste (Jahre, Monate, Tage).</li>
+                    <li><strong>Grüne Blöcke</strong> = Gewinner-Trades · <strong>Rote Blöcke</strong> = Verlierer-Trades.</li>
+                    <li><strong>Blaue Linie</strong> = Kumulative Portfolio-Equity-Kurve (wird beim Auswählen von Strategien in Echtzeit neu berechnet).</li>
+                    <li><strong>Systemisches Risiko</strong> = Gleichzeitige rote Blöcke in derselben Spalte zeigen korreliertes Risiko auf!</li>
+                </ul>
+            </div>
+
+            <div class="glass-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 15px;">
+                    <div class="panel-title" style="margin-bottom: 0;">🗺️ Portfolio TimeMap <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 10px;">Strategie-Aktivität &amp; Korrelation</span></div>
+                    
+                    <div id="gtm-kpis" style="display: flex; gap: 15px; font-size: 0.85rem; font-weight: 600; background: rgba(15,23,42,0.6); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--border);">
+                        <span id="gtm-kpi-strats" style="color: #a78bfa;">- Strategien</span>
+                        <span style="color: var(--border);">|</span>
+                        <span id="gtm-kpi-trades" style="color: #f8fafc;">- Trades</span>
+                        <span style="color: var(--border);">|</span>
+                        <span id="gtm-kpi-winrate" style="color: #34d399;">- Win Rate</span>
+                    </div>
+                </div>
+
+                <div class="filter-bar" style="margin-bottom: 1.2rem; display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">ACCOUNT TYPE:</span>
+                    <button class="filter-pill active" onclick="loadGlobalTimeMap('', this)">Alle Accounts</button>
+                    <button class="filter-pill" onclick="loadGlobalTimeMap('REAL', this)">🛡️ Nur Real</button>
+                    <button class="filter-pill" onclick="loadGlobalTimeMap('DEMO', this)">📉 Nur Demo</button>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">ZEITRAUM:</span>
+                        <div class="gtm-win-btns" style="display: flex; gap: 4px;">
+                            <button class="filter-pill active" onclick="setGtmWindow('all', this)">Alle</button>
+                            <button class="filter-pill" onclick="setGtmWindow('5', this)">5J</button>
+                            <button class="filter-pill" onclick="setGtmWindow('2', this)">2J</button>
+                            <button class="filter-pill" onclick="setGtmWindow('1', this)">1J</button>
+                            <button class="filter-pill" onclick="setGtmWindow('0.5', this)">6M</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">GRUPPIERUNG:</span>
+                        <select id="gtm-grouping" onchange="renderGlobalTimeMap()" style="background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; outline: none; cursor: pointer;">
+                            <option value="magic">Strategie / Magic Name</option>
+                            <option value="account">Account Name</option>
+                            <option value="symbol">Symbol / Asset</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">START-EQUITY:</span>
+                        <input type="number" id="gtm-start-eq" value="100000" step="10000" min="1000" oninput="renderGlobalTimeMap()" style="background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; width: 90px; outline: none;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                        <button id="gtm-spy-btn" class="filter-pill" onclick="toggleGtmSpy(this)" style="border-color: rgba(245,158,11,0.4); color: #f59e0b; background: rgba(245,158,11,0.1);">📈 SPY Benchmark</button>
+                        <span id="gtm-spy-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+
+                <!-- Active Strategy Chips -->
+                <div id="gtm-chips-wrap" style="margin-bottom: 1.2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Aktivierte Elemente im Portfolio:</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="toggleAllGtmChips(true)" style="background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Alle aktivieren</button>
+                            <button onclick="toggleAllGtmChips(false)" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-muted); padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Alle deaktivieren</button>
+                        </div>
+                    </div>
+                    <div id="gtm-chips-list" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <!-- SVG Visualizer Canvas -->
+                <div id="gtm-svg-wrap" style="position: relative; height: 560px; background: rgba(2, 6, 23, 0.7); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">
+                    <div id="gtm-scroll-layer" style="position: absolute; top: 20px; bottom: 35px; left: 0; right: 0; overflow-y: auto; overflow-x: hidden;">
+                        <svg id="gtm-lanes-svg" xmlns="http://www.w3.org/2000/svg" style="width: 100%; display: block;"></svg>
+                    </div>
+                    <svg id="gtm-axis-svg" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></svg>
+                    <div id="gtm-tooltip" style="position: absolute; display: none; pointer-events: none; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(139,92,246,0.4); padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; color: #fff; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.5);"></div>
+                </div>
+
+                <div style="display: flex; gap: 16px; align-items: center; margin-top: 10px; color: var(--text-muted); font-size: 0.8rem; justify-content: flex-end;">
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 8px; background: #10b981; opacity: 0.85; display: inline-block; border-radius: 2px;"></span> Gewinner Trade</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 8px; background: #ef4444; opacity: 0.85; display: inline-block; border-radius: 2px;"></span> Verlierer Trade</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 16px; height: 3px; background: #8b5cf6; display: inline-block; border-radius: 2px;"></span> Portfolio Equity</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 16px; height: 2px; background: #f59e0b; display: inline-block; border-radius: 2px;"></span> SPY Benchmark</div>
+                </div>
+            </div>
+        </div>
 
     <script>
         // ===== TAB SWITCHING =====
@@ -1134,12 +1229,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Check URL hash for deep-linking from dashboard
             var hash = window.location.hash.replace('#', '');
-            if (hash === 'leaderboard' || hash === 'portfolio') {
+            if (hash === 'leaderboard' || hash === 'portfolio' || hash === 'timemap') {
                 // Activate correct tab
                 document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
                 document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-                document.getElementById('tab-' + hash).classList.add('active');
-                // Find and activate the matching button
+                var targetPanel = document.getElementById('tab-' + hash);
+                if (targetPanel) targetPanel.classList.add('active');
+                
                 var btns = document.querySelectorAll('.tab-btn');
                 btns.forEach(function(b) {
                     if (b.textContent.toLowerCase().indexOf(hash) !== -1) b.classList.add('active');
@@ -1147,6 +1243,7 @@
 
                 if (hash === 'leaderboard') { loadLeaderboard(''); window._leaderboardLoaded = true; }
                 else if (hash === 'portfolio') { loadPortfolioData(); window._portfolioLoaded = true; }
+                else if (hash === 'timemap') { loadGlobalTimeMap(''); window._timemapLoaded = true; }
             } else {
                 loadHeatmap('');
                 window._heatmapLoaded = true;

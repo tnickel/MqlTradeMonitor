@@ -2254,6 +2254,18 @@ public class DashboardController {
     }
 
     /**
+     * TimeMap trade data for portfolio correlation analysis.
+     */
+    @GetMapping("/api/analytics/timemap")
+    @ResponseBody
+    public List<Map<String, Object>> getTimeMap(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) String type) {
+        return strategyAnalyticsService.getTimeMapData(accountId, type, analyticsAllowedIds(userDetails));
+    }
+
+    /**
      * Equity overlay curves for portfolio analytics.
      */
     @GetMapping("/api/stats/equity-overlay")

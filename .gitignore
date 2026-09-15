@@ -50,3 +50,6 @@ android-app/app/build/
 *.iml
 .externalNativeBuild/
 .cxx/
+# Lokale Arbeitsordner - duerfen nicht nach GitHub
+scratch/
+external_code_no_Github/

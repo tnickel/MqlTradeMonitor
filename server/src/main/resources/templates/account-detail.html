@@ -1877,6 +1877,89 @@
 
         <!-- ==================== TAB: ANALYSIS ==================== -->
         <div id="tab-analysis" class="tab-content">
+            <!-- ==================== PORTFOLIO TIMEMAP SECTION ==================== -->
+            <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-top: 1rem; margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <h3 style="color: #fff; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; margin: 0;">
+                            🗺️ Portfolio TimeMap <span style="font-size: 0.85rem; font-weight: 500; color: #a5b4fc; background: rgba(99,102,241,0.15); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3);">Strategie-Aktivität &amp; Korrelation</span>
+                        </h3>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 6px 0 0 0;">
+                            Zeigt <strong>WANN</strong> welche Strategien gehandelt haben. 
+                            <span style="color: #10b981; font-weight: 600;">● Gewinner (Grün)</span> · 
+                            <span style="color: #ef4444; font-weight: 600;">● Verlierer (Rot)</span> · 
+                            <span style="color: #6366f1; font-weight: 600;">● Equity (Blaue Linie)</span>
+                        </p>
+                    </div>
+                    <div id="acc-timemap-kpis" style="display: flex; gap: 15px; font-size: 0.85rem; font-weight: 600; background: rgba(15,23,42,0.6); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <span id="acc-tm-kpi-strats" style="color: #818cf8;">- Strategien</span>
+                        <span style="color: var(--border-color);">|</span>
+                        <span id="acc-tm-kpi-trades" style="color: #f8fafc;">- Trades</span>
+                        <span style="color: var(--border-color);">|</span>
+                        <span id="acc-tm-kpi-winrate" style="color: #34d399;">- Win Rate</span>
+                    </div>
+                </div>
+
+                <!-- Controls row -->
+                <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 12px 18px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); border-radius: 14px; margin-bottom: 1.2rem;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Zeitraum:</span>
+                        <div class="tm-win-btns" style="display: flex; gap: 4px;">
+                            <button class="tm-btn active" onclick="setAccTimeMapWindow('all', this)">Alle</button>
+                            <button class="tm-btn" onclick="setAccTimeMapWindow('5', this)">5J</button>
+                            <button class="tm-btn" onclick="setAccTimeMapWindow('2', this)">2J</button>
+                            <button class="tm-btn" onclick="setAccTimeMapWindow('1', this)">1J</button>
+                            <button class="tm-btn" onclick="setAccTimeMapWindow('0.5', this)">6M</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Gruppierung:</span>
+                        <select id="acc-tm-grouping" onchange="renderAccTimeMap()" style="background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 5px 10px; font-size: 0.85rem; outline: none; cursor: pointer;">
+                            <option value="magic">Strategie / Magic Number</option>
+                            <option value="symbol">Symbol / Asset</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Start-Equity:</span>
+                        <input type="number" id="acc-tm-start-eq" value="100000" step="10000" min="1000" oninput="renderAccTimeMap()" style="background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 5px 10px; font-size: 0.85rem; width: 95px; outline: none;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                        <button id="acc-tm-spy-btn" class="tm-btn" onclick="toggleAccTimeMapSpy(this)" style="border-color: rgba(245,158,11,0.4); color: #f59e0b; background: rgba(245,158,11,0.1);">📈 SPY Benchmark</button>
+                        <span id="acc-tm-spy-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+
+                <!-- Active Strategy Chips -->
+                <div id="acc-tm-chips-wrap" style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Aktive Elemente im TimeMap:</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="toggleAllAccTimeMapChips(true)" style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); color: #818cf8; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Alle aktivieren</button>
+                            <button onclick="toggleAllAccTimeMapChips(false)" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Alle deaktivieren</button>
+                        </div>
+                    </div>
+                    <div id="acc-tm-chips-list" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <!-- SVG Visualizer Canvas -->
+                <div id="acc-tm-svg-wrap" style="position: relative; height: 520px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">
+                    <div id="acc-tm-scroll-layer" style="position: absolute; top: 20px; bottom: 35px; left: 0; right: 0; overflow-y: auto; overflow-x: hidden;">
+                        <svg id="acc-tm-lanes-svg" xmlns="http://www.w3.org/2000/svg" style="width: 100%; display: block;"></svg>
+                    </div>
+                    <svg id="acc-tm-axis-svg" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></svg>
+                    <div id="acc-tm-tooltip" style="position: absolute; display: none; pointer-events: none; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(99,102,241,0.4); padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; color: #fff; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.5);"></div>
+                </div>
+
+                <div style="display: flex; gap: 16px; align-items: center; margin-top: 10px; color: var(--text-muted); font-size: 0.8rem; justify-content: flex-end;">
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 8px; background: #10b981; opacity: 0.8; display: inline-block; border-radius: 2px;"></span> Gewinner Trade</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 8px; background: #ef4444; opacity: 0.8; display: inline-block; border-radius: 2px;"></span> Verlierer Trade</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 16px; height: 3px; background: #6366f1; display: inline-block; border-radius: 2px;"></span> Cumulative Equity</div>
+                    <div style="display: flex; gap: 6px; align-items: center;"><span style="width: 16px; height: 2px; background: #f59e0b; display: inline-block; border-radius: 2px;"></span> SPY Benchmark</div>
+                </div>
+            </div>
             <!-- Row 1: Duration vs Profit Scatter Plot (Full Width, Large) -->
             <div style="background: var(--bg-secondary); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); padding: 2rem; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-top: 1rem;">
                 <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">📈 Duration vs Profit</h3>
@@ -2500,6 +2583,508 @@
             var activeSymbolsCount = document.querySelectorAll('.symbol-checkbox:checked').length;
             badge.textContent = activeMagicsCount + ' von ' + totalMagics + ' Magics, ' + activeSymbolsCount + ' von ' + totalSymbols + ' Symbolen aktiv';
         }
+
+        // =========================================================================
+        // PORTFOLIO TIMEMAP JS ENGINE
+        // =========================================================================
+        var AccTimeMap = {
+            trades: [],
+            activeKeys: new Set(),
+            windowMode: 'all',
+            groupingMode: 'magic',
+            startEquity: 100000,
+            showSpy: false,
+            spyData: null,
+            spyLoading: false,
+
+            init: function(rawTrades) {
+                if (!rawTrades || !Array.isArray(rawTrades)) return;
+                this.trades = [];
+                var self = this;
+                
+                rawTrades.forEach(function(t) {
+                    if (!t.openTime || !t.closeTime) return;
+                    var oMs = self.parseDateMs(t.openTime);
+                    var cMs = self.parseDateMs(t.closeTime);
+                    if (cMs < oMs) return;
+
+                    var pnl = parseFloat(t.profit || 0) + parseFloat(t.swap || 0) + (parseFloat(t.commission || 0) * (typeof commissionFactor !== 'undefined' ? commissionFactor : 1.0));
+                    var mName = (t.magicName && t.magicName.trim() !== '') ? t.magicName : (t.magicNumber ? ('Magic ' + t.magicNumber) : 'Manual Trade');
+                    
+                    self.trades.push({
+                        ticket: t.ticket,
+                        magicNumber: t.magicNumber || 0,
+                        magicName: mName,
+                        symbol: t.symbol || 'UNKNOWN',
+                        openTime: oMs,
+                        closeTime: cMs,
+                        profit: pnl,
+                        volume: t.volume || 0
+                    });
+                });
+
+                this.buildChips();
+                this.render();
+            },
+
+            parseDateMs: function(str) {
+                if (typeof str === 'number') return str;
+                var p = str.split(/[- :.]/);
+                if (p.length >= 3) {
+                    var d = new Date(p[0], p[1] - 1, p[2], p[3] || 0, p[4] || 0, p[5] || 0);
+                    return d.getTime();
+                }
+                return new Date(str).getTime();
+            },
+
+            getKey: function(t) {
+                if (this.groupingMode === 'symbol') return t.symbol;
+                return t.magicName;
+            },
+
+            buildChips: function() {
+                var keys = new Set();
+                var self = this;
+                this.trades.forEach(function(t) { keys.add(self.getKey(t)); });
+                
+                this.activeKeys = new Set(keys);
+                var container = document.getElementById('acc-tm-chips-list');
+                if (!container) return;
+                container.innerHTML = '';
+
+                Array.from(keys).sort().forEach(function(key) {
+                    var chip = document.createElement('div');
+                    chip.className = 'tm-chip active';
+                    chip.textContent = key;
+                    chip.dataset.key = key;
+                    chip.onclick = function() {
+                        if (self.activeKeys.has(key)) {
+                            self.activeKeys.delete(key);
+                            chip.classList.remove('active');
+                        } else {
+                            self.activeKeys.add(key);
+                            chip.classList.add('active');
+                        }
+                        self.render();
+                    };
+                    container.appendChild(chip);
+                });
+            },
+
+            render: function() {
+                var wrap = document.getElementById('acc-tm-svg-wrap');
+                var scrollLayer = document.getElementById('acc-tm-scroll-layer');
+                var lanesSvg = document.getElementById('acc-tm-lanes-svg');
+                var axisSvg = document.getElementById('acc-tm-axis-svg');
+                if (!wrap || !lanesSvg || !axisSvg) return;
+
+                var self = this;
+                var groupSel = document.getElementById('acc-tm-grouping');
+                if (groupSel) this.groupingMode = groupSel.value;
+                var eqInput = document.getElementById('acc-tm-start-eq');
+                if (eqInput && parseFloat(eqInput.value) > 0) this.startEquity = parseFloat(eqInput.value);
+
+                // Filter trades by active chips
+                var filtered = this.trades.filter(function(t) {
+                    return self.activeKeys.has(self.getKey(t));
+                });
+
+                lanesSvg.innerHTML = '';
+                axisSvg.innerHTML = '';
+
+                var W = scrollLayer.clientWidth || 800;
+                var Vh = wrap.clientHeight || 500;
+                var PAD = { left: 150, right: 100, top: 20, bottom: 35 };
+                var plotH = Math.max(10, Vh - PAD.top - PAD.bottom);
+
+                axisSvg.style.width = W + 'px';
+                axisSvg.style.height = Vh + 'px';
+                axisSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + Vh);
+
+                if (filtered.length === 0) {
+                    document.getElementById('acc-tm-kpi-strats').textContent = '0 Strategien';
+                    document.getElementById('acc-tm-kpi-trades').textContent = '0 Trades';
+                    document.getElementById('acc-tm-kpi-winrate').textContent = 'Win Rate: -';
+                    
+                    lanesSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + plotH);
+                    lanesSvg.style.height = plotH + 'px';
+                    var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    txt.setAttribute('x', W / 2);
+                    txt.setAttribute('y', plotH / 2);
+                    txt.setAttribute('text-anchor', 'middle');
+                    txt.setAttribute('fill', '#94a3b8');
+                    txt.setAttribute('font-size', '13px');
+                    txt.setAttribute('font-weight', '600');
+                    txt.textContent = 'Keine Trades für die ausgewählten Filter vorhanden.';
+                    lanesSvg.appendChild(txt);
+                    return;
+                }
+
+                // Calculate time window
+                var tMinAll = Infinity, tMaxAll = -Infinity;
+                filtered.forEach(function(t) {
+                    if (t.openTime < tMinAll) tMinAll = t.openTime;
+                    if (t.closeTime > tMaxAll) tMaxAll = t.closeTime;
+                });
+
+                var tMax = tMaxAll;
+                var tMin = tMinAll;
+                if (this.windowMode !== 'all') {
+                    var years = parseFloat(this.windowMode);
+                    tMin = Math.max(tMinAll, tMax - years * 365.25 * 86400000);
+                }
+
+                var inWindow = filtered.filter(function(t) {
+                    return t.openTime <= tMax && t.closeTime >= tMin;
+                });
+
+                // Group by lane key & calc exposure
+                var byGroup = new Map();
+                var totalWins = 0;
+                inWindow.forEach(function(t) {
+                    var key = self.getKey(t);
+                    if (!byGroup.has(key)) byGroup.set(key, { name: key, exposure: 0, intervals: [] });
+                    var row = byGroup.get(key);
+                    var s = Math.max(t.openTime, tMin);
+                    var e = Math.min(t.closeTime, tMax);
+                    var dur = Math.max(0, e - s);
+                    row.exposure += dur;
+                    row.intervals.push({ s: s, e: e, dur: dur, pl: t.profit, trade: t });
+                    if (t.profit >= 0) totalWins++;
+                });
+
+                var strategies = Array.from(byGroup.values()).sort(function(a, b) { return b.exposure - a.exposure; });
+
+                // Update summary KPIs
+                document.getElementById('acc-tm-kpi-strats').textContent = strategies.length + ' Aktive Zeilen';
+                document.getElementById('acc-tm-kpi-trades').textContent = inWindow.length + ' Trades';
+                var wr = inWindow.length > 0 ? (totalWins * 100.0 / inWindow.length).toFixed(1) + '%' : '-';
+                document.getElementById('acc-tm-kpi-winrate').textContent = 'Win Rate: ' + wr;
+
+                // X scale mapping
+                var x0 = PAD.left, x1 = W - PAD.right;
+                var plotW = x1 - x0;
+                var tRange = Math.max(1, tMax - tMin);
+                var tx = function(t) { return x0 + ((t - tMin) / tRange) * plotW; };
+
+                // Scrolling Lanes SVG height & row metrics
+                var MIN_LANE_H = 18;
+                var LANE_GAP = 6;
+                var laneContentH = Math.max(plotH, strategies.length * (MIN_LANE_H + LANE_GAP));
+                lanesSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + laneContentH);
+                lanesSvg.style.height = laneContentH + 'px';
+                var laneH = Math.max(MIN_LANE_H, Math.floor((laneContentH - strategies.length * LANE_GAP) / strategies.length));
+
+                var tooltip = document.getElementById('acc-tm-tooltip');
+
+                // Render lanes & trade blocks
+                for (var i = 0; i < strategies.length; i++) {
+                    var strat = strategies[i];
+                    var ly = i * (laneH + LANE_GAP);
+
+                    // Background row highlight
+                    var bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    bgRect.setAttribute('x', x0);
+                    bgRect.setAttribute('y', ly);
+                    bgRect.setAttribute('width', plotW);
+                    bgRect.setAttribute('height', laneH);
+                    bgRect.setAttribute('fill', i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.15)');
+                    bgRect.setAttribute('rx', '4');
+                    lanesSvg.appendChild(bgRect);
+
+                    // Row label (Y axis strategy name)
+                    var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    lbl.setAttribute('x', x0 - 10);
+                    lbl.setAttribute('y', ly + laneH / 2);
+                    lbl.setAttribute('text-anchor', 'end');
+                    lbl.setAttribute('dominant-baseline', 'middle');
+                    lbl.setAttribute('fill', '#e2e8f0');
+                    lbl.setAttribute('font-size', '11px');
+                    lbl.setAttribute('font-weight', '600');
+                    var truncName = strat.name.length > 20 ? strat.name.slice(0, 18) + '…' : strat.name;
+                    lbl.textContent = truncName;
+                    lanesSvg.appendChild(lbl);
+
+                    // Render trade rectangles (losers then winners)
+                    strat.intervals.forEach(function(iv) {
+                        var rx = tx(iv.s);
+                        var rw = Math.max(2, tx(iv.e) - rx);
+                        var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', rx);
+                        rect.setAttribute('y', ly + 2);
+                        rect.setAttribute('width', rw);
+                        rect.setAttribute('height', laneH - 4);
+                        rect.setAttribute('fill', iv.pl >= 0 ? '#10b981' : '#ef4444');
+                        rect.setAttribute('fill-opacity', '0.85');
+                        rect.setAttribute('rx', '3');
+                        rect.setAttribute('cursor', 'pointer');
+
+                        // Tooltip listeners
+                        rect.onmouseover = function(evt) {
+                            rect.setAttribute('fill-opacity', '1');
+                            rect.setAttribute('stroke', '#fff');
+                            rect.setAttribute('stroke-width', '1.5');
+                            if (!tooltip) return;
+                            var plFmt = (iv.pl >= 0 ? '+' : '') + iv.pl.toFixed(2) + ' €';
+                            var durHrs = (iv.dur / 3600000).toFixed(1) + 'h';
+                            tooltip.style.display = 'block';
+                            tooltip.innerHTML = '<strong>' + strat.name + '</strong> (' + iv.trade.symbol + ')<br/>' +
+                                                'Ticket: #' + iv.trade.ticket + '<br/>' +
+                                                'Profit: <span style="color:' + (iv.pl >= 0 ? '#34d399' : '#f87171') + '; font-weight:bold;">' + plFmt + '</span><br/>' +
+                                                'Haltedauer: ' + durHrs + '<br/>' +
+                                                'Eröffnet: ' + new Date(iv.s).toLocaleString();
+                        };
+                        rect.onmousemove = function(evt) {
+                            if (!tooltip) return;
+                            var rectBox = wrap.getBoundingClientRect();
+                            tooltip.style.left = (evt.clientX - rectBox.left + 15) + 'px';
+                            tooltip.style.top = (evt.clientY - rectBox.top - 10) + 'px';
+                        };
+                        rect.onmouseout = function() {
+                            rect.setAttribute('fill-opacity', '0.85');
+                            rect.removeAttribute('stroke');
+                            if (tooltip) tooltip.style.display = 'none';
+                        };
+                        lanesSvg.appendChild(rect);
+                    });
+                }
+
+                // Fixed Overlay: X Gridlines & Time Labels
+                var y0 = PAD.top, y1 = Vh - PAD.bottom;
+                var ticks = self.makeTimeTicks(tMin, tMax);
+                ticks.forEach(function(tk) {
+                    var x = tx(tk.t);
+                    var gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    gridLine.setAttribute('x1', x);
+                    gridLine.setAttribute('y1', y0);
+                    gridLine.setAttribute('x2', x);
+                    gridLine.setAttribute('y2', y1);
+                    gridLine.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+                    gridLine.setAttribute('stroke-dasharray', '3,3');
+                    axisSvg.appendChild(gridLine);
+
+                    var tTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    tTxt.setAttribute('x', x);
+                    tTxt.setAttribute('y', y1 + 18);
+                    tTxt.setAttribute('text-anchor', 'middle');
+                    tTxt.setAttribute('fill', '#94a3b8');
+                    tTxt.setAttribute('font-size', '10px');
+                    tTxt.textContent = tk.label;
+                    axisSvg.appendChild(tTxt);
+                });
+
+                // Fixed Overlay: Cumulative Equity Line
+                var sortedOrders = inWindow.slice().sort(function(a, b) { return a.closeTime - b.closeTime; });
+                var cumEq = self.startEquity;
+                var eqPoints = [{ t: tMin, eq: cumEq }];
+                sortedOrders.forEach(function(t) {
+                    cumEq += t.profit;
+                    if (t.closeTime >= tMin && t.closeTime <= tMax) {
+                        eqPoints.push({ t: t.closeTime, eq: cumEq });
+                    }
+                });
+                if (eqPoints[eqPoints.length - 1].t < tMax) {
+                    eqPoints.push({ t: tMax, eq: cumEq });
+                }
+
+                var minEq = Infinity, maxEq = -Infinity;
+                eqPoints.forEach(function(p) {
+                    if (p.eq < minEq) minEq = p.eq;
+                    if (p.eq > maxEq) maxEq = p.eq;
+                });
+                if (minEq === maxEq) { minEq -= 100; maxEq += 100; }
+                var eqPad = (maxEq - minEq) * 0.08;
+                minEq -= eqPad; maxEq += eqPad;
+
+                var ey = function(v) { return y1 - ((v - minEq) / (maxEq - minEq)) * plotH; };
+
+                // Right Y-axis scale labels
+                for (var j = 0; j <= 3; j++) {
+                    var frac = j / 3;
+                    var val = minEq + frac * (maxEq - minEq);
+                    var yPos = ey(val);
+                    var valTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    valTxt.setAttribute('x', x1 + 8);
+                    valTxt.setAttribute('y', yPos);
+                    valTxt.setAttribute('dominant-baseline', 'middle');
+                    valTxt.setAttribute('fill', '#818cf8');
+                    valTxt.setAttribute('font-size', '10px');
+                    valTxt.setAttribute('font-weight', '600');
+                    valTxt.textContent = (val / 1000).toFixed(1) + 'k €';
+                    axisSvg.appendChild(valTxt);
+                }
+
+                // Render Equity Step-Post Path
+                if (eqPoints.length > 1) {
+                    var pathD = 'M ' + tx(eqPoints[0].t) + ' ' + ey(eqPoints[0].eq);
+                    for (var k = 1; k < eqPoints.length; k++) {
+                        var prevP = eqPoints[k - 1];
+                        var curP = eqPoints[k];
+                        pathD += ' L ' + tx(curP.t) + ' ' + ey(prevP.eq) + ' L ' + tx(curP.t) + ' ' + ey(curP.eq);
+                    }
+                    var casing = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    casing.setAttribute('d', pathD);
+                    casing.setAttribute('fill', 'none');
+                    casing.setAttribute('stroke', '#090d16');
+                    casing.setAttribute('stroke-width', '5');
+                    axisSvg.appendChild(casing);
+
+                    var eqPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    eqPath.setAttribute('d', pathD);
+                    eqPath.setAttribute('fill', 'none');
+                    eqPath.setAttribute('stroke', '#6366f1');
+                    eqPath.setAttribute('stroke-width', '2.5');
+                    axisSvg.appendChild(eqPath);
+                }
+
+                // Render SPY if enabled
+                if (this.showSpy && this.spyData && this.spyData.length > 1) {
+                    var spyInRange = this.spyData.filter(function(p) { return p.t >= tMin && p.t <= tMax; });
+                    if (spyInRange.length >= 2) {
+                        var s0 = spyInRange[0].close;
+                        var spyPoints = spyInRange.map(function(p) {
+                            return { t: p.t, eq: self.startEquity * (p.close / s0) };
+                        });
+                        var spyPtsStr = spyPoints.map(function(p) { return tx(p.t) + ',' + ey(p.eq); }).join(' ');
+                        var spyPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                        spyPoly.setAttribute('points', spyPtsStr);
+                        spyPoly.setAttribute('fill', 'none');
+                        spyPoly.setAttribute('stroke', '#f59e0b');
+                        spyPoly.setAttribute('stroke-width', '2');
+                        spyPoly.setAttribute('stroke-dasharray', '4,2');
+                        axisSvg.appendChild(spyPoly);
+                    }
+                }
+            },
+
+            makeTimeTicks: function(tMin, tMax) {
+                var spanDays = (tMax - tMin) / 86400000;
+                var out = [];
+                if (spanDays > 365 * 2) {
+                    var yStart = new Date(tMin).getFullYear();
+                    var yEnd = new Date(tMax).getFullYear();
+                    for (var y = yStart; y <= yEnd; y++) {
+                        var t = new Date(y, 0, 1).getTime();
+                        if (t >= tMin && t <= tMax) out.push({ t: t, label: String(y) });
+                    }
+                } else if (spanDays > 60) {
+                    var d = new Date(tMin);
+                    d = new Date(d.getFullYear(), d.getMonth(), 1);
+                    while (d.getTime() <= tMax) {
+                        if (d.getTime() >= tMin) {
+                            out.push({ t: d.getTime(), label: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') });
+                        }
+                        d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+                    }
+                } else {
+                    var d2 = new Date(tMin);
+                    d2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+                    while (d2.getTime() <= tMax) {
+                        if (d2.getTime() >= tMin) {
+                            out.push({ t: d2.getTime(), label: String(d2.getMonth() + 1).padStart(2, '0') + '-' + String(d2.getDate()).padStart(2, '0') });
+                        }
+                        d2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate() + 1);
+                    }
+                }
+                var maxN = 10;
+                if (out.length > maxN) {
+                    var stride = Math.ceil(out.length / maxN);
+                    return out.filter(function(_, idx) { return idx % stride === 0; });
+                }
+                return out;
+            },
+
+            loadSpy: function() {
+                var self = this;
+                var statusEl = document.getElementById('acc-tm-spy-status');
+                if (statusEl) statusEl.textContent = 'Lade SPY…';
+                var target = 'https://query1.finance.yahoo.com/v8/finance/chart/SPY?period1=628041600&period2=2000000000&interval=1d';
+                var urls = [
+                    target,
+                    'https://api.allorigins.win/raw?url=' + encodeURIComponent(target),
+                    'https://corsproxy.io/?' + encodeURIComponent(target)
+                ];
+                var tryFetch = function(idx) {
+                    if (idx >= urls.length) {
+                        if (statusEl) statusEl.textContent = 'SPY Offline';
+                        self.showSpy = false;
+                        self.render();
+                        return;
+                    }
+                    fetch(urls[idx]).then(function(res) { return res.json(); }).then(function(json) {
+                        var r = json && json.chart && json.chart.result && json.chart.result[0];
+                        var ts = r && r.timestamp;
+                        var closes = r && r.indicators && r.indicators.quote && r.indicators.quote[0] && r.indicators.quote[0].close;
+                        if (!ts || !closes) throw new Error('bad shape');
+                        var pts = [];
+                        for (var i = 0; i < ts.length; i++) {
+                            if (closes[i] != null && isFinite(closes[i])) {
+                                pts.push({ t: ts[i] * 1000, close: closes[i] });
+                            }
+                        }
+                        pts.sort(function(a, b) { return a.t - b.t; });
+                        self.spyData = pts;
+                        if (statusEl) statusEl.textContent = 'SPY Geladen';
+                        self.render();
+                    }).catch(function() {
+                        tryFetch(idx + 1);
+                    });
+                };
+                tryFetch(0);
+            }
+        };
+
+        function setAccTimeMapWindow(winMode, btnEl) {
+            AccTimeMap.windowMode = winMode;
+            if (btnEl) {
+                var btns = btnEl.parentElement.querySelectorAll('.tm-btn');
+                btns.forEach(function(b) { b.classList.remove('active'); });
+                btnEl.classList.add('active');
+            }
+            AccTimeMap.render();
+        }
+
+        function renderAccTimeMap() {
+            AccTimeMap.render();
+        }
+
+        function toggleAccTimeMapSpy(btnEl) {
+            AccTimeMap.showSpy = !AccTimeMap.showSpy;
+            if (btnEl) btnEl.classList.toggle('active', AccTimeMap.showSpy);
+            if (AccTimeMap.showSpy && !AccTimeMap.spyData) {
+                AccTimeMap.loadSpy();
+            } else {
+                AccTimeMap.render();
+            }
+        }
+
+        function toggleAllAccTimeMapChips(enableAll) {
+            var container = document.getElementById('acc-tm-chips-list');
+            if (!container) return;
+            var chips = container.querySelectorAll('.tm-chip');
+            AccTimeMap.activeKeys = new Set();
+            chips.forEach(function(c) {
+                if (enableAll) {
+                    AccTimeMap.activeKeys.add(c.dataset.key);
+                    c.classList.add('active');
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+            AccTimeMap.render();
+        }
+
+        // Integrate with renderAnalysisCharts
+        var originalRenderAnalysisCharts = window.renderAnalysisCharts;
+        window.renderAnalysisCharts = function(trades) {
+            if (typeof originalRenderAnalysisCharts === 'function') {
+                try { originalRenderAnalysisCharts(trades); } catch(e) {}
+            }
+            if (trades && Array.isArray(trades)) {
+                AccTimeMap.init(trades);
+            }
+        };
+
 
         document.addEventListener('DOMContentLoaded', function() {
             // Restore active tab

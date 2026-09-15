@@ -509,6 +509,57 @@ public class StrategyAnalyticsService {
         return allowedIds.contains(acc.getAccountId());
     }
 
+    /**
+     * Get trade interval data for Portfolio TimeMap visualization.
+     */
+    public List<Map<String, Object>> getTimeMapData(Long accountId, String type, Set<Long> allowedIds) {
+        List<ClosedTradeEntity> trades;
+        if (accountId != null) {
+            trades = closedTradeRepository.findByAccountId(accountId);
+        } else {
+            trades = new ArrayList<>();
+            for (Account acc : accountManager.getAccountsSortedByPrivilege()) {
+                if (!isAccountAllowed(acc, allowedIds)) continue;
+                if (type != null && !type.isEmpty() && !type.equalsIgnoreCase(acc.getType())) continue;
+                trades.addAll(closedTradeRepository.findByAccountId(acc.getAccountId()));
+            }
+        }
+
+        Map<Long, String> mappings = magicMappingService.getAllMappings();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ClosedTradeEntity trade : trades) {
+            if (trade.getOpenTime() == null || trade.getCloseTime() == null) continue;
+            try {
+                LocalDateTime openDt = LocalDateTime.parse(trade.getOpenTime(), TRADE_FMT);
+                LocalDateTime closeDt = LocalDateTime.parse(trade.getCloseTime(), TRADE_FMT);
+                long openEpochMs = openDt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long closeEpochMs = closeDt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                if (closeEpochMs < openEpochMs) continue;
+
+                double netProfit = getNetProfit(trade);
+                String strategyName = mappings.getOrDefault(trade.getMagicNumber(), "Magic " + trade.getMagicNumber());
+                Account acc = accountManager.getAccount(trade.getAccountId());
+                String accountName = (acc != null && acc.getName() != null) ? acc.getName() : ("Acc " + trade.getAccountId());
+
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("ticket", trade.getTicket());
+                map.put("accountId", trade.getAccountId());
+                map.put("accountName", accountName);
+                map.put("symbol", trade.getSymbol() != null ? trade.getSymbol() : "UNKNOWN");
+                map.put("magicNumber", trade.getMagicNumber());
+                map.put("strategyName", strategyName);
+                map.put("openTime", openEpochMs);
+                map.put("closeTime", closeEpochMs);
+                map.put("profit", netProfit);
+                map.put("volume", trade.getVolume());
+                map.put("type", trade.getType());
+                result.add(map);
+            } catch (Exception ignored) {}
+        }
+        return result;
+    }
+
     private double getNetProfit(ClosedTradeEntity trade) {
         Account account = accountManager.getAccount(trade.getAccountId());
         double commissionFactor = account != null ? account.getCommissionFactor() : 1.0;
