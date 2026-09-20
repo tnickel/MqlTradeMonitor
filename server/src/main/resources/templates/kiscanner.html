@@ -75,6 +75,17 @@
             padding: 1rem;
         }
 
+        /* Feste Chart-Hoehe: ohne begrenzten Container laeuft der responsive
+           Canvas in eine Hoehenschleife (Chart.js maintainAspectRatio=false). */
+        .chart-box {
+            position: relative;
+            height: 260px;
+        }
+
+        .chart-box canvas {
+            display: block;
+        }
+
         .kiscanner-chart-card h3 {
             margin: 0 0 0.75rem 0;
             font-size: 1rem;
@@ -86,18 +97,16 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 0.5rem 0.75rem 1rem;
-            overflow-x: auto;
         }
 
         table.kiscanner-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             font-size: 0.85rem;
         }
 
         table.kiscanner-table th {
-            position: sticky;
-            top: 0;
             text-align: left;
             color: var(--text-secondary);
             font-size: 0.72rem;
@@ -105,6 +114,8 @@
             letter-spacing: 0.5px;
             padding: 0.6rem 0.5rem;
             border-bottom: 1px solid var(--border-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
 
@@ -113,15 +124,20 @@
             border-bottom: 1px dashed var(--border-color);
             color: var(--text-primary);
             vertical-align: middle;
+            overflow: hidden;
             white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
-        table.kiscanner-table td.urteil-cell,
-        table.kiscanner-table td.name-cell {
+        /* Mehrzeilige Meta-Info unter dem Signalnamen (Plattform, Bericht vom). */
+        td.name-cell .meta {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            line-height: 1.3;
             white-space: normal;
-            min-width: 12em;
-            max-width: 22em;
         }
+
+        td.num { text-align: right; }
 
         .ampel-badge {
             display: inline-block;
@@ -130,7 +146,7 @@
 
         .score-bar {
             display: inline-block;
-            width: 100px;
+            width: 70px;
             height: 8px;
             border-radius: 4px;
             background: rgba(128, 128, 128, 0.25);
@@ -177,17 +193,20 @@
                  background-color: rgba(0,0,0,0.6); }
 
         .modal-content {
-            background: var(--bg-secondary, #1e222d);
+            /* Bewusst opak: die Theme-Variable ist glasig-halbtransparent und
+               liess den Dialog-Inhalt über der Seite verschwimmen. */
+            background: #1e222d;
+            color: #e8eaf2;
             margin: 6vh auto;
             padding: 1.5rem 2rem;
-            border: 1px solid var(--border-color);
+            border: 1px solid #3a3f55;
             border-radius: 14px;
             max-width: 900px;
             width: 92%;
-            color: var(--text-primary);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
 
-        .close-modal { color: var(--text-secondary); float: right; font-size: 1.8rem;
+        .close-modal { color: #9ca3af; float: right; font-size: 1.8rem;
                        font-weight: bold; cursor: pointer; }
 
         .doc-row {
@@ -255,11 +274,11 @@
         <div class="kiscanner-charts">
             <div class="kiscanner-chart-card">
                 <h3>Ampel-Verteilung</h3>
-                <canvas id="ampel-chart" height="200"></canvas>
+                <div class="chart-box"><canvas id="ampel-chart"></canvas></div>
             </div>
             <div class="kiscanner-chart-card">
                 <h3>Risiko vs. Ertrag — max. Trading-DD gegen Ertrag/Monat</h3>
-                <canvas id="risk-chart" height="200"></canvas>
+                <div class="chart-box"><canvas id="risk-chart"></canvas></div>
                 <p style="color: var(--text-secondary); font-size: 0.72rem; margin: 0.5rem 0 0 0;">
                     Gestrichelte Linien: Drawdown-Schranke 30&nbsp;% (vertikal) und Ertragsschwelle 5&nbsp;%/Monat (horizontal).
                     Nur Punkte links OBEN erfüllen beide Kriterien gleichzeitig.
@@ -270,44 +289,50 @@
         <!-- Signal table -->
         <div class="kiscanner-table-wrap">
             <table class="kiscanner-table" id="kiscanner-table">
+                <colgroup>
+                    <col style="width:5%"><col style="width:14%"><col style="width:17%">
+                    <col style="width:7%"><col style="width:6%"><col style="width:7%">
+                    <col style="width:11%"><col style="width:13%">
+                    <col style="width:5%"><col style="width:4%"><col style="width:4%">
+                    <col style="width:7%">
+                </colgroup>
                 <thead>
                     <tr>
-                        <th>Ampel</th>
+                        <th title="Ampel des Scanners">Ampel</th>
                         <th>Name</th>
                         <th>Stop-Nachweis</th>
-                        <th style="text-align:right;">Trading-DD %</th>
-                        <th style="text-align:right;">EQ-DD %</th>
-                        <th style="text-align:right;">Ertrag/Mon. %</th>
-                        <th>Risiko-Score ↓</th>
+                        <th style="text-align:right;" title="Max. Trading-Drawdown in %">T-DD %</th>
+                        <th style="text-align:right;" title="Drawdown By Equity in %">EQ-DD %</th>
+                        <th style="text-align:right;" title="Ertrag in % pro Monat">Ertrag %</th>
+                        <th title="Risiko-Score 1–10, kleiner ist besser">Score ↓</th>
                         <th>Urteil</th>
-                        <th>Bericht vom</th>
-                        <th style="text-align:right;">Abonnenten</th>
-                        <th style="text-align:right;">30 T.</th>
-                        <th style="text-align:right;">7 T.</th>
-                        <th>Dokumente</th>
+                        <th style="text-align:right;" title="Abonnenten aktuell">Abos</th>
+                        <th style="text-align:right;" title="Abonnenten-Bilanz 30 Tage">30 T.</th>
+                        <th style="text-align:right;" title="Abonnenten-Bilanz 7 Tage">7 T.</th>
+                        <th title="PDF-Dokumente: 📄 Berichte · 🟡 Tiefenanalysen — Klick öffnet die Liste">PDFs</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr th:each="s : ${kiSignals}"
                         th:attr="data-ampel=${s.ampel},data-dd=${s.tradingDdPct},data-ertrag=${s.ertragMonatPct},data-name=${s.name}">
-                        <td><span class="ampel-badge" th:text="${s.ampel}">🟢</span></td>
+                        <td><span class="ampel-badge" th:title="${s.ampel}" th:text="${s.ampel}">🟢</span></td>
                         <td class="name-cell">
                             <a th:if="${s.url != null}" th:href="${s.url}" target="_blank" rel="noopener"
-                               style="color: var(--text-primary); text-decoration: none;"
-                               th:title="'Signal #' + ${s.signalId}">
+                               style="color: var(--text-primary); text-decoration: none; display:block; overflow:hidden; text-overflow:ellipsis;"
+                               th:title="${s.name} + ' — Signal #' + ${s.signalId}">
                                 <span th:text="${s.name}">Gold Spike</span></a>
-                            <span th:unless="${s.url != null}" th:text="${s.name}">Gold Spike</span>
+                            <span th:unless="${s.url != null}" style="display:block; overflow:hidden; text-overflow:ellipsis;"
+                                  th:title="${s.name}" th:text="${s.name}">Gold Spike</span>
                             <span class="neu-marker" th:if="${'NEU'.equals(s.stand)}">NEU</span>
-                            <div class="doc-meta" th:if="${s.platform != null}" th:text="${s.platform}">MT5</div>
+                            <div class="meta" th:if="${s.platform != null}"
+                                 th:text="${s.platform} + (${s.berichtVom != null} ? ' · Bericht ' + ${s.berichtVom} : '')">MT5</div>
                         </td>
-                        <td>
+                        <td th:title="${s.stopNachweis != null ? s.stopNachweis : ''}">
                             <span th:text="${s.stopNachweis != null ? s.stopNachweis : '—'}">bewiesen</span>
                         </td>
-                        <td style="text-align:right;"
-                            th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 1)} : '—'">8.1</td>
-                        <td style="text-align:right;"
-                            th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 1)} : '—'">3.8</td>
-                        <td style="text-align:right; font-weight:700;"
+                        <td class="num" th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 1)} : '—'">8.1</td>
+                        <td class="num" th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 1)} : '—'">3.8</td>
+                        <td class="num" style="font-weight:700;"
                             th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} : '—'">6.2</td>
                         <td>
                             <span class="score-bar">
@@ -315,18 +340,16 @@
                             </span>
                             <span th:text="${s.score != null} ? ${#numbers.formatDecimal(s.score, 1, 1)} : '—'">3.2</span>
                         </td>
-                        <td class="urteil-cell">
+                        <td class="urteil-cell" th:title="${s.urteil != null ? s.urteil : ''}">
                             <span th:text="${s.urteil != null ? s.urteil : '—'}">Kandidat</span>
                         </td>
-                        <td class="doc-meta" th:text="${s.berichtVom != null ? s.berichtVom : '—'}">2026-09-20 10:00</td>
-                        <td style="text-align:right;"
-                            th:text="${s.abonnenten != null} ? ${#numbers.formatDecimal(s.abonnenten, 1, 0)} : ''">120</td>
-                        <td style="text-align:right;">
+                        <td class="num" th:text="${s.abonnenten != null} ? ${#numbers.formatDecimal(s.abonnenten, 1, 0)} : ''">120</td>
+                        <td class="num">
                             <span th:if="${s.aboDelta30 != null and s.aboDelta30 > 0}" class="delta-up" th:text="'+' + ${s.aboDelta30}">+12</span>
                             <span th:if="${s.aboDelta30 != null and s.aboDelta30 < 0}" class="delta-down" th:text="${s.aboDelta30}">-3</span>
                             <span th:if="${s.aboDelta30 != null and s.aboDelta30 == 0}" class="delta-zero">0</span>
                         </td>
-                        <td style="text-align:right;">
+                        <td class="num">
                             <span th:if="${s.aboDelta7 != null and s.aboDelta7 > 0}" class="delta-up" th:text="'+' + ${s.aboDelta7}">+2</span>
                             <span th:if="${s.aboDelta7 != null and s.aboDelta7 < 0}" class="delta-down" th:text="${s.aboDelta7}">-1</span>
                             <span th:if="${s.aboDelta7 != null and s.aboDelta7 == 0}" class="delta-zero">0</span>
@@ -344,7 +367,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(kiSignals)}">
-                        <td colspan="13" style="text-align:center; padding: 2rem; color: var(--text-secondary);">
+                        <td colspan="12" style="text-align:center; padding: 2rem; color: var(--text-secondary);">
                             Noch keine Signale übertragen — im MqlKiScanner den „Tradeserver-Sync“ starten.
                         </td>
                     </tr>
@@ -476,6 +499,30 @@
             });
             const scatterCtx = document.getElementById('risk-chart');
             if (scatterCtx && points.length) {
+                // Schrankenlinien (30 % DD / 5 % Ertrag) als Inline-Plugin.
+                const schranken = {
+                    id: 'schranken',
+                    afterDatasetsDraw(chart) {
+                        const {ctx, chartArea, scales} = chart;
+                        if (!chartArea) return;
+                        const x = scales.x.getPixelForValue(30);
+                        const y = scales.y.getPixelForValue(5);
+                        ctx.save();
+                        ctx.setLineDash([6, 5]);
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeStyle = 'rgba(239,68,68,0.8)';
+                        ctx.beginPath();
+                        ctx.moveTo(x, chartArea.top);
+                        ctx.lineTo(x, chartArea.bottom);
+                        ctx.stroke();
+                        ctx.strokeStyle = 'rgba(34,197,94,0.8)';
+                        ctx.beginPath();
+                        ctx.moveTo(chartArea.left, y);
+                        ctx.lineTo(chartArea.right, y);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                };
                 new Chart(scatterCtx, {
                     type: 'scatter',
                     data: {datasets: [{
@@ -501,7 +548,8 @@
                                         color: textColor}, ticks: {color: textColor},
                                 grid: {color: gridColor}}
                         }
-                    }
+                    },
+                    plugins: [schranken]
                 });
             }
         })();
