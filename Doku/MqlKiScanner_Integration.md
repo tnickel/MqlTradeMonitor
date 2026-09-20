@@ -89,8 +89,12 @@ AJAX alle 30 s (`/api/kiscanner/status`). Klick öffnet `/kiscanner`.
 Sicherheit: Fehlgeschlagene Key-Prüfungen landen wie bei EAs im
 ClientErrorLog (`KISCANNER_AUTH_FAILED`); Dokumente werden nur bei
 korrektem PDF-Magic-Byte gespeichert und inline mit `nosniff` ausgeliefert.
-Produktiv-Limit: nginx `client_max_body_size 10m` → Scanner sendet maximal
-8-MB-PDFs (Base64 +33 %).
+Grenzen: 12 MB je Dokument (KiScannerService), Scanner sendet max. 8 MB
+PDFs (Base64 +33 %); nginx auf monitor.tnickel-ki.de erlaubt
+`client_max_body_size 200m`. **Der Monitor ist nur über
+https://monitor.tnickel-ki.de vollständig erreichbar** (proxyt alles auf
+8080) — andere VHosts derselben Maschine geben nur eine Pfad-Allowlist
+frei und beantworten `/api/kiscanner` mit nginx-404.
 
 ## Build/Test-Hinweis
 
