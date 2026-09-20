@@ -96,6 +96,15 @@ public class SecurityConfig {
                         AntPathRequestMatcher.antMatcher("/api/history"),
                         AntPathRequestMatcher.antMatcher("/api/ea-logs"),
                         AntPathRequestMatcher.antMatcher("/api/upload-requested-ticks"),
+                        // MqlKiScanner one-shot sync protocol (own X-User-Key auth,
+                        // exactly these paths — browser GETs under /api/kiscanner
+                        // like /status and /documents/{id}/view stay CSRF- and
+                        // session-protected).
+                        AntPathRequestMatcher.antMatcher("/api/kiscanner/register"),
+                        AntPathRequestMatcher.antMatcher("/api/kiscanner/signals"),
+                        AntPathRequestMatcher.antMatcher("/api/kiscanner/documents"),
+                        AntPathRequestMatcher.antMatcher("/api/kiscanner/complete"),
+                        AntPathRequestMatcher.antMatcher("/api/kiscanner/abort"),
                         AntPathRequestMatcher.antMatcher("/h2-console/**")
                 ))
                 .addFilterBefore(readOnlyFilter, UsernamePasswordAuthenticationFilter.class)
@@ -112,6 +121,14 @@ public class SecurityConfig {
                                 AntPathRequestMatcher.antMatcher("/api/ea-logs"),
                                 AntPathRequestMatcher.antMatcher("/api/upload-requested-ticks"),
                                 AntPathRequestMatcher.antMatcher("/api/update/download"),
+                                // MqlKiScanner machine endpoints (exact paths; the
+                                // scanner authenticates per request via X-User-Key).
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/ping"),
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/register"),
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/signals"),
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/documents"),
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/complete"),
+                                AntPathRequestMatcher.antMatcher("/api/kiscanner/abort"),
                                 AntPathRequestMatcher.antMatcher("/css/**"),
                                 AntPathRequestMatcher.antMatcher("/js/**"),
                                 AntPathRequestMatcher.antMatcher("/img/**"),

@@ -468,10 +468,63 @@ Abmelden und Sitzung beenden.
 
 ---
 
-## 7. Öffentliche Ressourcen
+## 7. MqlKiScanner-Sync-Protokoll (`/api/kiscanner/*`)
+
+Einmal-Sync des MqlKiScanner (Signal-Analyse-Tool, kein EA). Alle Aufrufe
+erfordern den Header `X-User-Key` (API-Key eines Benutzers); Details und
+Feldlisten: `Doku/MqlKiScanner_Integration.md`.
+
+### GET `/api/kiscanner/ping`
+
+Verbindungstest (Erreichbarkeit + Key). **Response:** `{"status":"ok","service":"MqlTradeMonitor","kiscannerApi":"v1"}`
+
+### POST `/api/kiscanner/register`
+
+Handshake/Sonderbehandlung — verlangt `client:"MqlKiScanner"` und
+`protocolVersion:1` (sonst HTTP 400). Öffnet einen Sync-Lauf und liefert den
+Dokumentenbestand für den clientseitigen SHA-256-Diff.
+
+**Request:**
+```json
+{"client":"MqlKiScanner","protocolVersion":1,"scannerVersion":"0.1.0","signalCount":42}
+```
+
+**Response:** `{"status":"ok","runId":7,"serverTime":"…","documents":[{"docKey":"signal/2349227/03-gesamtbericht.pdf","sha256":"…"}],"signalIds":[…]}`
+
+### POST `/api/kiscanner/signals`
+
+Vollständiger Tabellen-Snapshot (Spiegel-Semantik: fehlende `signalId`s
+werden gelöscht). **Response:** `{"status":"ok","stored":42,"deleted":1}`
+
+### POST `/api/kiscanner/documents`
+
+Ein PDF pro Aufruf (nur `application/pdf`, Magic-Byte-geprüft, 12-MB-Limit),
+Upsert über `docKey`.
+
+**Request (Auszug):**
+```json
+{"docKey":"signal/2349227/03-gesamtbericht.pdf","signalId":2349227,
+ "group":"eigene","kind":"gesamtbericht","fileName":"03-gesamtbericht.pdf",
+ "sha256":"…","sizeBytes":45123,"contentBase64":"JVBERi0xLjQ…"}
+```
+
+### POST `/api/kiscanner/complete` / POST `/api/kiscanner/abort`
+
+Lauf abschließen (`{signals,documents,uploaded,skipped,bytes}`) bzw. im
+Fehlerfall abbrechen (`{"reason":"…"}`).
+
+### Browser-Endpunkte (Session-Login)
+
+- `GET /api/kiscanner/status` — JSON für die Dashboard-Kachel.
+- `GET /api/kiscanner/documents/{id}/view` — PDF inline.
+- `GET /kiscanner` — Ansichtsseite (Tabelle, Charts, PDFs).
+
+---
+
+## 8. Öffentliche Ressourcen
 
 Die folgenden Pfade sind ohne Authentifizierung zugänglich:
-- `/api/**` - MetaTrader EA API
+- `/api/**` - MetaTrader EA API (Einzelheiten: `SecurityConfig`)
 - `/login` - Login-Seite
 - `/css/**`, `/js/**` - Statische Ressourcen
 - `/mobile/**` - Mobile Ansichten

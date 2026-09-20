@@ -265,6 +265,39 @@
                 </div>
             </div>
 
+            <!-- MqlKiScanner Tile (Signal-Tabelle & PDFs aus dem Scanner-Sync) -->
+            <div id="kiscanner-card" class="account-card" onclick="location.href='/kiscanner'"
+                style="cursor: pointer; border: 1px solid #06b6d4; background: linear-gradient(to bottom right, #2a2e39, rgba(6, 182, 212, 0.12)); flex: 0 1 auto; min-width: 300px; display: flex; flex-direction: column;"
+                th:if="${kiStatus != null}">
+                <div class="account-header" style="flex: 0 0 auto;">
+                    <span class="account-id" style="font-size: 1.1rem;">🔬 MqlKiScanner</span>
+                    <span id="kiscanner-status-badge" class="status-badge"
+                        th:classappend="${kiStatus.connected} ? 'online' : 'offline'"
+                        th:text="${kiStatus.connected} ? 'VERBUNDEN' : 'KEINE DATEN'"
+                        th:style="'font-size:0.7rem;' + (${kiStatus.connected} ? '' : 'background:rgba(107,114,128,.25);color:#9ca3af;')">VERBUNDEN</span>
+                </div>
+                <div class="account-metrics" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 5px; flex: 1;">
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Signale</span>
+                        <span class="metric-value" id="kiscanner-signals" style="font-size: 0.95rem; font-weight: bold;"
+                            th:text="${kiStatus.signals}">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.4rem 0.6rem;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">PDFs</span>
+                        <span class="metric-value" id="kiscanner-documents" style="font-size: 0.95rem; font-weight: bold;"
+                            th:text="${kiStatus.documents}">0</span>
+                    </div>
+                    <div class="metric" style="padding: 0.4rem 0.6rem; grid-column: 1 / span 2;">
+                        <span class="metric-label" style="font-size: 0.7rem; line-height: 1.2;">Letzte Synchronisierung</span>
+                        <span class="metric-value" id="kiscanner-last-sync" style="font-size: 0.95rem; font-weight: bold;"
+                            th:text="${kiStatus['lastRunAtText'] != null ? kiStatus['lastRunAtText'] : '—'}">—</span>
+                    </div>
+                </div>
+                <div class="view-details-btn"
+                    style="padding: 0.3rem; font-size: 0.8rem; text-align: center; margin-top: auto; background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%);">Signal-Tabelle &amp; PDFs →
+                </div>
+            </div>
+
             <!-- Report Generator Tile -->
             <div id="report-generator-card" class="account-card" onclick="openReportModal()"
                 style="cursor: pointer; border: 1px solid #f59e0b; background: linear-gradient(to bottom right, #2a2e39, rgba(245, 158, 11, 0.12)); flex: 0 1 auto; min-width: 300px; display: flex; flex-direction: column;">
@@ -2593,6 +2626,42 @@
             fetchAndRenderNews();
             setInterval(fetchAndRenderNews, 30000);
         }
+
+        // MqlKiScanner Tile: refreshes signal/document counts and the last sync
+        // time every 30 s so an active sync becomes visible without reload.
+        async function fetchAndRenderKiScanner() {
+            const card = document.getElementById('kiscanner-card');
+            if (!card) return;
+            try {
+                const response = await fetch('/api/kiscanner/status');
+                if (!response.ok) return;
+                const data = await response.json();
+                const badge = document.getElementById('kiscanner-status-badge');
+                if (badge) {
+                    badge.textContent = data.connected ? 'VERBUNDEN' : 'KEINE DATEN';
+                    badge.className = 'status-badge ' + (data.connected ? 'online' : 'offline');
+                    if (!data.connected) {
+                        badge.style.fontSize = '0.7rem';
+                        badge.style.background = 'rgba(107,114,128,.25)';
+                        badge.style.color = '#9ca3af';
+                    } else {
+                        badge.style.background = '';
+                        badge.style.color = '';
+                    }
+                }
+                const signalsEl = document.getElementById('kiscanner-signals');
+                const docsEl = document.getElementById('kiscanner-documents');
+                const lastEl = document.getElementById('kiscanner-last-sync');
+                if (signalsEl) signalsEl.textContent = data.signals;
+                if (docsEl) docsEl.textContent = data.documents;
+                if (lastEl && data.lastRunAtText) lastEl.textContent = data.lastRunAtText;
+            } catch (e) { /* keep the server-rendered state */ }
+        }
+        function initKiScannerTile() {
+            fetchAndRenderKiScanner();
+            setInterval(fetchAndRenderKiScanner, 30000);
+        }
+        document.addEventListener('DOMContentLoaded', initKiScannerTile);
 
         function openNewsConfigModal() {
             document.getElementById('newsConfigModal').style.display = 'block';

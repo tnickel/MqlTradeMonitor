@@ -96,11 +96,26 @@ MqlTradeMonitor/
 | POST | `/api/trades-init` | Initialer vollständiger Trade-Upload |
 | POST | `/api/heartbeat` | Heartbeat (accountId, timestamp) |
 
+## MqlKiScanner-Sync (KiScannerApiController — Sonderprotokoll, kein EA)
+
+| Method | URL | Beschreibung |
+|--------|-----|--------------|
+| GET | `/api/kiscanner/ping` | Verbindungstest (X-User-Key) |
+| POST | `/api/kiscanner/register` | Handshake (client/protocolVersion Pflicht), öffnet Lauf, liefert Dokumentenbestand |
+| POST | `/api/kiscanner/signals` | Signal-Tabellen-Snapshot (Spiegel-Semantik) |
+| POST | `/api/kiscanner/documents` | Ein PDF je Aufruf (base64, validiert) |
+| POST | `/api/kiscanner/complete` / `abort` | Lauf abschließen / abbrechen |
+| GET | `/api/kiscanner/status` | JSON für Dashboard-Kachel (Session) |
+| GET | `/api/kiscanner/documents/{id}/view` | PDF inline (Session) |
+
+Doku: `Doku/MqlKiScanner_Integration.md`
+
 ## Wichtige AJAX/View-Endpoints (DashboardController)
 
 | Method | URL | Beschreibung |
 |--------|-----|--------------|
-| GET | `/` | Dashboard |
+| GET | `/` | Dashboard (enth. Kachel „🔬 MqlKiScanner“) |
+| GET | `/kiscanner` | MqlKiScanner-Ansicht: Signal-Tabelle, Charts, PDFs |
 | GET | `/account/{id}` | Account-Detail-Seite |
 | GET | `/api/equity-history/{accountId}` | JSON: Equity-Snapshots für Chart |
 | GET | `/api/stats/magic-drawdowns` | JSON: Drawdown-Statistiken |
@@ -124,6 +139,9 @@ MqlTradeMonitor/
 | `dashboard_sections` | DashboardSectionEntity | Dynamische Dashboard-Sektionen |
 | `magic_mappings` | MagicMappingEntity | Magic-Number → Name/Kommentar |
 | `global_config` | GlobalConfigEntity | Admin-Einstellungen (u.a. `SYNC_EXEMPT_MAGIC_NUMBERS`) |
+| `ki_signals` | KiSignalEntity | MqlKiScanner: Signal-Zeilen des letzten Sync-Snapshots |
+| `ki_documents` | KiDocumentEntity | MqlKiScanner: übertragene PDFs (BLOB, sha256) |
+| `ki_sync_runs` | KiSyncRunEntity | MqlKiScanner: Sync-Läufe (running/ok/aborted) |
 | `request_logs` | RequestLog | HTTP-Request-Logs |
 | `client_logs` | ClientLog | Client-Verbindungslogs |
 | `login_logs` | LoginLog | Authentifizierungs-Logs |

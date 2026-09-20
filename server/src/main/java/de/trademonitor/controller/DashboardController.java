@@ -191,6 +191,9 @@ public class DashboardController {
     @Autowired
     private de.trademonitor.repository.AccountRepository accountRepository;
 
+    @Autowired
+    private de.trademonitor.service.KiScannerService kiScannerService;
+
     @ModelAttribute
     public void addCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails, Model model) {
         if (userDetails != null) {
@@ -343,6 +346,9 @@ public class DashboardController {
         model.addAttribute("alarmedAccounts", alarmedAccounts);
 
         model.addAttribute("syncMetrics", copierVerificationService.getMetrics());
+
+        // MqlKiScanner-Kachel: Status des letzten Sync-Laufs.
+        model.addAttribute("kiStatus", kiScannerService.statusForDashboard());
 
         // Global Export Stats
         List<Long> allowedAccountIds = allAccounts.stream()
@@ -3054,7 +3060,7 @@ public class DashboardController {
 
     @PostMapping("/api/account/links/{linkId}/description")
     @ResponseBody
-    public ResponseEntity<?> updateLinkDescription(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ResponseEntity<String> updateLinkDescription(@AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable long linkId, @RequestParam("description") String description) {
         de.trademonitor.entity.AccountLinkEntity link = accountLinkRepository.findById(linkId).orElse(null);
         if (link == null) {
@@ -3066,6 +3072,26 @@ public class DashboardController {
         link.setMinText(description);
         accountLinkRepository.save(link);
         return ResponseEntity.ok("Beschreibung aktualisiert");
+    }
+
+    /**
+     * MqlKiScanner view: the synced signal table with charts and documents.
+     * Reached via the dashboard tile; data comes from the KiScanner sync
+     * protocol (no live connection needed — the server keeps the mirror).
+     */
+    @GetMapping("/kiscanner")
+    public String kiScannerPage(Model model) {
+        model.addAttribute("kiStatus", kiScannerService.statusForDashboard());
+        List<de.trademonitor.entity.KiSignalEntity> signals = kiScannerService.signalsForView();
+        model.addAttribute("kiSignals", signals);
+        Map<Long, List<de.trademonitor.entity.KiDocumentEntity>> docsBySignal = new LinkedHashMap<>();
+        for (de.trademonitor.entity.KiSignalEntity signal : signals) {
+            docsBySignal.put(signal.getSignalId(),
+                    kiScannerService.documentsForSignal(signal.getSignalId()));
+        }
+        model.addAttribute("kiDocsBySignal", docsBySignal);
+        model.addAttribute("kiPortfolioDocs", kiScannerService.portfolioDocuments());
+        return "kiscanner";
     }
 
 }

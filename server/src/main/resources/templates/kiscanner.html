@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MqlKiScanner — Signal-Tabelle</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .container-fluid {
+            width: 95%;
+            margin: 0 auto;
+            max-width: 1800px;
+        }
+
+        .kiscanner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background: linear-gradient(to bottom right, var(--bg-card), rgba(6, 182, 212, 0.08));
+            border: 1px solid rgba(6, 182, 212, 0.35);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kiscanner-stats {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .kiscanner-stat {
+            flex: 1 1 140px;
+            min-width: 140px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.9rem 1.1rem;
+            text-align: center;
+        }
+
+        .kiscanner-stat .label {
+            display: block;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+
+        .kiscanner-stat .value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .kiscanner-charts {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .kiscanner-chart-card {
+            flex: 1 1 320px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .kiscanner-chart-card h3 {
+            margin: 0 0 0.75rem 0;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .kiscanner-table-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.5rem 0.75rem 1rem;
+            overflow-x: auto;
+        }
+
+        table.kiscanner-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        table.kiscanner-table th {
+            position: sticky;
+            top: 0;
+            text-align: left;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0.6rem 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        table.kiscanner-table td {
+            padding: 0.5rem;
+            border-bottom: 1px dashed var(--border-color);
+            color: var(--text-primary);
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        table.kiscanner-table td.urteil-cell,
+        table.kiscanner-table td.name-cell {
+            white-space: normal;
+            min-width: 12em;
+            max-width: 22em;
+        }
+
+        .ampel-badge {
+            display: inline-block;
+            font-size: 1.05rem;
+        }
+
+        .score-bar {
+            display: inline-block;
+            width: 100px;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(128, 128, 128, 0.25);
+            overflow: hidden;
+            vertical-align: middle;
+            margin-right: 0.4rem;
+        }
+
+        .score-bar > span {
+            display: block;
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .delta-up { color: #22c55e; }
+        .delta-down { color: #ef4444; }
+        .delta-zero { color: #9ca3af; }
+        .neu-marker {
+            background: rgba(6, 182, 212, 0.2);
+            color: #22d3ee;
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            border-radius: 4px;
+            font-size: 0.65rem;
+            padding: 0.05rem 0.3rem;
+            margin-left: 0.35rem;
+            font-weight: 700;
+        }
+
+        .docs-btn {
+            background: rgba(6, 182, 212, 0.15);
+            color: #22d3ee;
+            border: 1px solid rgba(6, 182, 212, 0.45);
+            border-radius: 6px;
+            padding: 0.25rem 0.55rem;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+
+        .docs-btn:hover { background: rgba(6, 182, 212, 0.3); }
+        .docs-btn:disabled { opacity: 0.35; cursor: default; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+                 width: 100%; height: 100%; overflow: auto;
+                 background-color: rgba(0,0,0,0.6); }
+
+        .modal-content {
+            background: var(--bg-secondary, #1e222d);
+            margin: 6vh auto;
+            padding: 1.5rem 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            max-width: 900px;
+            width: 92%;
+            color: var(--text-primary);
+        }
+
+        .close-modal { color: var(--text-secondary); float: right; font-size: 1.8rem;
+                       font-weight: bold; cursor: pointer; }
+
+        .doc-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.45rem 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .doc-row:last-child { border-bottom: none; }
+        .doc-meta { color: var(--text-secondary); font-size: 0.75rem; }
+        .doc-open {
+            color: #22d3ee;
+            text-decoration: none;
+            border: 1px solid rgba(6,182,212,.45);
+            border-radius: 6px;
+            padding: 0.2rem 0.55rem;
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+        .doc-open:hover { background: rgba(6,182,212,.15); }
+        .group-heading { margin: 0.9rem 0 0.25rem 0; font-size: 0.85rem;
+                         color: var(--text-secondary); text-transform: uppercase;
+                         letter-spacing: 1px; }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="kiscanner-header">
+            <div>
+                <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem;">← Dashboard</a>
+                <h1 style="margin: 0.3rem 0 0.2rem 0; color: var(--text-primary);">
+                    🔬 MqlKiScanner — Signal-Tabelle</h1>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;" th:if="${kiStatus != null}">
+                    Gespiegelt aus dem MqlKiScanner (forensische Risiko-Analyse) ·
+                    <span th:if="${kiStatus.connected}" style="color:#22c55e;">verbunden</span>
+                    <span th:unless="${kiStatus.connected}" style="color:#9ca3af;">noch keine Übertragung</span>
+                    · Letzte Synchronisierung:
+                    <strong th:text="${kiStatus['lastRunAtText'] != null ? kiStatus['lastRunAtText'] : '—'}">—</strong>
+                    <th:block th:if="${kiStatus['scannerVersion'] != null}">
+                        · Scanner <span th:text="${kiStatus['scannerVersion']}">0.1.0</span>
+                    </th:block>
+                </p>
+                <p style="margin: 0.4rem 0 0 0; color: var(--text-secondary); font-size: 0.78rem;">
+                    Entscheidung des Scanners: Risiko vor Ertrag — harte Schranke 30&nbsp;% Drawdown, Ertrag &gt; 5&nbsp;%/Monat,
+                    Stop-Nachweis nur mit Beleg. Ampel/Score/Urteil kommen unverändert aus dem Scanner.
+                </p>
+            </div>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="kiscanner-stats" id="kiscanner-stats">
+            <div class="kiscanner-stat"><span class="label">Signale</span><span class="value" id="stat-signals">0</span></div>
+            <div class="kiscanner-stat"><span class="label">🟢 Kandidaten</span><span class="value" style="color:#22c55e;" id="stat-green">0</span></div>
+            <div class="kiscanner-stat"><span class="label">🟡 Beobachtung</span><span class="value" style="color:#eab308;" id="stat-yellow">0</span></div>
+            <div class="kiscanner-stat"><span class="label">🔴 Risiko/Ausschluss</span><span class="value" style="color:#ef4444;" id="stat-red">0</span></div>
+            <div class="kiscanner-stat"><span class="label">PDFs</span><span class="value" id="stat-docs">0</span></div>
+        </div>
+
+        <!-- Charts -->
+        <div class="kiscanner-charts">
+            <div class="kiscanner-chart-card">
+                <h3>Ampel-Verteilung</h3>
+                <canvas id="ampel-chart" height="200"></canvas>
+            </div>
+            <div class="kiscanner-chart-card">
+                <h3>Risiko vs. Ertrag — max. Trading-DD gegen Ertrag/Monat</h3>
+                <canvas id="risk-chart" height="200"></canvas>
+                <p style="color: var(--text-secondary); font-size: 0.72rem; margin: 0.5rem 0 0 0;">
+                    Gestrichelte Linien: Drawdown-Schranke 30&nbsp;% (vertikal) und Ertragsschwelle 5&nbsp;%/Monat (horizontal).
+                    Nur Punkte links OBEN erfüllen beide Kriterien gleichzeitig.
+                </p>
+            </div>
+        </div>
+
+        <!-- Signal table -->
+        <div class="kiscanner-table-wrap">
+            <table class="kiscanner-table" id="kiscanner-table">
+                <thead>
+                    <tr>
+                        <th>Ampel</th>
+                        <th>Name</th>
+                        <th>Stop-Nachweis</th>
+                        <th style="text-align:right;">Trading-DD %</th>
+                        <th style="text-align:right;">EQ-DD %</th>
+                        <th style="text-align:right;">Ertrag/Mon. %</th>
+                        <th>Risiko-Score ↓</th>
+                        <th>Urteil</th>
+                        <th>Bericht vom</th>
+                        <th style="text-align:right;">Abonnenten</th>
+                        <th style="text-align:right;">30 T.</th>
+                        <th style="text-align:right;">7 T.</th>
+                        <th>Dokumente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="s : ${kiSignals}"
+                        th:attr="data-ampel=${s.ampel},data-dd=${s.tradingDdPct},data-ertrag=${s.ertragMonatPct},data-name=${s.name}">
+                        <td><span class="ampel-badge" th:text="${s.ampel}">🟢</span></td>
+                        <td class="name-cell">
+                            <a th:if="${s.url != null}" th:href="${s.url}" target="_blank" rel="noopener"
+                               style="color: var(--text-primary); text-decoration: none;"
+                               th:title="'Signal #' + ${s.signalId}">
+                                <span th:text="${s.name}">Gold Spike</span></a>
+                            <span th:unless="${s.url != null}" th:text="${s.name}">Gold Spike</span>
+                            <span class="neu-marker" th:if="${'NEU'.equals(s.stand)}">NEU</span>
+                            <div class="doc-meta" th:if="${s.platform != null}" th:text="${s.platform}">MT5</div>
+                        </td>
+                        <td>
+                            <span th:text="${s.stopNachweis != null ? s.stopNachweis : '—'}">bewiesen</span>
+                        </td>
+                        <td style="text-align:right;"
+                            th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 1)} : '—'">8.1</td>
+                        <td style="text-align:right;"
+                            th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 1)} : '—'">3.8</td>
+                        <td style="text-align:right; font-weight:700;"
+                            th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} : '—'">6.2</td>
+                        <td>
+                            <span class="score-bar">
+                                <span th:style="'width:' + (${s.score != null} ? ${#numbers.formatDecimal(s.score * 10, 1, 0)} : '0') + '%;background:' + (${s.score == null} ? '#9ca3af' : (${s.score <= 3} ? '#22c55e' : (${s.score <= 6} ? '#eab308' : '#ef4444')))"></span>
+                            </span>
+                            <span th:text="${s.score != null} ? ${#numbers.formatDecimal(s.score, 1, 1)} : '—'">3.2</span>
+                        </td>
+                        <td class="urteil-cell">
+                            <span th:text="${s.urteil != null ? s.urteil : '—'}">Kandidat</span>
+                        </td>
+                        <td class="doc-meta" th:text="${s.berichtVom != null ? s.berichtVom : '—'}">2026-09-20 10:00</td>
+                        <td style="text-align:right;"
+                            th:text="${s.abonnenten != null} ? ${#numbers.formatDecimal(s.abonnenten, 1, 0)} : ''">120</td>
+                        <td style="text-align:right;">
+                            <span th:if="${s.aboDelta30 != null and s.aboDelta30 > 0}" class="delta-up" th:text="'+' + ${s.aboDelta30}">+12</span>
+                            <span th:if="${s.aboDelta30 != null and s.aboDelta30 < 0}" class="delta-down" th:text="${s.aboDelta30}">-3</span>
+                            <span th:if="${s.aboDelta30 != null and s.aboDelta30 == 0}" class="delta-zero">0</span>
+                        </td>
+                        <td style="text-align:right;">
+                            <span th:if="${s.aboDelta7 != null and s.aboDelta7 > 0}" class="delta-up" th:text="'+' + ${s.aboDelta7}">+2</span>
+                            <span th:if="${s.aboDelta7 != null and s.aboDelta7 < 0}" class="delta-down" th:text="${s.aboDelta7}">-1</span>
+                            <span th:if="${s.aboDelta7 != null and s.aboDelta7 == 0}" class="delta-zero">0</span>
+                        </td>
+                        <td>
+                            <button type="button" class="docs-btn"
+                                    th:attr="data-signal=${s.signalId}"
+                                    onclick="showKiDocs(this.getAttribute('data-signal'))"
+                                    th:disabled="${#lists.isEmpty(kiDocsBySignal.get(s.signalId))}">
+                                📄 <span th:text="${s.docsBerichte != null ? s.docsBerichte : 0}">2</span>
+                                <th:block th:if="${s.docsTiefenanalyse != null and s.docsTiefenanalyse > 0}">
+                                    · 🟡 <span th:text="${s.docsTiefenanalyse}">1</span>
+                                </th:block>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(kiSignals)}">
+                        <td colspan="13" style="text-align:center; padding: 2rem; color: var(--text-secondary);">
+                            Noch keine Signale übertragen — im MqlKiScanner den „Tradeserver-Sync“ starten.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Portfolio documents -->
+        <div class="kiscanner-chart-card" style="margin-top: 1.5rem;"
+             th:if="${!#lists.isEmpty(kiPortfolioDocs)}">
+            <h3>Portfolio-Gesamtbericht</h3>
+            <div class="doc-row" th:each="d : ${kiPortfolioDocs}">
+                <div>
+                    <div th:text="${d.label != null ? d.label : d.fileName}">Portfolio-Gesamtbericht</div>
+                    <div class="doc-meta"
+                         th:text="${#numbers.formatDecimal(d.fileSize / 1024.0, 1, 0)} + ' kB' + (${d.updatedAt != null} ? ' · synchronisiert ' + ${#temporals.format(d.updatedAt, 'dd.MM.yyyy HH:mm')} : '')">120 kB</div>
+                </div>
+                <a class="doc-open" th:href="@{'/api/kiscanner/documents/' + ${d.id} + '/view'}"
+                   target="_blank" rel="noopener">PDF ansehen ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents modal: one hidden block per signal, server-rendered -->
+    <div id="kiDocsModal" class="modal" onclick="if (event.target === this) closeKiDocs();">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeKiDocs()">&times;</span>
+            <h2 style="margin-top: 0;">📄 Dokumente</h2>
+            <div th:each="entry : ${kiDocsBySignal}" th:attr="id='ki-docs-' + ${entry.key}" style="display:none;">
+                <th:block th:with="docs=${entry.value}">
+                    <div class="group-heading">Eigene Berichte</div>
+                    <th:block th:each="d : ${docs}" th:if="${'eigene'.equals(d.group)}">
+                        <div class="doc-row">
+                            <div>
+                                <div th:text="${d.label != null ? d.label : d.fileName}">1 · Trade-Analyse</div>
+                                <div class="doc-meta"
+                                     th:text="${#numbers.formatDecimal(d.fileSize / 1024.0, 1, 0)} + ' kB' + (${d.lastModified != null} ? ' · Stand: ' + ${d.lastModified} : '')">45 kB</div>
+                            </div>
+                            <a class="doc-open" th:href="@{'/api/kiscanner/documents/' + ${d.id} + '/view'}"
+                               target="_blank" rel="noopener">PDF ansehen ↗</a>
+                        </div>
+                    </th:block>
+                    <div class="group-heading">Testreports (MqlDownloader-Spiegel)</div>
+                    <th:block th:each="d : ${docs}" th:if="${'downloader'.equals(d.group)}">
+                        <div class="doc-row">
+                            <div>
+                                <div th:text="${d.fileName}">testreport.pdf</div>
+                                <div class="doc-meta"
+                                     th:text="${#numbers.formatDecimal(d.fileSize / 1024.0, 1, 0)} + ' kB' + (${d.lastModified != null} ? ' · Stand: ' + ${d.lastModified} : '')">80 kB</div>
+                            </div>
+                            <a class="doc-open" th:href="@{'/api/kiscanner/documents/' + ${d.id} + '/view'}"
+                               target="_blank" rel="noopener">PDF ansehen ↗</a>
+                        </div>
+                    </th:block>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem; padding: 0.5rem 0;"
+                         th:if="${#lists.isEmpty(docs)}">Keine Dokumente für dieses Signal übertragen.</div>
+                </th:block>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showKiDocs(signalId) {
+            document.querySelectorAll('#kiDocsModal [id^="ki-docs-"]').forEach(
+                el => el.style.display = 'none');
+            const block = document.getElementById('ki-docs-' + signalId);
+            if (block) block.style.display = 'block';
+            document.getElementById('kiDocsModal').style.display = 'block';
+        }
+        function closeKiDocs() {
+            document.getElementById('kiDocsModal').style.display = 'none';
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeKiDocs();
+        });
+
+        // --- Stats + charts are derived from the table rows ---------------
+        (function () {
+            const rows = Array.from(document.querySelectorAll('#kiscanner-table tbody tr[data-ampel]'));
+            const ampelCount = {};
+            rows.forEach(row => {
+                const ampel = row.getAttribute('data-ampel') || '⚪';
+                ampelCount[ampel] = (ampelCount[ampel] || 0) + 1;
+            });
+            const docLinks = document.querySelectorAll('#kiDocsModal .doc-open').length;
+            const set = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            };
+            set('stat-signals', rows.length);
+            set('stat-green', (ampelCount['🟢'] || 0));
+            set('stat-yellow', (ampelCount['🟡'] || 0));
+            set('stat-red', (ampelCount['🔴'] || 0) + (ampelCount['⛔'] || 0));
+            set('stat-docs', docLinks);
+
+            const css = getComputedStyle(document.body);
+            const textColor = css.getPropertyValue('--text-secondary') || '#a0a0c0';
+            const gridColor = 'rgba(128,128,128,0.25)';
+
+            // Ampel donut
+            const donutLabels = [], donutData = [], donutColors = [];
+            const palette = {'🟢': '#22c55e', '🟡': '#eab308', '🔴': '#ef4444',
+                             '⛔': '#b91c1c', '⚪': '#9ca3af', '🟠': '#f97316'};
+            Object.keys(ampelCount).sort().forEach(key => {
+                donutLabels.push(key + ' (' + ampelCount[key] + ')');
+                donutData.push(ampelCount[key]);
+                donutColors.push(palette[key] || '#6b7280');
+            });
+            const donutCtx = document.getElementById('ampel-chart');
+            if (donutCtx && donutData.length) {
+                new Chart(donutCtx, {
+                    type: 'doughnut',
+                    data: {labels: donutLabels, datasets: [{data: donutData,
+                            backgroundColor: donutColors, borderColor: 'transparent'}]},
+                    options: {responsive: true, maintainAspectRatio: false,
+                        plugins: {legend: {position: 'right', labels: {color: textColor}}}}
+                });
+            }
+
+            // Risk vs. return scatter
+            const points = [];
+            rows.forEach((row, index) => {
+                const dd = parseFloat(row.getAttribute('data-dd'));
+                const ertrag = parseFloat(row.getAttribute('data-ertrag'));
+                if (!isNaN(dd) && !isNaN(ertrag)) {
+                    points.push({x: dd, y: ertrag,
+                        name: row.getAttribute('data-name') || ('#' + index)});
+                }
+            });
+            const scatterCtx = document.getElementById('risk-chart');
+            if (scatterCtx && points.length) {
+                new Chart(scatterCtx, {
+                    type: 'scatter',
+                    data: {datasets: [{
+                        data: points,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        backgroundColor: 'rgba(6,182,212,0.7)',
+                        borderColor: '#06b6d4'
+                    }]},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false},
+                            tooltip: {callbacks: {label: item =>
+                                item.raw.name + ': ' + item.x.toFixed(1) + ' % DD · ' +
+                                item.y.toFixed(1) + ' %/Mon.'}}
+                        },
+                        scales: {
+                            x: {title: {display: true, text: 'max. Trading-DD %',
+                                        color: textColor}, ticks: {color: textColor},
+                                grid: {color: gridColor}},
+                            y: {title: {display: true, text: 'Ertrag % / Monat',
+                                        color: textColor}, ticks: {color: textColor},
+                                grid: {color: gridColor}}
+                        }
+                    }
+                });
+            }
+        })();
+    </script>
+</body>
+
+</html>
