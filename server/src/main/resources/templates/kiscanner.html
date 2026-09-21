@@ -781,11 +781,11 @@
 
             // Risk vs. return scatter with Ampel-based categories & interactive toggling
             const groups = {
-                '🟢': { label: '🟢 Kandidat', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.75)', points: [] },
-                '🟡': { label: '🟡 Beobachtung', color: '#eab308', bg: 'rgba(234, 179, 8, 0.75)', points: [] },
-                '🔴': { label: '🔴 Risiko', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.75)', points: [] },
-                '⛔': { label: '⛔ Ausschluss', color: '#b91c1c', bg: 'rgba(185, 28, 28, 0.75)', points: [] },
-                '⚪': { label: '⚪ Sonstige', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.75)', points: [] }
+                '🟢': { label: '🟢 Kandidat', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.75)', defaultVisible: true, points: [] },
+                '🟡': { label: '🟡 Beobachtung', color: '#eab308', bg: 'rgba(234, 179, 8, 0.75)', defaultVisible: true, points: [] },
+                '🔴': { label: '🔴 Risiko', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.75)', defaultVisible: false, points: [] },
+                '⛔': { label: '⛔ Ausschluss', color: '#b91c1c', bg: 'rgba(185, 28, 28, 0.75)', defaultVisible: false, points: [] },
+                '⚪': { label: '⚪ Sonstige', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.75)', defaultVisible: false, points: [] }
             };
 
             let totalPoints = 0;
@@ -821,6 +821,7 @@
                     return {
                         label: g.label + ' (' + g.points.length + ')',
                         data: g.points,
+                        hidden: !g.defaultVisible,
                         backgroundColor: g.bg,
                         borderColor: g.color,
                         borderWidth: 1.5,
