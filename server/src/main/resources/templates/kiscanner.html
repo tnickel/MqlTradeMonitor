@@ -369,6 +369,7 @@
                 <h3>Risiko vs. Ertrag — max. Trading-DD gegen Ertrag/Monat</h3>
                 <div class="chart-box"><canvas id="risk-chart"></canvas></div>
                 <p style="color: var(--text-secondary); font-size: 0.72rem; margin: 0.5rem 0 0 0;">
+                    💡 <strong>Interaktiv:</strong> Klick auf eine Kategorie in der Legende oben schaltet die Punkte ein/aus · Hover über einen Punkt zeigt den Signal-Provider &amp; Details.<br>
                     Gestrichelte Linien: Drawdown-Schranke 30&nbsp;% (vertikal) und Ertragsschwelle 5&nbsp;%/Monat (horizontal).
                     Nur Punkte links OBEN erfüllen beide Kriterien gleichzeitig.
                 </p>
@@ -778,18 +779,61 @@
                 });
             }
 
-            // Risk vs. return scatter
-            const points = [];
+            // Risk vs. return scatter with Ampel-based categories & interactive toggling
+            const groups = {
+                '🟢': { label: '🟢 Kandidat', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.75)', points: [] },
+                '🟡': { label: '🟡 Beobachtung', color: '#eab308', bg: 'rgba(234, 179, 8, 0.75)', points: [] },
+                '🔴': { label: '🔴 Risiko', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.75)', points: [] },
+                '⛔': { label: '⛔ Ausschluss', color: '#b91c1c', bg: 'rgba(185, 28, 28, 0.75)', points: [] },
+                '⚪': { label: '⚪ Sonstige', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.75)', points: [] }
+            };
+
+            let totalPoints = 0;
             rows.forEach((row, index) => {
                 const dd = parseFloat(row.getAttribute('data-dd'));
                 const ertrag = parseFloat(row.getAttribute('data-ertrag'));
                 if (!isNaN(dd) && !isNaN(ertrag)) {
-                    points.push({x: dd, y: ertrag,
-                        name: row.getAttribute('data-name') || ('#' + index)});
+                    const ampel = row.getAttribute('data-ampel') || '⚪';
+                    const name = row.getAttribute('data-name') || ('#' + index);
+                    const score = row.children[6] ? (row.children[6].getAttribute('data-val') || '') : '';
+                    const urteil = row.children[7] ? (row.children[7].getAttribute('data-val') || '') : '';
+                    const metaEl = row.querySelector('.meta');
+                    const meta = metaEl ? metaEl.textContent.trim() : '';
+
+                    const targetGroup = groups[ampel] || groups['⚪'];
+                    targetGroup.points.push({
+                        x: dd,
+                        y: ertrag,
+                        name: name,
+                        ampel: ampel,
+                        score: score,
+                        urteil: urteil,
+                        meta: meta
+                    });
+                    totalPoints++;
                 }
             });
+
+            const datasets = Object.keys(groups)
+                .filter(key => groups[key].points.length > 0)
+                .map(key => {
+                    const g = groups[key];
+                    return {
+                        label: g.label + ' (' + g.points.length + ')',
+                        data: g.points,
+                        backgroundColor: g.bg,
+                        borderColor: g.color,
+                        borderWidth: 1.5,
+                        pointRadius: 6,
+                        pointHoverRadius: 9,
+                        pointHoverBackgroundColor: g.color,
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 2
+                    };
+                });
+
             const scatterCtx = document.getElementById('risk-chart');
-            if (scatterCtx && points.length) {
+            if (scatterCtx && totalPoints > 0) {
                 // Schrankenlinien (30 % DD / 5 % Ertrag) als Inline-Plugin.
                 const schranken = {
                     id: 'schranken',
@@ -801,12 +845,12 @@
                         ctx.save();
                         ctx.setLineDash([6, 5]);
                         ctx.lineWidth = 1.5;
-                        ctx.strokeStyle = 'rgba(239,68,68,0.8)';
+                        ctx.strokeStyle = 'rgba(239,68,68,0.85)';
                         ctx.beginPath();
                         ctx.moveTo(x, chartArea.top);
                         ctx.lineTo(x, chartArea.bottom);
                         ctx.stroke();
-                        ctx.strokeStyle = 'rgba(34,197,94,0.8)';
+                        ctx.strokeStyle = 'rgba(34,197,94,0.85)';
                         ctx.beginPath();
                         ctx.moveTo(chartArea.left, y);
                         ctx.lineTo(chartArea.right, y);
@@ -816,28 +860,72 @@
                 };
                 new Chart(scatterCtx, {
                     type: 'scatter',
-                    data: {datasets: [{
-                        data: points,
-                        pointRadius: 6,
-                        pointHoverRadius: 8,
-                        backgroundColor: 'rgba(6,182,212,0.7)',
-                        borderColor: '#06b6d4'
-                    }]},
+                    data: { datasets: datasets },
                     options: {
-                        responsive: true, maintainAspectRatio: false,
+                        responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
-                            legend: {display: false},
-                            tooltip: {callbacks: {label: item =>
-                                item.raw.name + ': ' + item.x.toFixed(1) + ' % DD · ' +
-                                item.y.toFixed(1) + ' %/Mon.'}}
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                align: 'end',
+                                labels: {
+                                    color: textColor,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    boxWidth: 8,
+                                    padding: 12,
+                                    font: { size: 11 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.96)',
+                                titleColor: '#22d3ee',
+                                titleFont: { size: 13, weight: 'bold' },
+                                bodyColor: '#e2e8f0',
+                                bodyFont: { size: 11.5 },
+                                borderColor: 'rgba(6, 182, 212, 0.5)',
+                                borderWidth: 1,
+                                padding: 10,
+                                boxPadding: 4,
+                                usePointStyle: true,
+                                callbacks: {
+                                    title: items => {
+                                        if (!items.length) return '';
+                                        const p = items[0].raw;
+                                        return p.name + (p.meta ? '  ·  ' + p.meta : '');
+                                    },
+                                    label: item => {
+                                        const p = item.raw;
+                                        return [
+                                            'Signal-Provider: ' + p.name,
+                                            'Einstufung: ' + p.ampel + (p.urteil ? ' (' + p.urteil + ')' : ''),
+                                            'Max. Trading-DD: ' + p.x.toFixed(1) + ' %',
+                                            'Monatsertrag: ' + p.y.toFixed(1) + ' %' + (p.score ? '  ·  Score: ' + p.score : '')
+                                        ];
+                                    }
+                                }
+                            }
                         },
                         scales: {
-                            x: {title: {display: true, text: 'max. Trading-DD %',
-                                        color: textColor}, ticks: {color: textColor},
-                                grid: {color: gridColor}},
-                            y: {title: {display: true, text: 'Ertrag % / Monat',
-                                        color: textColor}, ticks: {color: textColor},
-                                grid: {color: gridColor}}
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'max. Trading-DD %',
+                                    color: textColor
+                                },
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Ertrag % / Monat',
+                                    color: textColor
+                                },
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            }
                         }
                     },
                     plugins: [schranken]
