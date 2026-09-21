@@ -225,4 +225,29 @@ public class KiScannerApiControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().string(org.hamcrest.Matchers.containsString("MqlKiScanner")));
     }
+
+    @Test
+    public void kiscannerPageRendersSortableTableWithSignalData() throws Exception {
+        keyValid();
+        mockMvc.perform(post("/api/kiscanner/register")
+                        .header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"client\":\"MqlKiScanner\",\"protocolVersion\":1,\"signalCount\":1}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/kiscanner/signals").header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signals\":[{\"signalId\":2349227,\"name\":\"Gold Spike\",\"ampel\":\"🟢\","
+                                + "\"score\":3.2,\"tradingDdPct\":8.1,\"ertragMonatPct\":6.2,\"abonnenten\":120}]}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/kiscanner").with(user("dashboard").roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .content().string(org.hamcrest.Matchers.containsString("th class=\"sortable\"")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .content().string(org.hamcrest.Matchers.containsString("data-val=\"3.2\"")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .content().string(org.hamcrest.Matchers.containsString("initKiTableSorting")));
+    }
 }
