@@ -610,21 +610,29 @@
                     sortKiTable(table, th, colIndex, sortType);
                 });
             });
+
+            // Default-Sortierung: Score aufsteigend (kleinster Score = bestes Risiko)
+            const defaultScoreTh = table.querySelector('thead th[data-col="6"]');
+            if (defaultScoreTh) {
+                sortKiTable(table, defaultScoreTh, 6, 'num', 'asc');
+            }
         }
 
-        function sortKiTable(table, clickedTh, colIndex, sortType) {
+        function sortKiTable(table, clickedTh, colIndex, sortType, forceDir) {
             const tbody = table.querySelector('tbody');
             if (!tbody) return;
             const rows = Array.from(tbody.querySelectorAll('tr[data-ampel]'));
             if (rows.length <= 1) return;
 
-            let dir = 'asc';
-            if (clickedTh.classList.contains('sort-asc')) {
-                dir = 'desc';
-            } else if (clickedTh.classList.contains('sort-desc')) {
-                dir = 'asc';
-            } else {
-                dir = clickedTh.getAttribute('data-default-dir') || 'asc';
+            let dir = forceDir;
+            if (!dir) {
+                if (clickedTh.classList.contains('sort-asc')) {
+                    dir = 'desc';
+                } else if (clickedTh.classList.contains('sort-desc')) {
+                    dir = 'asc';
+                } else {
+                    dir = clickedTh.getAttribute('data-default-dir') || 'asc';
+                }
             }
 
             // Reset all header indicators
