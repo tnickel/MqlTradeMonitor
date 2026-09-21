@@ -155,6 +155,59 @@
             color: #22d3ee;
         }
 
+        /* Floating Header Tooltip */
+        .header-tooltip {
+            position: fixed;
+            z-index: 2000;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            max-width: 320px;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            border-radius: 10px;
+            padding: 0.75rem 0.95rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(6, 182, 212, 0.2);
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            line-height: 1.45;
+        }
+
+        .header-tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .header-tooltip .htt-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #22d3ee;
+            margin-bottom: 0.35rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .header-tooltip .htt-desc {
+            color: #cbd5e1;
+            font-size: 0.76rem;
+            line-height: 1.4;
+            margin-bottom: 0.4rem;
+        }
+
+        .header-tooltip .htt-hint {
+            color: var(--text-secondary, #94a3b8);
+            font-size: 0.68rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
         table.kiscanner-table td {
             padding: 0.5rem;
             border-bottom: 1px dashed var(--border-color);
@@ -334,40 +387,64 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th class="sortable" data-col="0" data-type="num" data-default-dir="asc" title="Ampel des Scanners — Klicken zum Sortieren">
+                        <th class="sortable" data-col="0" data-type="num" data-default-dir="asc"
+                            data-tooltip-title="Ampel — Forensische Gesamteinstufung"
+                            data-tooltip-desc="Gesamturteil des Scanners: 🟢 Kandidat (alle Schranken erfüllt), 🟡 Beobachtung (Teilnachweis oder Grenzfall), 🔴 Risiko / ⛔ Ausschluss (harte Schranken verletzt, z.B. Drawdown > 30 % oder Martingale).">
                             Ampel <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="1" data-type="text" data-default-dir="asc" title="Name des Signals — Klicken zum Sortieren">
+                        <th class="sortable" data-col="1" data-type="text" data-default-dir="asc"
+                            data-tooltip-title="Name — Signal &amp; Plattform"
+                            data-tooltip-desc="Signalbezeichnung mit Direktlink zu MQL5, Handelsplattform (MT4/MT5), Bericht-Zeitstempel und NEU-Marker für kürzlich aufgenommene Signale.">
                             Name <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="2" data-type="text" data-default-dir="asc" title="Stop-Loss Nachweis — Klicken zum Sortieren">
+                        <th class="sortable" data-col="2" data-type="text" data-default-dir="asc"
+                            data-tooltip-title="Stop-Nachweis — Hard-SL Forensik"
+                            data-tooltip-desc="Orderbuch-Prüfung auf gesetzte Stop-Loss-Orders. Weist nach, ob Positionen mit echten Hard-SLs abgesichert sind, um Totalverluste durch unbegrenzte Drawdowns zu verhindern.">
                             Stop-Nachweis <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="3" data-type="num" data-default-dir="asc" style="text-align:right;" title="Max. Trading-Drawdown in % — Klicken zum Sortieren">
+                        <th class="sortable" data-col="3" data-type="num" data-default-dir="asc" style="text-align:right;"
+                            data-tooltip-title="T-DD % — Max. Trading-Drawdown"
+                            data-tooltip-desc="Maximaler historischer Kontoverlust bezogen auf abgeschlossene Trades in Prozent. Der Scanner verlangt strikt einen Drawdown von maximal 30 %.">
                             T-DD % <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="4" data-type="num" data-default-dir="asc" style="text-align:right;" title="Drawdown By Equity in % — Klicken zum Sortieren">
+                        <th class="sortable" data-col="4" data-type="num" data-default-dir="asc" style="text-align:right;"
+                            data-tooltip-title="EQ-DD % — Equity-Drawdown (Floating)"
+                            data-tooltip-desc="Maximaler temporärer Buchverlust des offenen Portfolios während der Laufzeit. Unverzichtbarer Frühindikator für verdeckte Schieflagen.">
                             EQ-DD % <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="5" data-type="num" data-default-dir="desc" style="text-align:right;" title="Ertrag in % pro Monat — Klicken zum Sortieren">
+                        <th class="sortable" data-col="5" data-type="num" data-default-dir="desc" style="text-align:right;"
+                            data-tooltip-title="Ertrag % — Monatliche Rendite"
+                            data-tooltip-desc="Durchschnittlicher monatlicher Ertrag in Prozent. Der Scanner setzt eine Mindestrendite von 5 %/Monat voraus, um das Risiko zu rechtfertigen.">
                             Ertrag % <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="6" data-type="num" data-default-dir="asc" title="Risiko-Score 1–10 (kleiner ist besser) — Klicken zum Sortieren">
+                        <th class="sortable" data-col="6" data-type="num" data-default-dir="asc"
+                            data-tooltip-title="Score — Risiko-Score (1.0 – 10.0)"
+                            data-tooltip-desc="Aggregierter forensischer Risikowert des Scanners (kleiner ist besser): 1–3 geringes Risiko (grün), 3–6 moderates Risiko (gelb), > 6 hohes Risiko / toxisch (rot).">
                             Score <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="7" data-type="text" data-default-dir="asc" title="Urteil des Scanners — Klicken zum Sortieren">
+                        <th class="sortable" data-col="7" data-type="text" data-default-dir="asc"
+                            data-tooltip-title="Urteil — Scanner-Diagnose"
+                            data-tooltip-desc="Konkrete Begründung des Analyse-Urteils (z.B. 'Kandidat (Forensik bestanden)', 'Martingale-Signatur nachgewiesen' oder 'Schranke verletzt').">
                             Urteil <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="8" data-type="num" data-default-dir="desc" style="text-align:right;" title="Abonnenten aktuell — Klicken zum Sortieren">
+                        <th class="sortable" data-col="8" data-type="num" data-default-dir="desc" style="text-align:right;"
+                            data-tooltip-title="Abos — Aktive Abonnenten"
+                            data-tooltip-desc="Aktuelle Anzahl an Tradern, die dieses Signal auf MQL5/MQL4 im Live-Konto kostenpflichtig kopieren.">
                             Abos <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="9" data-type="num" data-default-dir="desc" style="text-align:right;" title="Abonnenten-Bilanz 30 Tage — Klicken zum Sortieren">
+                        <th class="sortable" data-col="9" data-type="num" data-default-dir="desc" style="text-align:right;"
+                            data-tooltip-title="30 T. — Abonnenten-Trend (30 Tage)"
+                            data-tooltip-desc="Netto-Veränderung der Abonnentenzahl über die letzten 30 Tage (+ Zuwachs, - Abgänge). Zeigt die mittelfristige Beliebtheit.">
                             30 T. <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="10" data-type="num" data-default-dir="desc" style="text-align:right;" title="Abonnenten-Bilanz 7 Tage — Klicken zum Sortieren">
+                        <th class="sortable" data-col="10" data-type="num" data-default-dir="desc" style="text-align:right;"
+                            data-tooltip-title="7 T. — Abonnenten-Trend (7 Tage)"
+                            data-tooltip-desc="Netto-Veränderung der Abonnenten über die letzten 7 Tage. Reagiert unmittelbar auf jüngste Marktbewegungen oder Verlustphasen.">
                             7 T. <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="11" data-type="num" data-default-dir="desc" title="PDF-Dokumente — Klicken zum Sortieren">
+                        <th class="sortable" data-col="11" data-type="num" data-default-dir="desc"
+                            data-tooltip-title="PDFs — Analyse-Dokumente"
+                            data-tooltip-desc="Anzahl verfügbarer Analyse-PDFs (📄 Trade-Berichte · 🟡 Tiefenanalysen). Klick auf den Button öffnet das Dokumenten-Modal.">
                             PDFs <span class="sort-icon">⇅</span>
                         </th>
                     </tr>
@@ -498,6 +575,13 @@
         </div>
     </div>
 
+    <!-- Header info floating tooltip -->
+    <div id="headerTooltip" class="header-tooltip">
+        <div class="htt-title" id="httTitle">Spalteninfo</div>
+        <div class="htt-desc" id="httDesc">Beschreibung</div>
+        <div class="htt-hint">⚡ Klicken zum Sortieren (auf-/absteigend)</div>
+    </div>
+
     <script>
         function showKiDocs(signalId) {
             document.querySelectorAll('#kiDocsModal [id^="ki-docs-"]').forEach(
@@ -598,6 +682,58 @@
         }
 
         initKiTableSorting();
+
+        // --- Header Info Tooltips -----------------------------------------
+        function initHeaderTooltips() {
+            const tooltip = document.getElementById('headerTooltip');
+            const titleEl = document.getElementById('httTitle');
+            const descEl = document.getElementById('httDesc');
+            if (!tooltip || !titleEl || !descEl) return;
+
+            const headers = document.querySelectorAll('#kiscanner-table thead th.sortable');
+            headers.forEach(th => {
+                th.addEventListener('mouseenter', () => {
+                    const title = th.getAttribute('data-tooltip-title');
+                    const desc = th.getAttribute('data-tooltip-desc');
+                    if (!title) return;
+
+                    titleEl.textContent = title;
+                    descEl.textContent = desc || '';
+                    positionTooltip(th);
+                    tooltip.classList.add('visible');
+                });
+
+                th.addEventListener('mousemove', () => {
+                    positionTooltip(th);
+                });
+
+                th.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+
+            function positionTooltip(th) {
+                const rect = th.getBoundingClientRect();
+                const ttWidth = tooltip.offsetWidth || 300;
+                const ttHeight = tooltip.offsetHeight || 90;
+
+                let left = rect.left + (rect.width / 2) - (ttWidth / 2);
+                if (left < 12) left = 12;
+                if (left + ttWidth > window.innerWidth - 12) {
+                    left = window.innerWidth - ttWidth - 12;
+                }
+
+                let top = rect.bottom + 8;
+                if (top + ttHeight > window.innerHeight - 10) {
+                    top = Math.max(10, rect.top - ttHeight - 8);
+                }
+
+                tooltip.style.left = Math.round(left) + 'px';
+                tooltip.style.top = Math.round(top) + 'px';
+            }
+        }
+
+        initHeaderTooltips();
 
         // --- Stats + charts are derived from the table rows ---------------
         (function () {

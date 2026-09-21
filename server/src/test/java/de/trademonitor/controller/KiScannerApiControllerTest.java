@@ -248,6 +248,10 @@ public class KiScannerApiControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().string(org.hamcrest.Matchers.containsString("data-val=\"3.2\"")))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .content().string(org.hamcrest.Matchers.containsString("initKiTableSorting")));
+                        .content().string(org.hamcrest.Matchers.containsString("initKiTableSorting")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .content().string(org.hamcrest.Matchers.containsString("headerTooltip")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .content().string(org.hamcrest.Matchers.containsString("initHeaderTooltips")));
     }
 }
