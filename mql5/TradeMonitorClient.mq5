@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.23"
+#property version   "1.24"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,8 +25,9 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.23"
+#define EA_VERSION "1.24"
 #define HISTORY_SYNC_REVISION 1
+#define UPDATE_GUARD_FILE "TM_LastUpdateAttempt.dat"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -99,7 +100,10 @@ string GetEnvVar(string name);
 void SaveAssignedAccountId(long assignedId);
 long LoadAssignedAccountId();
 bool DownloadUpdateFile(string url, string tempFileName);
-bool ApplyUpdate(string tempFileName);
+bool ApplyUpdate(string tempFileName, string targetVersion);
+bool IsRepeatUpdateAttempt(string targetVersion);
+void MarkUpdateApplied(string targetVersion);
+void RestartEAForNewVersion();
 
 
 //+------------------------------------------------------------------+
@@ -1334,22 +1338,22 @@ void SendHeartbeat()
       string updateAvailStr = GetJsonValue(response, "updateAvailable");
       if(updateAvailStr == "true" || updateAvailStr == "1")
       {
-         string updateUrl = GetJsonValue(response, "updateUrl");
-         string targetVersion = GetJsonValue(response, "targetVersion");
-         if(updateUrl != "")
-         {
-            Print("Software update available: Version ", targetVersion, ". Downloading...");
-            string fullUpdateUrl = updateUrl;
-            if(StringFind(updateUrl, "http") != 0)
+            string updateUrl = GetJsonValue(response, "updateUrl");
+            string targetVersion = GetJsonValue(response, "targetVersion");
+            if(updateUrl != "" && !IsRepeatUpdateAttempt(targetVersion))
             {
-               fullUpdateUrl = cfg_ServerURL + updateUrl;
+               Print("Software update available: Version ", targetVersion, ". Downloading...");
+               string fullUpdateUrl = updateUrl;
+               if(StringFind(updateUrl, "http") != 0)
+               {
+                  fullUpdateUrl = cfg_ServerURL + updateUrl;
+               }
+               string tempFileName = "TradeMonitorClient_temp.dat";
+               if(DownloadUpdateFile(fullUpdateUrl, tempFileName))
+               {
+                  ApplyUpdate(tempFileName, targetVersion);
+               }
             }
-            string tempFileName = "TradeMonitorClient_temp.dat";
-            if(DownloadUpdateFile(fullUpdateUrl, tempFileName))
-            {
-               ApplyUpdate(tempFileName);
-            }
-         }
       }
 
       int reqPos = StringFind(response, "\"pendingRequest\"");
@@ -1909,7 +1913,7 @@ bool DownloadUpdateFile(string url, string tempFileName)
 //+------------------------------------------------------------------+
 //| Apply downloaded update by overwriting the running EA program    |
 //+------------------------------------------------------------------+
-bool ApplyUpdate(string tempFileName)
+bool ApplyUpdate(string tempFileName, string targetVersion)
 {
    string sandboxPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + tempFileName;
    string expertsPath = MQLInfoString(MQL_PROGRAM_PATH);
@@ -1919,8 +1923,10 @@ bool ApplyUpdate(string tempFileName)
    bool success = CopyFileW(sandboxPath, expertsPath, false);
    if(success)
    {
-      Print("Update applied successfully! MetaTrader will now restart the EA.");
+      MarkUpdateApplied(targetVersion);
+      Print("Update applied successfully. Restarting EA to activate version ", targetVersion, "...");
       FileDelete(tempFileName);
+      RestartEAForNewVersion();
       return true;
    }
    else
@@ -1928,4 +1934,82 @@ bool ApplyUpdate(string tempFileName)
       Print("Error: Failed to copy update file. Win32 error code: ", GetLastError());
       return false;
    }
+}
+
+//+------------------------------------------------------------------+
+//| Guard: was an update to this exact target version already        |
+//| applied recently? Prevents a download/restart storm when the     |
+//| server advertises a version its binary does not actually carry.  |
+//+------------------------------------------------------------------+
+bool IsRepeatUpdateAttempt(string targetVersion)
+{
+   if(targetVersion == "") return false;
+   if(!FileIsExist(UPDATE_GUARD_FILE)) return false;
+   
+   int handle = FileOpen(UPDATE_GUARD_FILE, FILE_READ|FILE_TXT|FILE_ANSI);
+   if(handle == INVALID_HANDLE) return false;
+   string saved = FileReadString(handle);
+   FileClose(handle);
+   StringTrimLeft(saved);
+   StringTrimRight(saved);
+   if(saved != targetVersion) return false;
+   
+   // Allow a retry after 3 days in case the server was fixed without a version bump
+   datetime appliedAt = (datetime)FileGetInteger(UPDATE_GUARD_FILE, FILE_MODIFY_DATE);
+   if(TimeCurrent() - appliedAt > 3 * 24 * 60 * 60) return false;
+   
+   Print("Update to version ", targetVersion, " was already applied, but the running EA still reports version ", EA_VERSION,
+         ". Skipping repeated download - restart the EA manually to load it.");
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Remember the target version of the last applied update           |
+//+------------------------------------------------------------------+
+void MarkUpdateApplied(string targetVersion)
+{
+   if(targetVersion == "") return;
+   int handle = FileOpen(UPDATE_GUARD_FILE, FILE_WRITE|FILE_TXT|FILE_ANSI);
+   if(handle == INVALID_HANDLE)
+   {
+      Print("Warning: could not write update guard file, error ", GetLastError());
+      return;
+   }
+   FileWriteString(handle, targetVersion);
+   FileClose(handle);
+}
+
+//+------------------------------------------------------------------+
+//| Reload the EA from disk so the overwritten binary becomes active.|
+//| MetaTrader does not notice the replaced .ex5 on its own; saving  |
+//| and re-applying a template of the own chart re-attaches the EA,  |
+//| which makes the terminal load the new program file.              |
+//+------------------------------------------------------------------+
+void RestartEAForNewVersion()
+{
+   string tplName = "TradeMonitorSelfUpdate_" + IntegerToString(ChartID());
+   string tplFile = tplName + ".tpl";
+   
+   ResetLastError();
+   if(!ChartSaveTemplate(0, tplName))
+   {
+      Print("Error: ChartSaveTemplate failed, error ", GetLastError(),
+            ". The new version becomes active at the next manual attach or terminal restart.");
+      return;
+   }
+   
+   // ChartSaveTemplate writes to <data>\Profiles\Templates; mirror the file into
+   // MQL5\Profiles\Templates so the data-folder-relative apply path finds it too.
+   string dataPath = TerminalInfoString(TERMINAL_DATA_PATH);
+   CopyFileW(dataPath + "\\Profiles\\Templates\\" + tplFile,
+             dataPath + "\\MQL5\\Profiles\\Templates\\" + tplFile, false);
+   
+   bool applied = ChartApplyTemplate(0, "\\Profiles\\Templates\\" + tplFile);
+   if(!applied)
+      applied = ChartApplyTemplate(0, tplFile);
+   if(applied)
+      Print("Reload triggered. MetaTrader will now restart the EA with the new version.");
+   else
+      Print("Error: ChartApplyTemplate failed, error ", GetLastError(),
+            ". The new version becomes active at the next manual attach or terminal restart.");
 }
