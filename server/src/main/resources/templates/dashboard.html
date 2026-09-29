@@ -553,6 +553,9 @@
                             </table>
                             <div id="sys-health-problems" style="margin-top: 10px; color: #ef4444; font-size: 0.85rem;"></div>
                             <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                                <button th:if="${currentUser != null && currentUser.role == 'ROLE_ADMIN'}" onclick="testSiren()" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #ef4444; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
+                                    🚨 Sirene Testen
+                                </button>
                                 <button onclick="openSirenLogModal()" style="width: 100%; padding: 8px 12px; background: rgba(247, 118, 142, 0.1); border: 1px solid rgba(247, 118, 142, 0.3); border-radius: 4px; color: #f7768e; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.background='rgba(247, 118, 142, 0.2)'" onmouseout="this.style.background='rgba(247, 118, 142, 0.1)'">
                                     📢 Sirenen-Logbuch
                                 </button>
@@ -1658,11 +1661,16 @@
         }
 
         function testSiren() {
-            if (!confirm("Sirene jetzt testen?")) return;
+            if (!confirm("Sirene jetzt testen? Sie sollte anschließend hupen.")) return;
 
             fetch('/api/test-siren', { method: 'POST' })
-                .then(response => response.text())
-                .then(data => alert(data))
+                .then(response => {
+                    if (response.ok) {
+                        alert('✅ Sirene wurde ausgelöst. Wenn sie nicht hupt, prüfe die Homey-Konfiguration (ID/Event) im Admin-Bereich.');
+                    } else {
+                        return response.text().then(t => alert('❌ ' + t));
+                    }
+                })
                 .catch(error => alert('Netzwerkfehler: ' + error));
         }
     </script>
