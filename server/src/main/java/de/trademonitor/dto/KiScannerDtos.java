@@ -53,6 +53,14 @@ public final class KiScannerDtos {
         public Double ddEquityPct;
         public Double ddBalancePct;
         public Double ertragMonatPct;
+        // Zinseszins-wahre Ertrags-/Effizienzkennzahlen (Scanner 01.10.):
+        // Forensik = linearer Ø auf eigener Kapitalbasis; Geom = geometrisches
+        // Monatsmittel (CAGR-Basis); RetDD = Ertrag je Prozent DD (Jahr = Calmar)
+        public Double ertragMonatForensikPct;
+        public Double ertragMonatGeomPct;
+        public Double cagrJahrPct;
+        public Double retddMonat;
+        public Double retddJahr;
         public Double growthPct;
         public Double pf;
         public Double winratePct;

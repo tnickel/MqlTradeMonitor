@@ -65,6 +65,16 @@ public class KiSignalEntity {
 
     @Column(name = "ertrag_monat_pct")
     private Double ertragMonatPct;
+    @Column(name = "ertrag_monat_forensik_pct")
+    private Double ertragMonatForensikPct;
+    @Column(name = "ertrag_monat_geom_pct")
+    private Double ertragMonatGeomPct;
+    @Column(name = "cagr_jahr_pct")
+    private Double cagrJahrPct;
+    @Column(name = "retdd_monat")
+    private Double retddMonat;
+    @Column(name = "retdd_jahr")
+    private Double retddJahr;
 
     @Column(name = "growth_pct")
     private Double growthPct;
@@ -187,6 +197,16 @@ public class KiSignalEntity {
 
     public Double getErtragMonatPct() { return ertragMonatPct; }
     public void setErtragMonatPct(Double ertragMonatPct) { this.ertragMonatPct = ertragMonatPct; }
+    public Double getErtragMonatForensikPct() { return ertragMonatForensikPct; }
+    public void setErtragMonatForensikPct(Double v) { this.ertragMonatForensikPct = v; }
+    public Double getErtragMonatGeomPct() { return ertragMonatGeomPct; }
+    public void setErtragMonatGeomPct(Double v) { this.ertragMonatGeomPct = v; }
+    public Double getCagrJahrPct() { return cagrJahrPct; }
+    public void setCagrJahrPct(Double v) { this.cagrJahrPct = v; }
+    public Double getRetddMonat() { return retddMonat; }
+    public void setRetddMonat(Double v) { this.retddMonat = v; }
+    public Double getRetddJahr() { return retddJahr; }
+    public void setRetddJahr(Double v) { this.retddJahr = v; }
 
     public Double getGrowthPct() { return growthPct; }
     public void setGrowthPct(Double growthPct) { this.growthPct = growthPct; }

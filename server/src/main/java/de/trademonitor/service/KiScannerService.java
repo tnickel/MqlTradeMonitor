@@ -120,6 +120,11 @@ public class KiScannerService {
             entity.setDdEquityPct(row.ddEquityPct);
             entity.setDdBalancePct(row.ddBalancePct);
             entity.setErtragMonatPct(row.ertragMonatPct);
+            entity.setErtragMonatForensikPct(row.ertragMonatForensikPct);
+            entity.setErtragMonatGeomPct(row.ertragMonatGeomPct);
+            entity.setCagrJahrPct(row.cagrJahrPct);
+            entity.setRetddMonat(row.retddMonat);
+            entity.setRetddJahr(row.retddJahr);
             entity.setGrowthPct(row.growthPct);
             entity.setPf(row.pf);
             entity.setWinratePct(row.winratePct);

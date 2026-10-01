@@ -414,36 +414,41 @@
                             EQ-DD % <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="5" data-type="num" data-default-dir="desc" style="text-align:right;"
+                            data-tooltip-title="RetDD — Ertrag je Prozent Drawdown (Effizienz)"
+                            data-tooltip-desc="Zinseszins-wahre Rendite-Risiko-Effizienz: geometrischer Monats-Ertrag geteilt durch das Drawdown-Maximum (gleiche Kapitalbasis). Ab 0.5 effizient (grün), 0.167 = exakt die Projektmaße (5 %/Monat bei 30 % DD), darunter unattraktiv. Jahreswert = echter Calmar (CAGR/DD). Tooltipp der Zelle zeigt auch CAGR und Forensik-Ertrag.">
+                            RetDD <span class="sort-icon">⇅</span>
+                        </th>
+                        <th class="sortable" data-col="6" data-type="num" data-default-dir="desc" style="text-align:right;"
                             data-tooltip-title="Ertrag % — Monatliche Rendite"
                             data-tooltip-desc="Durchschnittlicher monatlicher Ertrag in Prozent. Der Scanner setzt eine Mindestrendite von 5 %/Monat voraus, um das Risiko zu rechtfertigen.">
                             Ertrag % <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="6" data-type="num" data-default-dir="asc"
+                        <th class="sortable" data-col="7" data-type="num" data-default-dir="asc"
                             data-tooltip-title="Score — Risiko-Score (1.0 – 10.0)"
                             data-tooltip-desc="Aggregierter forensischer Risikowert des Scanners (kleiner ist besser): 1–3 geringes Risiko (grün), 3–6 moderates Risiko (gelb), > 6 hohes Risiko / toxisch (rot).">
                             Score <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="7" data-type="text" data-default-dir="asc"
+                        <th class="sortable" data-col="8" data-type="text" data-default-dir="asc"
                             data-tooltip-title="Urteil — Scanner-Diagnose"
                             data-tooltip-desc="Konkrete Begründung des Analyse-Urteils (z.B. 'Kandidat (Forensik bestanden)', 'Martingale-Signatur nachgewiesen' oder 'Schranke verletzt').">
                             Urteil <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="8" data-type="num" data-default-dir="desc" style="text-align:right;"
+                        <th class="sortable" data-col="9" data-type="num" data-default-dir="desc" style="text-align:right;"
                             data-tooltip-title="Abos — Aktive Abonnenten"
                             data-tooltip-desc="Aktuelle Anzahl an Tradern, die dieses Signal auf MQL5/MQL4 im Live-Konto kostenpflichtig kopieren.">
                             Abos <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="9" data-type="num" data-default-dir="desc" style="text-align:right;"
+                        <th class="sortable" data-col="10" data-type="num" data-default-dir="desc" style="text-align:right;"
                             data-tooltip-title="30 T. — Abonnenten-Trend (30 Tage)"
                             data-tooltip-desc="Netto-Veränderung der Abonnentenzahl über die letzten 30 Tage (+ Zuwachs, - Abgänge). Zeigt die mittelfristige Beliebtheit.">
                             30 T. <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="10" data-type="num" data-default-dir="desc" style="text-align:right;"
+                        <th class="sortable" data-col="11" data-type="num" data-default-dir="desc" style="text-align:right;"
                             data-tooltip-title="7 T. — Abonnenten-Trend (7 Tage)"
                             data-tooltip-desc="Netto-Veränderung der Abonnenten über die letzten 7 Tage. Reagiert unmittelbar auf jüngste Marktbewegungen oder Verlustphasen.">
                             7 T. <span class="sort-icon">⇅</span>
                         </th>
-                        <th class="sortable" data-col="11" data-type="num" data-default-dir="desc"
+                        <th class="sortable" data-col="12" data-type="num" data-default-dir="desc"
                             data-tooltip-title="PDFs — Analyse-Dokumente"
                             data-tooltip-desc="Anzahl verfügbarer Analyse-PDFs (📄 Trade-Berichte · 🟡 Tiefenanalysen). Klick auf den Button öffnet das Dokumenten-Modal.">
                             PDFs <span class="sort-icon">⇅</span>
@@ -452,7 +457,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="s, sStat : ${kiSignals}"
-                        th:attr="data-ampel=${s.ampel},data-dd=${s.tradingDdPct},data-ertrag=${s.ertragMonatPct},data-name=${s.name},data-orig-index=${sStat.index}">
+                        th:attr="data-ampel=${s.ampel},data-dd=${s.tradingDdPct},data-ertrag=${s.ertragMonatPct},data-retdd=${s.retddMonat},data-name=${s.name},data-orig-index=${sStat.index}">
                         <td th:attr="data-val=${s.ampel == '🟢' ? 1 : (s.ampel == '🟡' ? 2 : (s.ampel == '🔴' ? 3 : (s.ampel == '⛔' ? 4 : 5)))}">
                             <span class="ampel-badge" th:title="${s.ampel}" th:text="${s.ampel}">🟢</span>
                         </td>
@@ -475,7 +480,15 @@
                             th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 1)} : '—'">8.1</td>
                         <td class="num" th:attr="data-val=${s.ddEquityPct}"
                             th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 1)} : '—'">3.8</td>
+                        <td class="num retdd-cell" th:attr="data-val=${s.retddMonat}"
+                            th:title="${s.retddMonat != null} ? ('RetDD ' + ${#numbers.formatDecimal(s.retddMonat, 1, 3)} + '/Monat · Calmar (Jahr): ' + ${#numbers.formatDecimal(s.retddJahr, 1, 1)} + ' · CAGR: ' + ${#numbers.formatDecimal(s.cagrJahrPct, 1, 0)} + ' %/Jahr · Ertrag geom.: ' + ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 1)} + ' %/M · Ertrag Forensik: ' + ${#numbers.formatDecimal(s.ertragMonatForensikPct, 1, 1)} + ' %/M') : 'Keine RetDD-Basis (ohne Forensik-Ertrag oder DD)'">
+                            <span th:if="${s.retddMonat != null}"
+                                  th:style="'font-weight:700;color:' + (${s.retddMonat >= 0.5} ? '#22c55e' : (${s.retddMonat >= 0.167} ? '#eab308' : '#f97316'))"
+                                  th:text="${#numbers.formatDecimal(s.retddMonat, 1, 2)}">0.31</span>
+                            <span th:unless="${s.retddMonat != null}">—</span>
+                        </td>
                         <td class="num" style="font-weight:700;" th:attr="data-val=${s.ertragMonatPct}"
+                            th:title="${s.ertragMonatGeomPct != null} ? ('Plattform: ' + ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} + ' %/M · geometrisch (zinseszins-wahr): ' + ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 1)} + ' %/M · Forensik (linear, eigene Basis): ' + ${#numbers.formatDecimal(s.ertragMonatForensikPct, 1, 1)} + ' %/M') : ''"
                             th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} : '—'">6.2</td>
                         <td th:attr="data-val=${s.score}">
                             <span class="score-bar">
@@ -612,7 +625,7 @@
             });
 
             // Default-Sortierung: Score aufsteigend (kleinster Score = bestes Risiko)
-            const defaultScoreTh = table.querySelector('thead th[data-col="6"]');
+            const defaultScoreTh = table.querySelector('thead th[data-col="7"]');
             if (defaultScoreTh) {
                 sortKiTable(table, defaultScoreTh, 6, 'num', 'asc');
             }
@@ -803,17 +816,20 @@
                 if (!isNaN(dd) && !isNaN(ertrag)) {
                     const ampel = row.getAttribute('data-ampel') || '⚪';
                     const name = row.getAttribute('data-name') || ('#' + index);
-                    const score = row.children[6] ? (row.children[6].getAttribute('data-val') || '') : '';
-                    const urteil = row.children[7] ? (row.children[7].getAttribute('data-val') || '') : '';
+                    const score = row.children[7] ? (row.children[7].getAttribute('data-val') || '') : '';
+                    const urteil = row.children[8] ? (row.children[8].getAttribute('data-val') || '') : '';
                     const metaEl = row.querySelector('.meta');
                     const meta = metaEl ? metaEl.textContent.trim() : '';
 
+                    const retddRaw = parseFloat(row.getAttribute('data-retdd'));
+                    const retdd = isNaN(retddRaw) ? null : retddRaw;
                     const targetGroup = groups[ampel] || groups['⚪'];
                     targetGroup.points.push({
                         x: dd,
                         y: ertrag,
                         name: name,
                         ampel: ampel,
+                        retdd: retdd,
                         score: score,
                         urteil: urteil,
                         meta: meta
@@ -910,7 +926,7 @@
                                             'Signal-Provider: ' + p.name,
                                             'Einstufung: ' + p.ampel + (p.urteil ? ' (' + p.urteil + ')' : ''),
                                             'Max. Trading-DD: ' + p.x.toFixed(1) + ' %',
-                                            'Monatsertrag: ' + p.y.toFixed(1) + ' %' + (p.score ? '  ·  Score: ' + p.score : '')
+                                            'Monatsertrag: ' + p.y.toFixed(1) + ' %' + (p.retdd != null ? '  ·  RetDD: ' + p.retdd.toFixed(2) + '/M' : '') + (p.score ? '  ·  Score: ' + p.score : '')
                                         ];
                                     }
                                 }
