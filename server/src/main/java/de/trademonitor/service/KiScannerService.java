@@ -119,12 +119,17 @@ public class KiScannerService {
             entity.setTradingDdPct(row.tradingDdPct);
             entity.setDdEquityPct(row.ddEquityPct);
             entity.setDdBalancePct(row.ddBalancePct);
+            entity.setMaxDrawdownEquityPct(nonNegative(row.maxDrawdownEquityPct));
+            entity.setDrawdownLimitPct(positive(row.drawdownLimitPct));
+            entity.setMinReturnMonthlyPct(finite(row.minReturnMonthlyPct));
+            entity.setMinRetddMonthly(nonNegative(row.minRetddMonthly));
             entity.setErtragMonatPct(row.ertragMonatPct);
             entity.setErtragMonatForensikPct(row.ertragMonatForensikPct);
-            entity.setErtragMonatGeomPct(row.ertragMonatGeomPct);
-            entity.setCagrJahrPct(row.cagrJahrPct);
-            entity.setRetddMonat(row.retddMonat);
-            entity.setRetddJahr(row.retddJahr);
+            entity.setErtragMonatGeomPct(finite(row.ertragMonatGeomPct));
+            entity.setCagrJahrPct(finite(row.cagrJahrPct));
+            entity.setRetddMonat(finite(row.retddMonat));
+            entity.setRetddJahr(finite(row.retddJahr));
+            entity.setRetddBasis(trim(row.retddBasis, 128));
             entity.setGrowthPct(row.growthPct);
             entity.setPf(row.pf);
             entity.setWinratePct(row.winratePct);
@@ -331,6 +336,19 @@ public class KiScannerService {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    /** Preserve raw doubles; formatting belongs to the view. */
+    private static Double finite(Double value) {
+        return value != null && Double.isFinite(value) ? value : null;
+    }
+
+    private static Double nonNegative(Double value) {
+        return finite(value) != null && value >= 0 ? value : null;
+    }
+
+    private static Double positive(Double value) {
+        return finite(value) != null && value > 0 ? value : null;
     }
 
     private static String trim(String value, int max) {

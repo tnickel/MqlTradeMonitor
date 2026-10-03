@@ -2,7 +2,9 @@ package de.trademonitor.controller;
 
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -14,8 +16,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import de.trademonitor.entity.UserEntity;
+import de.trademonitor.entity.KiSignalEntity;
+import de.trademonitor.repository.KiSignalRepository;
 import de.trademonitor.repository.UserRepository;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -42,8 +47,16 @@ public class KiScannerApiControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private KiSignalRepository kiSignalRepository;
+
     @MockBean
     private UserRepository userRepository;
+
+    @BeforeEach
+    public void clearSignalSnapshot() {
+        kiSignalRepository.deleteAllInBatch();
+    }
 
     private void keyValid() {
         UserEntity user = new UserEntity("scanner-user", "ignored", "ROLE_USER");
@@ -253,5 +266,112 @@ public class KiScannerApiControllerTest {
                         .content().string(org.hamcrest.Matchers.containsString("headerTooltip")))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().string(org.hamcrest.Matchers.containsString("initHeaderTooltips")));
+    }
+
+    @Test
+    public void equityEfficiencySyncPreservesRawPrecisionAndDisplaysOwnMeasurements() throws Exception {
+        keyValid();
+        mockMvc.perform(post("/api/kiscanner/signals").header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"signals":[{"signalId":900009,"name":"Precision","ampel":"🟡",
+                                "tradingDdPct":0.1,"ddEquityPct":34.95,"ertragMonatPct":99,
+                                "maxDrawdownEquityPct":6,"ertragMonatGeomPct":5.99994,
+                                "retddMonat":0.9999899999999999,"cagrJahrPct":72.123456,
+                                "retddJahr":12.020576,"retddBasis":"gemessener_max_equity_drawdown_inkl_floating",
+                                "drawdownLimitPct":20,"minReturnMonthlyPct":7,"minRetddMonthly":1}]}
+                                """))
+                .andExpect(status().isOk());
+        KiSignalEntity stored = kiSignalRepository.findBySignalId(900009L).orElseThrow();
+        assertEquals(6.0, stored.getMaxDrawdownEquityPct());
+        assertEquals(5.99994, stored.getErtragMonatGeomPct());
+        assertEquals(0.9999899999999999, stored.getRetddMonat());
+        assertTrue(stored.getEquityRetddMonat() < 1);
+        assertEquals(72.123456, stored.getCagrJahrPct());
+        assertEquals(12.020576, stored.getRetddJahr());
+        assertEquals(20.0, stored.getDrawdownLimitPct());
+        assertEquals(7.0, stored.getMinReturnMonthlyPct());
+        assertEquals(1.0, stored.getMinRetddMonthly());
+        assertEquals("gemessener_max_equity_drawdown_inkl_floating", stored.getRetddBasis());
+        assertEquals("🟡", stored.getAmpel());
+
+        String html = mockMvc.perform(get("/kiscanner").with(user("dashboard").roles("USER")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(html.contains("data-dd=\"6.0\""));
+        assertTrue(html.contains("data-ertrag=\"5.99994\""));
+        assertTrue(html.contains("data-retdd=\"0.9999899999999999\""));
+        assertTrue(html.contains("equity-dd-cell dd-green"));
+        // Display rounding must not turn a ratio below the raw threshold green.
+        assertTrue(html.contains("font-weight:700;color:#eab308"));
+        assertTrue(html.contains("ki-details-900009"));
+        assertTrue(html.contains("Gewinn %/Monat"));
+        assertTrue(html.contains("data-dd-limit=\"20.0\""));
+        assertTrue(html.contains("data-min-return=\"7.0\""));
+    }
+
+    @Test
+    public void equityDrawdownColorsUseTransmittedLimitAndKeepMissingNeutral() throws Exception {
+        keyValid();
+        mockMvc.perform(post("/api/kiscanner/signals").header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"signals":[
+                                {"signalId":1,"name":"Green","maxDrawdownEquityPct":16,"drawdownLimitPct":20},
+                                {"signalId":2,"name":"Yellow","maxDrawdownEquityPct":20,"drawdownLimitPct":20},
+                                {"signalId":3,"name":"Red","maxDrawdownEquityPct":20.00001,"drawdownLimitPct":20},
+                                {"signalId":4,"name":"Missing measurement","ddEquityPct":1,"drawdownLimitPct":20},
+                                {"signalId":5,"name":"Missing threshold","maxDrawdownEquityPct":1}]}
+                                """))
+                .andExpect(status().isOk());
+        String html = mockMvc.perform(get("/kiscanner").with(user("dashboard").roles("USER")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquityColor(html, "16.0", "green");
+        assertEquityColor(html, "20.0", "yellow");
+        assertEquityColor(html, "20.00001", "red");
+        assertEquityColor(html, "1.0", "unknown");
+        assertEquals(20.00001, kiSignalRepository.findBySignalId(3L).orElseThrow().getMaxDrawdownEquityPct());
+        assertNull(kiSignalRepository.findBySignalId(4L).orElseThrow().getMaxDrawdownEquityPct());
+        assertNull(kiSignalRepository.findBySignalId(5L).orElseThrow().getDrawdownLimitPct());
+    }
+
+    @Test
+    public void legacyAndMissingPayloadsHaveNoEquityEfficiencyFallback() throws Exception {
+        keyValid();
+        mockMvc.perform(post("/api/kiscanner/signals").header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"signals":[
+                                {"signalId":10,"name":"Legacy","tradingDdPct":0.1,"ddEquityPct":8,
+                                 "ertragMonatPct":99,"ertragMonatGeomPct":12,"retddMonat":120,"retddJahr":1200},
+                                {"signalId":11,"name":"Zero EQ","maxDrawdownEquityPct":0,
+                                 "ertragMonatGeomPct":12,"retddMonat":120,"retddBasis":"gemessener_max_equity_drawdown_inkl_floating"},
+                                {"signalId":12,"name":"Missing gain","maxDrawdownEquityPct":6,
+                                 "ertragMonatPct":99,"retddMonat":120,"retddBasis":"gemessener_max_equity_drawdown_inkl_floating"}]}
+                                """))
+                .andExpect(status().isOk());
+        for (long id : new long[] {10, 11, 12}) {
+            KiSignalEntity stored = kiSignalRepository.findBySignalId(id).orElseThrow();
+            assertNull(stored.getEquityRetddMonat());
+            assertNull(stored.getEquityRetddJahr());
+        }
+        assertNull(kiSignalRepository.findBySignalId(12L).orElseThrow().getErtragMonatGeomPct());
+        mockMvc.perform(get("/kiscanner").with(user("dashboard").roles("USER")))
+                .andExpect(status().isOk());
+        // Snapshot semantics also clear previously present fields rather than retaining a stale ratio.
+        mockMvc.perform(post("/api/kiscanner/signals").header("X-User-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signals\":[{\"signalId\":11,\"name\":\"Unknown\"}]}"))
+                .andExpect(status().isOk());
+        KiSignalEntity cleared = kiSignalRepository.findBySignalId(11L).orElseThrow();
+        assertNull(cleared.getMaxDrawdownEquityPct());
+        assertNull(cleared.getErtragMonatGeomPct());
+        assertNull(cleared.getRetddMonat());
+        assertNull(cleared.getRetddBasis());
+    }
+
+    private static void assertEquityColor(String html, String rawValue, String color) {
+        String cell = "<td\\b(?=[^>]*class=\"num equity-dd-cell dd-" + color
+                + "\")(?=[^>]*data-val=\"" + Pattern.quote(rawValue) + "\")[^>]*>";
+        assertTrue(Pattern.compile(cell).matcher(html).find(), rawValue + " should be " + color);
     }
 }

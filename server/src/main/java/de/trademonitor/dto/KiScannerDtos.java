@@ -52,6 +52,11 @@ public final class KiScannerDtos {
         public Double tradingDdPct;
         public Double ddEquityPct;
         public Double ddBalancePct;
+        /** Measured equity including floating PnL; never a platform/closed-DD fallback. */
+        public Double maxDrawdownEquityPct;
+        public Double drawdownLimitPct;
+        public Double minReturnMonthlyPct;
+        public Double minRetddMonthly;
         public Double ertragMonatPct;
         // Zinseszins-wahre Ertrags-/Effizienzkennzahlen (Scanner 01.10.):
         // Forensik = linearer Ø auf eigener Kapitalbasis; Geom = geometrisches
@@ -61,6 +66,7 @@ public final class KiScannerDtos {
         public Double cagrJahrPct;
         public Double retddMonat;
         public Double retddJahr;
+        public String retddBasis;
         public Double growthPct;
         public Double pf;
         public Double winratePct;

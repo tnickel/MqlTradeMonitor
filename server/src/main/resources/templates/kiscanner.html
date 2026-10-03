@@ -97,10 +97,12 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 0.5rem 0.75rem 1rem;
+            overflow-x: auto;
         }
 
         table.kiscanner-table {
             width: 100%;
+            min-width: 1150px;
             table-layout: fixed;
             border-collapse: collapse;
             font-size: 0.85rem;
@@ -277,6 +279,15 @@
         .docs-btn:hover { background: rgba(6, 182, 212, 0.3); }
         .docs-btn:disabled { opacity: 0.35; cursor: default; }
 
+        .dd-green { background: rgba(34,197,94,.16); }
+        .dd-yellow { background: rgba(234,179,8,.18); }
+        .dd-red { background: rgba(239,68,68,.2); }
+        .dd-unknown { background: rgba(156,163,175,.12); }
+        .ki-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
+        .ki-detail-grid > div { padding: .75rem; border-radius: 8px; border: 1px solid #3a3f55; }
+        .ki-detail-grid span { display: block; color: #a0a0c0; font-size: .76rem; }
+        .ki-detail-grid strong { display: block; margin-top: .3rem; font-size: 1.2rem; }
+
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
                  width: 100%; height: 100%; overflow: auto;
                  background-color: rgba(0,0,0,0.6); }
@@ -344,8 +355,8 @@
                     </th:block>
                 </p>
                 <p style="margin: 0.4rem 0 0 0; color: var(--text-secondary); font-size: 0.78rem;">
-                    Entscheidung des Scanners: Risiko vor Ertrag — harte Schranke 30&nbsp;% Drawdown, Ertrag &gt; 5&nbsp;%/Monat,
-                    Stop-Nachweis nur mit Beleg. Ampel/Score/Urteil kommen unverändert aus dem Scanner.
+                    Risiko vor Ertrag. Eigene Gewinn- und Equity-Messung sowie Grenzwerte werden aus dem Scanner gespiegelt.
+                    Ampel/Score/Urteil kommen unverändert aus dem Scanner.
                 </p>
             </div>
         </div>
@@ -366,12 +377,12 @@
                 <div class="chart-box"><canvas id="ampel-chart"></canvas></div>
             </div>
             <div class="kiscanner-chart-card">
-                <h3>Risiko vs. Ertrag — max. Trading-DD gegen Ertrag/Monat</h3>
+                <h3>Risiko vs. Gewinn — gemessener Equity-DD gegen Gewinn %/Monat</h3>
                 <div class="chart-box"><canvas id="risk-chart"></canvas></div>
                 <p style="color: var(--text-secondary); font-size: 0.72rem; margin: 0.5rem 0 0 0;">
                     💡 <strong>Interaktiv:</strong> Klick auf eine Kategorie in der Legende oben schaltet die Punkte ein/aus · Hover über einen Punkt zeigt den Signal-Provider &amp; Details.<br>
-                    Gestrichelte Linien: Drawdown-Schranke 30&nbsp;% (vertikal) und Ertragsschwelle 5&nbsp;%/Monat (horizontal).
-                    Nur Punkte links OBEN erfüllen beide Kriterien gleichzeitig.
+                    <span id="risk-limit-note">Gestrichelte Linien zeigen die übertragenen Grenzwerte. Fehlende Messwerte werden ausgelassen.</span>
+                    Weitere Kriterien und das Gesamturteil stehen in der Ampel.
                 </p>
             </div>
         </div>
@@ -380,17 +391,17 @@
         <div class="kiscanner-table-wrap">
             <table class="kiscanner-table" id="kiscanner-table">
                 <colgroup>
-                    <col style="width:5%"><col style="width:14%"><col style="width:16%">
-                    <col style="width:7%"><col style="width:6%"><col style="width:7%">
-                    <col style="width:10%"><col style="width:13%">
+                    <col style="width:4%"><col style="width:13%"><col style="width:12%">
+                    <col style="width:6%"><col style="width:8%"><col style="width:10%">
+                    <col style="width:6%"><col style="width:7%"><col style="width:14%">
                     <col style="width:5%"><col style="width:5%"><col style="width:5%">
-                    <col style="width:7%">
+                    <col style="width:5%">
                 </colgroup>
                 <thead>
                     <tr>
                         <th class="sortable" data-col="0" data-type="num" data-default-dir="asc"
                             data-tooltip-title="Ampel — Forensische Gesamteinstufung"
-                            data-tooltip-desc="Gesamturteil des Scanners: 🟢 Kandidat (alle Schranken erfüllt), 🟡 Beobachtung (Teilnachweis oder Grenzfall), 🔴 Risiko / ⛔ Ausschluss (harte Schranken verletzt, z.B. Drawdown > 30 % oder Martingale).">
+                            data-tooltip-desc="Gesamturteil des Scanners: 🟢 Kandidat, 🟡 Beobachtung, 🔴 Risiko / ⛔ Ausschluss. Der Monitor übernimmt die Bewertung unverändert; die Farbe einzelner Messwerte ist kein Gesamturteil.">
                             Ampel <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="1" data-type="text" data-default-dir="asc"
@@ -405,23 +416,23 @@
                         </th>
                         <th class="sortable" data-col="3" data-type="num" data-default-dir="asc" style="text-align:right;"
                             data-tooltip-title="T-DD % — Max. Trading-Drawdown"
-                            data-tooltip-desc="Maximaler historischer Kontoverlust bezogen auf abgeschlossene Trades in Prozent. Der Scanner verlangt strikt einen Drawdown von maximal 30 %.">
+                            data-tooltip-desc="Drawdown aus abgeschlossenen Trades. Zwischenzeitliche Verluste offener Positionen fehlen. Dieser Wert ersetzt keine Equity-Messung und ist niemals der RetDD-Nenner.">
                             T-DD % <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="4" data-type="num" data-default-dir="asc" style="text-align:right;"
-                            data-tooltip-title="EQ-DD % — Equity-Drawdown (Floating)"
-                            data-tooltip-desc="Maximaler temporärer Buchverlust des offenen Portfolios während der Laufzeit. Unverzichtbarer Frühindikator für verdeckte Schieflagen.">
-                            EQ-DD % <span class="sort-icon">⇅</span>
+                            data-tooltip-title="Max-EQ-DD % — Gemessener Equity-Drawdown"
+                            data-tooltip-desc="Höchste belastbare Equity-Messung des Scanners aus Kursen oder Monitor, inklusive offener Gewinne und Verluste. H1-Kurse bilden virtuelle Trading-Equity ab und erfassen keine Tiefs innerhalb einer Stunde. Plattform- und Trading-DD sind kein Ersatz. Grün bis 80 % der übertragenen DD-Grenze, gelb bis zur Grenze, rot darüber; fehlende Messung oder Grenze grau.">
+                            Max-EQ-DD % <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="5" data-type="num" data-default-dir="desc" style="text-align:right;"
-                            data-tooltip-title="RetDD — Ertrag je Prozent Drawdown (Effizienz)"
-                            data-tooltip-desc="Zinseszins-wahre Rendite-Risiko-Effizienz: geometrischer Monats-Ertrag geteilt durch das Drawdown-Maximum (gleiche Kapitalbasis). Ab 0.5 effizient (grün), 0.167 = exakt die Projektmaße (5 %/Monat bei 30 % DD), darunter unattraktiv. Jahreswert = echter Calmar (CAGR/DD). Tooltipp der Zelle zeigt auch CAGR und Forensik-Ertrag.">
-                            RetDD <span class="sort-icon">⇅</span>
+                            data-tooltip-title="Gewinn %/Monat — Eigene geometrische Rendite"
+                            data-tooltip-desc="Geometrische Monatsrendite aus dem Trade-Export auf der virtuellen Trade-Netto-Kurve und tatsächlichen Export-Zeitspanne. Plattform-Ertrag wird nicht als Ersatz verwendet. Fehlende Berechnung bleibt leer.">
+                            Gewinn %/Monat <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="6" data-type="num" data-default-dir="desc" style="text-align:right;"
-                            data-tooltip-title="Ertrag % — Monatliche Rendite"
-                            data-tooltip-desc="Durchschnittlicher monatlicher Ertrag in Prozent. Der Scanner setzt eine Mindestrendite von 5 %/Monat voraus, um das Risiko zu rechtfertigen.">
-                            Ertrag % <span class="sort-icon">⇅</span>
+                            data-tooltip-title="RetDD — Monatsgewinn je Equity-Drawdown-Punkt"
+                            data-tooltip-desc="Eigene geometrische Gewinn-%/Monat geteilt durch gemessenen Max-EQ-DD. Ohne Gewinn, positive Equity-Messung oder bestätigte Equity-Basis bleibt RetDD leer. Grün ab der übertragenen Mindestschwelle, darunter gelb; unbekannte Schwelle neutral. Jahreswert = CAGR geteilt durch denselben Equity-DD. Abweichende Kapitalbasen und Zeiträume begrenzen die Vergleichbarkeit.">
+                            RetDD <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="7" data-type="num" data-default-dir="asc"
                             data-tooltip-title="Score — Risiko-Score (1.0 – 10.0)"
@@ -457,7 +468,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="s, sStat : ${kiSignals}"
-                        th:attr="data-ampel=${s.ampel},data-dd=${s.tradingDdPct},data-ertrag=${s.ertragMonatPct},data-retdd=${s.retddMonat},data-name=${s.name},data-orig-index=${sStat.index}">
+                        th:attr="data-ampel=${s.ampel},data-dd=${s.maxDrawdownEquityPct},data-ertrag=${s.ertragMonatGeomPct},data-retdd=${s.equityRetddMonat},data-dd-limit=${s.drawdownLimitPct},data-min-return=${s.minReturnMonthlyPct},data-min-retdd=${s.minRetddMonthly},data-name=${s.name},data-orig-index=${sStat.index}">
                         <td th:attr="data-val=${s.ampel == '🟢' ? 1 : (s.ampel == '🟡' ? 2 : (s.ampel == '🔴' ? 3 : (s.ampel == '⛔' ? 4 : 5)))}">
                             <span class="ampel-badge" th:title="${s.ampel}" th:text="${s.ampel}">🟢</span>
                         </td>
@@ -471,6 +482,8 @@
                             <span class="neu-marker" th:if="${'NEU'.equals(s.stand)}">NEU</span>
                             <div class="meta" th:if="${s.platform != null}"
                                  th:text="${s.platform} + (${s.berichtVom != null} ? ' · Bericht ' + ${s.berichtVom} : '')">MT5</div>
+                            <button type="button" class="docs-btn" th:attr="data-signal=${s.signalId}"
+                                    onclick="showKiDetails(this.getAttribute('data-signal'))">Kennzahlen</button>
                         </td>
                         <td th:title="${s.stopNachweis != null ? s.stopNachweis : ''}"
                             th:attr="data-val=${s.stopNachweis != null ? s.stopNachweis : ''}">
@@ -478,18 +491,20 @@
                         </td>
                         <td class="num" th:attr="data-val=${s.tradingDdPct}"
                             th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 1)} : '—'">8.1</td>
-                        <td class="num" th:attr="data-val=${s.ddEquityPct}"
-                            th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 1)} : '—'">3.8</td>
-                        <td class="num retdd-cell" th:attr="data-val=${s.retddMonat}"
-                            th:title="${s.retddMonat != null} ? ('RetDD ' + ${#numbers.formatDecimal(s.retddMonat, 1, 3)} + '/Monat · Calmar (Jahr): ' + ${#numbers.formatDecimal(s.retddJahr, 1, 1)} + ' · CAGR: ' + ${#numbers.formatDecimal(s.cagrJahrPct, 1, 0)} + ' %/Jahr · Ertrag geom.: ' + ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 1)} + ' %/M · Ertrag Forensik: ' + ${#numbers.formatDecimal(s.ertragMonatForensikPct, 1, 1)} + ' %/M') : 'Keine RetDD-Basis (ohne Forensik-Ertrag oder DD)'">
-                            <span th:if="${s.retddMonat != null}"
-                                  th:style="'font-weight:700;color:' + (${s.retddMonat >= 0.5} ? '#22c55e' : (${s.retddMonat >= 0.167} ? '#eab308' : '#f97316'))"
-                                  th:text="${#numbers.formatDecimal(s.retddMonat, 1, 2)}">0.31</span>
-                            <span th:unless="${s.retddMonat != null}">—</span>
+                        <td class="num equity-dd-cell" th:attr="data-val=${s.maxDrawdownEquityPct}"
+                            th:classappend="${s.maxDrawdownEquityPct == null or s.drawdownLimitPct == null ? 'dd-unknown' : (s.maxDrawdownEquityPct <= 0.8 * s.drawdownLimitPct ? 'dd-green' : (s.maxDrawdownEquityPct <= s.drawdownLimitPct ? 'dd-yellow' : 'dd-red'))}"
+                            th:title="${s.drawdownLimitPct != null} ? ('Übertragene DD-Grenze: ' + ${#numbers.formatDecimal(s.drawdownLimitPct, 1, 2)} + ' %. Farbe betrifft nur die Equity-Messung; Gesamturteil siehe Ampel.') : 'Keine DD-Grenze übertragen; Farbe neutral.'"
+                            th:text="${s.maxDrawdownEquityPct != null} ? ${#numbers.formatDecimal(s.maxDrawdownEquityPct, 1, 2)} : '—'">—</td>
+                        <td class="num own-gain-cell" style="font-weight:700;" th:attr="data-val=${s.ertragMonatGeomPct}"
+                            title="Eigene geometrische Monatsrendite; kein Plattform-Fallback."
+                            th:text="${s.ertragMonatGeomPct != null} ? ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 2)} : '—'">—</td>
+                        <td class="num retdd-cell" th:attr="data-val=${s.equityRetddMonat}"
+                            title="Eigener geometrischer Monatsgewinn / gemessener Max-EQ-DD. Basis und Jahreswerte unter Kennzahlen.">
+                            <span th:if="${s.equityRetddMonat != null}"
+                                  th:style="'font-weight:700;color:' + (${s.minRetddMonthly == null} ? '#9ca3af' : (${s.equityRetddMonat >= s.minRetddMonthly} ? '#22c55e' : '#eab308'))"
+                                  th:text="${#numbers.formatDecimal(s.equityRetddMonat, 1, 2)}">—</span>
+                            <span th:unless="${s.equityRetddMonat != null}">—</span>
                         </td>
-                        <td class="num" style="font-weight:700;" th:attr="data-val=${s.ertragMonatPct}"
-                            th:title="${s.ertragMonatGeomPct != null} ? ('Plattform: ' + ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} + ' %/M · geometrisch (zinseszins-wahr): ' + ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 1)} + ' %/M · Forensik (linear, eigene Basis): ' + ${#numbers.formatDecimal(s.ertragMonatForensikPct, 1, 1)} + ' %/M') : ''"
-                            th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 1)} : '—'">6.2</td>
                         <td th:attr="data-val=${s.score}">
                             <span class="score-bar">
                                 <span th:style="'width:' + (${s.score != null} ? ${#numbers.formatDecimal(s.score * 10, 1, 0)} : '0') + '%;background:' + (${s.score == null} ? '#9ca3af' : (${s.score <= 3} ? '#22c55e' : (${s.score <= 6} ? '#eab308' : '#ef4444')))"></span>
@@ -527,7 +542,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(kiSignals)}">
-                        <td colspan="12" style="text-align:center; padding: 2rem; color: var(--text-secondary);">
+                        <td colspan="13" style="text-align:center; padding: 2rem; color: var(--text-secondary);">
                             Noch keine Signale übertragen — im MqlKiScanner den „Tradeserver-Sync“ starten.
                         </td>
                     </tr>
@@ -547,6 +562,33 @@
                 </div>
                 <a class="doc-open" th:href="@{'/api/kiscanner/documents/' + ${d.id} + '/view'}"
                    target="_blank" rel="noopener">PDF ansehen ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signal metrics: raw values are persisted; only these labels are formatted. -->
+    <div id="kiDetailsModal" class="modal" onclick="if (event.target === this) closeKiDetails();">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeKiDetails()">&times;</span>
+            <div th:each="s : ${kiSignals}" th:attr="id='ki-details-' + ${s.signalId}" style="display:none;">
+                <h2 th:text="${s.name} + ' · #' + ${s.signalId}">Kennzahlen</h2>
+                <p th:text="${s.ampel} + ' · ' + ${s.urteil != null ? s.urteil : 'Kein Urteil übertragen'}"></p>
+                <div class="ki-detail-grid">
+                    <div><span>Max-Drawdown (Equity, gemessen)</span><strong th:text="${s.maxDrawdownEquityPct != null} ? ${#numbers.formatDecimal(s.maxDrawdownEquityPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Gewinn %/Monat (eigene geometrische Rendite)</span><strong th:text="${s.ertragMonatGeomPct != null} ? ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>RetDD (Monat)</span><strong th:text="${s.equityRetddMonat != null} ? ${#numbers.formatDecimal(s.equityRetddMonat, 1, 3)} : '—'"></strong></div>
+                    <div><span>Jahres-CAGR (eigene virtuelle Kurve)</span><strong th:text="${s.cagrJahrPct != null} ? ${#numbers.formatDecimal(s.cagrJahrPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>RetDD (Jahr: CAGR / gemessener EQ-DD)</span><strong th:text="${s.equityRetddJahr != null} ? ${#numbers.formatDecimal(s.equityRetddJahr, 1, 3)} : '—'"></strong></div>
+                    <div><span>Trading-DD (geschlossene Trades)</span><strong th:text="${s.tradingDdPct != null} ? ${#numbers.formatDecimal(s.tradingDdPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Equity-DD (Plattform-Selbstauskunft)</span><strong th:text="${s.ddEquityPct != null} ? ${#numbers.formatDecimal(s.ddEquityPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Ertrag / Monat (Plattform)</span><strong th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Übertragene DD-Grenze</span><strong th:text="${s.drawdownLimitPct != null} ? ${#numbers.formatDecimal(s.drawdownLimitPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Übertragenes Gewinnziel / Monat</span><strong th:text="${s.minReturnMonthlyPct != null} ? ${#numbers.formatDecimal(s.minReturnMonthlyPct, 1, 2)} + ' %' : '—'"></strong></div>
+                    <div><span>Übertragener Mindest-RetDD / Monat</span><strong th:text="${s.minRetddMonthly != null} ? ${#numbers.formatDecimal(s.minRetddMonthly, 1, 3)} : '—'"></strong></div>
+                </div>
+                <p>RetDD = eigene geometrische Gewinn-%/Monat ÷ gemessener Max-Equity-DD %. Ohne positive Equity-Messung und bestätigte Basis bleibt das Verhältnis unbekannt.</p>
+                <p class="doc-meta" th:text="'Übertragene RetDD-Basis: ' + ${s.retddBasis != null ? s.retddBasis : 'unbekannt'}"></p>
+                <p class="doc-meta">Kurs-Messungen bilden H1-Closes einer virtuellen Trading-Equity ab. Monitor-Basis und Zeitraum können abweichen; bei unterschiedlichen Kapitalflüssen ist kein echter Konto-Calmar belegt.</p>
             </div>
         </div>
     </div>
@@ -597,6 +639,16 @@
     </div>
 
     <script>
+        function showKiDetails(signalId) {
+            document.querySelectorAll('#kiDetailsModal [id^="ki-details-"]').forEach(
+                el => el.style.display = 'none');
+            const block = document.getElementById('ki-details-' + signalId);
+            if (block) block.style.display = 'block';
+            document.getElementById('kiDetailsModal').style.display = 'block';
+        }
+        function closeKiDetails() {
+            document.getElementById('kiDetailsModal').style.display = 'none';
+        }
         function showKiDocs(signalId) {
             document.querySelectorAll('#kiDocsModal [id^="ki-docs-"]').forEach(
                 el => el.style.display = 'none');
@@ -608,7 +660,7 @@
             document.getElementById('kiDocsModal').style.display = 'none';
         }
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeKiDocs();
+            if (e.key === 'Escape') { closeKiDocs(); closeKiDetails(); }
         });
 
         // --- Table Sorting ------------------------------------------------
@@ -627,7 +679,7 @@
             // Default-Sortierung: Score aufsteigend (kleinster Score = bestes Risiko)
             const defaultScoreTh = table.querySelector('thead th[data-col="7"]');
             if (defaultScoreTh) {
-                sortKiTable(table, defaultScoreTh, 6, 'num', 'asc');
+                sortKiTable(table, defaultScoreTh, Number(defaultScoreTh.getAttribute('data-col')), 'num', 'asc');
             }
         }
 
@@ -760,6 +812,21 @@
         // --- Stats + charts are derived from the table rows ---------------
         (function () {
             const rows = Array.from(document.querySelectorAll('#kiscanner-table tbody tr[data-ampel]'));
+            // Only draw a shared threshold if this snapshot supplies one unambiguous value.
+            const sharedLimit = attribute => {
+                const values = new Set(rows.map(row => {
+                    const raw = row.getAttribute(attribute);
+                    return raw == null || raw === '' ? NaN : Number(raw);
+                }).filter(Number.isFinite));
+                return values.size === 1 ? values.values().next().value : null;
+            };
+            const ddLimit = sharedLimit('data-dd-limit');
+            const gainLimit = sharedLimit('data-min-return');
+            const limitNote = document.getElementById('risk-limit-note');
+            if (limitNote) limitNote.textContent =
+                'Übertragene Grenzen: Equity-DD ' + (ddLimit == null ? 'unbekannt' : ddLimit + ' %') +
+                ', Gewinn/Monat ' + (gainLimit == null ? 'unbekannt' : gainLimit + ' %') +
+                '. Fehlende Messwerte werden ausgelassen. ';
             const ampelCount = {};
             rows.forEach(row => {
                 const ampel = row.getAttribute('data-ampel') || '⚪';
@@ -813,7 +880,7 @@
             rows.forEach((row, index) => {
                 const dd = parseFloat(row.getAttribute('data-dd'));
                 const ertrag = parseFloat(row.getAttribute('data-ertrag'));
-                if (!isNaN(dd) && !isNaN(ertrag)) {
+                if (Number.isFinite(dd) && Number.isFinite(ertrag)) {
                     const ampel = row.getAttribute('data-ampel') || '⚪';
                     const name = row.getAttribute('data-name') || ('#' + index);
                     const score = row.children[7] ? (row.children[7].getAttribute('data-val') || '') : '';
@@ -859,27 +926,31 @@
 
             const scatterCtx = document.getElementById('risk-chart');
             if (scatterCtx && totalPoints > 0) {
-                // Schrankenlinien (30 % DD / 5 % Ertrag) als Inline-Plugin.
+                // Transmitted thresholds are presentation metadata, not a new evaluation.
                 const schranken = {
                     id: 'schranken',
                     afterDatasetsDraw(chart) {
                         const {ctx, chartArea, scales} = chart;
                         if (!chartArea) return;
-                        const x = scales.x.getPixelForValue(30);
-                        const y = scales.y.getPixelForValue(5);
                         ctx.save();
                         ctx.setLineDash([6, 5]);
                         ctx.lineWidth = 1.5;
-                        ctx.strokeStyle = 'rgba(239,68,68,0.85)';
-                        ctx.beginPath();
-                        ctx.moveTo(x, chartArea.top);
-                        ctx.lineTo(x, chartArea.bottom);
-                        ctx.stroke();
-                        ctx.strokeStyle = 'rgba(34,197,94,0.85)';
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, y);
-                        ctx.lineTo(chartArea.right, y);
-                        ctx.stroke();
+                        if (ddLimit != null) {
+                            const x = scales.x.getPixelForValue(ddLimit);
+                            ctx.strokeStyle = 'rgba(239,68,68,0.85)';
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
+                        }
+                        if (gainLimit != null) {
+                            const y = scales.y.getPixelForValue(gainLimit);
+                            ctx.strokeStyle = 'rgba(34,197,94,0.85)';
+                            ctx.beginPath();
+                            ctx.moveTo(chartArea.left, y);
+                            ctx.lineTo(chartArea.right, y);
+                            ctx.stroke();
+                        }
                         ctx.restore();
                     }
                 };
@@ -925,8 +996,8 @@
                                         return [
                                             'Signal-Provider: ' + p.name,
                                             'Einstufung: ' + p.ampel + (p.urteil ? ' (' + p.urteil + ')' : ''),
-                                            'Max. Trading-DD: ' + p.x.toFixed(1) + ' %',
-                                            'Monatsertrag: ' + p.y.toFixed(1) + ' %' + (p.retdd != null ? '  ·  RetDD: ' + p.retdd.toFixed(2) + '/M' : '') + (p.score ? '  ·  Score: ' + p.score : '')
+                                            'Gemessener Max-EQ-DD: ' + p.x.toFixed(2) + ' %',
+                                            'Gewinn/Monat (geom.): ' + p.y.toFixed(2) + ' %' + (p.retdd != null ? '  ·  RetDD: ' + p.retdd.toFixed(2) : '') + (p.score ? '  ·  Score: ' + p.score : '')
                                         ];
                                     }
                                 }
@@ -936,7 +1007,7 @@
                             x: {
                                 title: {
                                     display: true,
-                                    text: 'max. Trading-DD %',
+                                    text: 'gemessener Max-Equity-DD %',
                                     color: textColor
                                 },
                                 ticks: { color: textColor },
@@ -945,7 +1016,7 @@
                             y: {
                                 title: {
                                     display: true,
-                                    text: 'Ertrag % / Monat',
+                                    text: 'Gewinn %/Monat (eigene geometrische Rendite)',
                                     color: textColor
                                 },
                                 ticks: { color: textColor },

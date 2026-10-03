@@ -63,6 +63,16 @@ public class KiSignalEntity {
     @Column(name = "dd_balance_pct")
     private Double ddBalancePct;
 
+    /** Scanner measurement including floating; separate from platform/closed DD. */
+    @Column(name = "max_drawdown_equity_pct")
+    private Double maxDrawdownEquityPct;
+    @Column(name = "drawdown_limit_pct")
+    private Double drawdownLimitPct;
+    @Column(name = "min_return_monthly_pct")
+    private Double minReturnMonthlyPct;
+    @Column(name = "min_retdd_monthly")
+    private Double minRetddMonthly;
+
     @Column(name = "ertrag_monat_pct")
     private Double ertragMonatPct;
     @Column(name = "ertrag_monat_forensik_pct")
@@ -75,6 +85,8 @@ public class KiSignalEntity {
     private Double retddMonat;
     @Column(name = "retdd_jahr")
     private Double retddJahr;
+    @Column(name = "retdd_basis", length = 128)
+    private String retddBasis;
 
     @Column(name = "growth_pct")
     private Double growthPct;
@@ -195,6 +207,15 @@ public class KiSignalEntity {
     public Double getDdBalancePct() { return ddBalancePct; }
     public void setDdBalancePct(Double ddBalancePct) { this.ddBalancePct = ddBalancePct; }
 
+    public Double getMaxDrawdownEquityPct() { return maxDrawdownEquityPct; }
+    public void setMaxDrawdownEquityPct(Double v) { this.maxDrawdownEquityPct = v; }
+    public Double getDrawdownLimitPct() { return drawdownLimitPct; }
+    public void setDrawdownLimitPct(Double v) { this.drawdownLimitPct = v; }
+    public Double getMinReturnMonthlyPct() { return minReturnMonthlyPct; }
+    public void setMinReturnMonthlyPct(Double v) { this.minReturnMonthlyPct = v; }
+    public Double getMinRetddMonthly() { return minRetddMonthly; }
+    public void setMinRetddMonthly(Double v) { this.minRetddMonthly = v; }
+
     public Double getErtragMonatPct() { return ertragMonatPct; }
     public void setErtragMonatPct(Double ertragMonatPct) { this.ertragMonatPct = ertragMonatPct; }
     public Double getErtragMonatForensikPct() { return ertragMonatForensikPct; }
@@ -207,6 +228,30 @@ public class KiSignalEntity {
     public void setRetddMonat(Double v) { this.retddMonat = v; }
     public Double getRetddJahr() { return retddJahr; }
     public void setRetddJahr(Double v) { this.retddJahr = v; }
+    public String getRetddBasis() { return retddBasis; }
+    public void setRetddBasis(String v) { this.retddBasis = v; }
+
+    /** Display only verified equity-based ratios, including after loading legacy snapshots. */
+    @Transient
+    public Double getEquityRetddMonat() {
+        return hasEquityRetddBasis() && finite(ertragMonatGeomPct) && finite(retddMonat)
+                ? retddMonat : null;
+    }
+
+    @Transient
+    public Double getEquityRetddJahr() {
+        return hasEquityRetddBasis() && finite(cagrJahrPct) && finite(retddJahr)
+                ? retddJahr : null;
+    }
+
+    private boolean hasEquityRetddBasis() {
+        return finite(maxDrawdownEquityPct) && maxDrawdownEquityPct > 0
+                && "gemessener_max_equity_drawdown_inkl_floating".equals(retddBasis);
+    }
+
+    private static boolean finite(Double value) {
+        return value != null && Double.isFinite(value);
+    }
 
     public Double getGrowthPct() { return growthPct; }
     public void setGrowthPct(Double growthPct) { this.growthPct = growthPct; }
