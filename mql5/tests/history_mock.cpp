@@ -189,6 +189,9 @@ int main(int argc, char **argv) {
   failRestore = scenario == "restore-failure";
   failInitial = scenario == "initial-failure";
   string latest = "";
-  string result = BuildClosedTradesJson(scenario == "full" ? "" : "2026.09.14 16:11:41", latest);
+  string bookmark = "2026.09.14 16:11:41";
+  if (scenario == "full") bookmark = "";
+  else if (scenario == "synced") bookmark = "2026.09.14 16:47:47";
+  string result = BuildClosedTradesJson(bookmark, latest);
   std::cout << result << '\n' << latest << '\n' << selectCalls << ' ' << positionCalls << '\n';
 }

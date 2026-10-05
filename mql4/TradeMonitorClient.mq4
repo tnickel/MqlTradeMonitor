@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.13"
+#property version   "1.14"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,7 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL4/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.13"
+#define EA_VERSION "1.14"
 
 //--- Active runtime parameters (loaded from config or input defaults)
 string   cfg_ServerURL = "";
@@ -850,10 +850,11 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    outLatestCloseTime = "";
    
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
+   datetime syncCutoffTime = isIncremental ? StringToTime(sinceCloseTime) : 0;
    datetime sinceTimeVal = 0;
    if(isIncremental)
    {
-      sinceTimeVal = StringToTime(sinceCloseTime) - 7200; // 2 hours safety window
+      sinceTimeVal = syncCutoffTime - 7200; // 2 hours safety window
    }
    if(!isIncremental && cfg_DebugMode > 0)
       Print("Processing full history: ", totalOrders, " orders found...");
@@ -875,7 +876,7 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
                   string closeTime = TimeToString(closeTimeVal, TIME_DATE|TIME_SECONDS);
                   
                   // Skip trades already synced (incremental mode) using the 2-hour safety window
-                  if(isIncremental && closeTimeVal < sinceTimeVal)
+                  if(isIncremental && closeTimeVal <= syncCutoffTime)
                   {
                      skippedCount++;
                      continue;

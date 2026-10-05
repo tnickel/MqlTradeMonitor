@@ -4,7 +4,7 @@
 //|                        Sends trades to monitoring server         |
 //+------------------------------------------------------------------+
 #property copyright "TradeMonitor"
-#property version   "1.24"
+#property version   "1.25"
 #property strict
 
 //--- Input parameters (defaults, overridden by config file if present)
@@ -25,7 +25,7 @@ uint GetEnvironmentVariableW(string lpName, ushort &lpBuffer[], uint nSize);
 
 //--- Config file name (stored in MQL5/Files/)
 #define CONFIG_FILE "TradeMonitorClient.cfg"
-#define EA_VERSION "1.24"
+#define EA_VERSION "1.25"
 #define HISTORY_SYNC_REVISION 1
 #define UPDATE_GUARD_FILE "TM_LastUpdateAttempt.dat"
 
@@ -987,10 +987,11 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
    outLatestCloseTime = "";
    // Determine incremental vs full sync BEFORE selecting history
    bool isIncremental = (sinceCloseTime != "" && StringLen(sinceCloseTime) > 0);
+   datetime syncCutoffTime = isIncremental ? StringToTime(sinceCloseTime) : 0;
    datetime sinceTimeVal = 0;
    if(isIncremental)
    {
-      sinceTimeVal = StringToTime(sinceCloseTime) - 7200; // 2 hours safety window
+      sinceTimeVal = syncCutoffTime - 7200; // 2 hours safety window for broker deal history selection
    }
    
    // For incremental updates, only load deals from the relevant time range.
@@ -1025,8 +1026,8 @@ string BuildClosedTradesJson(string sinceCloseTime, string &outLatestCloseTime)
             datetime dealTimeVal = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
             string closeTime = TimeToString(dealTimeVal, TIME_DATE|TIME_SECONDS);
             
-            // Skip trades already synced (incremental mode) using the 2-hour safety window
-            if(isIncremental && dealTimeVal < sinceTimeVal)
+            // Skip trades already synced (incremental mode)
+            if(isIncremental && dealTimeVal <= syncCutoffTime)
             {
                skippedCount++;
                continue;

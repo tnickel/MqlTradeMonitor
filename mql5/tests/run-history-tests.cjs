@@ -62,6 +62,12 @@ try {
     assert.deepEqual(run('full').rows, run('sell').rows);
     assert.deepEqual(run('full').calls, [1, 0], 'Full history must use the entries already selected');
   });
+  test('Subsequent incremental sync with latest close time bookmark skips already synced trades', () => {
+    const actual = run('synced');
+    assert.deepEqual(actual.rows, [], 'Already synced trades must not be re-processed or returned');
+    assert.equal(actual.latest, '', 'Latest close time must be empty when no new trades found');
+    assert.deepEqual(actual.calls, [1, 0], 'Should not trigger position history lookups when all deals are skipped');
+  });
   test('Partial closes allocate opening commission proportionally', () => {
     const rows = run('partial').rows;
     assert.deepEqual(rows.map(r => [r.type, r.volume, r.commission]), [['SELL', .05, -.26], ['SELL', .12, -.62]]);
