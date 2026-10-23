@@ -1,3 +1,96 @@
+# Protokoll v2 (18.10.2026)
+
+Die Endpunkte bleiben `/api/kiscanner/*`. `/ping` liefert `kiscannerApi: 2`,
+`protocolVersion: 2`, `supportedProtocolVersions: [1,2]`. Authentifizierung:
+vorhandener `X-User-Key`; Browserabrufe weiter mit angemeldeter Sitzung.
+
+`register` erhält `client: "MqlKiScanner"`, `protocolVersion: 2`, optional
+`scannerVersion` und `signalCount` (0..2000). Antwort: `runId`, ausgehandelte
+`protocolVersion`, `supportedProtocolVersions`, `signalIdentities` mit
+`{sourceUid,source,signalId}` sowie `documents` mit
+`{docKey,sha256,sourceUid,source,signalId}`. Eine Quellen-UID bleibt exakt und
+unverändert; `source` ist nur das aktuelle Anzeigekürzel. UID: gültiges Unicode,
+maximal 255 UTF-8-Bytes, keine Rand-Leerzeichen/Steuerzeichen. Labels maximal
+128 Zeichen. `legacy:v1` ist reserviert.
+
+Alle v2-Schreibaufrufe brauchen die registrierte numerische `runId` im JSON.
+Sie ist zusätzlich an den Hash des API-Keys gebunden. Ein anderer gültiger Key
+kann einen fremden Lauf nicht ändern. Ein laufender v2-Sync sperrt weitere
+Registrierungen für 30 Minuten; danach wird nur dessen unvollständiges Staging
+verworfen. Serverneustart verwirft Staging und markiert laufende Journale als
+abgebrochen. Der letzte vollständig übertragene Bestand bleibt erhalten.
+
+1. `signals`: `{runId, signals:[{sourceUid,source,signalId,...}]}`; positive
+   externe Signal-ID. Das Paar `(sourceUid,signalId)` ist eindeutig. Gleiche
+   ID bei verschiedenen Quellen ist erlaubt, doppeltes Paar wird abgewiesen.
+   Maximal 2000 Signale. Nach dem ersten PDF kann der Snapshot nicht ersetzt
+   werden. `stored` bestätigt hier nur Staging (`staged:true`).
+2. `documents`: bisherige PDF-Felder plus `runId,sourceUid,source,signalId`.
+   Signaldokumente brauchen einen Eigentümer im aktuellen Signal-Snapshot und
+   den Key `signal/{RFC3986-escaped sourceUid}/{signalId}/...`; URL-Encoding
+   entspricht Python `quote(uid,safe="")`, einschließlich `%20`, `%2F`, `%2A`.
+   Ein `docKey` kann nie seinen Eigentümer wechseln. Portfolio-Dokumente haben
+   alle drei Eigentümerfelder null und einen `portfolio/`-Key. SHA-256 und
+   optionale `sizeBytes` werden gegen echte PDF-Bytes geprüft; PDF-Magic und
+   12 MiB je Datei, insgesamt 512 MiB/10000 Dateien im Staging.
+3. `complete`: `{runId,signals,documents,uploaded,skipped,bytes,documentKeys}`.
+   `documentKeys` enthält exakt alle gewollten Dokumente, auch SHA-übersprungene
+   Bestandsdokumente. Zähler und Bytes müssen zum Staging passen. Fehlende,
+   fremde oder doppelte Keys verhindern den Commit. Ein Quellen-Labelwechsel
+   aktualisiert auch gecachte Dokumente desselben stabilen Eigentümers.
+   Erst jetzt ersetzen Signale, PDFs und Erfolgsjournal den aktiven Snapshot
+   gemeinsam in einer DB-Transaktion. Nicht genannte PDFs werden gelöscht.
+   Antwort enthält endgültige `stored`/`deleted`-Signalzahlen.
+4. `abort`: `{runId,reason}` verwirft ausschließlich Staging. Ein fehlgeschlagener
+   Commit rollt alle Änderungen zurück; der vorherige Bestand bleibt sichtbar.
+
+Die v2-Signalzeile überträgt außerdem `minCalmarJahr`, `retddJahr`,
+`retddJahrVorbehalt`, `retddVorbehaltGrund` und `equityMeasurementStatus`.
+Die Hauptspalte zeigt den Jahres-Calmar (Jahres-CAGR / belastbarer eigener
+Equity-DD inklusive Floating). Sie vergleicht den ungerundeten Jahreswert mit
+`minCalmarJahr`. Unbekannte Schwellen bleiben neutral; kein historischer
+Default wird erfunden. Vorbehaltswerte erscheinen orange mit `≈` und können
+kein Grün erzeugen. Monatswerte stehen ergänzend im Kennzahlen-Dialog. Die
+DD-Färbung respektiert ausschließlich `drawdownLimitPct`, auch 50 Prozent;
+Ampel und Berechnungen werden unverändert vom Scanner übernommen. Neue
+Schemafelder sind nullable; beim Upgrade bleiben frühere Schwellen unbekannt.
+
+Die Browseransicht verwendet interne Signal-Zeilen-IDs für DOM und Dialoge,
+Dokumentfilter verwenden das vollständige Quellenpaar. Quelle und externe ID
+sind sichtbar. Das Dashboard zeigt den letzten erfolgreichen Snapshot und
+zusätzlich `lastAttemptStatus`/`lastAttemptRunId` des letzten Versuchs.
+
+## Bestand und v1-Kompatibilität
+
+Hibernate legt eigene Tabellen `ki_signals_v2`/`ki_documents_v2` an. Eine
+markierte Copy-Migration überträgt alte Tabellen verlustfrei und bewahrt auch
+interne IDs/PDF-URLs. Die H2-Identity-Sequenzen werden vor der Copy-Transaktion
+auf `max(old.id)+1` gesetzt: H2-DDL läuft nicht mitten in der Copy-Transaktion.
+Der Kopiervorgang und sein Marker sind atomar. Alte Tabellen werden weder
+gelöscht noch verändert. Ihre Besitzer bleiben ausdrücklich `legacy:v1` /
+`Legacy v1`, Portfolio bleibt ohne Besitzer; heutige Quellen werden nie geraten.
+
+Vor der ersten erfolgreichen v2-Übertragung bleibt der v1-Vertrag erhalten
+(register erforderlich, danach unmittelbare v1-Schreibvorgänge). Nach dem ersten
+v2-Commit werden Legacy-Zeilen im aktiven Snapshot ersetzt und v1-Schreibvorgänge
+klar abgewiesen. So kann ein alter Client keinen neuen Composite-Bestand löschen.
+Die Originaltabellen bleiben als historische Kopie erhalten. Ein Downgrade auf
+alte Software ist nach neuen Schreibvorgängen kein zulässiger Daten-Rollback.
+Vor dem produktiven Update sind deshalb WAR und geschlossene H2 gemeinsam zu
+sichern; Sicherungen enthalten private Laufzeitdaten und gehören nicht ins Repo.
+
+## Abnahme
+
+JDK 21, Java-17-Buildziel: `mvn -q test` → 73 Tests, 0 Fehler, 0 übersprungen
+(18.10.2026). Darin 15 bestehende v1-Tests, 11 neue v2-Integrationstests und
+2 eigenständige H2-Migrationsfälle. Belegt: gleiche Anbieter-ID in zwei Quellen,
+Quellenumbenennung, PDF-Zuordnung, falsche Run-/Key-Bindung, Duplikate,
+Hash-/Owner-Fehler, Abbruch, absichtlich fehlgeschlagener DB-Commit mit Rollback,
+Jahres-Schwelle/Rohpräzision, orange Vorbehaltswerte, unbekannte Alt-Schwellen, 50-Prozent-DD-Anzeige, Legacy-IDs/Sequenzen und Copy-Rollback bei Fehler in der zweiten Tabelle.
+Keine produktiven Scanner-Daten werden durch diese Tests übertragen.
+
+---
+
 # MqlKiScanner-Integration (KiScanner-Sync-Protokoll v1)
 
 Stand: 20.09.2026 · Gegenstück: MqlKiScanner `doc/06_tradeserver-sync.md`

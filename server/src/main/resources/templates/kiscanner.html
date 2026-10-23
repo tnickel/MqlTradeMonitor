@@ -430,9 +430,9 @@
                             Gewinn %/Monat <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="6" data-type="num" data-default-dir="desc" style="text-align:right;"
-                            data-tooltip-title="RetDD — Monatsgewinn je Equity-Drawdown-Punkt"
-                            data-tooltip-desc="Eigene geometrische Gewinn-%/Monat geteilt durch gemessenen Max-EQ-DD. Ohne Gewinn, positive Equity-Messung oder bestätigte Equity-Basis bleibt RetDD leer. Grün ab der übertragenen Mindestschwelle, darunter gelb; unbekannte Schwelle neutral. Jahreswert = CAGR geteilt durch denselben Equity-DD. Abweichende Kapitalbasen und Zeiträume begrenzen die Vergleichbarkeit.">
-                            RetDD <span class="sort-icon">⇅</span>
+                            data-tooltip-title="Jahres-Calmar — Jahres-CAGR je Equity-Drawdown-Punkt"
+                            data-tooltip-desc="Jahres-CAGR geteilt durch belastbaren eigenen Max-Equity-DD inklusive Floating. Grün nur ab dem übertragenen minCalmarJahr; unbekannte Schwelle neutral. Vorbehaltliche Messungen bleiben orange mit ≈ und erlauben keine Freigabe. Die Ampel wird unverändert vom Scanner übernommen.">
+                            Calmar/Jahr <span class="sort-icon">⇅</span>
                         </th>
                         <th class="sortable" data-col="7" data-type="num" data-default-dir="asc"
                             data-tooltip-title="Score — Risiko-Score (1.0 – 10.0)"
@@ -468,7 +468,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="s, sStat : ${kiSignals}"
-                        th:attr="data-ampel=${s.ampel},data-dd=${s.maxDrawdownEquityPct},data-ertrag=${s.ertragMonatGeomPct},data-retdd=${s.equityRetddMonat},data-dd-limit=${s.drawdownLimitPct},data-min-return=${s.minReturnMonthlyPct},data-min-retdd=${s.minRetddMonthly},data-name=${s.name},data-orig-index=${sStat.index}">
+                        th:attr="data-ampel=${s.ampel},data-dd=${s.maxDrawdownEquityPct},data-ertrag=${s.ertragMonatGeomPct},data-retdd=${s.equityRetddJahr},data-dd-limit=${s.drawdownLimitPct},data-min-return=${s.minReturnMonthlyPct},data-min-calmar=${s.minCalmarJahr},data-name=${s.name},data-orig-index=${sStat.index}">
                         <td th:attr="data-val=${s.ampel == '🟢' ? 1 : (s.ampel == '🟡' ? 2 : (s.ampel == '🔴' ? 3 : (s.ampel == '⛔' ? 4 : 5)))}">
                             <span class="ampel-badge" th:title="${s.ampel}" th:text="${s.ampel}">🟢</span>
                         </td>
@@ -479,10 +479,11 @@
                                 <span th:text="${s.name}">Gold Spike</span></a>
                             <span th:unless="${s.url != null}" style="display:block; overflow:hidden; text-overflow:ellipsis;"
                                   th:title="${s.name}" th:text="${s.name}">Gold Spike</span>
+                            <div class="meta" th:text="${s.source} + ' · #' + ${s.signalId}" th:title="${s.sourceUid}"></div>
                             <span class="neu-marker" th:if="${'NEU'.equals(s.stand)}">NEU</span>
                             <div class="meta" th:if="${s.platform != null}"
                                  th:text="${s.platform} + (${s.berichtVom != null} ? ' · Bericht ' + ${s.berichtVom} : '')">MT5</div>
-                            <button type="button" class="docs-btn" th:attr="data-signal=${s.signalId}"
+                            <button type="button" class="docs-btn" th:attr="data-signal=${s.id}"
                                     onclick="showKiDetails(this.getAttribute('data-signal'))">Kennzahlen</button>
                         </td>
                         <td th:title="${s.stopNachweis != null ? s.stopNachweis : ''}"
@@ -498,12 +499,12 @@
                         <td class="num own-gain-cell" style="font-weight:700;" th:attr="data-val=${s.ertragMonatGeomPct}"
                             title="Eigene geometrische Monatsrendite; kein Plattform-Fallback."
                             th:text="${s.ertragMonatGeomPct != null} ? ${#numbers.formatDecimal(s.ertragMonatGeomPct, 1, 2)} : '—'">—</td>
-                        <td class="num retdd-cell" th:attr="data-val=${s.equityRetddMonat}"
-                            title="Eigener geometrischer Monatsgewinn / gemessener Max-EQ-DD. Basis und Jahreswerte unter Kennzahlen.">
-                            <span th:if="${s.equityRetddMonat != null}"
-                                  th:style="'font-weight:700;color:' + (${s.minRetddMonthly == null} ? '#9ca3af' : (${s.equityRetddMonat >= s.minRetddMonthly} ? '#22c55e' : '#eab308'))"
-                                  th:text="${#numbers.formatDecimal(s.equityRetddMonat, 1, 2)}">—</span>
-                            <span th:unless="${s.equityRetddMonat != null}">—</span>
+                        <td class="num retdd-cell" th:attr="data-val=${s.displayRetddJahr}"
+                            th:title="${s.retddVorbehaltGrund != null ? s.retddVorbehaltGrund : 'Jahres-CAGR / eigener gemessener Equity-DD inklusive Floating; Mindestwert siehe Kennzahlen.'}">
+                            <span th:if="${s.displayRetddJahr != null}"
+                                  th:style="'font-weight:700;color:' + (${s.equityRetddJahr == null} ? '#f97316' : (${s.minCalmarJahr == null} ? '#9ca3af' : (${s.equityRetddJahr >= s.minCalmarJahr} ? '#22c55e' : '#eab308')))"
+                                  th:text="(${s.equityRetddJahr == null} ? '≈ ' : '') + ${#numbers.formatDecimal(s.displayRetddJahr, 1, 2)}">—</span>
+                            <span th:unless="${s.displayRetddJahr != null}">—</span>
                         </td>
                         <td th:attr="data-val=${s.score}">
                             <span class="score-bar">
@@ -531,9 +532,9 @@
                         </td>
                         <td th:attr="data-val=${(s.docsBerichte != null ? s.docsBerichte : 0) + (s.docsTiefenanalyse != null ? s.docsTiefenanalyse : 0)}">
                             <button type="button" class="docs-btn"
-                                    th:attr="data-signal=${s.signalId}"
+                                    th:attr="data-signal=${s.id}"
                                     onclick="showKiDocs(this.getAttribute('data-signal'))"
-                                    th:disabled="${#lists.isEmpty(kiDocsBySignal.get(s.signalId))}">
+                                    th:disabled="${#lists.isEmpty(kiDocsBySignal.get(s.id))}">
                                 📄 <span th:text="${s.docsBerichte != null ? s.docsBerichte : 0}">2</span>
                                 <th:block th:if="${s.docsTiefenanalyse != null and s.docsTiefenanalyse > 0}">
                                     · 🟡 <span th:text="${s.docsTiefenanalyse}">1</span>
@@ -570,8 +571,8 @@
     <div id="kiDetailsModal" class="modal" onclick="if (event.target === this) closeKiDetails();">
         <div class="modal-content">
             <span class="close-modal" onclick="closeKiDetails()">&times;</span>
-            <div th:each="s : ${kiSignals}" th:attr="id='ki-details-' + ${s.signalId}" style="display:none;">
-                <h2 th:text="${s.name} + ' · #' + ${s.signalId}">Kennzahlen</h2>
+            <div th:each="s : ${kiSignals}" th:attr="id='ki-details-' + ${s.id}" style="display:none;">
+                <h2 th:text="${s.name} + ' · ' + ${s.source} + ' · #' + ${s.signalId}">Kennzahlen</h2>
                 <p th:text="${s.ampel} + ' · ' + ${s.urteil != null ? s.urteil : 'Kein Urteil übertragen'}"></p>
                 <div class="ki-detail-grid">
                     <div><span>Max-Drawdown (Equity, gemessen)</span><strong th:text="${s.maxDrawdownEquityPct != null} ? ${#numbers.formatDecimal(s.maxDrawdownEquityPct, 1, 2)} + ' %' : '—'"></strong></div>
@@ -584,9 +585,11 @@
                     <div><span>Ertrag / Monat (Plattform)</span><strong th:text="${s.ertragMonatPct != null} ? ${#numbers.formatDecimal(s.ertragMonatPct, 1, 2)} + ' %' : '—'"></strong></div>
                     <div><span>Übertragene DD-Grenze</span><strong th:text="${s.drawdownLimitPct != null} ? ${#numbers.formatDecimal(s.drawdownLimitPct, 1, 2)} + ' %' : '—'"></strong></div>
                     <div><span>Übertragenes Gewinnziel / Monat</span><strong th:text="${s.minReturnMonthlyPct != null} ? ${#numbers.formatDecimal(s.minReturnMonthlyPct, 1, 2)} + ' %' : '—'"></strong></div>
-                    <div><span>Übertragener Mindest-RetDD / Monat</span><strong th:text="${s.minRetddMonthly != null} ? ${#numbers.formatDecimal(s.minRetddMonthly, 1, 3)} : '—'"></strong></div>
+                    <div><span>Übertragener Mindest-Jahres-Calmar</span><strong th:text="${s.minCalmarJahr != null} ? ${#numbers.formatDecimal(s.minCalmarJahr, 1, 3)} : 'unbekannt'"></strong></div>
+                    <div><span>Jahres-Calmar unter Vorbehalt</span><strong th:text="${s.retddJahrVorbehalt != null} ? '≈ ' + ${#numbers.formatDecimal(s.retddJahrVorbehalt, 1, 3)} : '—'"></strong></div>
                 </div>
-                <p>RetDD = eigene geometrische Gewinn-%/Monat ÷ gemessener Max-Equity-DD %. Ohne positive Equity-Messung und bestätigte Basis bleibt das Verhältnis unbekannt.</p>
+                <p>Jahres-Calmar = Jahres-CAGR ÷ eigener gemessener Max-Equity-DD inklusive Floating. Die übertragene Jahres-Schwelle entscheidet die Färbung. Monats-RetDD ist eine Zusatzinformation. Ohne belastbare Equity-Messung bleibt ein etwaiger Vorbehaltswert orange und erlaubt kein Grün.</p>
+                <p class="doc-meta" th:text="${s.equityMeasurementStatus != null ? s.equityMeasurementStatus : 'Equity-Messstatus unbekannt'}"></p>
                 <p class="doc-meta" th:text="'Übertragene RetDD-Basis: ' + ${s.retddBasis != null ? s.retddBasis : 'unbekannt'}"></p>
                 <p class="doc-meta">Kurs-Messungen bilden H1-Closes einer virtuellen Trading-Equity ab. Monitor-Basis und Zeitraum können abweichen; bei unterschiedlichen Kapitalflüssen ist kein echter Konto-Calmar belegt.</p>
             </div>
@@ -822,10 +825,12 @@
             };
             const ddLimit = sharedLimit('data-dd-limit');
             const gainLimit = sharedLimit('data-min-return');
+            const calmarLimit = sharedLimit('data-min-calmar');
             const limitNote = document.getElementById('risk-limit-note');
             if (limitNote) limitNote.textContent =
                 'Übertragene Grenzen: Equity-DD ' + (ddLimit == null ? 'unbekannt' : ddLimit + ' %') +
                 ', Gewinn/Monat ' + (gainLimit == null ? 'unbekannt' : gainLimit + ' %') +
+                ', Jahres-Calmar ' + (calmarLimit == null ? 'unbekannt' : calmarLimit) +
                 '. Fehlende Messwerte werden ausgelassen. ';
             const ampelCount = {};
             rows.forEach(row => {
@@ -997,7 +1002,7 @@
                                             'Signal-Provider: ' + p.name,
                                             'Einstufung: ' + p.ampel + (p.urteil ? ' (' + p.urteil + ')' : ''),
                                             'Gemessener Max-EQ-DD: ' + p.x.toFixed(2) + ' %',
-                                            'Gewinn/Monat (geom.): ' + p.y.toFixed(2) + ' %' + (p.retdd != null ? '  ·  RetDD: ' + p.retdd.toFixed(2) : '') + (p.score ? '  ·  Score: ' + p.score : '')
+                                            'Gewinn/Monat (geom.): ' + p.y.toFixed(2) + ' %' + (p.retdd != null ? '  ·  Jahres-Calmar: ' + p.retdd.toFixed(2) : '') + (p.score ? '  ·  Score: ' + p.score : '')
                                         ];
                                     }
                                 }

@@ -12,4 +12,6 @@ import de.trademonitor.entity.KiSyncRunEntity;
 public interface KiSyncRunRepository extends JpaRepository<KiSyncRunEntity, Long> {
 
     Optional<KiSyncRunEntity> findTopByOrderByIdDesc();
+
+    Optional<KiSyncRunEntity> findTopByStatusOrderByIdDesc(String status);
 }

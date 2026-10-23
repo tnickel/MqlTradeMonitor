@@ -3086,8 +3086,8 @@ public class DashboardController {
         model.addAttribute("kiSignals", signals);
         Map<Long, List<de.trademonitor.entity.KiDocumentEntity>> docsBySignal = new LinkedHashMap<>();
         for (de.trademonitor.entity.KiSignalEntity signal : signals) {
-            docsBySignal.put(signal.getSignalId(),
-                    kiScannerService.documentsForSignal(signal.getSignalId()));
+            docsBySignal.put(signal.getId(),
+                    kiScannerService.documentsForSignal(signal.getSourceUid(), signal.getSignalId()));
         }
         model.addAttribute("kiDocsBySignal", docsBySignal);
         model.addAttribute("kiPortfolioDocs", kiScannerService.portfolioDocuments());

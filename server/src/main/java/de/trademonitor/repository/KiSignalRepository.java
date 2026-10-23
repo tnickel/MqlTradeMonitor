@@ -14,5 +14,7 @@ public interface KiSignalRepository extends JpaRepository<KiSignalEntity, Long> 
 
     Optional<KiSignalEntity> findBySignalId(long signalId);
 
+    Optional<KiSignalEntity> findBySourceUidAndSignalId(String sourceUid, long signalId);
+
     List<KiSignalEntity> findAllByOrderByDisplayOrderAsc();
 }

@@ -16,5 +16,7 @@ public interface KiDocumentRepository extends JpaRepository<KiDocumentEntity, Lo
 
     List<KiDocumentEntity> findBySignalIdOrderByKindAscFileNameAsc(Long signalId);
 
+    List<KiDocumentEntity> findBySourceUidAndSignalIdOrderByKindAscFileNameAsc(String sourceUid, Long signalId);
+
     List<KiDocumentEntity> findByGroupOrderByUpdatedAtDesc(String group);
 }

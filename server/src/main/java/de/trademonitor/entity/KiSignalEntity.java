@@ -10,7 +10,7 @@ import jakarta.persistence.*;
  * rows missing from the latest snapshot are deleted.
  */
 @Entity
-@Table(name = "ki_signals")
+@Table(name = "ki_signals_v2", uniqueConstraints = @UniqueConstraint(columnNames = {"source_uid", "signal_id"}))
 public class KiSignalEntity {
 
     @Id
@@ -18,8 +18,19 @@ public class KiSignalEntity {
     private Long id;
 
     /** Natural key: MQL5 signal id from the scanner. */
-    @Column(name = "signal_id", nullable = false, unique = true)
+    @Column(name = "signal_id", nullable = false)
     private long signalId;
+
+    @Column(name = "source_uid", nullable = false, length = 255)
+    private String sourceUid = "legacy:v1";
+
+    @Column(name = "source_label", nullable = false, length = 128)
+    private String source = "Legacy v1";
+
+    public String getSourceUid() { return sourceUid; }
+    public void setSourceUid(String value) { sourceUid = value; }
+    public String getSource() { return source; }
+    public void setSource(String value) { source = value; }
 
     /** Display order as sent by the scanner (NEU rows first, then name). */
     @Column(name = "display_order", nullable = false)
@@ -72,6 +83,28 @@ public class KiSignalEntity {
     private Double minReturnMonthlyPct;
     @Column(name = "min_retdd_monthly")
     private Double minRetddMonthly;
+    @Column(name = "min_calmar_jahr")
+    private Double minCalmarJahr;
+    @Column(name = "retdd_jahr_vorbehalt")
+    private Double retddJahrVorbehalt;
+    @Column(name = "retdd_vorbehalt_grund", length = 2048)
+    private String retddVorbehaltGrund;
+    @Column(name = "equity_measurement_status", length = 2048)
+    private String equityMeasurementStatus;
+    public Double getMinCalmarJahr() { return minCalmarJahr; }
+    public void setMinCalmarJahr(Double v) { minCalmarJahr = v; }
+    public Double getRetddJahrVorbehalt() { return retddJahrVorbehalt; }
+    public void setRetddJahrVorbehalt(Double v) { retddJahrVorbehalt = v; }
+    public String getRetddVorbehaltGrund() { return retddVorbehaltGrund; }
+    public void setRetddVorbehaltGrund(String v) { retddVorbehaltGrund = v; }
+    public String getEquityMeasurementStatus() { return equityMeasurementStatus; }
+    public void setEquityMeasurementStatus(String v) { equityMeasurementStatus = v; }
+    @Transient
+    public Double getDisplayRetddJahr() {
+        Double measured = getEquityRetddJahr();
+        return measured != null ? measured : finite(retddJahrVorbehalt) ? retddJahrVorbehalt : null;
+    }
+
 
     @Column(name = "ertrag_monat_pct")
     private Double ertragMonatPct;
@@ -245,7 +278,7 @@ public class KiSignalEntity {
     }
 
     private boolean hasEquityRetddBasis() {
-        return finite(maxDrawdownEquityPct) && maxDrawdownEquityPct > 0
+        return retddJahrVorbehalt == null && finite(maxDrawdownEquityPct) && maxDrawdownEquityPct > 0
                 && "gemessener_max_equity_drawdown_inkl_floating".equals(retddBasis);
     }
 

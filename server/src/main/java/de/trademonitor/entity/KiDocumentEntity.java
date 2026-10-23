@@ -8,7 +8,7 @@ import jakarta.persistence.*;
  * test reports). Stored as a BLOB like account documents.
  */
 @Entity
-@Table(name = "ki_documents")
+@Table(name = "ki_documents_v2")
 public class KiDocumentEntity {
 
     @Id
@@ -22,6 +22,15 @@ public class KiDocumentEntity {
     /** Owning MQL5 signal id; null for the portfolio report. */
     @Column(name = "signal_id")
     private Long signalId;
+
+    @Column(name = "source_uid", length = 255)
+    private String sourceUid;
+    @Column(name = "source_label", length = 128)
+    private String source;
+    public String getSourceUid() { return sourceUid; }
+    public void setSourceUid(String value) { sourceUid = value; }
+    public String getSource() { return source; }
+    public void setSource(String value) { source = value; }
 
     /** eigene | downloader | portfolio. */
     @Column(name = "group_name", nullable = false, length = 32)

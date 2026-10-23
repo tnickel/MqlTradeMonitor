@@ -53,9 +53,19 @@ public class KiScannerApiControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private de.trademonitor.service.KiScannerService service;
+
     @BeforeEach
-    public void clearSignalSnapshot() {
+    public void clearSignalSnapshot() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "openRun", null);
+        jdbc.update("UPDATE ki_scanner_protocol_state SET v2_active=FALSE WHERE id=1");
         kiSignalRepository.deleteAllInBatch();
+        keyValid();
+        mockMvc.perform(post("/api/kiscanner/register").header("X-User-Key", API_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"client\":\"MqlKiScanner\",\"protocolVersion\":1}"))
+                .andExpect(status().isOk());
     }
 
     private void keyValid() {
@@ -80,7 +90,7 @@ public class KiScannerApiControllerTest {
         mockMvc.perform(get("/api/kiscanner/ping").header("X-User-Key", API_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
-                .andExpect(jsonPath("$.kiscannerApi").value("v1"));
+                .andExpect(jsonPath("$.kiscannerApi").value(2));
     }
 
     @Test
@@ -98,7 +108,7 @@ public class KiScannerApiControllerTest {
         keyValid();
         mockMvc.perform(post("/api/kiscanner/register").header("X-User-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"client\":\"MqlKiScanner\",\"protocolVersion\":2}"))
+                        .content("{\"client\":\"MqlKiScanner\",\"protocolVersion\":99}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
     }
@@ -279,7 +289,7 @@ public class KiScannerApiControllerTest {
                                 "maxDrawdownEquityPct":6,"ertragMonatGeomPct":5.99994,
                                 "retddMonat":0.9999899999999999,"cagrJahrPct":72.123456,
                                 "retddJahr":12.020576,"retddBasis":"gemessener_max_equity_drawdown_inkl_floating",
-                                "drawdownLimitPct":20,"minReturnMonthlyPct":7,"minRetddMonthly":1}]}
+                                "drawdownLimitPct":20,"minReturnMonthlyPct":7,"minRetddMonthly":1,"minCalmarJahr":13}]}
                                 """))
                 .andExpect(status().isOk());
         KiSignalEntity stored = kiSignalRepository.findBySignalId(900009L).orElseThrow();
@@ -292,6 +302,7 @@ public class KiScannerApiControllerTest {
         assertEquals(20.0, stored.getDrawdownLimitPct());
         assertEquals(7.0, stored.getMinReturnMonthlyPct());
         assertEquals(1.0, stored.getMinRetddMonthly());
+        assertEquals(13.0, stored.getMinCalmarJahr());
         assertEquals("gemessener_max_equity_drawdown_inkl_floating", stored.getRetddBasis());
         assertEquals("🟡", stored.getAmpel());
 
@@ -299,11 +310,11 @@ public class KiScannerApiControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertTrue(html.contains("data-dd=\"6.0\""));
         assertTrue(html.contains("data-ertrag=\"5.99994\""));
-        assertTrue(html.contains("data-retdd=\"0.9999899999999999\""));
+        assertTrue(html.contains("data-retdd=\"12.020576\""));
         assertTrue(html.contains("equity-dd-cell dd-green"));
         // Display rounding must not turn a ratio below the raw threshold green.
         assertTrue(html.contains("font-weight:700;color:#eab308"));
-        assertTrue(html.contains("ki-details-900009"));
+        assertTrue(html.contains("ki-details-" + stored.getId()));
         assertTrue(html.contains("Gewinn %/Monat"));
         assertTrue(html.contains("data-dd-limit=\"20.0\""));
         assertTrue(html.contains("data-min-return=\"7.0\""));

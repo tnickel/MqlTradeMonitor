@@ -92,7 +92,8 @@ public class KiScannerApiController {
                 "status", "ok",
                 "service", "MqlTradeMonitor",
                 "kiscannerApi", KiScannerService.API_VERSION,
-                "protocolVersion", KiScannerService.PROTOCOL_VERSION));
+                "protocolVersion", KiScannerService.PROTOCOL_VERSION,
+                "supportedProtocolVersions", java.util.List.of(1, 2)));
     }
 
     /** Step 1: handshake. Validates the special client identification. */
@@ -110,12 +111,12 @@ public class KiScannerApiController {
                     + "für den MqlKiScanner, nicht der EA-Register-Weg).");
         }
         if (request.getProtocolVersion() == null
-                || request.getProtocolVersion() != KiScannerService.PROTOCOL_VERSION) {
+                || !java.util.List.of(1, 2).contains(request.getProtocolVersion())) {
             return badRequest("Protokollversion " + request.getProtocolVersion()
                     + " nicht unterstützt — Server spricht Version "
                     + KiScannerService.PROTOCOL_VERSION + ".");
         }
-        return ResponseEntity.ok(kiScannerService.register(request));
+        return ResponseEntity.ok(kiScannerService.register(request, userKey.trim()));
     }
 
     /** Step 2: full signal-table snapshot (mirror semantics). */
@@ -134,7 +135,7 @@ public class KiScannerApiController {
             return badRequest("Zu viele Signale in einem Snapshot (Limit 2000)");
         }
         return ResponseEntity.ok(
-                kiScannerService.replaceSignals(request.getSignals()));
+                kiScannerService.replaceSignals(request, userKey.trim()));
     }
 
     /** Step 3: one document per call (PDF, base64). */
@@ -147,7 +148,7 @@ public class KiScannerApiController {
             return unauthorized(httpRequest);
         }
         try {
-            return ResponseEntity.ok(kiScannerService.storeDocument(request));
+            return ResponseEntity.ok(kiScannerService.storeDocument(request, userKey.trim()));
         } catch (KiScannerService.KiScannerProtocolException e) {
             return badRequest(e.getMessage());
         } catch (Exception e) {
@@ -167,7 +168,7 @@ public class KiScannerApiController {
         if (!isAuthorized(userKey)) {
             return unauthorized(httpRequest);
         }
-        return ResponseEntity.ok(kiScannerService.complete(request));
+        return ResponseEntity.ok(kiScannerService.complete(request, userKey.trim()));
     }
 
     /** Step 4b: error path — mark the run as aborted. */
@@ -180,7 +181,12 @@ public class KiScannerApiController {
             return unauthorized(httpRequest);
         }
         return ResponseEntity.ok(
-                kiScannerService.abort(request != null ? request.getReason() : ""));
+                kiScannerService.abort(request, userKey.trim()));
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(KiScannerService.KiScannerProtocolException.class)
+    public ResponseEntity<?> protocolError(KiScannerService.KiScannerProtocolException error) {
+        return badRequest(error.getMessage());
     }
 
     // --- Browser endpoints (session-authenticated via Spring Security) -----

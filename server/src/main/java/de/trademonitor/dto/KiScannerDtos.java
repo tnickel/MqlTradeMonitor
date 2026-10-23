@@ -40,6 +40,8 @@ public final class KiScannerDtos {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SignalRow {
         public Long signalId;
+        public String sourceUid;
+        public String source;
         public String name;
         public String platform;
         public String url;
@@ -57,6 +59,10 @@ public final class KiScannerDtos {
         public Double drawdownLimitPct;
         public Double minReturnMonthlyPct;
         public Double minRetddMonthly;
+        public Double minCalmarJahr;
+        public Double retddJahrVorbehalt;
+        public String retddVorbehaltGrund;
+        public String equityMeasurementStatus;
         public Double ertragMonatPct;
         // Zinseszins-wahre Ertrags-/Effizienzkennzahlen (Scanner 01.10.):
         // Forensik = linearer Ø auf eigener Kapitalbasis; Geom = geometrisches
@@ -93,6 +99,7 @@ public final class KiScannerDtos {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SignalsRequest {
+        public Long runId;
         private List<SignalRow> signals;
 
         public List<SignalRow> getSignals() { return signals; }
@@ -101,6 +108,9 @@ public final class KiScannerDtos {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DocumentRequest {
+        public Long runId;
+        public String sourceUid;
+        public String source;
         private String docKey;
         private Long signalId;
         private String group;
@@ -149,6 +159,8 @@ public final class KiScannerDtos {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SyncStatsRequest {
+        public Long runId;
+        public List<String> documentKeys;
         private Integer signals;
         private Integer documents;
         private Integer uploaded;
@@ -173,6 +185,7 @@ public final class KiScannerDtos {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AbortRequest {
+        public Long runId;
         private String reason;
 
         public String getReason() { return reason; }
