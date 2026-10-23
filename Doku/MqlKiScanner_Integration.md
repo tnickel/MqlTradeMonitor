@@ -79,6 +79,25 @@ alte Software ist nach neuen Schreibvorgängen kein zulässiger Daten-Rollback.
 Vor dem produktiven Update sind deshalb WAR und geschlossene H2 gemeinsam zu
 sichern; Sicherungen enthalten private Laufzeitdaten und gehören nicht ins Repo.
 
+## Registrierungspflicht für Abschluss und Abbruch (24.10.2026)
+
+`POST /api/kiscanner/complete` und `POST /api/kiscanner/abort` benötigen in
+beiden Protokollversionen einen aktuell offenen, zuvor per `register`
+angelegten Lauf. Ohne diesen Lauf antwortet der Server mit HTTP 400 und
+`{"status":"error","message":"Zuerst register aufrufen"}`. Das gilt auch
+für v1 und für einen erneuten Abschluss oder Abbruch nach einem bereits
+beendeten Lauf; diese Aufrufe sind kein erfolgreicher Leerlauf mit
+`runId:null`. Ein gültiger API-Key allein ersetzt den Handshake nicht.
+V2 verlangt zusätzlich die zum registrierten Lauf und API-Key passende
+`runId`; fremde oder fehlende Laufkennungen werden ebenfalls abgewiesen.
+
+Gezielte Offline-Nachprüfung am 24.10.2026 mit lokalem JDK 21.0.8:
+`mvn -o -Dtest=KiScannerApiControllerTest,KiScannerV2Test,KiScannerMigrationTest test`
+→ 29 Tests grün (16 Controller-, 11 v2- und 2 Migrationsfälle), keine Skips.
+Die Tests verwenden die H2-In-Memory-Datenbank des Testprofils; es fand keine
+produktive Migration statt. Der Controller-Test prüft ausdrücklich beide
+Abschlussendpunkte ohne offenen Registerlauf.
+
 ## Abnahme
 
 JDK 21, Java-17-Buildziel: `mvn -q test` → 73 Tests, 0 Fehler, 0 übersprungen

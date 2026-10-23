@@ -262,7 +262,6 @@ public class KiScannerService {
 
     public synchronized Map<String, Object> complete(KiScannerDtos.SyncStatsRequest stats, String key) {
         validateRun(stats == null ? null : stats.runId, key);
-        if (openRun == null) return Map.of("status", "ok");
         if (openVersion == 2) {
             if (stagedSignals == null || stats == null || stats.documentKeys == null)
                 throw new KiScannerProtocolException("Snapshot oder documentKeys fehlen");
@@ -321,7 +320,6 @@ public class KiScannerService {
 
     public synchronized Map<String, Object> abort(KiScannerDtos.AbortRequest request, String key) {
         validateRun(request == null ? null : request.runId, key);
-        if (openRun == null) return Map.of("status", "ok");
         Long id = openRun.getId(); finishRun("aborted", request == null ? null : request.getReason()); clearRun();
         return Map.of("status", "ok", "runId", id);
     }

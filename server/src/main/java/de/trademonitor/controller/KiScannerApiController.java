@@ -29,6 +29,8 @@ import de.trademonitor.service.KiScannerService;
  *   3. POST /api/kiscanner/documents  one PDF per call (base64)
  *   4. POST /api/kiscanner/complete   closes the run, connection ends
  *      POST /api/kiscanner/abort      error path
+ * Both complete and abort require an active registered run, including v1;
+ * without a run they return HTTP 400 rather than an idempotent no-op.
  *
  * Sonderbehandlung: every call must carry a valid server API key in the
  * X-User-Key header (any user account's key, like the EAs) AND the

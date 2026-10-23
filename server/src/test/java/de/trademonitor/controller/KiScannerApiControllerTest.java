@@ -78,6 +78,17 @@ public class KiScannerApiControllerTest {
     }
 
     @Test
+    public void completeAndAbortRequireAnActiveRegisteredRunForEveryProtocol() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "openRun", null);
+        for (String action : new String[]{"complete", "abort"}) {
+            mockMvc.perform(post("/api/kiscanner/" + action).header("X-User-Key", API_KEY)
+                    .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").exists());
+        }
+    }
+
+    @Test
     public void pingWithoutKeyIsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/kiscanner/ping"))
                 .andExpect(status().isUnauthorized())
